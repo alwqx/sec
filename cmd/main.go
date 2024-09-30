@@ -51,6 +51,15 @@ func SearchHandler(cmd *cobra.Command, args []string) error {
 		return errors.New("args of search command should be one")
 	}
 
-	provider.Search(args[0])
+	res := provider.Search(args[0])
+	num := len(res)
+	for i := range num {
+		item := res[i]
+		fmt.Printf("%-8s\t%s", item.ExCode, item.Name)
+		if i != num-1 {
+			fmt.Println()
+		}
+	}
+
 	return nil
 }
