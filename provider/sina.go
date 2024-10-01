@@ -85,8 +85,6 @@ func parseSinaSearchResults(body string) []types.SinaSearchResult {
 		res = append(res, ssr)
 	}
 
-	fmt.Println(res)
-
 	return res
 }
 
