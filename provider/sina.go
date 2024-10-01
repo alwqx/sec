@@ -50,7 +50,6 @@ func Search(key string) []types.SinaSearchResult {
 func parseSinaSearchResults(body string) []types.SinaSearchResult {
 	body1 := strings.ReplaceAll(body, `var suggestvalue="`, "")
 	body2 := strings.ReplaceAll(body1, `";`, "")
-
 	lines := strings.Split(body2, ";")
 
 	res := make([]types.SinaSearchResult, 0, len(lines))
@@ -65,7 +64,11 @@ func parseSinaSearchResults(body string) []types.SinaSearchResult {
 
 		switch ss[1] {
 		case "11", "12", "15":
-			ssr.ExChange = ss[3][:2]
+			if len(ss[3]) >= 2 {
+				ssr.ExChange = ss[3][:2]
+			} else {
+				slog.Warn("invalid code %s of %s", ss[0], ss[3])
+			}
 			ssr.ExCode = strings.ToUpper(ss[3])
 			ssr.SecurityType = types.SecurityTypeStock
 		case "21", "22", "23", "24", "25", "26":
