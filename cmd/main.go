@@ -38,10 +38,10 @@ func NewCLI() *cobra.Command {
 	}
 
 	infoCmd := &cobra.Command{
-		Use:   "get infomation of SECURITY",
+		Use:   "info infomation of SECURITY",
 		Short: "Print basic information of a secutiry/stock",
 		Args:  cobra.ExactArgs(1),
-		RunE:  SearchHandler,
+		RunE:  InfoHandler,
 	}
 
 	rootCmd.AddCommand(searchCmd, infoCmd)
@@ -85,13 +85,14 @@ func InfoHandler(cmd *cobra.Command, args []string) error {
 
 	// 2. choose the first item
 	sec := secs[0]
-	for i := range num {
-		item := res[i]
-		fmt.Printf("%-8s\t%s", item.ExCode, item.Name)
-		if i != num-1 {
-			fmt.Println()
-		}
-	}
+	fmt.Println(sec)
+	// for i := range num {
+	// 	item := res[i]
+	// 	fmt.Printf("%-8s\t%s", item.ExCode, item.Name)
+	// 	if i != num-1 {
+	// 		fmt.Println()
+	// 	}
+	// }
 
 	return nil
 }
