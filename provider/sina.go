@@ -6,9 +6,11 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/alwqx/sec/types"
@@ -20,8 +22,7 @@ const (
 	SinaReferer = "https://finance.sina.com.cn"
 )
 
-type SinaProvider struct{}
-
+// Search 根据关键字查询证券信息
 func Search(key string) []types.BasicSecurity {
 	reqUrl := fmt.Sprintf("https://suggest3.sinajs.cn/suggest/type=11,12,15,21,22,23,24,25,26,31,33,41&key=%s", key)
 	headers := make(http.Header)
@@ -45,12 +46,12 @@ func Search(key string) []types.BasicSecurity {
 		return nil
 	}
 
-	return parseBasicSecuritys(string(resBytes))
+	return parseBasicSecurity(string(resBytes))
 }
 
-// parseBasicSecuritys 解析 sina 搜索结果字符串
+// parseBasicSecurity 解析 sina 搜索结果字符串
 // var suggestvalue="龙芯中科,11,688047,sh688047,龙芯中科,,龙芯中科,99,1,,;绿叶制药,31,02186,02186,绿叶制药,,绿叶制药,99,1,ESG,";
-func parseBasicSecuritys(body string) []types.BasicSecurity {
+func parseBasicSecurity(body string) []types.BasicSecurity {
 	body1 := strings.ReplaceAll(body, `var suggestvalue="`, "")
 	body2 := strings.ReplaceAll(body1, `";`, "")
 	lines := strings.Split(body2, ";")
@@ -103,26 +104,69 @@ func formatUSCode(in string) (out string) {
 }
 
 // Profile 获取证券的基本信息
-func Profile(key string) []types.SinaSecurityProfile {
-	// infoUrl = fmt.Sprintf("https://hq.sinajs.cn/list=%s,%s_i", key, key)
+// exCode SH600036
+func Profile(exCode string) *types.SinaProfile {
+	var (
+		wg          sync.WaitGroup
+		corp        *types.BasicCorp
+		quote       *types.SinaQuote
+		partProfile *sinaPartProfile
 
-	corp, err := CorpInfo(key)
-	if err != nil {
-		slog.Error(fmt.Sprintf("corp info error: %v", err))
+		err1, err2 error
+	)
+
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		corp, err1 = CorpInfo(exCode)
+	}()
+	go func() {
+		defer wg.Done()
+		quote, partProfile, err2 = Info(exCode)
+	}()
+	wg.Wait()
+
+	if err1 != nil {
+		slog.Error(fmt.Sprintf("corp info error: %v", err1))
 	}
-	fmt.Println(*corp)
-	return nil
+	if err2 != nil {
+		slog.Error(fmt.Sprintf("info error: %v", err2))
+	}
+
+	profile := &types.SinaProfile{
+		// Code:            quota.,
+		ExCode:          corp.ExCode,
+		Name:            corp.Name,
+		ListingPrice:    corp.Price,
+		ListingDate:     corp.Date,
+		WebSite:         corp.WebSite,
+		RegisterAddress: corp.WebSite,
+		BusinessAddress: corp.BusinessAddress,
+		MainBusiness:    corp.MainBussiness,
+		Current:         quote.Current,
+		Category:        partProfile.Categray,
+		MarketCap:       quote.Current * float64(partProfile.Cap) * 10000.0,
+		TradedMarketCap: quote.Current * float64(partProfile.TradeCap) * 10000.0,
+	}
+
+	if partProfile.VPS != 0 {
+		profile.PB = corp.Price / partProfile.VPS
+	}
+	if partProfile.Profit > 0 {
+		profile.PeTTM = quote.Current * float64(partProfile.Cap) / partProfile.Profit / 10000.0
+	}
+
+	return profile
 }
 
 // CorpInfo 请求公司信息
-func CorpInfo(key string) (*types.BasicCorp, error) {
-	coraUrl := fmt.Sprintf("https://vip.stock.finance.sina.com.cn/corp/go.php/vCI_CorpInfo/stockid/%s.phtml", key)
+func CorpInfo(exCode string) (*types.BasicCorp, error) {
+	coraUrl := fmt.Sprintf("https://vip.stock.finance.sina.com.cn/corp/go.php/vCI_CorpInfo/stockid/%s.phtml", exCode)
 	headers := make(http.Header)
 	headers.Set("Referer", SinaReferer)
 
 	resp, err := makeRequest(http.MethodGet, coraUrl, headers, nil)
 	if err != nil {
-		slog.Error("new request %s error: %v", coraUrl, err)
 		return nil, err
 	}
 
@@ -137,6 +181,123 @@ func CorpInfo(key string) (*types.BasicCorp, error) {
 	}
 
 	return parseCorpInfo(body)
+}
+
+// Info 请求公司信息
+// var hq_str_sh688047="龙芯中科,106.000,99.680,119.620,119.620,104.500,119.620,0.000,8256723,938310086.000,25600,119.620,7255,119.610,3033,119.600,1767,119.570,6300,119.550,0,0.000,0,0.000,0,0.000,0,0.000,0,0.000,2024-09-30,15:00:01,00,";
+// var hq_str_sh688047_i="A,lxzk,-0.8200,-1.1566,-0.5900,8.2671,94.6804,40100,27964.4729,27964.4729,0,CNY,-3.2944,-4.6378,60.0600,1,-6.9400,2.1959,-2.3813,133.21,67.89,0.2,龙芯中科,K|D|0|40100|4100,119.62|79.74,20240630|-119064971.81,700.7400|90.1790,|,,1/1,EQA,,0.00,110.610|119.620|99.680,半导体,龙芯中科,7,417392977.82";
+func Info(exCode string) (*types.SinaQuote, *sinaPartProfile, error) {
+	lowerKey := strings.ToLower(exCode)
+	reqUrl := fmt.Sprintf("https://hq.sinajs.cn/list=%s,%s_i", lowerKey, lowerKey)
+	headers := make(http.Header)
+	headers.Set("Referer", SinaReferer)
+
+	resp, err := makeRequest(http.MethodGet, reqUrl, headers, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	defer resp.Body.Close()
+	err = adjustRespBodyByEncode(resp)
+	if err != nil {
+		return nil, nil, err
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	regstr := regexp.MustCompile(`"(.*)"`)
+	lines := regstr.FindAll([]byte(body), -1)
+	if len(lines) != 2 {
+		slog.Error("request %s get invalid body %s", reqUrl, body)
+	}
+
+	quote := parseSinaInfoQuote(string(lines[0]))
+	partProfile, err := parseSinaInfoPartProfile(string(lines[1]))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return quote, partProfile, nil
+}
+
+// 原始行：var hq_str_sh688047="龙芯中科,106.000,99.680,119.620,119.620,104.500,119.620,0.000,8256723,938310086.000,25600,119.620,7255,119.610,3033,119.600,1767,119.570,6300,119.550,0,0.000,0,0.000,0,0.000,0,0.000,0,0.000,2024-09-30,15:00:01,00,";
+// 经过正则抽取后的内容：龙芯中科,106.000,99.680,119.620,119.620,104.500,119.620,0.000,8256723,938310086.000,25600,119.620,7255,119.610,3033,119.600,1767,119.570,6300,119.550,0,0.000,0,0.000,0,0.000,0,0.000,0,0.000,2024-09-30,15:00:01,00,
+func parseSinaInfoQuote(quote string) *types.SinaQuote {
+	items := strings.Split(quote, ",")
+	res := new(types.SinaQuote)
+	res.Name = items[0]
+
+	var err error
+	res.Current, err = strconv.ParseFloat(items[3], 64)
+	if err != nil {
+		slog.Error(err.Error())
+	}
+	res.Open, err = strconv.ParseFloat(items[1], 64)
+	if err != nil {
+		slog.Error(err.Error())
+	}
+	res.YClose, err = strconv.ParseFloat(items[2], 64)
+	if err != nil {
+		slog.Error(err.Error())
+	}
+	res.High, err = strconv.ParseFloat(items[4], 64)
+	if err != nil {
+		slog.Error(err.Error())
+	}
+	res.Low, err = strconv.ParseFloat(items[5], 64)
+	if err != nil {
+		slog.Error(err.Error())
+	}
+	res.Volume, err = strconv.ParseFloat(items[9], 64)
+	if err != nil {
+		slog.Error(err.Error())
+	}
+	res.TurnOver, err = strconv.ParseInt(items[8], 10, 64)
+	if err != nil {
+		slog.Error(err.Error())
+	}
+	res.TradeDate = items[30]
+	res.Time = items[31]
+
+	return res
+}
+
+type sinaPartProfile struct {
+	VPS      float64 // 每股净资产
+	Cap      int64   // 总股本
+	TradeCap float64 // 流通股本
+	Profit   float64 // 净利润
+	Categray string  // 行业分类
+}
+
+func parseSinaInfoPartProfile(line string) (*sinaPartProfile, error) {
+	items := strings.Split(line, ",")
+	var (
+		err error
+	)
+
+	partProfile := sinaPartProfile{}
+	partProfile.VPS, err = strconv.ParseFloat(items[5], 64)
+	if err != nil {
+		return nil, err
+	}
+	partProfile.Cap, err = strconv.ParseInt(items[7], 10, 64)
+	if err != nil {
+		return nil, err
+	}
+	partProfile.TradeCap, err = strconv.ParseFloat(items[8], 64)
+	if err != nil {
+		return nil, err
+	}
+	partProfile.Profit, err = strconv.ParseFloat(items[18], 64)
+	if err != nil {
+		return nil, err
+	}
+	partProfile.Categray = strings.TrimSpace(items[34])
+
+	return &partProfile, nil
 }
 
 // adjustRespBodyByEncode 根据 header 中的编码调整 response.Body 的内容，避免乱码
@@ -200,6 +361,8 @@ func parseCorpInfo(body []byte) (*types.BasicCorp, error) {
 	res := new(types.BasicCorp)
 	ss := doc.Find("#comInfo1 td")
 	ss.Each(func(i int, s *goquery.Selection) {
+		// for debug/dev:
+		// fmt.Printf("Review %d: %s\n", i, s.Text())
 		// For each item found, get the title
 		switch i {
 		case 1:
@@ -218,14 +381,15 @@ func parseCorpInfo(body []byte) (*types.BasicCorp, error) {
 			}
 		case 35:
 			res.WebSite = strings.TrimSpace(s.Text())
+		case 41:
+			res.HistoryName = strings.TrimSpace(s.Text())
 		case 43:
 			res.RegisterAddress = strings.TrimSpace(s.Text())
 		case 45:
-			res.WorkAddress = strings.TrimSpace(s.Text())
+			res.BusinessAddress = strings.TrimSpace(s.Text())
 		case 49:
 			res.MainBussiness = strings.TrimSpace(s.Text())
 		}
-		// fmt.Printf("Review %d: %s\n", i, s.Text())
 	})
 
 	return res, nil
