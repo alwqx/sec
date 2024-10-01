@@ -20,7 +20,14 @@ func Search(key string) []types.SinaSearchResult {
 		err  error
 	)
 
-	resp, err = http.DefaultClient.Get(reqUrl)
+	req, err := http.NewRequest(http.MethodGet, reqUrl, nil)
+	if err != nil {
+		slog.Error("new request %s error: %v", reqUrl, err)
+		return nil
+	}
+	req.Header.Add("Referer", "https://finance.sina.com.cn")
+
+	resp, err = http.DefaultClient.Do(req)
 	if err != nil {
 		slog.Error("[Search] request %s error: %v", reqUrl, err)
 		return nil
