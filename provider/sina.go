@@ -1,12 +1,15 @@
 package provider
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 
+	"github.com/PuerkitoBio/goquery"
 	"github.com/alwqx/sec/types"
 	"golang.org/x/text/encoding/simplifiedchinese"
 )
@@ -104,4 +107,86 @@ func formatUSCode(in string) (out string) {
 		out = "$" + out
 	}
 	return
+}
+
+// Profile 获取证券的基本信息
+func Profile(key string) []types.SinaSecurityProfile {
+	coraUrl := fmt.Sprintf("https://vip.stock.finance.sina.com.cn/corp/go.php/vCI_CorpInfo/stockid/%s.phtml", key)
+	// infoUrl = fmt.Sprintf("https://hq.sinajs.cn/list=%s,%s_i", key, key)
+
+	var (
+		resp *http.Response
+		err  error
+	)
+
+	req, err := http.NewRequest(http.MethodGet, coraUrl, nil)
+	if err != nil {
+		slog.Error("new request %s error: %v", coraUrl, err)
+		return nil
+	}
+	req.Header.Add("Referer", "https://finance.sina.com.cn")
+
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		slog.Error("[Search] request %s error: %v", coraUrl, err)
+		return nil
+	}
+	defer resp.Body.Close()
+
+	var resBytes []byte
+	resBytes, err = io.ReadAll(resp.Body)
+	if err != nil {
+		slog.Error("[Search] request %s error: %v", coraUrl, err)
+		return nil
+	}
+
+	encodHeader := strings.ToLower(resp.Header.Get("Content-Type"))
+	if strings.Contains(encodHeader, "charset=gbk") {
+		resBytes, err = simplifiedchinese.GBK.NewDecoder().Bytes(resBytes)
+		// simplifiedchinese.GB18030.NewDecoder().Bytes(resBytes)
+		if err != nil {
+			slog.Error("[Search] request %s error: %v", coraUrl, err)
+			return nil
+		}
+	}
+	newBody := io.NopCloser(bytes.NewBuffer(resBytes))
+
+	doc, err := goquery.NewDocumentFromReader(newBody)
+	if err != nil {
+		slog.Error("[Search] request %s error: %v", coraUrl, err)
+		return nil
+	}
+
+	res := types.SinaSecurityProfile{}
+	ss := doc.Find("#comInfo1 td")
+	ss.Each(func(i int, s *goquery.Selection) {
+		// For each item found, get the title
+		switch i {
+		case 1:
+			res.Name = s.Text()
+		case 3:
+			res.EnName = s.Text()
+		case 4:
+			res.ExChange = s.Text()
+		case 7:
+			res.Date = strings.TrimSpace(s.Text())
+		case 9:
+			str := strings.TrimSpace(s.Text())
+			pf, err := strconv.ParseFloat(str, 32)
+			if err == nil {
+				res.Price = pf
+			}
+		case 35:
+			res.WebSite = strings.TrimSpace(s.Text())
+		case 43:
+			res.RegisterAddress = strings.TrimSpace(s.Text())
+		case 45:
+			res.WorkAddress = strings.TrimSpace(s.Text())
+		case 49:
+			res.MainBussiness = strings.TrimSpace(s.Text())
+		}
+		// fmt.Printf("Review %d: %s\n", i, s.Text())
+	})
+
+	return nil
 }

@@ -21,3 +21,7 @@ func TestParseSinaSearchResults(t *testing.T) {
 	require.Equal(t, "hk", res[1].ExChange)
 	require.Equal(t, types.SecurityTypeStock, res[1].SecurityType)
 }
+
+func TestProfile(t *testing.T) {
+	Profile("688047")
+}
