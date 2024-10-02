@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/alwqx/sec/types"
@@ -29,6 +30,7 @@ func TestPrintQuote(t *testing.T) {
 		Volume:    938310086.000,
 		TurnOver:  8256723,
 	}
+	fmt.Println("上涨")
 	printQuote(quote)
 
 	// 跌
@@ -44,6 +46,7 @@ func TestPrintQuote(t *testing.T) {
 		Volume:    938310086.000,
 		TurnOver:  8256723,
 	}
+	fmt.Println("下跌")
 	printQuote(quote)
 
 	// 平
@@ -59,5 +62,6 @@ func TestPrintQuote(t *testing.T) {
 		Volume:    938310086.000,
 		TurnOver:  8256723,
 	}
+	fmt.Println("不变")
 	printQuote(quote)
 }
