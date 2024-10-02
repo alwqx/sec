@@ -266,7 +266,7 @@ func parseSinaInfoQuote(quote string) *types.SinaQuote {
 
 type sinaPartProfile struct {
 	VPS      float64 // 每股净资产
-	Cap      int64   // 总股本
+	Cap      float64 // 总股本
 	TradeCap float64 // 流通股本
 	Profit   float64 // 净利润
 	Categray string  // 行业分类
@@ -283,7 +283,7 @@ func parseSinaInfoPartProfile(line string) (*sinaPartProfile, error) {
 	if err != nil {
 		return nil, err
 	}
-	partProfile.Cap, err = strconv.ParseInt(items[7], 10, 64)
+	partProfile.Cap, err = strconv.ParseFloat(items[7], 64)
 	if err != nil {
 		return nil, err
 	}
