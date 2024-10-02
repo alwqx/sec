@@ -12,7 +12,7 @@ const (
 	ExChangeBse    = "bse"    // 北交所
 	ExChangeHKex   = "hk"     // 香港交所
 	ExChangeNyse   = "ny"     // 纽约交所
-	ExChangeNasdaq = "dasdap" // 纳斯达克
+	ExChangeNasdaq = "nasdaq" // 纳斯达克
 )
 
 type BasicSecurity struct {
