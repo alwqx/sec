@@ -65,3 +65,22 @@ func TestPrintQuote(t *testing.T) {
 	fmt.Println("不变")
 	printQuote(quote)
 }
+
+func TestPrintSecs(t *testing.T) {
+	// 1. empty
+	printSecs(nil)
+	printSecs([]types.BasicSecurity{})
+
+	// 2. common
+	secs := []types.BasicSecurity{
+		{
+			Name:   "龙芯中科",
+			ExCode: "SH688047",
+		},
+		{
+			Name:   "立讯精密",
+			ExCode: "SZ002475",
+		},
+	}
+	printSecs(secs)
+}
