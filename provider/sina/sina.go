@@ -394,3 +394,35 @@ func parseCorpInfo(body []byte) (*types.BasicCorp, error) {
 
 	return res, nil
 }
+
+func Quota(exCode string) (*types.SinaQuote, error) {
+	lowerKey := strings.ToLower(exCode)
+	reqUrl := fmt.Sprintf("https://hq.sinajs.cn/list=%s", lowerKey)
+	headers := make(http.Header)
+	headers.Set("Referer", SinaReferer)
+
+	resp, err := makeRequest(http.MethodGet, reqUrl, headers, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+	err = adjustRespBodyByEncode(resp)
+	if err != nil {
+		return nil, err
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	regstr := regexp.MustCompile(`"(.*)"`)
+	lines := regstr.FindAll([]byte(body), -1)
+	if len(lines) != 1 {
+		slog.Error("request %s get invalid body %s", reqUrl, body)
+	}
+
+	quote := parseSinaInfoQuote(string(lines[0]))
+
+	return quote, nil
+}

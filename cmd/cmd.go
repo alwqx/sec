@@ -45,7 +45,14 @@ func NewCLI() *cobra.Command {
 		RunE:  InfoHandler,
 	}
 
-	rootCmd.AddCommand(searchCmd, infoCmd)
+	quotaCmd := &cobra.Command{
+		Use:   "quota infomation of SECURITY",
+		Short: "Print quota information of a secutiry/stock",
+		Args:  cobra.ExactArgs(1),
+		RunE:  QuotaHandler,
+	}
+
+	rootCmd.AddCommand(searchCmd, infoCmd, quotaCmd)
 
 	return rootCmd
 }
@@ -99,4 +106,27 @@ func humanCap(cap float64) (res string) {
 		res = fmt.Sprintf("%-.2f万", cap/10_000.0)
 	}
 	return
+}
+
+func QuotaHandler(cmd *cobra.Command, args []string) error {
+	if len(args) != 1 {
+		return errors.New("args of command should be one")
+	}
+
+	// 1. search security
+	secs := sina.Search(args[0])
+	if len(secs) == 0 {
+		slog.Warn(fmt.Sprintf("no result of %s", args[0]))
+		return nil
+	}
+
+	// 2. choose the first item
+	sec := secs[0]
+	quota, err := sina.Quota(sec.ExCode)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(*quota)
+	return nil
 }
