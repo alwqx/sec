@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/alwqx/sec/provider"
+	"github.com/alwqx/sec/provider/sina"
 	"github.com/alwqx/sec/version"
 	"github.com/spf13/cobra"
 )
@@ -59,7 +59,7 @@ func SearchHandler(cmd *cobra.Command, args []string) error {
 		return errors.New("args of command should be one")
 	}
 
-	res := provider.Search(args[0])
+	res := sina.Search(args[0])
 	for _, item := range res {
 		fmt.Printf("%-8s\t%s\n", item.ExCode, item.Name)
 	}
@@ -73,7 +73,7 @@ func InfoHandler(cmd *cobra.Command, args []string) error {
 	}
 
 	// 1. search security
-	secs := provider.Search(args[0])
+	secs := sina.Search(args[0])
 	if len(secs) == 0 {
 		slog.Warn(fmt.Sprintf("no result of %s", args[0]))
 		return nil
@@ -81,7 +81,7 @@ func InfoHandler(cmd *cobra.Command, args []string) error {
 
 	// 2. choose the first item
 	sec := secs[0]
-	profile := provider.Profile(sec.ExCode)
+	profile := sina.Profile(sec.ExCode)
 	fmt.Printf("基本信息\n证券代码\t%s\n简称历史\t%s\n公司名称\t%s\n上市日期\t%s\n发行价格\t%.2f\n行业分类\t%s\n主营业务\t%s\n办公地址\t%s\n公司网址\t%s\n当前价格\t%.2f\n市净率PB\t%.2f\n市盈率TTM\t%.2f\n总市值  \t%.2f\n流通市值\t%.2f\n",
 		sec.ExCode, profile.HistoryName, profile.Name, profile.ListingDate, profile.ListingPrice,
 		profile.Category, profile.MainBusiness, profile.BusinessAddress, profile.WebSite,
