@@ -22,13 +22,17 @@ const (
 	SinaReferer = "https://finance.sina.com.cn"
 )
 
+// defaultHttpHeaders 生成请求 sina 接口的默认 http.Header
+func defaultHttpHeaders() http.Header {
+	headers := make(http.Header)
+	headers.Add("Referer", SinaReferer)
+	return headers
+}
+
 // Search 根据关键字查询证券信息
 func Search(key string) []types.BasicSecurity {
 	reqUrl := fmt.Sprintf("https://suggest3.sinajs.cn/suggest/type=11,12,15,21,22,23,24,25,26,31,33,41&key=%s", key)
-	headers := make(http.Header)
-	headers.Add("Referer", "https://finance.sina.com.cn")
-
-	resp, err := makeRequest(http.MethodGet, reqUrl, headers, nil)
+	resp, err := makeRequest(http.MethodGet, reqUrl, defaultHttpHeaders(), nil)
 	if err != nil {
 		return nil
 	}
@@ -61,32 +65,46 @@ func parseBasicSecurity(body string) []types.BasicSecurity {
 		// 腾讯控股,31,00700,00700,腾讯控股,,腾讯控股,99,1,ESG;
 		// 1 5 7名称 2市场 3 4代码 8- 9在市 10-
 		ss := strings.Split(item, ",")
-		ssr := types.BasicSecurity{
-			Name: ss[0],
-			Code: ss[2],
+		if ss[8] != "1" {
+			continue
 		}
+
+		var (
+			name     string = ss[4]
+			exCode   string = strings.ToUpper(ss[3])
+			code     string = ss[2]
+			exChange string
+			secType  types.SecurityType
+		)
 
 		switch ss[1] {
 		case "11", "12", "15":
 			if len(ss[3]) >= 2 {
-				ssr.ExChange = ss[3][:2]
+				exChange = ss[3][:2]
 			} else {
 				slog.Warn("invalid code %s of %s", ss[0], ss[3])
 			}
-			ssr.ExCode = strings.ToUpper(ss[3])
-			ssr.SecurityType = types.SecurityTypeStock
+			secType = types.SecurityTypeStock
 		case "21", "22", "23", "24", "25", "26":
-			ssr.SecurityType = types.SecurityTypeFund
+			secType = types.SecurityTypeFund
 		case "31", "33":
-			ssr.SecurityType = types.SecurityTypeStock
-			ssr.ExChange = types.ExChangeHKex
-			ssr.ExCode = "HK" + ss[3]
+			secType = types.SecurityTypeStock
+			exChange = types.ExChangeHKex
+			exCode = "HK" + ss[3]
 		case "41":
-			ssr.SecurityType = types.SecurityTypeStock
-			ssr.ExChange = types.ExChangeNasdaq
-			ssr.ExCode = formatUSCode(ss[3])
+			secType = types.SecurityTypeStock
+			exChange = types.ExChangeNasdaq
+			exCode = formatUSCode(ss[3])
 		default:
 			slog.Warn("can not recganize code: %s %s", ss[0], ss[2])
+		}
+
+		ssr := types.BasicSecurity{
+			Name:         name,
+			Code:         code,
+			ExCode:       exCode,
+			ExChange:     exChange,
+			SecurityType: secType,
 		}
 
 		res = append(res, ssr)
@@ -100,7 +118,7 @@ func formatUSCode(in string) (out string) {
 	if !strings.Contains(in, "$") {
 		out = "$" + out
 	}
-	return
+	return strings.ToUpper(out)
 }
 
 // Profile 获取证券的基本信息
@@ -162,10 +180,7 @@ func Profile(exCode string) *types.SinaProfile {
 // CorpInfo 请求公司信息
 func CorpInfo(exCode string) (*types.BasicCorp, error) {
 	coraUrl := fmt.Sprintf("https://vip.stock.finance.sina.com.cn/corp/go.php/vCI_CorpInfo/stockid/%s.phtml", exCode)
-	headers := make(http.Header)
-	headers.Set("Referer", SinaReferer)
-
-	resp, err := makeRequest(http.MethodGet, coraUrl, headers, nil)
+	resp, err := makeRequest(http.MethodGet, coraUrl, defaultHttpHeaders(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -189,10 +204,7 @@ func CorpInfo(exCode string) (*types.BasicCorp, error) {
 func Info(exCode string) (*types.SinaQuote, *sinaPartProfile, error) {
 	lowerKey := strings.ToLower(exCode)
 	reqUrl := fmt.Sprintf("https://hq.sinajs.cn/list=%s,%s_i", lowerKey, lowerKey)
-	headers := make(http.Header)
-	headers.Set("Referer", SinaReferer)
-
-	resp, err := makeRequest(http.MethodGet, reqUrl, headers, nil)
+	resp, err := makeRequest(http.MethodGet, reqUrl, defaultHttpHeaders(), nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -400,10 +412,7 @@ func parseCorpInfo(body []byte) (*types.BasicCorp, error) {
 func Quote(exCode string) (*types.SinaQuote, error) {
 	lowerKey := strings.ToLower(exCode)
 	reqUrl := fmt.Sprintf("https://hq.sinajs.cn/list=%s", lowerKey)
-	headers := make(http.Header)
-	headers.Set("Referer", SinaReferer)
-
-	resp, err := makeRequest(http.MethodGet, reqUrl, headers, nil)
+	resp, err := makeRequest(http.MethodGet, reqUrl, defaultHttpHeaders(), nil)
 	if err != nil {
 		return nil, err
 	}

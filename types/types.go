@@ -16,10 +16,10 @@ const (
 )
 
 type BasicSecurity struct {
-	Name         string       // 股票名称
+	Name         string       // 证券名称
 	SecurityType SecurityType // 证券类型：股票 stock，基金 fund
-	Code         string       // 股票代码
-	ExCode       string       // 股票带交易所编码 SH600036
+	Code         string       // 证券代码
+	ExCode       string       // 证券带交易所编码 SH600036
 	ExChange     string       // 交易所
 }
 

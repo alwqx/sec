@@ -204,11 +204,11 @@ func printSecs(secs []types.BasicSecurity) {
 
 	data := make([][]string, 0, num)
 	for _, sec := range secs {
-		data = append(data, []string{sec.ExCode, sec.Name})
+		data = append(data, []string{sec.ExCode, sec.Name, string(sec.SecurityType), sec.ExChange})
 	}
 
 	table := tablewriter.NewWriter(os.Stdout)
-	headers := []string{"证券代码", "证券名称"}
+	headers := []string{"证券代码", "证券名称", "证券类型", "交易所"}
 	table.SetHeader(headers)
 	headerStyles := make([]tablewriter.Colors, 0, len(headers))
 	for range headers {
