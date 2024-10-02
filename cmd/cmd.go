@@ -82,10 +82,21 @@ func InfoHandler(cmd *cobra.Command, args []string) error {
 	// 2. choose the first item
 	sec := secs[0]
 	profile := sina.Profile(sec.ExCode)
-	fmt.Printf("基本信息\n证券代码\t%s\n简称历史\t%s\n公司名称\t%s\n上市日期\t%s\n发行价格\t%.2f\n行业分类\t%s\n主营业务\t%s\n办公地址\t%s\n公司网址\t%s\n当前价格\t%.2f\n市净率PB\t%.2f\n市盈率TTM\t%.2f\n总市值  \t%.2f\n流通市值\t%.2f\n",
+	fmt.Printf("基本信息\n证券代码\t%s\n简称历史\t%s\n公司名称\t%s\n上市日期\t%s\n发行价格\t%.2f\n行业分类\t%s\n主营业务\t%s\n办公地址\t%s\n公司网址\t%s\n当前价格\t%.2f\n市净率PB\t%.2f\n市盈率TTM\t%.2f\n总市值  \t%s\n流通市值\t%s\n",
 		sec.ExCode, profile.HistoryName, profile.Name, profile.ListingDate, profile.ListingPrice,
 		profile.Category, profile.MainBusiness, profile.BusinessAddress, profile.WebSite,
-		profile.Current, profile.PB, profile.PeTTM, profile.MarketCap, profile.TradedMarketCap)
+		profile.Current, profile.PB, profile.PeTTM, humanCap(profile.MarketCap), humanCap(profile.TradedMarketCap))
 
 	return nil
+}
+
+func humanCap(cap float64) (res string) {
+	if cap <= 0.0 {
+		res = " - "
+	} else if cap > 100_000_000.0 {
+		res = fmt.Sprintf("%-.2f亿", cap/100_000_000.0)
+	} else {
+		res = fmt.Sprintf("%-.2f万", cap/10_000.0)
+	}
+	return
 }
