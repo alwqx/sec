@@ -1,6 +1,7 @@
 package sina
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/alwqx/sec/types"
@@ -20,6 +21,11 @@ func TestParseBasicSecuritys(t *testing.T) {
 	require.Equal(t, "HK02186", res[1].ExCode)
 	require.Equal(t, "hk", res[1].ExChange)
 	require.Equal(t, types.SecurityTypeStock, res[1].SecurityType)
+
+	// 证券
+	body2 := `var suggestvalue="汇泉兴至未来一年持有混合C,21,014826,of014826,汇泉兴至未来一年持有混合C,,汇泉兴至未来一年持有混合C,99,1,,";`
+	res = parseBasicSecurity(body2)
+	fmt.Println(res)
 }
 
 func TestProfile(t *testing.T) {

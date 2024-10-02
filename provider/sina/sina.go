@@ -65,32 +65,46 @@ func parseBasicSecurity(body string) []types.BasicSecurity {
 		// 腾讯控股,31,00700,00700,腾讯控股,,腾讯控股,99,1,ESG;
 		// 1 5 7名称 2市场 3 4代码 8- 9在市 10-
 		ss := strings.Split(item, ",")
-		ssr := types.BasicSecurity{
-			Name: ss[0],
-			Code: ss[2],
+		if ss[8] != "1" {
+			continue
 		}
+
+		var (
+			name     string = ss[4]
+			exCode   string = strings.ToUpper(ss[3])
+			code     string = ss[2]
+			exChange string
+			secType  types.SecurityType
+		)
 
 		switch ss[1] {
 		case "11", "12", "15":
 			if len(ss[3]) >= 2 {
-				ssr.ExChange = ss[3][:2]
+				exChange = ss[3][:2]
 			} else {
 				slog.Warn("invalid code %s of %s", ss[0], ss[3])
 			}
-			ssr.ExCode = strings.ToUpper(ss[3])
-			ssr.SecurityType = types.SecurityTypeStock
+			secType = types.SecurityTypeStock
 		case "21", "22", "23", "24", "25", "26":
-			ssr.SecurityType = types.SecurityTypeFund
+			secType = types.SecurityTypeFund
 		case "31", "33":
-			ssr.SecurityType = types.SecurityTypeStock
-			ssr.ExChange = types.ExChangeHKex
-			ssr.ExCode = "HK" + ss[3]
+			secType = types.SecurityTypeStock
+			exChange = types.ExChangeHKex
+			exCode = "HK" + ss[3]
 		case "41":
-			ssr.SecurityType = types.SecurityTypeStock
-			ssr.ExChange = types.ExChangeNasdaq
-			ssr.ExCode = formatUSCode(ss[3])
+			secType = types.SecurityTypeStock
+			exChange = types.ExChangeNasdaq
+			exCode = formatUSCode(ss[3])
 		default:
 			slog.Warn("can not recganize code: %s %s", ss[0], ss[2])
+		}
+
+		ssr := types.BasicSecurity{
+			Name:         name,
+			Code:         code,
+			ExCode:       exCode,
+			ExChange:     exChange,
+			SecurityType: secType,
 		}
 
 		res = append(res, ssr)
