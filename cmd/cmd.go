@@ -4,9 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
+	"strconv"
 
 	"github.com/alwqx/sec/provider/sina"
 	"github.com/alwqx/sec/version"
+	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 )
 
@@ -122,11 +125,44 @@ func QuotaHandler(cmd *cobra.Command, args []string) error {
 
 	// 2. choose the first item
 	sec := secs[0]
-	quota, err := sina.Quota(sec.ExCode)
+	quote, err := sina.Quota(sec.ExCode)
 	if err != nil {
 		return err
 	}
+	fmt.Println(*quote)
 
-	fmt.Println(*quota)
+	data := [][]string{
+		{
+			quote.TradeDate,
+			quote.Time,
+			quote.Name,
+			quote.Code,
+			strconv.FormatFloat(quote.Current, 'g', -1, 64),
+			strconv.FormatFloat(quote.YClose, 'g', -1, 64),
+			strconv.FormatFloat(quote.Open, 'g', -1, 64),
+			strconv.FormatFloat(quote.High, 'g', -1, 64),
+			strconv.FormatFloat(quote.Low, 'g', -1, 64),
+			strconv.FormatInt(quote.TurnOver, 10),
+			strconv.FormatFloat(quote.Volume, 'g', -1, 64),
+		},
+	}
+	table := tablewriter.NewWriter(os.Stdout)
+	headers := []string{"日期", "时间", "名称", "代码", "当前价格", "昨收", "今开", "最高", "最低", "成交量", "成交额"}
+	table.SetHeader(headers)
+
+	headerStyles := make([]tablewriter.Colors, 0, len(headers))
+	for range headers {
+		headerStyles = append(headerStyles, tablewriter.Colors{tablewriter.Bold})
+	}
+	table.SetHeaderColor(headerStyles...)
+	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
+	table.SetAlignment(tablewriter.ALIGN_LEFT)
+	table.SetHeaderLine(false)
+	table.SetBorder(false)
+	table.SetNoWhiteSpace(true)
+	table.SetTablePadding("\t")
+	table.AppendBulk(data)
+	table.Render()
+
 	return nil
 }
