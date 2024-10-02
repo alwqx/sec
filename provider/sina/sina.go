@@ -22,13 +22,17 @@ const (
 	SinaReferer = "https://finance.sina.com.cn"
 )
 
+// defaultHttpHeaders 生成请求 sina 接口的默认 http.Header
+func defaultHttpHeaders() http.Header {
+	headers := make(http.Header)
+	headers.Add("Referer", SinaReferer)
+	return headers
+}
+
 // Search 根据关键字查询证券信息
 func Search(key string) []types.BasicSecurity {
 	reqUrl := fmt.Sprintf("https://suggest3.sinajs.cn/suggest/type=11,12,15,21,22,23,24,25,26,31,33,41&key=%s", key)
-	headers := make(http.Header)
-	headers.Add("Referer", "https://finance.sina.com.cn")
-
-	resp, err := makeRequest(http.MethodGet, reqUrl, headers, nil)
+	resp, err := makeRequest(http.MethodGet, reqUrl, defaultHttpHeaders(), nil)
 	if err != nil {
 		return nil
 	}
@@ -162,10 +166,7 @@ func Profile(exCode string) *types.SinaProfile {
 // CorpInfo 请求公司信息
 func CorpInfo(exCode string) (*types.BasicCorp, error) {
 	coraUrl := fmt.Sprintf("https://vip.stock.finance.sina.com.cn/corp/go.php/vCI_CorpInfo/stockid/%s.phtml", exCode)
-	headers := make(http.Header)
-	headers.Set("Referer", SinaReferer)
-
-	resp, err := makeRequest(http.MethodGet, coraUrl, headers, nil)
+	resp, err := makeRequest(http.MethodGet, coraUrl, defaultHttpHeaders(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -189,10 +190,7 @@ func CorpInfo(exCode string) (*types.BasicCorp, error) {
 func Info(exCode string) (*types.SinaQuote, *sinaPartProfile, error) {
 	lowerKey := strings.ToLower(exCode)
 	reqUrl := fmt.Sprintf("https://hq.sinajs.cn/list=%s,%s_i", lowerKey, lowerKey)
-	headers := make(http.Header)
-	headers.Set("Referer", SinaReferer)
-
-	resp, err := makeRequest(http.MethodGet, reqUrl, headers, nil)
+	resp, err := makeRequest(http.MethodGet, reqUrl, defaultHttpHeaders(), nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -400,10 +398,7 @@ func parseCorpInfo(body []byte) (*types.BasicCorp, error) {
 func Quote(exCode string) (*types.SinaQuote, error) {
 	lowerKey := strings.ToLower(exCode)
 	reqUrl := fmt.Sprintf("https://hq.sinajs.cn/list=%s", lowerKey)
-	headers := make(http.Header)
-	headers.Set("Referer", SinaReferer)
-
-	resp, err := makeRequest(http.MethodGet, reqUrl, headers, nil)
+	resp, err := makeRequest(http.MethodGet, reqUrl, defaultHttpHeaders(), nil)
 	if err != nil {
 		return nil, err
 	}

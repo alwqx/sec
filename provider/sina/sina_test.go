@@ -46,3 +46,10 @@ func TestParseSinaInfoQuote(t *testing.T) {
 	require.EqualValues(t, 8256723, quote.TurnOver)
 	require.EqualValues(t, 938310086.000, quote.Volume)
 }
+
+func TestDefaultHttpHeaders(t *testing.T) {
+	hs := defaultHttpHeaders()
+	require.Equal(t, 1, len(hs))
+	require.Equal(t, SinaReferer, hs.Get("Referer"))
+	require.Equal(t, "", hs.Get("Others"))
+}
