@@ -223,9 +223,12 @@ func Info(exCode string) (*types.SinaQuote, *sinaPartProfile, error) {
 }
 
 // 原始行：var hq_str_sh688047="龙芯中科,106.000,99.680,119.620,119.620,104.500,119.620,0.000,8256723,938310086.000,25600,119.620,7255,119.610,3033,119.600,1767,119.570,6300,119.550,0,0.000,0,0.000,0,0.000,0,0.000,0,0.000,2024-09-30,15:00:01,00,";
-// 经过正则抽取后的内容：龙芯中科,106.000,99.680,119.620,119.620,104.500,119.620,0.000,8256723,938310086.000,25600,119.620,7255,119.610,3033,119.600,1767,119.570,6300,119.550,0,0.000,0,0.000,0,0.000,0,0.000,0,0.000,2024-09-30,15:00:01,00,
+// 经过正则抽取后的内容："龙芯中科,106.000,99.680,119.620,119.620,104.500,119.620,0.000,8256723,938310086.000,25600,119.620,7255,119.610,3033,119.600,1767,119.570,6300,119.550,0,0.000,0,0.000,0,0.000,0,0.000,0,0.000,2024-09-30,15:00:01,00,"
 func parseSinaInfoQuote(quote string) *types.SinaQuote {
-	items := strings.Split(quote, ",")
+	// 将首尾的冒号去掉
+	newQuote := strings.TrimPrefix(quote, "\"")
+	newQuote = strings.TrimSuffix(newQuote, "\"")
+	items := strings.Split(newQuote, ",")
 	res := new(types.SinaQuote)
 	res.Name = items[0]
 
@@ -317,7 +320,6 @@ func adjustRespBodyByEncode(resp *http.Response) error {
 		newBodyBytes, err = simplifiedchinese.GBK.NewDecoder().Bytes(resBytes)
 	} else if strings.Contains(encodHeader, "charset=gb18030") {
 		newBodyBytes, err = simplifiedchinese.GB18030.NewDecoder().Bytes(resBytes)
-
 	}
 	if err != nil {
 		return err
@@ -393,4 +395,36 @@ func parseCorpInfo(body []byte) (*types.BasicCorp, error) {
 	})
 
 	return res, nil
+}
+
+func Quote(exCode string) (*types.SinaQuote, error) {
+	lowerKey := strings.ToLower(exCode)
+	reqUrl := fmt.Sprintf("https://hq.sinajs.cn/list=%s", lowerKey)
+	headers := make(http.Header)
+	headers.Set("Referer", SinaReferer)
+
+	resp, err := makeRequest(http.MethodGet, reqUrl, headers, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+	err = adjustRespBodyByEncode(resp)
+	if err != nil {
+		return nil, err
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	// var hq_str_sh688047=\"龙芯中科,106.000,99.680,119.620,119.620,104.500,119.620,0.000,8256723,938310086.000,25600,119.620,7255,119.610,3033,119.600,1767,119.570,6300,119.550,0,0.000,0,0.000,0,0.000,0,0.000,0,0.000,2024-09-30,15:00:01,00,\";\n
+	regstr := regexp.MustCompile(`\"(.*)\"`)
+	lines := regstr.FindAll(body, -1)
+	if len(lines) != 1 {
+		slog.Error("request %s get invalid body %s", reqUrl, body)
+	}
+	quote := parseSinaInfoQuote(string(lines[0]))
+
+	return quote, nil
 }

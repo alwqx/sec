@@ -31,6 +31,18 @@ func TestProfile(t *testing.T) {
 }
 
 func TestParseSinaInfoQuote(t *testing.T) {
-	body := "龙芯中科,106.000,99.680,119.620,119.620,104.500,119.620,0.000,8256723,938310086.000,25600,119.620,7255,119.610,3033,119.600,1767,119.570,6300,119.550,0,0.000,0,0.000,0,0.000,0,0.000,0,0.000,2024-09-30,15:00:01,00,"
-	parseSinaInfoQuote(body)
+	body := `"龙芯中科,106.000,99.680,119.620,119.620,104.500,119.620,0.000,8256723,938310086.000,25600,119.620,7255,119.610,3033,119.600,1767,119.570,6300,119.550,0,0.000,0,0.000,0,0.000,0,0.000,0,0.000,2024-09-30,15:00:01,00,"`
+	quote := parseSinaInfoQuote(body)
+	require.NotNil(t, quote)
+	require.Equal(t, "2024-09-30", quote.TradeDate)
+	require.EqualValues(t, "15:00:01", quote.Time)
+	require.Equal(t, "", quote.Code)
+	require.Equal(t, "龙芯中科", quote.Name)
+	require.EqualValues(t, 119.62, quote.Current)
+	require.EqualValues(t, 106.00, quote.Open)
+	require.EqualValues(t, 99.68, quote.YClose)
+	require.EqualValues(t, 119.62, quote.High)
+	require.EqualValues(t, 104.5, quote.Low)
+	require.EqualValues(t, 8256723, quote.TurnOver)
+	require.EqualValues(t, 938310086.000, quote.Volume)
 }
