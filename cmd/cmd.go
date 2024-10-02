@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/alwqx/sec/provider/sina"
+	"github.com/alwqx/sec/types"
 	"github.com/alwqx/sec/version"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
@@ -129,14 +130,32 @@ func QuoteHandler(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
+	if quote == nil {
+		slog.Warn(fmt.Sprintf("no result of %s", args[0]))
+		return nil
+	}
+	// TODO: 港股指数成交额 * 1000
+	printQuote(quote)
+
+	return nil
+}
+
+func printQuote(quote *types.SinaQuote) {
+	if quote == nil {
+		return
+	}
+
+	// 计算涨跌
+	rate := (quote.Current/quote.YClose - 1.0) * 100.0
+	curWithRate := fmt.Sprintf("%-.2f %-.2f%s", quote.Current, rate, "%")
 
 	data := [][]string{
 		{
-			quote.TradeDate,
-			quote.Time,
+			fmt.Sprintf("%s %s", quote.TradeDate, quote.Time),
 			quote.Name,
 			quote.Code,
-			strconv.FormatFloat(quote.Current, 'g', -1, 64),
+			// strconv.FormatFloat(quote.Current, 'g', -1, 64),
+			curWithRate,
 			strconv.FormatFloat(quote.YClose, 'g', -1, 64),
 			strconv.FormatFloat(quote.Open, 'g', -1, 64),
 			strconv.FormatFloat(quote.High, 'g', -1, 64),
@@ -146,14 +165,29 @@ func QuoteHandler(cmd *cobra.Command, args []string) error {
 		},
 	}
 	table := tablewriter.NewWriter(os.Stdout)
-	headers := []string{"日期", "时间", "名称", "代码", "当前价格", "昨收", "今开", "最高", "最低", "成交量", "成交额"}
+	headers := []string{"时间", "名称", "代码", "当前价格", "昨收", "今开", "最高", "最低", "成交量", "成交额"}
 	table.SetHeader(headers)
 
 	headerStyles := make([]tablewriter.Colors, 0, len(headers))
 	for range headers {
 		headerStyles = append(headerStyles, tablewriter.Colors{tablewriter.Bold})
 	}
+
+	columnsStyles := make([]tablewriter.Colors, 0, len(headers))
+	for _, title := range headers {
+		var item tablewriter.Colors = tablewriter.Colors{tablewriter.Bold}
+		if title == headers[3] {
+			if rate > 0 {
+				item = tablewriter.Colors{tablewriter.Bold, tablewriter.FgRedColor}
+			} else if rate < 0 {
+				item = tablewriter.Colors{tablewriter.Bold, tablewriter.FgGreenColor}
+			}
+		}
+		columnsStyles = append(columnsStyles, item)
+	}
+
 	table.SetHeaderColor(headerStyles...)
+	table.SetColumnColor(columnsStyles...)
 	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
 	table.SetAlignment(tablewriter.ALIGN_LEFT)
 	table.SetHeaderLine(false)
@@ -162,6 +196,4 @@ func QuoteHandler(cmd *cobra.Command, args []string) error {
 	table.SetTablePadding("\t")
 	table.AppendBulk(data)
 	table.Render()
-
-	return nil
 }
