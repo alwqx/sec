@@ -395,7 +395,7 @@ func parseCorpInfo(body []byte) (*types.BasicCorp, error) {
 	return res, nil
 }
 
-func Quota(exCode string) (*types.SinaQuote, error) {
+func Quote(exCode string) (*types.SinaQuote, error) {
 	lowerKey := strings.ToLower(exCode)
 	reqUrl := fmt.Sprintf("https://hq.sinajs.cn/list=%s", lowerKey)
 	headers := make(http.Header)
