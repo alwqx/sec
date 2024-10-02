@@ -70,10 +70,8 @@ func SearchHandler(cmd *cobra.Command, args []string) error {
 		return errors.New("args of command should be one")
 	}
 
-	res := sina.Search(args[0])
-	for _, item := range res {
-		fmt.Printf("%-8s\t%s\n", item.ExCode, item.Name)
-	}
+	secs := sina.Search(args[0])
+	printSecs(secs)
 
 	return nil
 }
@@ -165,7 +163,7 @@ func printQuote(quote *types.SinaQuote) {
 		},
 	}
 	table := tablewriter.NewWriter(os.Stdout)
-	headers := []string{"时间", "名称", "代码", "当前价格", "昨收", "今开", "最高", "最低", "成交量", "成交额"}
+	headers := []string{"时间", "名称", "证券代码", "当前价格", "昨收", "今开", "最高", "最低", "成交量", "成交额"}
 	table.SetHeader(headers)
 
 	headerStyles := make([]tablewriter.Colors, 0, len(headers))
@@ -188,6 +186,36 @@ func printQuote(quote *types.SinaQuote) {
 
 	table.SetHeaderColor(headerStyles...)
 	table.SetColumnColor(columnsStyles...)
+	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
+	table.SetAlignment(tablewriter.ALIGN_LEFT)
+	table.SetHeaderLine(false)
+	table.SetBorder(false)
+	table.SetNoWhiteSpace(true)
+	table.SetTablePadding("\t")
+	table.AppendBulk(data)
+	table.Render()
+}
+
+func printSecs(secs []types.BasicSecurity) {
+	num := len(secs)
+	if num == 0 {
+		return
+	}
+
+	data := make([][]string, 0, num)
+	for _, sec := range secs {
+		data = append(data, []string{sec.ExCode, sec.Name})
+	}
+
+	table := tablewriter.NewWriter(os.Stdout)
+	headers := []string{"证券代码", "证券名称"}
+	table.SetHeader(headers)
+	headerStyles := make([]tablewriter.Colors, 0, len(headers))
+	for range headers {
+		headerStyles = append(headerStyles, tablewriter.Colors{tablewriter.Bold})
+	}
+	table.SetHeaderColor(headerStyles...)
+
 	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
 	table.SetAlignment(tablewriter.ALIGN_LEFT)
 	table.SetHeaderLine(false)
