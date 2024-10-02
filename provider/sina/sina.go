@@ -118,7 +118,7 @@ func formatUSCode(in string) (out string) {
 	if !strings.Contains(in, "$") {
 		out = "$" + out
 	}
-	return
+	return strings.ToUpper(out)
 }
 
 // Profile 获取证券的基本信息
