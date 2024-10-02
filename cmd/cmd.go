@@ -35,27 +35,27 @@ func NewCLI() *cobra.Command {
 	rootCmd.Flags().BoolP("version", "v", false, "Show version information")
 
 	searchCmd := &cobra.Command{
-		Use:   "search SECURITY",
+		Use:   "search",
 		Short: "Search code and name of a secutiry/stock",
 		Args:  cobra.ExactArgs(1),
 		RunE:  SearchHandler,
 	}
 
 	infoCmd := &cobra.Command{
-		Use:   "info infomation of SECURITY",
+		Use:   "info",
 		Short: "Print basic information of a secutiry/stock",
 		Args:  cobra.ExactArgs(1),
 		RunE:  InfoHandler,
 	}
 
-	quotaCmd := &cobra.Command{
-		Use:   "quota infomation of SECURITY",
-		Short: "Print quota information of a secutiry/stock",
+	quoteCmd := &cobra.Command{
+		Use:   "quote",
+		Short: "Print quote information of a secutiry/stock",
 		Args:  cobra.ExactArgs(1),
 		RunE:  QuoteHandler,
 	}
 
-	rootCmd.AddCommand(searchCmd, infoCmd, quotaCmd)
+	rootCmd.AddCommand(searchCmd, infoCmd, quoteCmd)
 
 	return rootCmd
 }
