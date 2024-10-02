@@ -175,7 +175,7 @@ func printQuote(quote *types.SinaQuote) {
 
 	columnsStyles := make([]tablewriter.Colors, 0, len(headers))
 	for _, title := range headers {
-		var item tablewriter.Colors = tablewriter.Colors{tablewriter.Bold}
+		var item tablewriter.Colors = tablewriter.Colors{}
 		if title == headers[3] {
 			if rate > 0 {
 				item = tablewriter.Colors{tablewriter.Bold, tablewriter.FgRedColor}
