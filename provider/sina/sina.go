@@ -97,7 +97,7 @@ func Profile(exCode string) *CorpProfile {
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		corp, err1 = QueryBasciCorp(exCode)
+		corp, err1 = QueryBasicCorp(exCode)
 	}()
 	go func() {
 		defer wg.Done()
@@ -142,8 +142,8 @@ func Profile(exCode string) *CorpProfile {
 	return profile
 }
 
-// QueryBasciCorp 根据证券代码获取公司信息
-func QueryBasciCorp(exCode string) (*BasicCorp, error) {
+// QueryBasicCorp 根据证券代码获取公司信息
+func QueryBasicCorp(exCode string) (*BasicCorp, error) {
 	coraUrl := fmt.Sprintf("https://vip.stock.finance.sina.com.cn/corp/go.php/vCI_CorpInfo/stockid/%s.phtml", exCode)
 	resp, err := makeRequest(http.MethodGet, coraUrl, defaultHttpHeaders(), nil)
 	if err != nil {
