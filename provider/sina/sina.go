@@ -30,7 +30,7 @@ func defaultHttpHeaders() http.Header {
 }
 
 // Search 根据关键字查询证券信息
-func Search(key string) []types.BasicSecurity {
+func Search(key string) []BasicSecurity {
 	reqUrl := fmt.Sprintf("https://suggest3.sinajs.cn/suggest/type=11,12,15,21,22,23,24,25,26,31,33,41&key=%s", key)
 	resp, err := makeRequest(http.MethodGet, reqUrl, defaultHttpHeaders(), nil)
 	if err != nil {
@@ -53,14 +53,160 @@ func Search(key string) []types.BasicSecurity {
 	return parseBasicSecurity(string(resBytes))
 }
 
+func QuerySecQuote(exCode string) (*SecurityQuote, error) {
+	lowerKey := strings.ToLower(exCode)
+	reqUrl := fmt.Sprintf("https://hq.sinajs.cn/list=%s", lowerKey)
+	resp, err := makeRequest(http.MethodGet, reqUrl, defaultHttpHeaders(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+	err = adjustRespBodyByEncode(resp)
+	if err != nil {
+		return nil, err
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	// var hq_str_sh688047=\"龙芯中科,106.000,99.680,119.620,119.620,104.500,119.620,0.000,8256723,938310086.000,25600,119.620,7255,119.610,3033,119.600,1767,119.570,6300,119.550,0,0.000,0,0.000,0,0.000,0,0.000,0,0.000,2024-09-30,15:00:01,00,\";\n
+	regstr := regexp.MustCompile(`\"(.*)\"`)
+	lines := regstr.FindAll(body, -1)
+	if len(lines) != 1 {
+		slog.Error("request %s get invalid body %s", reqUrl, body)
+	}
+	quote := parseSecQuote(string(lines[0]))
+
+	return quote, nil
+}
+
+// Profile 根据证券代码获取证券的基本信息，exCode SH600036
+func Profile(exCode string) *CorpProfile {
+	var (
+		wg          sync.WaitGroup
+		corp        *BasicCorp
+		quote       *SecurityQuote
+		partProfile *sinaPartProfile
+
+		err1, err2 error
+	)
+
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		corp, err1 = QueryBasciCorp(exCode)
+	}()
+	go func() {
+		defer wg.Done()
+		quote, partProfile, err2 = Info(exCode)
+	}()
+	wg.Wait()
+
+	if err1 != nil {
+		slog.Error(fmt.Sprintf("corp info error: %v", err1))
+	}
+	if err2 != nil {
+		slog.Error(fmt.Sprintf("info error: %v", err2))
+	}
+
+	profile := &CorpProfile{
+		// Code:            quota.,
+		ExCode:          corp.ExCode,
+		Name:            corp.Name,
+		HistoryName:     corp.HistoryName,
+		ListingPrice:    corp.Price,
+		ListingDate:     corp.Date,
+		WebSite:         corp.WebSite,
+		RegisterAddress: corp.WebSite,
+		BusinessAddress: corp.BusinessAddress,
+		MainBusiness:    corp.MainBussiness,
+		Current:         quote.Current,
+		Category:        partProfile.Categray,
+		MarketCap:       quote.Current * float64(partProfile.Cap) * 10000.0,
+		TradedMarketCap: quote.Current * float64(partProfile.TradeCap) * 10000.0,
+	}
+
+	if profile.HistoryName == "" {
+		profile.HistoryName = quote.Name
+	}
+	if partProfile.VPS != 0 {
+		profile.PB = quote.Current / partProfile.VPS
+	}
+	if partProfile.Profit > 0 {
+		profile.PeTTM = quote.Current * float64(partProfile.Cap) / partProfile.Profit / 10000.0
+	}
+
+	return profile
+}
+
+// QueryBasciCorp 根据证券代码获取公司信息
+func QueryBasciCorp(exCode string) (*BasicCorp, error) {
+	coraUrl := fmt.Sprintf("https://vip.stock.finance.sina.com.cn/corp/go.php/vCI_CorpInfo/stockid/%s.phtml", exCode)
+	resp, err := makeRequest(http.MethodGet, coraUrl, defaultHttpHeaders(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+	err = adjustRespBodyByEncode(resp)
+	if err != nil {
+		return nil, err
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return parseBasicCorp(body)
+}
+
+// Info 请求证券信息
+// TODO: 拆分成 2 个函数
+// var hq_str_sh688047="龙芯中科,106.000,99.680,119.620,119.620,104.500,119.620,0.000,8256723,938310086.000,25600,119.620,7255,119.610,3033,119.600,1767,119.570,6300,119.550,0,0.000,0,0.000,0,0.000,0,0.000,0,0.000,2024-09-30,15:00:01,00,";
+// var hq_str_sh688047_i="A,lxzk,-0.8200,-1.1566,-0.5900,8.2671,94.6804,40100,27964.4729,27964.4729,0,CNY,-3.2944,-4.6378,60.0600,1,-6.9400,2.1959,-2.3813,133.21,67.89,0.2,龙芯中科,K|D|0|40100|4100,119.62|79.74,20240630|-119064971.81,700.7400|90.1790,|,,1/1,EQA,,0.00,110.610|119.620|99.680,半导体,龙芯中科,7,417392977.82";
+func Info(exCode string) (*SecurityQuote, *sinaPartProfile, error) {
+	lowerKey := strings.ToLower(exCode)
+	reqUrl := fmt.Sprintf("https://hq.sinajs.cn/list=%s,%s_i", lowerKey, lowerKey)
+	resp, err := makeRequest(http.MethodGet, reqUrl, defaultHttpHeaders(), nil)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	defer resp.Body.Close()
+	err = adjustRespBodyByEncode(resp)
+	if err != nil {
+		return nil, nil, err
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	regstr := regexp.MustCompile(`"(.*)"`)
+	lines := regstr.FindAll([]byte(body), -1)
+	if len(lines) != 2 {
+		slog.Error("request %s get invalid body %s", reqUrl, body)
+	}
+
+	quote := parseSecQuote(string(lines[0]))
+	partProfile, err := parseInfoPartProfile(string(lines[1]))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return quote, partProfile, nil
+}
+
 // parseBasicSecurity 解析 sina 搜索结果字符串
 // var suggestvalue="龙芯中科,11,688047,sh688047,龙芯中科,,龙芯中科,99,1,,;绿叶制药,31,02186,02186,绿叶制药,,绿叶制药,99,1,ESG,";
-func parseBasicSecurity(body string) []types.BasicSecurity {
+func parseBasicSecurity(body string) []BasicSecurity {
 	body1 := strings.ReplaceAll(body, `var suggestvalue="`, "")
 	body2 := strings.ReplaceAll(body1, `";`, "")
 	lines := strings.Split(body2, ";")
 
-	res := make([]types.BasicSecurity, 0, len(lines))
+	res := make([]BasicSecurity, 0, len(lines))
 	for _, item := range lines {
 		// 腾讯控股,31,00700,00700,腾讯控股,,腾讯控股,99,1,ESG;
 		// 1 5 7名称 2市场 3 4代码 8- 9在市 10-
@@ -99,7 +245,7 @@ func parseBasicSecurity(body string) []types.BasicSecurity {
 			slog.Warn("can not recganize code: %s %s", ss[0], ss[2])
 		}
 
-		ssr := types.BasicSecurity{
+		ssr := BasicSecurity{
 			Name:         name,
 			Code:         code,
 			ExCode:       exCode,
@@ -122,130 +268,14 @@ func formatUSCode(in string) (out string) {
 	return strings.ToUpper(out)
 }
 
-// Profile 根据证券代码获取证券的基本信息，exCode SH600036
-func Profile(exCode string) *types.SinaProfile {
-	var (
-		wg          sync.WaitGroup
-		corp        *types.BasicCorp
-		quote       *types.SinaQuote
-		partProfile *sinaPartProfile
-
-		err1, err2 error
-	)
-
-	wg.Add(2)
-	go func() {
-		defer wg.Done()
-		corp, err1 = CorpInfo(exCode)
-	}()
-	go func() {
-		defer wg.Done()
-		quote, partProfile, err2 = Info(exCode)
-	}()
-	wg.Wait()
-
-	if err1 != nil {
-		slog.Error(fmt.Sprintf("corp info error: %v", err1))
-	}
-	if err2 != nil {
-		slog.Error(fmt.Sprintf("info error: %v", err2))
-	}
-
-	profile := &types.SinaProfile{
-		// Code:            quota.,
-		ExCode:          corp.ExCode,
-		Name:            corp.Name,
-		HistoryName:     corp.HistoryName,
-		ListingPrice:    corp.Price,
-		ListingDate:     corp.Date,
-		WebSite:         corp.WebSite,
-		RegisterAddress: corp.WebSite,
-		BusinessAddress: corp.BusinessAddress,
-		MainBusiness:    corp.MainBussiness,
-		Current:         quote.Current,
-		Category:        partProfile.Categray,
-		MarketCap:       quote.Current * float64(partProfile.Cap) * 10000.0,
-		TradedMarketCap: quote.Current * float64(partProfile.TradeCap) * 10000.0,
-	}
-
-	if profile.HistoryName == "" {
-		profile.HistoryName = quote.Name
-	}
-	if partProfile.VPS != 0 {
-		profile.PB = quote.Current / partProfile.VPS
-	}
-	if partProfile.Profit > 0 {
-		profile.PeTTM = quote.Current * float64(partProfile.Cap) / partProfile.Profit / 10000.0
-	}
-
-	return profile
-}
-
-// CorpInfo 根据证券代码获取公司信息
-func CorpInfo(exCode string) (*types.BasicCorp, error) {
-	coraUrl := fmt.Sprintf("https://vip.stock.finance.sina.com.cn/corp/go.php/vCI_CorpInfo/stockid/%s.phtml", exCode)
-	resp, err := makeRequest(http.MethodGet, coraUrl, defaultHttpHeaders(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	defer resp.Body.Close()
-	err = adjustRespBodyByEncode(resp)
-	if err != nil {
-		return nil, err
-	}
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	return parseCorpInfo(body)
-}
-
-// Info 请求证券信息
-// var hq_str_sh688047="龙芯中科,106.000,99.680,119.620,119.620,104.500,119.620,0.000,8256723,938310086.000,25600,119.620,7255,119.610,3033,119.600,1767,119.570,6300,119.550,0,0.000,0,0.000,0,0.000,0,0.000,0,0.000,2024-09-30,15:00:01,00,";
-// var hq_str_sh688047_i="A,lxzk,-0.8200,-1.1566,-0.5900,8.2671,94.6804,40100,27964.4729,27964.4729,0,CNY,-3.2944,-4.6378,60.0600,1,-6.9400,2.1959,-2.3813,133.21,67.89,0.2,龙芯中科,K|D|0|40100|4100,119.62|79.74,20240630|-119064971.81,700.7400|90.1790,|,,1/1,EQA,,0.00,110.610|119.620|99.680,半导体,龙芯中科,7,417392977.82";
-func Info(exCode string) (*types.SinaQuote, *sinaPartProfile, error) {
-	lowerKey := strings.ToLower(exCode)
-	reqUrl := fmt.Sprintf("https://hq.sinajs.cn/list=%s,%s_i", lowerKey, lowerKey)
-	resp, err := makeRequest(http.MethodGet, reqUrl, defaultHttpHeaders(), nil)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	defer resp.Body.Close()
-	err = adjustRespBodyByEncode(resp)
-	if err != nil {
-		return nil, nil, err
-	}
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	regstr := regexp.MustCompile(`"(.*)"`)
-	lines := regstr.FindAll([]byte(body), -1)
-	if len(lines) != 2 {
-		slog.Error("request %s get invalid body %s", reqUrl, body)
-	}
-
-	quote := parseInfoQuote(string(lines[0]))
-	partProfile, err := parseInfoPartProfile(string(lines[1]))
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return quote, partProfile, nil
-}
-
 // 原始行：var hq_str_sh688047="龙芯中科,106.000,99.680,119.620,119.620,104.500,119.620,0.000,8256723,938310086.000,25600,119.620,7255,119.610,3033,119.600,1767,119.570,6300,119.550,0,0.000,0,0.000,0,0.000,0,0.000,0,0.000,2024-09-30,15:00:01,00,";
 // 经过正则抽取后的内容："龙芯中科,106.000,99.680,119.620,119.620,104.500,119.620,0.000,8256723,938310086.000,25600,119.620,7255,119.610,3033,119.600,1767,119.570,6300,119.550,0,0.000,0,0.000,0,0.000,0,0.000,0,0.000,2024-09-30,15:00:01,00,"
-func parseInfoQuote(quote string) *types.SinaQuote {
+func parseSecQuote(quote string) *SecurityQuote {
 	// 将首尾的冒号去掉
 	newQuote := strings.TrimPrefix(quote, "\"")
 	newQuote = strings.TrimSuffix(newQuote, "\"")
 	items := strings.Split(newQuote, ",")
-	res := new(types.SinaQuote)
+	res := new(SecurityQuote)
 	res.Name = items[0]
 
 	var err error
@@ -369,14 +399,14 @@ func makeRequest(method, reqURL string, headers http.Header, body io.Reader) (*h
 	return resp, nil
 }
 
-// parseCorpInfo 解析 html 得到基本 corp 信息
-func parseCorpInfo(body []byte) (*types.BasicCorp, error) {
+// parseBasicCorp 解析 html 得到基本 corp 信息
+func parseBasicCorp(body []byte) (*BasicCorp, error) {
 	doc, err := goquery.NewDocumentFromReader(io.NopCloser(bytes.NewBuffer(body)))
 	if err != nil {
 		return nil, err
 	}
 
-	res := new(types.BasicCorp)
+	res := new(BasicCorp)
 	ss := doc.Find("#comInfo1 td")
 	ss.Each(func(i int, s *goquery.Selection) {
 		// for debug/dev:
@@ -411,33 +441,4 @@ func parseCorpInfo(body []byte) (*types.BasicCorp, error) {
 	})
 
 	return res, nil
-}
-
-func Quote(exCode string) (*types.SinaQuote, error) {
-	lowerKey := strings.ToLower(exCode)
-	reqUrl := fmt.Sprintf("https://hq.sinajs.cn/list=%s", lowerKey)
-	resp, err := makeRequest(http.MethodGet, reqUrl, defaultHttpHeaders(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	defer resp.Body.Close()
-	err = adjustRespBodyByEncode(resp)
-	if err != nil {
-		return nil, err
-	}
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	// var hq_str_sh688047=\"龙芯中科,106.000,99.680,119.620,119.620,104.500,119.620,0.000,8256723,938310086.000,25600,119.620,7255,119.610,3033,119.600,1767,119.570,6300,119.550,0,0.000,0,0.000,0,0.000,0,0.000,0,0.000,2024-09-30,15:00:01,00,\";\n
-	regstr := regexp.MustCompile(`\"(.*)\"`)
-	lines := regstr.FindAll(body, -1)
-	if len(lines) != 1 {
-		slog.Error("request %s get invalid body %s", reqUrl, body)
-	}
-	quote := parseInfoQuote(string(lines[0]))
-
-	return quote, nil
 }

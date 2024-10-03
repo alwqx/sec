@@ -8,7 +8,6 @@ import (
 	"strconv"
 
 	"github.com/alwqx/sec/provider/sina"
-	"github.com/alwqx/sec/types"
 	"github.com/alwqx/sec/version"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
@@ -124,7 +123,7 @@ func QuoteHandler(cmd *cobra.Command, args []string) error {
 
 	// 2. choose the first item
 	sec := secs[0]
-	quote, err := sina.Quote(sec.ExCode)
+	quote, err := sina.QuerySecQuote(sec.ExCode)
 	if err != nil {
 		return err
 	}
@@ -138,7 +137,7 @@ func QuoteHandler(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func printQuote(quote *types.SinaQuote) {
+func printQuote(quote *sina.SecurityQuote) {
 	if quote == nil {
 		return
 	}
@@ -196,7 +195,7 @@ func printQuote(quote *types.SinaQuote) {
 	table.Render()
 }
 
-func printSecs(secs []types.BasicSecurity) {
+func printSecs(secs []sina.BasicSecurity) {
 	num := len(secs)
 	if num == 0 {
 		return
