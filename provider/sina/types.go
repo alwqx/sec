@@ -26,3 +26,22 @@ type BasicCorp struct {
 	BusinessAddress string  // 办公地址
 	MainBussiness   string  // 主营业务
 }
+
+type QuoteProfile struct {
+	Code            string
+	ExCode          string
+	Name            string  // 公司名称
+	HistoryName     string  // 简称历史
+	ListingPrice    float64 // 发行价格
+	ListingDate     string  // 上市时间
+	Category        string  // 行业分类
+	WebSite         string  // 公司网址
+	RegisterAddress string  // 注册地址
+	BusinessAddress string  // 办公地址
+	MainBusiness    string  // 主营业务
+	Current         float64 // 当前价格
+	PB              float64 // 市净率
+	PeTTM           float64 // 市盈率TTM
+	MarketCap       float64 // 总市值
+	TradedMarketCap float64 // 流通市值
+}
