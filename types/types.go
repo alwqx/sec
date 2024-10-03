@@ -29,7 +29,7 @@ type SinaSecurityProfile struct {
 	MainBussiness   string  // 主营业务
 }
 
-type Quote struct {
+type QuerySecQuote struct {
 	TradeDate string // 交易日期 "2023-06-02"
 	Code      string
 	Name      string

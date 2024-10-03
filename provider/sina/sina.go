@@ -413,7 +413,7 @@ func parseCorpInfo(body []byte) (*BasicCorp, error) {
 	return res, nil
 }
 
-func Quote(exCode string) (*SecurityQuote, error) {
+func QuerySecQuote(exCode string) (*SecurityQuote, error) {
 	lowerKey := strings.ToLower(exCode)
 	reqUrl := fmt.Sprintf("https://hq.sinajs.cn/list=%s", lowerKey)
 	resp, err := makeRequest(http.MethodGet, reqUrl, defaultHttpHeaders(), nil)

@@ -123,7 +123,7 @@ func QuoteHandler(cmd *cobra.Command, args []string) error {
 
 	// 2. choose the first item
 	sec := secs[0]
-	quote, err := sina.Quote(sec.ExCode)
+	quote, err := sina.QuerySecQuote(sec.ExCode)
 	if err != nil {
 		return err
 	}
