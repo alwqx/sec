@@ -113,7 +113,7 @@ func parseBasicSecurity(body string) []types.BasicSecurity {
 	return res
 }
 
-// formatUSCode 格式化每股证券代码
+// formatUSCode 格式化美国证券代码
 func formatUSCode(in string) (out string) {
 	out = in
 	if !strings.Contains(in, "$") {
