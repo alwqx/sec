@@ -15,14 +15,6 @@ const (
 	ExChangeNasdaq = "nasdaq" // 纳斯达克
 )
 
-type BasicSecurity struct {
-	Name         string       // 证券名称
-	SecurityType SecurityType // 证券类型：股票 stock，基金 fund
-	Code         string       // 证券代码
-	ExCode       string       // 证券带交易所编码 SH600036
-	ExChange     string       // 交易所
-}
-
 type SinaSecurityProfile struct {
 	Code            string // 证券代码
 	ExCode          string // 带交易所的证券代码

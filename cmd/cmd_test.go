@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/alwqx/sec/provider/sina"
 	"github.com/alwqx/sec/types"
 	"github.com/stretchr/testify/require"
 )
@@ -69,10 +70,10 @@ func TestPrintQuote(t *testing.T) {
 func TestPrintSecs(t *testing.T) {
 	// 1. empty
 	printSecs(nil)
-	printSecs([]types.BasicSecurity{})
+	printSecs([]sina.BasicSecurity{})
 
 	// 2. common
-	secs := []types.BasicSecurity{
+	secs := []sina.BasicSecurity{
 		{
 			Name:   "龙芯中科",
 			ExCode: "SH688047",

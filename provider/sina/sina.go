@@ -30,7 +30,7 @@ func defaultHttpHeaders() http.Header {
 }
 
 // Search 根据关键字查询证券信息
-func Search(key string) []types.BasicSecurity {
+func Search(key string) []BasicSecurity {
 	reqUrl := fmt.Sprintf("https://suggest3.sinajs.cn/suggest/type=11,12,15,21,22,23,24,25,26,31,33,41&key=%s", key)
 	resp, err := makeRequest(http.MethodGet, reqUrl, defaultHttpHeaders(), nil)
 	if err != nil {
@@ -171,12 +171,12 @@ func Info(exCode string) (*types.SinaQuote, *sinaPartProfile, error) {
 
 // parseBasicSecurity 解析 sina 搜索结果字符串
 // var suggestvalue="龙芯中科,11,688047,sh688047,龙芯中科,,龙芯中科,99,1,,;绿叶制药,31,02186,02186,绿叶制药,,绿叶制药,99,1,ESG,";
-func parseBasicSecurity(body string) []types.BasicSecurity {
+func parseBasicSecurity(body string) []BasicSecurity {
 	body1 := strings.ReplaceAll(body, `var suggestvalue="`, "")
 	body2 := strings.ReplaceAll(body1, `";`, "")
 	lines := strings.Split(body2, ";")
 
-	res := make([]types.BasicSecurity, 0, len(lines))
+	res := make([]BasicSecurity, 0, len(lines))
 	for _, item := range lines {
 		// 腾讯控股,31,00700,00700,腾讯控股,,腾讯控股,99,1,ESG;
 		// 1 5 7名称 2市场 3 4代码 8- 9在市 10-
@@ -215,7 +215,7 @@ func parseBasicSecurity(body string) []types.BasicSecurity {
 			slog.Warn("can not recganize code: %s %s", ss[0], ss[2])
 		}
 
-		ssr := types.BasicSecurity{
+		ssr := BasicSecurity{
 			Name:         name,
 			Code:         code,
 			ExCode:       exCode,

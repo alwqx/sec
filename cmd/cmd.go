@@ -196,7 +196,7 @@ func printQuote(quote *types.SinaQuote) {
 	table.Render()
 }
 
-func printSecs(secs []types.BasicSecurity) {
+func printSecs(secs []sina.BasicSecurity) {
 	num := len(secs)
 	if num == 0 {
 		return
