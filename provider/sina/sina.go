@@ -53,6 +53,35 @@ func Search(key string) []BasicSecurity {
 	return parseBasicSecurity(string(resBytes))
 }
 
+func QuerySecQuote(exCode string) (*SecurityQuote, error) {
+	lowerKey := strings.ToLower(exCode)
+	reqUrl := fmt.Sprintf("https://hq.sinajs.cn/list=%s", lowerKey)
+	resp, err := makeRequest(http.MethodGet, reqUrl, defaultHttpHeaders(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+	err = adjustRespBodyByEncode(resp)
+	if err != nil {
+		return nil, err
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	// var hq_str_sh688047=\"龙芯中科,106.000,99.680,119.620,119.620,104.500,119.620,0.000,8256723,938310086.000,25600,119.620,7255,119.610,3033,119.600,1767,119.570,6300,119.550,0,0.000,0,0.000,0,0.000,0,0.000,0,0.000,2024-09-30,15:00:01,00,\";\n
+	regstr := regexp.MustCompile(`\"(.*)\"`)
+	lines := regstr.FindAll(body, -1)
+	if len(lines) != 1 {
+		slog.Error("request %s get invalid body %s", reqUrl, body)
+	}
+	quote := parseInfoQuote(string(lines[0]))
+
+	return quote, nil
+}
+
 // Profile 根据证券代码获取证券的基本信息，exCode SH600036
 func Profile(exCode string) *CorpProfile {
 	var (
@@ -411,33 +440,4 @@ func parseCorpInfo(body []byte) (*BasicCorp, error) {
 	})
 
 	return res, nil
-}
-
-func QuerySecQuote(exCode string) (*SecurityQuote, error) {
-	lowerKey := strings.ToLower(exCode)
-	reqUrl := fmt.Sprintf("https://hq.sinajs.cn/list=%s", lowerKey)
-	resp, err := makeRequest(http.MethodGet, reqUrl, defaultHttpHeaders(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	defer resp.Body.Close()
-	err = adjustRespBodyByEncode(resp)
-	if err != nil {
-		return nil, err
-	}
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	// var hq_str_sh688047=\"龙芯中科,106.000,99.680,119.620,119.620,104.500,119.620,0.000,8256723,938310086.000,25600,119.620,7255,119.610,3033,119.600,1767,119.570,6300,119.550,0,0.000,0,0.000,0,0.000,0,0.000,0,0.000,2024-09-30,15:00:01,00,\";\n
-	regstr := regexp.MustCompile(`\"(.*)\"`)
-	lines := regstr.FindAll(body, -1)
-	if len(lines) != 1 {
-		slog.Error("request %s get invalid body %s", reqUrl, body)
-	}
-	quote := parseInfoQuote(string(lines[0]))
-
-	return quote, nil
 }
