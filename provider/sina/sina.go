@@ -77,7 +77,7 @@ func QuerySecQuote(exCode string) (*SecurityQuote, error) {
 	if len(lines) != 1 {
 		slog.Error("request %s get invalid body %s", reqUrl, body)
 	}
-	quote := parseInfoQuote(string(lines[0]))
+	quote := parseSecQuote(string(lines[0]))
 
 	return quote, nil
 }
@@ -163,6 +163,7 @@ func QueryBasciCorp(exCode string) (*BasicCorp, error) {
 }
 
 // Info 请求证券信息
+// TODO: 拆分成 2 个函数
 // var hq_str_sh688047="龙芯中科,106.000,99.680,119.620,119.620,104.500,119.620,0.000,8256723,938310086.000,25600,119.620,7255,119.610,3033,119.600,1767,119.570,6300,119.550,0,0.000,0,0.000,0,0.000,0,0.000,0,0.000,2024-09-30,15:00:01,00,";
 // var hq_str_sh688047_i="A,lxzk,-0.8200,-1.1566,-0.5900,8.2671,94.6804,40100,27964.4729,27964.4729,0,CNY,-3.2944,-4.6378,60.0600,1,-6.9400,2.1959,-2.3813,133.21,67.89,0.2,龙芯中科,K|D|0|40100|4100,119.62|79.74,20240630|-119064971.81,700.7400|90.1790,|,,1/1,EQA,,0.00,110.610|119.620|99.680,半导体,龙芯中科,7,417392977.82";
 func Info(exCode string) (*SecurityQuote, *sinaPartProfile, error) {
@@ -189,7 +190,7 @@ func Info(exCode string) (*SecurityQuote, *sinaPartProfile, error) {
 		slog.Error("request %s get invalid body %s", reqUrl, body)
 	}
 
-	quote := parseInfoQuote(string(lines[0]))
+	quote := parseSecQuote(string(lines[0]))
 	partProfile, err := parseInfoPartProfile(string(lines[1]))
 	if err != nil {
 		return nil, nil, err
@@ -269,7 +270,7 @@ func formatUSCode(in string) (out string) {
 
 // 原始行：var hq_str_sh688047="龙芯中科,106.000,99.680,119.620,119.620,104.500,119.620,0.000,8256723,938310086.000,25600,119.620,7255,119.610,3033,119.600,1767,119.570,6300,119.550,0,0.000,0,0.000,0,0.000,0,0.000,0,0.000,2024-09-30,15:00:01,00,";
 // 经过正则抽取后的内容："龙芯中科,106.000,99.680,119.620,119.620,104.500,119.620,0.000,8256723,938310086.000,25600,119.620,7255,119.610,3033,119.600,1767,119.570,6300,119.550,0,0.000,0,0.000,0,0.000,0,0.000,0,0.000,2024-09-30,15:00:01,00,"
-func parseInfoQuote(quote string) *SecurityQuote {
+func parseSecQuote(quote string) *SecurityQuote {
 	// 将首尾的冒号去掉
 	newQuote := strings.TrimPrefix(quote, "\"")
 	newQuote = strings.TrimSuffix(newQuote, "\"")
