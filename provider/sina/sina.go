@@ -53,75 +53,6 @@ func Search(key string) []types.BasicSecurity {
 	return parseBasicSecurity(string(resBytes))
 }
 
-// parseBasicSecurity 解析 sina 搜索结果字符串
-// var suggestvalue="龙芯中科,11,688047,sh688047,龙芯中科,,龙芯中科,99,1,,;绿叶制药,31,02186,02186,绿叶制药,,绿叶制药,99,1,ESG,";
-func parseBasicSecurity(body string) []types.BasicSecurity {
-	body1 := strings.ReplaceAll(body, `var suggestvalue="`, "")
-	body2 := strings.ReplaceAll(body1, `";`, "")
-	lines := strings.Split(body2, ";")
-
-	res := make([]types.BasicSecurity, 0, len(lines))
-	for _, item := range lines {
-		// 腾讯控股,31,00700,00700,腾讯控股,,腾讯控股,99,1,ESG;
-		// 1 5 7名称 2市场 3 4代码 8- 9在市 10-
-		ss := strings.Split(item, ",")
-		if ss[8] != "1" {
-			continue
-		}
-
-		var (
-			name     string = ss[4]
-			exCode   string = strings.ToUpper(ss[3])
-			code     string = ss[2]
-			exChange string
-			secType  types.SecurityType
-		)
-
-		switch ss[1] {
-		case "11", "12", "15":
-			if len(ss[3]) >= 2 {
-				exChange = ss[3][:2]
-			} else {
-				slog.Warn("invalid code %s of %s", ss[0], ss[3])
-			}
-			secType = types.SecurityTypeStock
-		case "21", "22", "23", "24", "25", "26":
-			secType = types.SecurityTypeFund
-		case "31", "33":
-			secType = types.SecurityTypeStock
-			exChange = types.ExChangeHKex
-			exCode = "HK" + ss[3]
-		case "41":
-			secType = types.SecurityTypeStock
-			exChange = types.ExChangeNasdaq
-			exCode = formatUSCode(ss[3])
-		default:
-			slog.Warn("can not recganize code: %s %s", ss[0], ss[2])
-		}
-
-		ssr := types.BasicSecurity{
-			Name:         name,
-			Code:         code,
-			ExCode:       exCode,
-			ExChange:     exChange,
-			SecurityType: secType,
-		}
-
-		res = append(res, ssr)
-	}
-
-	return res
-}
-
-// formatUSCode 格式化美国证券代码
-func formatUSCode(in string) (out string) {
-	out = in
-	if !strings.Contains(in, "$") {
-		out = "$" + out
-	}
-	return strings.ToUpper(out)
-}
-
 // Profile 根据证券代码获取证券的基本信息，exCode SH600036
 func Profile(exCode string) *types.SinaProfile {
 	var (
@@ -236,6 +167,75 @@ func Info(exCode string) (*types.SinaQuote, *sinaPartProfile, error) {
 	}
 
 	return quote, partProfile, nil
+}
+
+// parseBasicSecurity 解析 sina 搜索结果字符串
+// var suggestvalue="龙芯中科,11,688047,sh688047,龙芯中科,,龙芯中科,99,1,,;绿叶制药,31,02186,02186,绿叶制药,,绿叶制药,99,1,ESG,";
+func parseBasicSecurity(body string) []types.BasicSecurity {
+	body1 := strings.ReplaceAll(body, `var suggestvalue="`, "")
+	body2 := strings.ReplaceAll(body1, `";`, "")
+	lines := strings.Split(body2, ";")
+
+	res := make([]types.BasicSecurity, 0, len(lines))
+	for _, item := range lines {
+		// 腾讯控股,31,00700,00700,腾讯控股,,腾讯控股,99,1,ESG;
+		// 1 5 7名称 2市场 3 4代码 8- 9在市 10-
+		ss := strings.Split(item, ",")
+		if ss[8] != "1" {
+			continue
+		}
+
+		var (
+			name     string = ss[4]
+			exCode   string = strings.ToUpper(ss[3])
+			code     string = ss[2]
+			exChange string
+			secType  types.SecurityType
+		)
+
+		switch ss[1] {
+		case "11", "12", "15":
+			if len(ss[3]) >= 2 {
+				exChange = ss[3][:2]
+			} else {
+				slog.Warn("invalid code %s of %s", ss[0], ss[3])
+			}
+			secType = types.SecurityTypeStock
+		case "21", "22", "23", "24", "25", "26":
+			secType = types.SecurityTypeFund
+		case "31", "33":
+			secType = types.SecurityTypeStock
+			exChange = types.ExChangeHKex
+			exCode = "HK" + ss[3]
+		case "41":
+			secType = types.SecurityTypeStock
+			exChange = types.ExChangeNasdaq
+			exCode = formatUSCode(ss[3])
+		default:
+			slog.Warn("can not recganize code: %s %s", ss[0], ss[2])
+		}
+
+		ssr := types.BasicSecurity{
+			Name:         name,
+			Code:         code,
+			ExCode:       exCode,
+			ExChange:     exChange,
+			SecurityType: secType,
+		}
+
+		res = append(res, ssr)
+	}
+
+	return res
+}
+
+// formatUSCode 格式化美国证券代码
+func formatUSCode(in string) (out string) {
+	out = in
+	if !strings.Contains(in, "$") {
+		out = "$" + out
+	}
+	return strings.ToUpper(out)
 }
 
 // 原始行：var hq_str_sh688047="龙芯中科,106.000,99.680,119.620,119.620,104.500,119.620,0.000,8256723,938310086.000,25600,119.620,7255,119.610,3033,119.600,1767,119.570,6300,119.550,0,0.000,0,0.000,0,0.000,0,0.000,0,0.000,2024-09-30,15:00:01,00,";
