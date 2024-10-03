@@ -96,7 +96,7 @@ func Profile(exCode string) *CorpProfile {
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		corp, err1 = CorpInfo(exCode)
+		corp, err1 = QueryBasciCorp(exCode)
 	}()
 	go func() {
 		defer wg.Done()
@@ -141,8 +141,8 @@ func Profile(exCode string) *CorpProfile {
 	return profile
 }
 
-// CorpInfo 根据证券代码获取公司信息
-func CorpInfo(exCode string) (*BasicCorp, error) {
+// QueryBasciCorp 根据证券代码获取公司信息
+func QueryBasciCorp(exCode string) (*BasicCorp, error) {
 	coraUrl := fmt.Sprintf("https://vip.stock.finance.sina.com.cn/corp/go.php/vCI_CorpInfo/stockid/%s.phtml", exCode)
 	resp, err := makeRequest(http.MethodGet, coraUrl, defaultHttpHeaders(), nil)
 	if err != nil {
@@ -159,7 +159,7 @@ func CorpInfo(exCode string) (*BasicCorp, error) {
 		return nil, err
 	}
 
-	return parseCorpInfo(body)
+	return parseBasicCorp(body)
 }
 
 // Info 请求证券信息
@@ -398,8 +398,8 @@ func makeRequest(method, reqURL string, headers http.Header, body io.Reader) (*h
 	return resp, nil
 }
 
-// parseCorpInfo 解析 html 得到基本 corp 信息
-func parseCorpInfo(body []byte) (*BasicCorp, error) {
+// parseBasicCorp 解析 html 得到基本 corp 信息
+func parseBasicCorp(body []byte) (*BasicCorp, error) {
 	doc, err := goquery.NewDocumentFromReader(io.NopCloser(bytes.NewBuffer(body)))
 	if err != nil {
 		return nil, err
