@@ -155,6 +155,7 @@ func Profile(exCode string) *types.SinaProfile {
 		// Code:            quota.,
 		ExCode:          corp.ExCode,
 		Name:            corp.Name,
+		HistoryName:     corp.HistoryName,
 		ListingPrice:    corp.Price,
 		ListingDate:     corp.Date,
 		WebSite:         corp.WebSite,
@@ -167,6 +168,9 @@ func Profile(exCode string) *types.SinaProfile {
 		TradedMarketCap: quote.Current * float64(partProfile.TradeCap) * 10000.0,
 	}
 
+	if profile.HistoryName == "" {
+		profile.HistoryName = quote.Name
+	}
 	if partProfile.VPS != 0 {
 		profile.PB = quote.Current / partProfile.VPS
 	}
