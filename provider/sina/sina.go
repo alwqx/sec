@@ -57,7 +57,7 @@ func Search(key string) []types.BasicSecurity {
 func Profile(exCode string) *types.SinaProfile {
 	var (
 		wg          sync.WaitGroup
-		corp        *types.BasicCorp
+		corp        *BasicCorp
 		quote       *types.SinaQuote
 		partProfile *sinaPartProfile
 
@@ -113,7 +113,7 @@ func Profile(exCode string) *types.SinaProfile {
 }
 
 // CorpInfo 根据证券代码获取公司信息
-func CorpInfo(exCode string) (*types.BasicCorp, error) {
+func CorpInfo(exCode string) (*BasicCorp, error) {
 	coraUrl := fmt.Sprintf("https://vip.stock.finance.sina.com.cn/corp/go.php/vCI_CorpInfo/stockid/%s.phtml", exCode)
 	resp, err := makeRequest(http.MethodGet, coraUrl, defaultHttpHeaders(), nil)
 	if err != nil {
@@ -370,13 +370,13 @@ func makeRequest(method, reqURL string, headers http.Header, body io.Reader) (*h
 }
 
 // parseCorpInfo 解析 html 得到基本 corp 信息
-func parseCorpInfo(body []byte) (*types.BasicCorp, error) {
+func parseCorpInfo(body []byte) (*BasicCorp, error) {
 	doc, err := goquery.NewDocumentFromReader(io.NopCloser(bytes.NewBuffer(body)))
 	if err != nil {
 		return nil, err
 	}
 
-	res := new(types.BasicCorp)
+	res := new(BasicCorp)
 	ss := doc.Find("#comInfo1 td")
 	ss.Each(func(i int, s *goquery.Selection) {
 		// for debug/dev:
