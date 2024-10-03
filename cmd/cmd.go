@@ -8,7 +8,6 @@ import (
 	"strconv"
 
 	"github.com/alwqx/sec/provider/sina"
-	"github.com/alwqx/sec/types"
 	"github.com/alwqx/sec/version"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
@@ -138,7 +137,7 @@ func QuoteHandler(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func printQuote(quote *types.SinaQuote) {
+func printQuote(quote *sina.SecurityQuote) {
 	if quote == nil {
 		return
 	}

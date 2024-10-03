@@ -45,3 +45,18 @@ type CorpProfile struct {
 	MarketCap       float64 // 总市值
 	TradedMarketCap float64 // 流通市值
 }
+
+// SecurityQuote 证券行情
+type SecurityQuote struct {
+	TradeDate string // 交易日期 "2023-06-02"
+	Code      string
+	Name      string
+	Current   float64 // 当前价格
+	Open      float64
+	YClose    float64 // 上个交易日收盘价
+	High      float64
+	Low       float64
+	Volume    float64 // 成交金额 单位：元
+	TurnOver  int64   // 成交数量 单位：股
+	Time      string  // 交易日期 "2023-06-02"
+}

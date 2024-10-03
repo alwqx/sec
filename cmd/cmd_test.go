@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/alwqx/sec/provider/sina"
-	"github.com/alwqx/sec/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -19,7 +18,7 @@ func TestHumanNum(t *testing.T) {
 
 func TestPrintQuote(t *testing.T) {
 	// 涨
-	quote := &types.SinaQuote{
+	quote := &sina.SecurityQuote{
 		Name:      "龙芯中科",
 		TradeDate: "2024-09-30",
 		Time:      "15:00:01",
@@ -35,7 +34,7 @@ func TestPrintQuote(t *testing.T) {
 	printQuote(quote)
 
 	// 跌
-	quote = &types.SinaQuote{
+	quote = &sina.SecurityQuote{
 		Name:      "龙芯中科",
 		TradeDate: "2024-09-30",
 		Time:      "15:00:01",
@@ -51,7 +50,7 @@ func TestPrintQuote(t *testing.T) {
 	printQuote(quote)
 
 	// 平
-	quote = &types.SinaQuote{
+	quote = &sina.SecurityQuote{
 		Name:      "龙芯中科",
 		TradeDate: "2024-09-30",
 		Time:      "15:00:01",
