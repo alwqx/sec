@@ -2,6 +2,7 @@ package sina
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -188,6 +189,7 @@ func Info(exCode string) (*SecurityQuote, *sinaPartProfile, error) {
 	lines := regstr.FindAll([]byte(body), -1)
 	if len(lines) != 2 {
 		slog.Error("request %s get invalid body %s", reqUrl, body)
+		return nil, nil, errors.New("invalid body, should have 2 lines but not")
 	}
 
 	quote := parseSecQuote(string(lines[0]))
