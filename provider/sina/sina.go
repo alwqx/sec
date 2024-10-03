@@ -54,7 +54,7 @@ func Search(key string) []BasicSecurity {
 }
 
 // Profile 根据证券代码获取证券的基本信息，exCode SH600036
-func Profile(exCode string) *QuoteProfile {
+func Profile(exCode string) *CorpProfile {
 	var (
 		wg          sync.WaitGroup
 		corp        *BasicCorp
@@ -82,7 +82,7 @@ func Profile(exCode string) *QuoteProfile {
 		slog.Error(fmt.Sprintf("info error: %v", err2))
 	}
 
-	profile := &QuoteProfile{
+	profile := &CorpProfile{
 		// Code:            quota.,
 		ExCode:          corp.ExCode,
 		Name:            corp.Name,

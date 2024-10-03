@@ -27,7 +27,7 @@ type BasicCorp struct {
 	MainBussiness   string  // 主营业务
 }
 
-type QuoteProfile struct {
+type CorpProfile struct {
 	Code            string
 	ExCode          string
 	Name            string  // 公司名称
