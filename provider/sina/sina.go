@@ -168,7 +168,7 @@ func Profile(exCode string) *types.SinaProfile {
 	}
 
 	if partProfile.VPS != 0 {
-		profile.PB = corp.Price / partProfile.VPS
+		profile.PB = quote.Current / partProfile.VPS
 	}
 	if partProfile.Profit > 0 {
 		profile.PeTTM = quote.Current * float64(partProfile.Cap) / partProfile.Profit / 10000.0
