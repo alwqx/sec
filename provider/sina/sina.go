@@ -230,7 +230,7 @@ func Info(exCode string) (*types.SinaQuote, *sinaPartProfile, error) {
 	}
 
 	quote := parseInfoQuote(string(lines[0]))
-	partProfile, err := parseSinaInfoPartProfile(string(lines[1]))
+	partProfile, err := parseInfoPartProfile(string(lines[1]))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -291,7 +291,7 @@ type sinaPartProfile struct {
 	Categray string  // 行业分类
 }
 
-func parseSinaInfoPartProfile(line string) (*sinaPartProfile, error) {
+func parseInfoPartProfile(line string) (*sinaPartProfile, error) {
 	items := strings.Split(line, ",")
 	var (
 		err error
