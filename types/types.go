@@ -14,3 +14,9 @@ const (
 	ExChangeNyse   = "ny"     // 纽约交所
 	ExChangeNasdaq = "nasdaq" // 纳斯达克
 )
+
+type InfoOptions struct {
+	Code     string // 证券代码 600036
+	ExCode   string // 带交易所前缀的证券代码  SH600036
+	Dividend bool   // 是否显示分红送转信息，true显示，false不显示
+}

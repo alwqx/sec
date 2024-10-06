@@ -60,3 +60,13 @@ type SecurityQuote struct {
 	TurnOver  int64   // 成交数量 单位：股
 	Time      string  // 交易日期 "2023-06-02"
 }
+
+// 分红送转信息
+type Dividend struct {
+	PublicDate     string  // 公告日期
+	RecordDate     string  // 登记日期
+	DividendedDate string  // 除息日期
+	Shares         float64 // 送股数量
+	AddShares      float64 // 转增股票数量
+	Bonus          float64 // 红利
+}

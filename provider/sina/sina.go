@@ -85,7 +85,11 @@ func QuerySecQuote(exCode string) (*SecurityQuote, error) {
 }
 
 // Profile 根据证券代码获取证券的基本信息，exCode SH600036
-func Profile(exCode string) *CorpProfile {
+func Profile(opts *types.InfoOptions) *CorpProfile {
+	if opts == nil {
+		return nil
+	}
+
 	var (
 		wg          sync.WaitGroup
 		corp        *BasicCorp
@@ -98,11 +102,11 @@ func Profile(exCode string) *CorpProfile {
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		corp, err1 = QueryBasicCorp(exCode)
+		corp, err1 = QueryBasicCorp(opts.ExCode)
 	}()
 	go func() {
 		defer wg.Done()
-		quote, partProfile, err2 = Info(exCode)
+		quote, partProfile, err2 = Info(opts.ExCode)
 	}()
 	wg.Wait()
 
@@ -141,6 +145,28 @@ func Profile(exCode string) *CorpProfile {
 	}
 
 	return profile
+}
+
+// QueryDividends 查询分红送转信息
+func QueryDividends(code string) ([]Dividend, error) {
+	pageURL := fmt.Sprintf("https://vip.stock.finance.sina.com.cn/corp/go.php/vISSUE_ShareBonus/stockid/%s.phtml", code)
+	resp, err := makeRequest(http.MethodGet, pageURL, defaultHttpHeaders(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+	err = adjustRespBodyByEncode(resp)
+	if err != nil {
+		return nil, err
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	// 解析页面内容
+	return parseDividend(body)
 }
 
 // QueryBasicCorp 根据证券代码获取公司信息
@@ -440,6 +466,61 @@ func parseBasicCorp(body []byte) (*BasicCorp, error) {
 			res.BusinessAddress = strings.TrimSpace(s.Text())
 		case 49:
 			res.MainBussiness = strings.TrimSpace(s.Text())
+		}
+	})
+
+	return res, nil
+}
+
+// parseDividend 解析 html 得到基本 dividend 信息
+func parseDividend(body []byte) ([]Dividend, error) {
+	doc, err := goquery.NewDocumentFromReader(io.NopCloser(bytes.NewBuffer(body)))
+	if err != nil {
+		return nil, err
+	}
+
+	res := make([]Dividend, 0)
+	ss := doc.Find("#sharebonus_1 tr td")
+	var (
+		num  int
+		d    Dividend
+		errs []error
+	)
+
+	// 先统计分红送转总行数
+	ss.Each(func(i int, s *goquery.Selection) {
+		num += 1
+	})
+
+	ss.Each(func(i int, s *goquery.Selection) {
+		// for debug/dev:
+		// fmt.Printf("Review %d: %s\n", i, s.Text())
+		mod := i % 9
+		switch mod {
+		case 0:
+			if i > 0 {
+				res = append(res, d)
+				d = Dividend{}
+			}
+			d.PublicDate = s.Text()
+		case 1:
+			d.Shares, err = strconv.ParseFloat(s.Text(), 64)
+		case 2:
+			d.AddShares, err = strconv.ParseFloat(s.Text(), 64)
+		case 3:
+			d.Bonus, err = strconv.ParseFloat(s.Text(), 64)
+		case 5:
+			d.DividendedDate = s.Text()
+		case 6:
+			d.RecordDate = s.Text()
+		}
+
+		if err != nil {
+			errs = append(errs, err)
+		}
+
+		if i == num-1 {
+			res = append(res, d)
 		}
 	})
 
