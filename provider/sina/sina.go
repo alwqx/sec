@@ -85,7 +85,11 @@ func QuerySecQuote(exCode string) (*SecurityQuote, error) {
 }
 
 // Profile 根据证券代码获取证券的基本信息，exCode SH600036
-func Profile(exCode string) *CorpProfile {
+func Profile(opts *types.InfoOptions) *CorpProfile {
+	if opts == nil {
+		return nil
+	}
+
 	var (
 		wg          sync.WaitGroup
 		corp        *BasicCorp
@@ -98,11 +102,11 @@ func Profile(exCode string) *CorpProfile {
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		corp, err1 = QueryBasicCorp(exCode)
+		corp, err1 = QueryBasicCorp(opts.ExCode)
 	}()
 	go func() {
 		defer wg.Done()
-		quote, partProfile, err2 = Info(exCode)
+		quote, partProfile, err2 = Info(opts.ExCode)
 	}()
 	wg.Wait()
 
