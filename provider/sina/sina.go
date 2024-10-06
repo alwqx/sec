@@ -2,6 +2,7 @@ package sina
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -53,6 +54,7 @@ func Search(key string) []BasicSecurity {
 	return parseBasicSecurity(string(resBytes))
 }
 
+// QuerySecQuote 查询证券行情
 func QuerySecQuote(exCode string) (*SecurityQuote, error) {
 	lowerKey := strings.ToLower(exCode)
 	reqUrl := fmt.Sprintf("https://hq.sinajs.cn/list=%s", lowerKey)
@@ -96,7 +98,7 @@ func Profile(exCode string) *CorpProfile {
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		corp, err1 = QueryBasciCorp(exCode)
+		corp, err1 = QueryBasicCorp(exCode)
 	}()
 	go func() {
 		defer wg.Done()
@@ -141,8 +143,8 @@ func Profile(exCode string) *CorpProfile {
 	return profile
 }
 
-// QueryBasciCorp 根据证券代码获取公司信息
-func QueryBasciCorp(exCode string) (*BasicCorp, error) {
+// QueryBasicCorp 根据证券代码获取公司信息
+func QueryBasicCorp(exCode string) (*BasicCorp, error) {
 	coraUrl := fmt.Sprintf("https://vip.stock.finance.sina.com.cn/corp/go.php/vCI_CorpInfo/stockid/%s.phtml", exCode)
 	resp, err := makeRequest(http.MethodGet, coraUrl, defaultHttpHeaders(), nil)
 	if err != nil {
@@ -188,6 +190,7 @@ func Info(exCode string) (*SecurityQuote, *sinaPartProfile, error) {
 	lines := regstr.FindAll([]byte(body), -1)
 	if len(lines) != 2 {
 		slog.Error("request %s get invalid body %s", reqUrl, body)
+		return nil, nil, errors.New("invalid body, should have 2 lines but not")
 	}
 
 	quote := parseSecQuote(string(lines[0]))
