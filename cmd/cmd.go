@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/alwqx/sec/provider/sina"
 	"github.com/alwqx/sec/types"
@@ -99,12 +100,23 @@ func InfoHandler(cmd *cobra.Command, args []string) error {
 
 	// 2. choose the first item
 	sec := secs[0]
-	opts.ExCode = sec.ExChange
-	profile := sina.Profile(sec.ExCode)
+	opts.Code = sec.Code
+	opts.ExCode = sec.ExCode
+	profile := sina.Profile(opts)
 	fmt.Printf("基本信息\n证券代码\t%s\n简称历史\t%s\n公司名称\t%s\n上市日期\t%s\n发行价格\t%.2f\n行业分类\t%s\n主营业务\t%s\n办公地址\t%s\n公司网址\t%s\n当前价格\t%.2f\n市净率PB\t%.2f\n市盈率TTM\t%.2f\n总市值  \t%s\n流通市值\t%s\n",
 		sec.ExCode, profile.HistoryName, profile.Name, profile.ListingDate, profile.ListingPrice,
 		profile.Category, profile.MainBusiness, profile.BusinessAddress, profile.WebSite,
 		profile.Current, profile.PB, profile.PeTTM, humanNum(profile.MarketCap), humanNum(profile.TradedMarketCap))
+
+	if opts.Dividend {
+		dids, err := sina.QueryDividends(opts.Code)
+		if err != nil {
+			slog.Error("Error", "code", opts.Code, "error", err)
+		} else {
+			fmt.Println()
+			printDividends(dids)
+		}
+	}
 
 	return nil
 }
@@ -219,6 +231,52 @@ func printSecs(secs []sina.BasicSecurity) {
 
 	table := tablewriter.NewWriter(os.Stdout)
 	headers := []string{"证券代码", "证券名称", "证券类型", "交易所"}
+	table.SetHeader(headers)
+	headerStyles := make([]tablewriter.Colors, 0, len(headers))
+	for range headers {
+		headerStyles = append(headerStyles, tablewriter.Colors{tablewriter.Bold})
+	}
+	table.SetHeaderColor(headerStyles...)
+
+	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
+	table.SetAlignment(tablewriter.ALIGN_LEFT)
+	table.SetHeaderLine(false)
+	table.SetBorder(false)
+	table.SetNoWhiteSpace(true)
+	table.SetTablePadding("\t")
+	table.AppendBulk(data)
+	table.Render()
+}
+
+func printDividends(dids []sina.Dividend) {
+	num := len(dids)
+	if num == 0 {
+		return
+	}
+
+	data := make([][]string, 0, num)
+	for _, did := range dids {
+		var sb strings.Builder
+		sb.WriteString("10")
+		if did.Shares > 0 {
+			sb.WriteString(fmt.Sprintf("送%-.2f股", did.Shares))
+		}
+		if did.AddShares > 0 {
+			sb.WriteString(fmt.Sprintf("转%-.2f股", did.AddShares))
+		}
+		if did.Bonus > 0 {
+			sb.WriteString(fmt.Sprintf("派%-.2f元", did.Bonus))
+		}
+
+		bonus := sb.String()
+		if sb.Len() < 3 {
+			bonus = "不分配"
+		}
+		data = append(data, []string{did.PublicDate, bonus, did.DividendedDate, did.RecordDate})
+	}
+
+	table := tablewriter.NewWriter(os.Stdout)
+	headers := []string{"公告日期", "分红送配", "除权除息日", "股权登记日"}
 	table.SetHeader(headers)
 	headerStyles := make([]tablewriter.Colors, 0, len(headers))
 	for range headers {

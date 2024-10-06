@@ -2,6 +2,7 @@ package sina
 
 import (
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/alwqx/sec/types"
@@ -58,4 +59,36 @@ func TestDefaultHttpHeaders(t *testing.T) {
 	require.Equal(t, 1, len(hs))
 	require.Equal(t, SinaReferer, hs.Get("Referer"))
 	require.Equal(t, "", hs.Get("Others"))
+}
+
+func TestParseDividend(t *testing.T) {
+	// 读取 body 信息
+	data, err := os.ReadFile("./test_data/corp_ShareBonus_stockid_600036.html")
+	require.Nil(t, err)
+	res, err := parseDividend(data)
+	require.Nil(t, err)
+	require.NotNil(t, res)
+	require.Equal(t, 24, len(res))
+
+	// 2024年
+	require.EqualValues(t, 19.72, res[0].Bonus)
+	require.EqualValues(t, "2024-07-04", res[0].PublicDate)
+	require.EqualValues(t, "2024-07-11", res[0].DividendedDate)
+	require.EqualValues(t, "2024-07-10", res[0].RecordDate)
+	require.EqualValues(t, 0, res[0].Shares)
+	require.EqualValues(t, 0, res[0].AddShares)
+
+	// 2009年
+	require.EqualValues(t, 3, res[15].Shares)
+
+	// 2004年
+	require.EqualValues(t, 0.92, res[22].Bonus)
+
+	// 2003年
+	require.EqualValues(t, 1.2, res[23].Bonus)
+	require.EqualValues(t, "2003-07-08", res[23].PublicDate)
+	require.EqualValues(t, "2003-07-16", res[23].DividendedDate)
+	require.EqualValues(t, "2003-07-15", res[23].RecordDate)
+	require.EqualValues(t, 0, res[23].Shares)
+	require.EqualValues(t, 0, res[23].AddShares)
 }
