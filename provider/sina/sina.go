@@ -54,6 +54,7 @@ func Search(key string) []BasicSecurity {
 	return parseBasicSecurity(string(resBytes))
 }
 
+// QuerySecQuote 查询证券行情
 func QuerySecQuote(exCode string) (*SecurityQuote, error) {
 	lowerKey := strings.ToLower(exCode)
 	reqUrl := fmt.Sprintf("https://hq.sinajs.cn/list=%s", lowerKey)
