@@ -5,14 +5,14 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     steps:
+      - name: Check out source code
+        uses: actions/checkout@v4
+
       - name: Set up Go Env
         uses: actions/setup-go@v4
         with:
           go-version-file: go.mod
         id: go
-
-      - name: Check out source code
-        uses: actions/checkout@v4
 
       - name: Test
         run: go test -v ./...
