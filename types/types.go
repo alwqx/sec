@@ -30,3 +30,14 @@ func JSONify(data interface{}) {
 	b, _ := json.MarshalIndent(data, "", "\t")
 	fmt.Println(string(b))
 }
+
+func HumanNum(cap float64) (res string) {
+	if cap <= 0.0 {
+		res = " - "
+	} else if cap > 100_000_000.0 {
+		res = fmt.Sprintf("%-.2f亿", cap/100_000_000.0)
+	} else {
+		res = fmt.Sprintf("%-.2f万", cap/10_000.0)
+	}
+	return
+}
