@@ -20,6 +20,8 @@ func TestPrintQuote(t *testing.T) {
 	// 涨
 	quote := &sina.SecurityQuote{
 		Name:      "龙芯中科",
+		Code:      "688047",
+		ExCode:    "SH688047",
 		TradeDate: "2024-09-30",
 		Time:      "15:00:01",
 		Current:   119.62,
@@ -36,6 +38,8 @@ func TestPrintQuote(t *testing.T) {
 	// 跌
 	quote = &sina.SecurityQuote{
 		Name:      "龙芯中科",
+		Code:      "688047",
+		ExCode:    "SH688047",
 		TradeDate: "2024-09-30",
 		Time:      "15:00:01",
 		Current:   119.62,
@@ -52,6 +56,8 @@ func TestPrintQuote(t *testing.T) {
 	// 平
 	quote = &sina.SecurityQuote{
 		Name:      "龙芯中科",
+		Code:      "688047",
+		ExCode:    "SH688047",
 		TradeDate: "2024-09-30",
 		Time:      "15:00:01",
 		Current:   119.62,

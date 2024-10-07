@@ -50,6 +50,7 @@ type CorpProfile struct {
 type SecurityQuote struct {
 	TradeDate string // 交易日期 "2023-06-02"
 	Code      string
+	ExCode    string
 	Name      string
 	Current   float64 // 当前价格
 	Open      float64
