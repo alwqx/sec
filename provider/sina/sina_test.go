@@ -30,6 +30,7 @@ func TestParseBasicSecuritys(t *testing.T) {
 }
 
 func TestProfile(t *testing.T) {
+	t.Skip("just test for dev/debug")
 	// Profile("688047")
 	quote, part, err := Info("SH688047")
 	require.Nil(t, err)
