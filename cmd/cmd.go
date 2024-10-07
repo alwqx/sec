@@ -52,13 +52,6 @@ func NewCLI() *cobra.Command {
 
 	infoCmd.Flags().BoolP("dividends", "d", false, "show dividend info")
 
-	// quoteCmd := &cobra.Command{
-	// 	Use:   "quote",
-	// 	Short: "Print quote information of a secutiry/stock",
-	// 	Args:  cobra.ExactArgs(1),
-	// 	RunE:  QuoteHandler,
-	// }
-
 	rootCmd.AddCommand(searchCmd, infoCmd, quote.NewQuoteCLI())
 
 	return rootCmd
@@ -107,7 +100,7 @@ func InfoHandler(cmd *cobra.Command, args []string) error {
 	fmt.Printf("证券代码\t%s\n简称历史\t%s\n公司名称\t%s\n上市日期\t%s\n发行价格\t%.2f\n行业分类\t%s\n主营业务\t%s\n办公地址\t%s\n公司网址\t%s\n当前价格\t%.2f\n市净率PB\t%.2f\n市盈率TTM\t%.2f\n总市值  \t%s\n流通市值\t%s\n",
 		sec.ExCode, profile.HistoryName, profile.Name, profile.ListingDate, profile.ListingPrice,
 		profile.Category, profile.MainBusiness, profile.BusinessAddress, profile.WebSite,
-		profile.Current, profile.PB, profile.PeTTM, humanNum(profile.MarketCap), humanNum(profile.TradedMarketCap))
+		profile.Current, profile.PB, profile.PeTTM, types.HumanNum(profile.MarketCap), types.HumanNum(profile.TradedMarketCap))
 
 	if opts.Dividend {
 		dids, err := sina.QueryDividends(opts.Code)
@@ -120,17 +113,6 @@ func InfoHandler(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
-}
-
-func humanNum(cap float64) (res string) {
-	if cap <= 0.0 {
-		res = " - "
-	} else if cap > 100_000_000.0 {
-		res = fmt.Sprintf("%-.2f亿", cap/100_000_000.0)
-	} else {
-		res = fmt.Sprintf("%-.2f万", cap/10_000.0)
-	}
-	return
 }
 
 func printSecs(secs []sina.BasicSecurity) {
