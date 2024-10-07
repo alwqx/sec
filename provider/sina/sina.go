@@ -54,6 +54,37 @@ func Search(key string) []BasicSecurity {
 	return parseBasicSecurity(string(resBytes))
 }
 
+// MultiSearch 根据关键字查询多个证券信息
+// 最多支持 8 条证券信息查询
+func MultiSearch(keys []string) []BasicSecurity {
+	num := len(keys)
+	if num == 0 {
+		return nil
+	}
+	if num > 8 {
+		slog.Debug("MultiSearch: sec num>8, choose 8 keys to search")
+		keys = keys[:8]
+	}
+
+	res := make([]BasicSecurity, 0, num)
+	ch := make(chan BasicSecurity, num)
+	for _, key := range keys {
+		go func(code string) {
+			secs := Search(code)
+			if len(secs) >= 1 {
+				slog.Debug("MultiSearch", "secs", secs)
+				ch <- secs[0]
+			}
+		}(key)
+	}
+
+	for range num {
+		res = append(res, <-ch)
+	}
+
+	return res
+}
+
 // QuerySecQuote 查询证券行情
 func QuerySecQuote(exCode string) (*SecurityQuote, error) {
 	lowerKey := strings.ToLower(exCode)
@@ -305,7 +336,7 @@ func parseSecQuote(quote string) *SecurityQuote {
 	items := strings.Split(newQuote, ",")
 	res := new(SecurityQuote)
 	res.Name = items[0]
-
+	slog.Debug("parseSecQuote", "quote string", quote, "items", items)
 	var err error
 	res.Current, err = strconv.ParseFloat(items[3], 64)
 	if err != nil {
