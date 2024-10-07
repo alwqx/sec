@@ -63,7 +63,7 @@ func TestDefaultHttpHeaders(t *testing.T) {
 
 func TestParseDividend(t *testing.T) {
 	// 读取 body 信息
-	data, err := os.ReadFile("./test_data/corp_ShareBonus_stockid_600036.html")
+	data, err := os.ReadFile("./testdata/corp_ShareBonus_stockid_600036.html")
 	require.Nil(t, err)
 	res, err := parseDividend(data)
 	require.Nil(t, err)
