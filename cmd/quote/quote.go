@@ -26,21 +26,13 @@ func NewQuoteCLI() *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			cmd.Print(cmd.UsageString())
 		},
+		RunE: QuoteHandler,
 	}
-
-	listCmd := &cobra.Command{
-		Use:   "list",
-		Short: "List quote information of a secutiry/stock",
-		Args:  cobra.ExactArgs(1),
-		RunE:  ListHandler,
-	}
-
-	rootCmd.AddCommand(listCmd)
 
 	return rootCmd
 }
 
-func ListHandler(cmd *cobra.Command, args []string) error {
+func QuoteHandler(cmd *cobra.Command, args []string) error {
 	if len(args) != 1 {
 		return errors.New("args of command should be one")
 	}
@@ -50,7 +42,7 @@ func ListHandler(cmd *cobra.Command, args []string) error {
 	// 查询参数由逗号分隔
 	keys := strings.Split(args[0], ",")
 	dedupKeys := stringSliceDedup(keys)
-	slog.Debug("ListHandler", "dedupKeys", dedupKeys)
+	slog.Debug("QuoteHandler", "dedupKeys", dedupKeys)
 
 	if len(dedupKeys) == 1 {
 		return quoteOneSec(dedupKeys[0])
