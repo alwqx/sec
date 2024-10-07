@@ -31,9 +31,9 @@ func TestParseBasicSecuritys(t *testing.T) {
 
 func TestProfile(t *testing.T) {
 	// Profile("688047")
-	quota, part, err := Info("SH688047")
+	quote, part, err := Info("SH688047")
 	require.Nil(t, err)
-	require.NotNil(t, quota)
+	require.NotNil(t, quote)
 	require.NotNil(t, part)
 }
 
