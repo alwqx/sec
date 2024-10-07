@@ -2,6 +2,10 @@ package sina
 
 import "github.com/alwqx/sec/types"
 
+const (
+	MultiSearchMaxNum = 8 // 单次支持最多查询的证券数量
+)
+
 // BasicSecurity 基本证券信息
 type BasicSecurity struct {
 	Name         string             // 证券名称

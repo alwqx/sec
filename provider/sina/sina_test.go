@@ -92,3 +92,15 @@ func TestParseDividend(t *testing.T) {
 	require.EqualValues(t, 0, res[23].Shares)
 	require.EqualValues(t, 0, res[23].AddShares)
 }
+
+func TestMultiSearch(t *testing.T) {
+	t.Skip("just test for dev/debug")
+	// 1. empty
+	res := MultiSearch(nil)
+	require.Equal(t, 0, len(res))
+
+	// 2. common
+	keys := []string{"lxjm", "lxzk"}
+	res = MultiSearch(keys)
+	require.Equal(t, len(keys), len(res))
+}
