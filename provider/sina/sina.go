@@ -118,7 +118,6 @@ func Profile(opts *types.InfoOptions) *CorpProfile {
 	}
 
 	profile := &CorpProfile{
-		// Code:            quota.,
 		ExCode:          corp.ExCode,
 		Name:            corp.Name,
 		HistoryName:     corp.HistoryName,

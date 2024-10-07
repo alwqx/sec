@@ -155,6 +155,8 @@ func QuoteHandler(cmd *cobra.Command, args []string) error {
 		slog.Warn(fmt.Sprintf("no result of %s", args[0]))
 		return nil
 	}
+	quote.Code = sec.Code
+	quote.ExCode = sec.ExCode
 	// TODO: 港股指数成交额 * 1000
 	printQuote(quote)
 
@@ -173,8 +175,6 @@ func printQuote(quote *sina.SecurityQuote) {
 	data := [][]string{
 		{
 			fmt.Sprintf("%s %s", quote.TradeDate, quote.Time),
-			quote.Name,
-			quote.Code,
 			// strconv.FormatFloat(quote.Current, 'g', -1, 64),
 			curWithRate,
 			strconv.FormatFloat(quote.YClose, 'g', -1, 64),
@@ -183,10 +183,12 @@ func printQuote(quote *sina.SecurityQuote) {
 			strconv.FormatFloat(quote.Low, 'g', -1, 64),
 			humanNum(float64(quote.TurnOver)),
 			humanNum(quote.Volume),
+			quote.Name,
+			quote.ExCode,
 		},
 	}
 	table := tablewriter.NewWriter(os.Stdout)
-	headers := []string{"时间", "名称", "证券代码", "当前价格", "昨收", "今开", "最高", "最低", "成交量", "成交额"}
+	headers := []string{"时间", "当前价格", "昨收", "今开", "最高", "最低", "成交量", "成交额", "名称", "证券代码"}
 	table.SetHeader(headers)
 
 	headerStyles := make([]tablewriter.Colors, 0, len(headers))
@@ -197,11 +199,11 @@ func printQuote(quote *sina.SecurityQuote) {
 	columnsStyles := make([]tablewriter.Colors, 0, len(headers))
 	for _, title := range headers {
 		var item tablewriter.Colors = tablewriter.Colors{}
-		if title == headers[3] {
+		if title == headers[1] {
 			if rate > 0 {
-				item = tablewriter.Colors{tablewriter.Bold, tablewriter.FgRedColor}
+				item = tablewriter.Colors{tablewriter.Bold, tablewriter.UnderlineSingle, tablewriter.FgRedColor}
 			} else if rate < 0 {
-				item = tablewriter.Colors{tablewriter.Bold, tablewriter.FgGreenColor}
+				item = tablewriter.Colors{tablewriter.Bold, tablewriter.UnderlineSingle, tablewriter.FgGreenColor}
 			}
 		}
 		columnsStyles = append(columnsStyles, item)
