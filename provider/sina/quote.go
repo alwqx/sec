@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/gorilla/websocket"
@@ -60,6 +61,10 @@ func parseQuoteWsBody(msg string) []*SecurityQuote {
 		quote := parseSecQuote(items[1])
 		res = append(res, quote)
 	}
+
+	sort.Slice(res, func(i, j int) bool {
+		return res[i].Name < res[j].Name
+	})
 
 	return res
 }

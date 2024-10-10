@@ -121,7 +121,7 @@ func printQuote(quotes []*sina.SecurityQuote) {
 		return
 	}
 
-	headers := []string{"时间", "当前价格", "昨收", "今开", "最高", "最低", "成交量", "成交额", "名称", "证券代码"}
+	headers := []string{"时间", "名称", "当前价格", "昨收", "今开", "最高", "最低", "成交量", "成交额", "证券代码"}
 	columnsStyles := make([][]tablewriter.Colors, 0, len(headers))
 
 	data := make([][]string, 0, len(quotes))
@@ -132,7 +132,7 @@ func printQuote(quotes []*sina.SecurityQuote) {
 
 		row := []string{
 			fmt.Sprintf("%s %s", quote.TradeDate, quote.Time),
-			// strconv.FormatFloat(quote.Current, 'g', -1, 64),
+			quote.Name,
 			curWithRate,
 			strconv.FormatFloat(quote.YClose, 'g', -1, 64),
 			strconv.FormatFloat(quote.Open, 'g', -1, 64),
@@ -140,7 +140,6 @@ func printQuote(quotes []*sina.SecurityQuote) {
 			strconv.FormatFloat(quote.Low, 'g', -1, 64),
 			types.HumanNum(float64(quote.TurnOver)),
 			types.HumanNum(quote.Volume),
-			quote.Name,
 			quote.ExCode,
 		}
 
@@ -149,7 +148,7 @@ func printQuote(quotes []*sina.SecurityQuote) {
 		styles := make([]tablewriter.Colors, 0, len(headers))
 		for _, title := range headers {
 			var item tablewriter.Colors = tablewriter.Colors{}
-			if title == headers[1] {
+			if title == headers[2] {
 				if rate > 0 {
 					item = tablewriter.Colors{tablewriter.Bold, tablewriter.UnderlineSingle, tablewriter.FgRedColor}
 				} else if rate < 0 {
@@ -174,14 +173,12 @@ func printQuote(quotes []*sina.SecurityQuote) {
 	}
 
 	table.SetHeaderColor(headerStyles...)
-	// table.SetColumnColor(columnsStyles...)
 	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
 	table.SetAlignment(tablewriter.ALIGN_LEFT)
 	table.SetHeaderLine(false)
 	table.SetBorder(false)
 	table.SetNoWhiteSpace(false)
 	table.SetTablePadding("\t")
-	// table.AppendBulk(data)
 	table.Render()
 }
 
