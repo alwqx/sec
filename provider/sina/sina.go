@@ -335,39 +335,39 @@ func parseSecQuote(quote string) *SecurityQuote {
 	newQuote = strings.TrimSuffix(newQuote, "\"")
 	items := strings.Split(newQuote, ",")
 	res := new(SecurityQuote)
-	res.Name = items[0]
+	res.Name = strings.TrimSpace(items[0])
 	slog.Debug("parseSecQuote", "quote string", quote, "items", items)
 	var err error
-	res.Current, err = strconv.ParseFloat(items[3], 64)
+	res.Current, err = strconv.ParseFloat(strings.TrimSpace(items[3]), 64)
 	if err != nil {
 		slog.Error(err.Error())
 	}
-	res.Open, err = strconv.ParseFloat(items[1], 64)
+	res.Open, err = strconv.ParseFloat(strings.TrimSpace(items[1]), 64)
 	if err != nil {
 		slog.Error(err.Error())
 	}
-	res.YClose, err = strconv.ParseFloat(items[2], 64)
+	res.YClose, err = strconv.ParseFloat(strings.TrimSpace(items[2]), 64)
 	if err != nil {
 		slog.Error(err.Error())
 	}
-	res.High, err = strconv.ParseFloat(items[4], 64)
+	res.High, err = strconv.ParseFloat(strings.TrimSpace(items[4]), 64)
 	if err != nil {
 		slog.Error(err.Error())
 	}
-	res.Low, err = strconv.ParseFloat(items[5], 64)
+	res.Low, err = strconv.ParseFloat(strings.TrimSpace(items[5]), 64)
 	if err != nil {
 		slog.Error(err.Error())
 	}
-	res.Volume, err = strconv.ParseFloat(items[9], 64)
+	res.Volume, err = strconv.ParseFloat(strings.TrimSpace(items[9]), 64)
 	if err != nil {
 		slog.Error(err.Error())
 	}
-	res.TurnOver, err = strconv.ParseInt(items[8], 10, 64)
+	res.TurnOver, err = strconv.ParseInt(strings.TrimSpace(items[8]), 10, 64)
 	if err != nil {
 		slog.Error(err.Error())
 	}
-	res.TradeDate = items[30]
-	res.Time = items[31]
+	res.TradeDate = strings.TrimSpace(items[30])
+	res.Time = strings.TrimSpace(items[31])
 
 	return res
 }

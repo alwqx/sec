@@ -179,7 +179,7 @@ func printQuote(quotes []*sina.SecurityQuote) {
 	table.SetAlignment(tablewriter.ALIGN_LEFT)
 	table.SetHeaderLine(false)
 	table.SetBorder(false)
-	table.SetNoWhiteSpace(true)
+	table.SetNoWhiteSpace(false)
 	table.SetTablePadding("\t")
 	// table.AppendBulk(data)
 	table.Render()
