@@ -61,10 +61,12 @@ func NewCLI() *cobra.Command {
 	return rootCmd
 }
 
+// versionHandler print version
 func versionHandler(cmd *cobra.Command, _ []string) {
 	fmt.Printf("sec version is %s\n", version.Version)
 }
 
+// debugHandler set debug mode
 func debugHandler(cmd *cobra.Command, args []string) {
 	if debug, _ := cmd.Flags().GetBool("debug"); debug {
 		slog.SetLogLoggerLevel(slog.LevelDebug)
