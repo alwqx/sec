@@ -28,6 +28,7 @@ func NewQuoteCLI() *cobra.Command {
 		},
 		RunE: QuoteHandler,
 	}
+	rootCmd.Flags().BoolP("debug", "D", false, "Enable debug mode")
 
 	return rootCmd
 }
@@ -36,8 +37,6 @@ func QuoteHandler(cmd *cobra.Command, args []string) error {
 	if len(args) != 1 {
 		return errors.New("args of command should be one")
 	}
-
-	// slog.SetLogLoggerLevel(slog.LevelDebug)
 
 	// 查询参数由逗号分隔
 	keys := strings.Split(args[0], ",")

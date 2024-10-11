@@ -24,6 +24,7 @@ func NewCLI() *cobra.Command {
 		CompletionOptions: cobra.CompletionOptions{
 			DisableDefaultCmd: true,
 		},
+		PersistentPreRun: debugHandler,
 		Run: func(cmd *cobra.Command, args []string) {
 			if version, _ := cmd.Flags().GetBool("version"); version {
 				versionHandler(cmd, args)
@@ -34,6 +35,7 @@ func NewCLI() *cobra.Command {
 		},
 	}
 
+	rootCmd.Flags().BoolP("debug", "D", false, "Enable debug mode")
 	rootCmd.Flags().BoolP("version", "v", false, "Show version information")
 
 	searchCmd := &cobra.Command{
@@ -42,6 +44,7 @@ func NewCLI() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE:  SearchHandler,
 	}
+	searchCmd.Flags().BoolP("debug", "D", false, "Enable debug mode")
 
 	infoCmd := &cobra.Command{
 		Use:   "info",
@@ -50,6 +53,7 @@ func NewCLI() *cobra.Command {
 		RunE:  InfoHandler,
 	}
 
+	infoCmd.Flags().BoolP("debug", "D", false, "Enable debug mode")
 	infoCmd.Flags().BoolP("dividends", "d", false, "show dividend info")
 
 	rootCmd.AddCommand(searchCmd, infoCmd, quote.NewQuoteCLI())
@@ -59,6 +63,12 @@ func NewCLI() *cobra.Command {
 
 func versionHandler(cmd *cobra.Command, _ []string) {
 	fmt.Printf("sec version is %s\n", version.Version)
+}
+
+func debugHandler(cmd *cobra.Command, args []string) {
+	if debug, _ := cmd.Flags().GetBool("debug"); debug {
+		slog.SetLogLoggerLevel(slog.LevelDebug)
+	}
 }
 
 func SearchHandler(cmd *cobra.Command, args []string) error {
