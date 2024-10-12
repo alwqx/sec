@@ -77,6 +77,11 @@ func quoteOneSec(key string) error {
 }
 
 func quoteMultiSec(keys []string) error {
+	// keys 长度不能超过5
+	if len(keys) > 5 {
+		slog.Warn("quoteMultiSec support 5 secs at most, will choose top 5 keys")
+		keys = keys[:5]
+	}
 	// 1. search security
 	secs := sina.MultiSearch(keys)
 	if len(secs) == 0 {

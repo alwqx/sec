@@ -270,6 +270,11 @@ func parseBasicSecurity(body string) []BasicSecurity {
 		// 腾讯控股,31,00700,00700,腾讯控股,,腾讯控股,99,1,ESG;
 		// 1 5 7名称 2市场 3 4代码 8- 9在市 10-
 		ss := strings.Split(item, ",")
+		if len(ss) != 11 {
+			slog.Debug("parseBasicSecurity", "body invalid", body)
+			slog.Warn("parseBasicSecurity", "line of body invalid", item)
+			continue
+		}
 		if ss[8] != "1" {
 			continue
 		}
