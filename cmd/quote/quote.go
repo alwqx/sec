@@ -1,12 +1,18 @@
 package quote
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
 	"os"
+	"os/exec"
+	"os/signal"
+	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/alwqx/sec/provider/sina"
 	"github.com/alwqx/sec/types"
@@ -29,6 +35,7 @@ func NewQuoteCLI() *cobra.Command {
 		RunE: QuoteHandler,
 	}
 	rootCmd.Flags().BoolP("debug", "D", false, "Enable debug mode")
+	rootCmd.Flags().BoolP("realtime", "r", false, "Realtime updaet quote info")
 
 	return rootCmd
 }
@@ -42,38 +49,41 @@ func QuoteHandler(cmd *cobra.Command, args []string) error {
 	keys := strings.Split(args[0], ",")
 	dedupKeys := stringSliceDedup(keys)
 	slog.Debug("QuoteHandler", "dedupKeys", dedupKeys)
-
-	if len(dedupKeys) == 1 {
-		return quoteOneSec(dedupKeys[0])
+	if len(dedupKeys) > 5 {
+		slog.Warn("QuoteHandler support 5 secs at most, will choose top 5 keys")
+		dedupKeys = dedupKeys[:5]
 	}
 
-	return quoteMultiSec(keys)
-}
-
-func quoteOneSec(key string) error {
-	// 1. search security
-	secs := sina.Search(key)
-	if len(secs) == 0 {
-		slog.Warn(fmt.Sprintf("no result of %s", key))
-		return nil
-	}
-
-	// 2. choose the first item
-	sec := secs[0]
-	quote, err := sina.QuerySecQuote(sec.ExCode)
+	realTime, err := cmd.Flags().GetBool("realtime")
 	if err != nil {
 		return err
 	}
-	if quote == nil {
-		slog.Warn(fmt.Sprintf("no result of %s", key))
-		return nil
+	if !realTime {
+		return quoteMultiSec(dedupKeys)
 	}
-	quote.Code = sec.Code
-	quote.ExCode = sec.ExCode
-	// TODO: 港股指数成交额 * 1000
-	printQuote([]*sina.SecurityQuote{quote})
 
-	return nil
+	ctx, cancel := context.WithCancel(cmd.Context())
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT)
+	go func() {
+		for {
+			s := <-c
+			slog.InfoContext(ctx, "QuoteHandler", "get a signal", s.String())
+			switch s {
+			case syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT:
+				cancel()
+				time.Sleep(time.Second)
+				return
+			case syscall.SIGHUP:
+			default:
+				return
+			}
+		}
+	}()
+
+	slog.DebugContext(ctx, "QuoteHandler", "realTime", realTime)
+	err = quoteMultiSecRealtime(ctx, dedupKeys)
+	return err
 }
 
 func quoteMultiSec(keys []string) error {
@@ -114,6 +124,53 @@ func quoteMultiSec(keys []string) error {
 	printQuote(res)
 
 	return nil
+}
+
+func quoteMultiSecRealtime(ctx context.Context, keys []string) error {
+	// keys 长度不能超过5
+	if len(keys) > 5 {
+		slog.WarnContext(ctx, "quoteMultiSecRealtime support 5 secs at most, will choose top 5 keys")
+		keys = keys[:5]
+	}
+	// 1. search security
+	secs := sina.MultiSearch(keys)
+	if len(secs) == 0 {
+		slog.Warn(fmt.Sprintf("no result of %v", keys))
+		return nil
+	}
+
+	slog.Debug("quoteMultiSecRealtime", "secs", secs)
+
+	codes := make([]string, 0, len(secs))
+	secMap := make(map[string]sina.BasicSecurity, len(secs))
+	for i, sec := range secs {
+		codes = append(codes, sec.ExCode)
+		secMap[sec.Name] = secs[i]
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+			res, err := sina.QuoteWs(codes)
+			if err != nil {
+				return err
+			}
+
+			// 填充证券代码
+			for _, quote := range res {
+				if sec, ok := secMap[quote.Name]; ok {
+					quote.ExCode = sec.ExCode
+					quote.Code = sec.Code
+				}
+			}
+			clearTerm()
+			printQuote(res)
+
+			time.Sleep(3 * time.Second)
+		}
+	}
 }
 
 // printQuote 打印 quote 信息
@@ -203,4 +260,21 @@ func stringSliceDedup(strs []string) []string {
 	}
 
 	return res
+}
+
+// clearTerm 终端清屏
+func clearTerm() {
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "windows":
+		cmd = exec.Command("cmd", "/c", "cls")
+	default:
+		cmd = exec.Command("clear")
+	}
+
+	cmd.Stdout = os.Stdout
+	err := cmd.Run()
+	if err != nil {
+		slog.Error("clearTerm", "cmd error", err)
+	}
 }
