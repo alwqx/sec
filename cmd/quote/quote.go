@@ -42,12 +42,12 @@ func QuoteHandler(cmd *cobra.Command, args []string) error {
 	keys := strings.Split(args[0], ",")
 	dedupKeys := stringSliceDedup(keys)
 	slog.Debug("QuoteHandler", "dedupKeys", dedupKeys)
-
-	if len(dedupKeys) == 1 {
-		return quoteOneSec(dedupKeys[0])
+	if len(dedupKeys) > 5 {
+		slog.Warn("QuoteHandler support 5 secs at most, will choose top 5 keys")
+		dedupKeys = dedupKeys[:5]
 	}
 
-	return quoteMultiSec(keys)
+	return quoteMultiSec(dedupKeys)
 }
 
 func quoteOneSec(key string) error {
