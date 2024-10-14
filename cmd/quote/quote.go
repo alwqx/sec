@@ -273,5 +273,8 @@ func clearTerm() {
 	}
 
 	cmd.Stdout = os.Stdout
-	cmd.Run()
+	err := cmd.Run()
+	if err != nil {
+		slog.Error("clearTerm", "cmd error", err)
+	}
 }
