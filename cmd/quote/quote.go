@@ -262,7 +262,7 @@ func stringSliceDedup(strs []string) []string {
 	return res
 }
 
-// clearTerm 总端清屏
+// clearTerm 终端清屏
 func clearTerm() {
 	var cmd *exec.Cmd
 	switch runtime.GOOS {
