@@ -68,11 +68,10 @@ func QuoteHandler(cmd *cobra.Command, args []string) error {
 	go func() {
 		for {
 			s := <-c
-			slog.InfoContext(ctx, "QuoteHandler", "get a signal", s.String())
 			switch s {
 			case syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT:
+				slog.DebugContext(ctx, "QuoteHandler", "get a signal", s.String())
 				cancel()
-				time.Sleep(time.Second)
 				return
 			case syscall.SIGHUP:
 			default:

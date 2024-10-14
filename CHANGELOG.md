@@ -1,5 +1,9 @@
 # sec change log
 
+### WIP v0.1.4
+
+1. quote 实时模式时，接受信号后立即退出
+
 ### v0.1.3
 
 1. 全部命令添加 `--debug`/`-D` flag
