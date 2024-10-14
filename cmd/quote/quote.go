@@ -6,8 +6,11 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
+	"time"
 
 	"github.com/alwqx/sec/provider/sina"
 	"github.com/alwqx/sec/types"
@@ -58,9 +61,24 @@ func QuoteHandler(cmd *cobra.Command, args []string) error {
 	}
 
 	ctx, cancel := context.WithCancel(cmd.Context())
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT)
 	go func() {
-		cancel()
+		for {
+			s := <-c
+			slog.InfoContext(ctx, "QuoteHandler", "get a signal", s.String())
+			switch s {
+			case syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT:
+				cancel()
+				time.Sleep(time.Second)
+				return
+			case syscall.SIGHUP:
+			default:
+				return
+			}
+		}
 	}()
+
 	slog.DebugContext(ctx, "QuoteHandler", "realTime", realTime)
 	err = quoteMultiSecRealtime(ctx, dedupKeys)
 	return err
@@ -109,7 +127,7 @@ func quoteMultiSec(keys []string) error {
 func quoteMultiSecRealtime(ctx context.Context, keys []string) error {
 	// keys 长度不能超过5
 	if len(keys) > 5 {
-		slog.WarnContext(ctx, "quoteMultiSec support 5 secs at most, will choose top 5 keys")
+		slog.WarnContext(ctx, "quoteMultiSecRealtime support 5 secs at most, will choose top 5 keys")
 		keys = keys[:5]
 	}
 	// 1. search security
@@ -119,7 +137,7 @@ func quoteMultiSecRealtime(ctx context.Context, keys []string) error {
 		return nil
 	}
 
-	slog.Debug("quoteMultiSec", "secs", secs)
+	slog.Debug("quoteMultiSecRealtime", "secs", secs)
 
 	codes := make([]string, 0, len(secs))
 	secMap := make(map[string]sina.BasicSecurity, len(secs))
@@ -128,22 +146,28 @@ func quoteMultiSecRealtime(ctx context.Context, keys []string) error {
 		secMap[sec.Name] = secs[i]
 	}
 
-	res, err := sina.QuoteWs(codes)
-	if err != nil {
-		return err
-	}
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+			res, err := sina.QuoteWs(codes)
+			if err != nil {
+				return err
+			}
 
-	// 填充证券代码
-	for _, quote := range res {
-		if sec, ok := secMap[quote.Name]; ok {
-			quote.ExCode = sec.ExCode
-			quote.Code = sec.Code
+			// 填充证券代码
+			for _, quote := range res {
+				if sec, ok := secMap[quote.Name]; ok {
+					quote.ExCode = sec.ExCode
+					quote.Code = sec.Code
+				}
+			}
+			printQuote(res)
+
+			time.Sleep(3 * time.Second)
 		}
 	}
-
-	printQuote(res)
-
-	return nil
 }
 
 // printQuote 打印 quote 信息
