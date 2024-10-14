@@ -173,10 +173,7 @@ func quoteMultiSecRealtime(ctx context.Context, keys []string) error {
 }
 
 // printQuote 打印 quote 信息
-// TODO: 修复列偏移
 func printQuote(quotes []*sina.SecurityQuote) {
-	// types.JSONify(quotes)
-
 	if len(quotes) == 0 {
 		return
 	}
