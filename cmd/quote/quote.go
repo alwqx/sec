@@ -68,11 +68,10 @@ func QuoteHandler(cmd *cobra.Command, args []string) error {
 	go func() {
 		for {
 			s := <-c
-			slog.InfoContext(ctx, "QuoteHandler", "get a signal", s.String())
 			switch s {
 			case syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT:
+				slog.DebugContext(ctx, "QuoteHandler", "get a signal", s.String())
 				cancel()
-				time.Sleep(time.Second)
 				return
 			case syscall.SIGHUP:
 			default:
@@ -174,10 +173,7 @@ func quoteMultiSecRealtime(ctx context.Context, keys []string) error {
 }
 
 // printQuote 打印 quote 信息
-// TODO: 修复列偏移
 func printQuote(quotes []*sina.SecurityQuote) {
-	// types.JSONify(quotes)
-
 	if len(quotes) == 0 {
 		return
 	}
