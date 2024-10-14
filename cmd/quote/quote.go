@@ -1,6 +1,7 @@
 package quote
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -29,6 +30,7 @@ func NewQuoteCLI() *cobra.Command {
 		RunE: QuoteHandler,
 	}
 	rootCmd.Flags().BoolP("debug", "D", false, "Enable debug mode")
+	rootCmd.Flags().BoolP("realtime", "r", false, "Realtime updaet quote info")
 
 	return rootCmd
 }
@@ -47,13 +49,67 @@ func QuoteHandler(cmd *cobra.Command, args []string) error {
 		dedupKeys = dedupKeys[:5]
 	}
 
-	return quoteMultiSec(dedupKeys)
+	realTime, err := cmd.Flags().GetBool("realtime")
+	if err != nil {
+		return err
+	}
+	if !realTime {
+		return quoteMultiSec(dedupKeys)
+	}
+
+	ctx, cancel := context.WithCancel(cmd.Context())
+	go func() {
+		cancel()
+	}()
+	slog.DebugContext(ctx, "QuoteHandler", "realTime", realTime)
+	err = quoteMultiSecRealtime(ctx, dedupKeys)
+	return err
 }
 
 func quoteMultiSec(keys []string) error {
 	// keys 长度不能超过5
 	if len(keys) > 5 {
 		slog.Warn("quoteMultiSec support 5 secs at most, will choose top 5 keys")
+		keys = keys[:5]
+	}
+	// 1. search security
+	secs := sina.MultiSearch(keys)
+	if len(secs) == 0 {
+		slog.Warn(fmt.Sprintf("no result of %v", keys))
+		return nil
+	}
+
+	slog.Debug("quoteMultiSec", "secs", secs)
+
+	codes := make([]string, 0, len(secs))
+	secMap := make(map[string]sina.BasicSecurity, len(secs))
+	for i, sec := range secs {
+		codes = append(codes, sec.ExCode)
+		secMap[sec.Name] = secs[i]
+	}
+
+	res, err := sina.QuoteWs(codes)
+	if err != nil {
+		return err
+	}
+
+	// 填充证券代码
+	for _, quote := range res {
+		if sec, ok := secMap[quote.Name]; ok {
+			quote.ExCode = sec.ExCode
+			quote.Code = sec.Code
+		}
+	}
+
+	printQuote(res)
+
+	return nil
+}
+
+func quoteMultiSecRealtime(ctx context.Context, keys []string) error {
+	// keys 长度不能超过5
+	if len(keys) > 5 {
+		slog.WarnContext(ctx, "quoteMultiSec support 5 secs at most, will choose top 5 keys")
 		keys = keys[:5]
 	}
 	// 1. search security
