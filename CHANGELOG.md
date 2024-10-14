@@ -1,6 +1,6 @@
 # sec change log
 
-### WIP v0.1.3
+### v0.1.3
 
 1. 全部命令添加 `--debug`/`-D` flag
 2. quote 命令最多支持查询 5 个证券
