@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/exec"
 	"os/signal"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -163,6 +165,7 @@ func quoteMultiSecRealtime(ctx context.Context, keys []string) error {
 					quote.Code = sec.Code
 				}
 			}
+			clearTerm()
 			printQuote(res)
 
 			time.Sleep(3 * time.Second)
@@ -257,4 +260,18 @@ func stringSliceDedup(strs []string) []string {
 	}
 
 	return res
+}
+
+// clearTerm 总端清屏
+func clearTerm() {
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "windows":
+		cmd = exec.Command("cmd", "/c", "cls")
+	default:
+		cmd = exec.Command("clear")
+	}
+
+	cmd.Stdout = os.Stdout
+	cmd.Run()
 }
