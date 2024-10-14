@@ -50,32 +50,6 @@ func QuoteHandler(cmd *cobra.Command, args []string) error {
 	return quoteMultiSec(dedupKeys)
 }
 
-func quoteOneSec(key string) error {
-	// 1. search security
-	secs := sina.Search(key)
-	if len(secs) == 0 {
-		slog.Warn(fmt.Sprintf("no result of %s", key))
-		return nil
-	}
-
-	// 2. choose the first item
-	sec := secs[0]
-	quote, err := sina.QuerySecQuote(sec.ExCode)
-	if err != nil {
-		return err
-	}
-	if quote == nil {
-		slog.Warn(fmt.Sprintf("no result of %s", key))
-		return nil
-	}
-	quote.Code = sec.Code
-	quote.ExCode = sec.ExCode
-	// TODO: 港股指数成交额 * 1000
-	printQuote([]*sina.SecurityQuote{quote})
-
-	return nil
-}
-
 func quoteMultiSec(keys []string) error {
 	// keys 长度不能超过5
 	if len(keys) > 5 {
