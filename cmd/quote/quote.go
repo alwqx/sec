@@ -184,8 +184,9 @@ func printQuote(quotes []*sina.SecurityQuote) {
 	data := make([][]string, 0, len(quotes))
 	for _, quote := range quotes {
 		// 计算涨跌
-		rate := (quote.Current/quote.YClose - 1.0) * 100.0
-		curWithRate := fmt.Sprintf("%-.5g %-.2g%s", quote.Current, rate, "%")
+		diffPrice := quote.Current - quote.YClose
+		rate := diffPrice / quote.YClose * 100.0
+		curWithRate := fmt.Sprintf("%-.5g %-.5g %-.2g%s", quote.Current, diffPrice, rate, "%")
 
 		row := []string{
 			fmt.Sprintf("%s %s", quote.TradeDate, quote.Time),
