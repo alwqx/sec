@@ -86,6 +86,7 @@ func MultiSearch(keys []string) []BasicSecurity {
 }
 
 // QuerySecQuote 查询证券行情
+// exCode SH600036 HK00700
 func QuerySecQuote(exCode string) (*SecurityQuote, error) {
 	lowerKey := strings.ToLower(exCode)
 	reqUrl := fmt.Sprintf("https://hq.sinajs.cn/list=%s", lowerKey)
@@ -110,7 +111,7 @@ func QuerySecQuote(exCode string) (*SecurityQuote, error) {
 	if len(lines) != 1 {
 		slog.Error("request %s get invalid body %s", reqUrl, body)
 	}
-	quote := parseSecQuote(string(lines[0]))
+	quote := parseSecQuote(exCode, string(lines[0]))
 
 	return quote, nil
 }
@@ -162,6 +163,12 @@ func Profile(opts *types.InfoOptions) *CorpProfile {
 		Category:        partProfile.Categray,
 		MarketCap:       quote.Current * float64(partProfile.Cap) * 10000.0,
 		TradedMarketCap: quote.Current * float64(partProfile.TradeCap) * 10000.0,
+	}
+
+	// 港股的市值需要重新算
+	if strings.HasPrefix(opts.ExCode, "HK") {
+		profile.MarketCap = quote.Current * float64(partProfile.Cap)
+		profile.TradedMarketCap = quote.Current * float64(partProfile.TradeCap)
 	}
 
 	if profile.HistoryName == "" {
@@ -222,11 +229,16 @@ func QueryBasicCorp(exCode string) (*BasicCorp, error) {
 
 // Info 请求证券信息
 // TODO: 拆分成 2 个函数
+// A 股
 // var hq_str_sh688047="龙芯中科,106.000,99.680,119.620,119.620,104.500,119.620,0.000,8256723,938310086.000,25600,119.620,7255,119.610,3033,119.600,1767,119.570,6300,119.550,0,0.000,0,0.000,0,0.000,0,0.000,0,0.000,2024-09-30,15:00:01,00,";
 // var hq_str_sh688047_i="A,lxzk,-0.8200,-1.1566,-0.5900,8.2671,94.6804,40100,27964.4729,27964.4729,0,CNY,-3.2944,-4.6378,60.0600,1,-6.9400,2.1959,-2.3813,133.21,67.89,0.2,龙芯中科,K|D|0|40100|4100,119.62|79.74,20240630|-119064971.81,700.7400|90.1790,|,,1/1,EQA,,0.00,110.610|119.620|99.680,半导体,龙芯中科,7,417392977.82";
+// 港股
+// var hq_str_hk00700="TENCENT,腾讯控股,508.500,510.000,514.500,507.000,512.000,2.000,0.392,512.00000,512.50000,7662280393,14986877,0.000,0.000,542.266,345.980,2025/05/27,16:08";
+// var hq_str_hk00700_i="EQTY,MAIN,542.266,345.980,2.9127,0,0,9189794319,0,9189794319,0,195076015710.40,51819945047.20,5.69,1,腾讯控股,3.700,0.5,100,腾讯控股,50028.230,209573020603.860,216730058624.020,1216841671768.900,,,0.8788,122.528696,,413.391|473.070|518.000,4.756824,2.589747,51,HKD";
 func Info(exCode string) (*SecurityQuote, *sinaPartProfile, error) {
 	lowerKey := strings.ToLower(exCode)
 	reqUrl := fmt.Sprintf("https://hq.sinajs.cn/list=%s,%s_i", lowerKey, lowerKey)
+	slog.Warn("Info", "exCode", exCode, "lowerKey", lowerKey, "URL", reqUrl)
 	resp, err := makeRequest(http.MethodGet, reqUrl, defaultHttpHeaders(), nil)
 	if err != nil {
 		return nil, nil, err
@@ -242,6 +254,13 @@ func Info(exCode string) (*SecurityQuote, *sinaPartProfile, error) {
 		return nil, nil, err
 	}
 
+	// 正则抽取双引号("")中的内容
+	// origin
+	// var hq_str_sh688047="龙芯中科,124.000,124.780,124.960,125.990,123.480,124.950,124.960,1346625,167864719.000,4104,124.950,5000,124.940,1100,124.930,1200,124.710,500,124.700,2178,124.960,1700,124.980,2400,124.990,4889,125.000,200,125.020,2025-05-27,15:00:00,00,";
+	// var hq_str_sh688047_i="A,lxzk,-1.5600,-1.7502,-0.3800,6.9603,66.4645,40100,27964.4729,27964.4729,0,CNY,-6.2535,-7.0182,60.0600,1,-5.2800,1.2496,-1.5128,168.88,83.5,0.2,龙芯中科,K|D|0|40100|4100,149.74|99.82,20250331|-151280445.14,718.7600|91.7230,|,,1/1,EQA,,0.00,132.280|129.790|120.400,半导体,龙芯中科,1,509214702.8";
+	// 抽取后
+	// "龙芯中科,124.000,124.780,124.960,125.990,123.480,124.950,124.960,1346625,167864719.000,4104,124.950,5000,124.940,1100,124.930,1200,124.710,500,124.700,2178,124.960,1700,124.980,2400,124.990,4889,125.000,200,125.020,2025-05-27,15:00:00,00,";
+	// "A,lxzk,-1.5600,-1.7502,-0.3800,6.9603,66.4645,40100,27964.4729,27964.4729,0,CNY,-6.2535,-7.0182,60.0600,1,-5.2800,1.2496,-1.5128,168.88,83.5,0.2,龙芯中科,K|D|0|40100|4100,149.74|99.82,20250331|-151280445.14,718.7600|91.7230,|,,1/1,EQA,,0.00,132.280|129.790|120.400,半导体,龙芯中科,1,509214702.8";
 	regstr := regexp.MustCompile(`"(.*)"`)
 	lines := regstr.FindAll([]byte(body), -1)
 	if len(lines) != 2 {
@@ -249,8 +268,8 @@ func Info(exCode string) (*SecurityQuote, *sinaPartProfile, error) {
 		return nil, nil, errors.New("invalid body, should have 2 lines but not")
 	}
 
-	quote := parseSecQuote(string(lines[0]))
-	partProfile, err := parseInfoPartProfile(string(lines[1]))
+	quote := parseSecQuote(exCode, string(lines[0]))
+	partProfile, err := parseInfoPartProfile(exCode, string(lines[1]))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -261,16 +280,20 @@ func Info(exCode string) (*SecurityQuote, *sinaPartProfile, error) {
 // parseBasicSecurity 解析 sina 搜索结果字符串
 // var suggestvalue="龙芯中科,11,688047,sh688047,龙芯中科,,龙芯中科,99,1,,;绿叶制药,31,02186,02186,绿叶制药,,绿叶制药,99,1,ESG,";
 func parseBasicSecurity(body string) []BasicSecurity {
+	// 去除首部多余字符串
 	body1 := strings.ReplaceAll(body, `var suggestvalue="`, "")
+	// 去除尾部多余字符串
 	body2 := strings.ReplaceAll(body1, `";`, "")
+	// 按照 ; 分隔成多行
 	lines := strings.Split(body2, ";")
 
 	res := make([]BasicSecurity, 0, len(lines))
 	for _, item := range lines {
-		// 腾讯控股,31,00700,00700,腾讯控股,,腾讯控股,99,1,ESG;
-		// 1 5 7名称 2市场 3 4代码 8- 9在市 10-
+		// 腾讯控股,31,00700,00700,腾讯控股,,腾讯控股,99,1,ESG,
+		// 腾讯控股,31,00700,00700,腾讯控股,,腾讯控股,99,1,ESG,,
+		// 1 5 7名称 2市场 3 4代码 8- 9在市 10- 11-
 		ss := strings.Split(item, ",")
-		if len(ss) != 11 {
+		if len(ss) != 12 {
 			slog.Debug("parseBasicSecurity", "body invalid", body)
 			slog.Warn("parseBasicSecurity", "line of body invalid", item)
 			continue
@@ -332,16 +355,31 @@ func formatUSCode(in string) (out string) {
 	return strings.ToUpper(out)
 }
 
-// 原始行：var hq_str_sh688047="龙芯中科,106.000,99.680,119.620,119.620,104.500,119.620,0.000,8256723,938310086.000,25600,119.620,7255,119.610,3033,119.600,1767,119.570,6300,119.550,0,0.000,0,0.000,0,0.000,0,0.000,0,0.000,2024-09-30,15:00:01,00,";
-// 经过正则抽取后的内容："龙芯中科,106.000,99.680,119.620,119.620,104.500,119.620,0.000,8256723,938310086.000,25600,119.620,7255,119.610,3033,119.600,1767,119.570,6300,119.550,0,0.000,0,0.000,0,0.000,0,0.000,0,0.000,2024-09-30,15:00:01,00,"
-func parseSecQuote(quote string) *SecurityQuote {
-	// 将首尾的冒号去掉
-	newQuote := strings.TrimPrefix(quote, "\"")
+// parseSecQuote 从返回结果解析到结构化数据
+// A 股 "龙芯中科,106.000,99.680,119.620,119.620,104.500,119.620,0.000,8256723,938310086.000,25600,119.620,7255,119.610,3033,119.600,1767,119.570,6300,119.550,0,0.000,0,0.000,0,0.000,0,0.000,0,0.000,2024-09-30,15:00:01,00,"
+// 港股 "TENCENT,腾讯控股,508.500,510.000,514.500,507.000,512.000,2.000,0.392,512.00000,512.50000,7662280393,14986877,0.000,0.000,542.266,345.980,2025/05/27,16:08";
+func parseSecQuote(exCode, quoteLine string) *SecurityQuote {
+	if strings.HasPrefix(exCode, "SH") {
+		return parseSecQuoteOfAstock(quoteLine)
+	}
+	if strings.HasPrefix(exCode, "HK") {
+		return parseSecQuoteOfHstock(quoteLine)
+	}
+
+	slog.Error("parseSecQuote", "unsupported code", exCode, "line", quoteLine)
+	return new(SecurityQuote)
+}
+
+// parseSecQuoteOfAstock 从 A 股返回结果解析到结构化数据
+// A 股 "龙芯中科,106.000,99.680,119.620,119.620,104.500,119.620,0.000,8256723,938310086.000,25600,119.620,7255,119.610,3033,119.600,1767,119.570,6300,119.550,0,0.000,0,0.000,0,0.000,0,0.000,0,0.000,2024-09-30,15:00:01,00,"
+func parseSecQuoteOfAstock(quoteLine string) *SecurityQuote {
+	// 将首尾的双引号去掉
+	newQuote := strings.TrimPrefix(quoteLine, "\"")
 	newQuote = strings.TrimSuffix(newQuote, "\"")
 	items := strings.Split(newQuote, ",")
 	res := new(SecurityQuote)
 	res.Name = strings.TrimSpace(items[0])
-	slog.Debug("parseSecQuote", "quote string", quote, "items", items)
+	slog.Debug("parseSecQuote", "quote string", quoteLine, "items", items)
 	var err error
 	res.Current, err = strconv.ParseFloat(strings.TrimSpace(items[3]), 64)
 	if err != nil {
@@ -377,6 +415,53 @@ func parseSecQuote(quote string) *SecurityQuote {
 	return res
 }
 
+// parseSecQuoteOfHstock 从 H 股返回结果解析到结构化数据
+// "TENCENT,腾讯控股,508.500,510.000,514.500,507.000,512.000,2.000,0.392,512.00000,512.50000,7662280393,14986877,0.000,0.000,542.266,345.980,2025/05/27,16:08";
+// d                2open  3yclose  4high   5low   6current 7     8     9         10        11成交额   12成交量股 13    14    15      16      17         18
+func parseSecQuoteOfHstock(quoteLine string) *SecurityQuote {
+	// 将首尾的双引号去掉
+	newQuote := strings.TrimPrefix(quoteLine, "\"")
+	newQuote = strings.TrimSuffix(newQuote, "\"")
+	items := strings.Split(newQuote, ",")
+	res := new(SecurityQuote)
+	res.Name = strings.TrimSpace(items[1])
+	slog.Debug("parseSecQuote", "quote string", quoteLine, "items", items)
+
+	var err error
+	res.Current, err = strconv.ParseFloat(strings.TrimSpace(items[6]), 64)
+	if err != nil {
+		slog.Error(err.Error())
+	}
+	res.Open, err = strconv.ParseFloat(strings.TrimSpace(items[2]), 64)
+	if err != nil {
+		slog.Error(err.Error())
+	}
+	res.YClose, err = strconv.ParseFloat(strings.TrimSpace(items[3]), 64)
+	if err != nil {
+		slog.Error(err.Error())
+	}
+	res.High, err = strconv.ParseFloat(strings.TrimSpace(items[4]), 64)
+	if err != nil {
+		slog.Error(err.Error())
+	}
+	res.Low, err = strconv.ParseFloat(strings.TrimSpace(items[5]), 64)
+	if err != nil {
+		slog.Error(err.Error())
+	}
+	res.Volume, err = strconv.ParseFloat(strings.TrimSpace(items[11]), 64)
+	if err != nil {
+		slog.Error(err.Error())
+	}
+	res.TurnOver, err = strconv.ParseInt(strings.TrimSpace(items[12]), 10, 64)
+	if err != nil {
+		slog.Error(err.Error())
+	}
+	res.TradeDate = strings.TrimSpace(items[17])
+	res.Time = strings.TrimSpace(items[18])
+
+	return res
+}
+
 type sinaPartProfile struct {
 	VPS      float64 // 每股净资产
 	Cap      float64 // 总股本
@@ -385,7 +470,23 @@ type sinaPartProfile struct {
 	Categray string  // 行业分类
 }
 
-func parseInfoPartProfile(line string) (*sinaPartProfile, error) {
+func parseInfoPartProfile(exCode, line string) (*sinaPartProfile, error) {
+	if strings.HasPrefix(exCode, "SH") {
+		return parseInfoPartProfileOfAstock(line)
+	}
+
+	if strings.HasPrefix(exCode, "HK") {
+		return parseInfoPartProfileOfHstock(line)
+	}
+
+	slog.Error("parseInfoPartProfile", "unsuported excode", exCode)
+	return nil, fmt.Errorf("unsupported excode %s", exCode)
+}
+
+// parseInfoPartProfileOfAstock 解析 A 股 profile 数据
+// "A,lxzk,-1.5600,-1.7502,-0.3800,6.9603,66.4645,40100,27964.4729,27964.4729,0,CNY,-6.2535,-7.0182,60.0600,1,-5.2800,1.2496,-1.5128,168.88,83.5,0.2,龙芯中科,K|D|0|40100|4100,149.74|99.82,20250331|-151280445.14,718.7600|91.7230,|,,1/1,EQA,,0.00,132.280|129.790|120.400,半导体,龙芯中科,1,509214702.8";
+// 0  1    2       3       4       5      6       7     8          9          10 11 12      13      14      15  16    17     18      19     20   21  22      23               24                                  25              26 27 28 29 30 31  32                     33    34     35 36
+func parseInfoPartProfileOfAstock(line string) (*sinaPartProfile, error) {
 	items := strings.Split(line, ",")
 	var (
 		err error
@@ -409,6 +510,37 @@ func parseInfoPartProfile(line string) (*sinaPartProfile, error) {
 		return nil, err
 	}
 	partProfile.Categray = strings.TrimSpace(items[34])
+
+	return &partProfile, nil
+}
+
+// parseInfoPartProfileOfHstock 解析 H 股 profile 数据
+// "EQTY,MAIN,542.266,345.980,2.9127,0,0,9189794319,0,9189794319,0,195076015710.40,51819945047.20,5.69,1,腾讯控股,3.700,0.5,100,腾讯控股,50028.230,209573020603.860,216730058624.020,1216841671768.900,,,0.8788,122.528696,,413.391|473.070|518.000,4.756824,2.589747,51,HKD"
+// 0     1    2       3       4      5 6 7总股本     8 9流通股本   10 11              12             13  14 15     16    17   18  19    20         21               22               23               24 25 26  27
+func parseInfoPartProfileOfHstock(line string) (*sinaPartProfile, error) {
+	items := strings.Split(line, ",")
+	var (
+		err error
+	)
+
+	partProfile := sinaPartProfile{}
+	partProfile.VPS, err = strconv.ParseFloat(items[27], 64)
+	if err != nil {
+		return nil, err
+	}
+	partProfile.Cap, err = strconv.ParseFloat(items[7], 64)
+	if err != nil {
+		return nil, err
+	}
+	partProfile.TradeCap, err = strconv.ParseFloat(items[9], 64)
+	if err != nil {
+		return nil, err
+	}
+	partProfile.Profit, err = strconv.ParseFloat(items[12], 64)
+	if err != nil {
+		return nil, err
+	}
+	partProfile.Categray = strings.TrimSpace(items[32])
 
 	return &partProfile, nil
 }

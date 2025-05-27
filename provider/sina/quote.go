@@ -58,7 +58,7 @@ func parseQuoteWsBody(msg string) []*SecurityQuote {
 			slog.Error("parseQuoteWsBody", "invalid ws quote", line)
 		}
 		slog.Debug("parseQuoteWsBody", "items", items)
-		quote := parseSecQuote(items[1])
+		quote := parseSecQuote(strings.ToUpper(items[0]), items[1])
 		res = append(res, quote)
 	}
 
@@ -70,7 +70,7 @@ func parseQuoteWsBody(msg string) []*SecurityQuote {
 }
 
 // formatQuoteKeys
-// A股格式
+// A股格式 SH600036
 // 港股格式 rt_hk00700
 // 港股指数 rt_hkHSI
 // 美股格式 gb_baba

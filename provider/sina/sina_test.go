@@ -10,7 +10,7 @@ import (
 )
 
 func TestParseBasicSecuritys(t *testing.T) {
-	body := `var suggestvalue="龙芯中科,11,688047,sh688047,龙芯中科,,龙芯中科,99,1,,;绿叶制药,31,02186,02186,绿叶制药,,绿叶制药,99,1,ESG,";`
+	body := `var suggestvalue="龙芯中科,11,688047,sh688047,龙芯中科,,龙芯中科,99,1,,,;绿叶制药,31,02186,02186,绿叶制药,,绿叶制药,99,1,ESG,,";`
 	res := parseBasicSecurity(body)
 	require.Equal(t, 2, len(res))
 	require.Equal(t, "龙芯中科", res[0].Name)
@@ -24,7 +24,7 @@ func TestParseBasicSecuritys(t *testing.T) {
 	require.Equal(t, types.SecurityTypeStock, res[1].SecurityType)
 
 	// 证券
-	body2 := `var suggestvalue="汇泉兴至未来一年持有混合C,21,014826,of014826,汇泉兴至未来一年持有混合C,,汇泉兴至未来一年持有混合C,99,1,,";`
+	body2 := `var suggestvalue="汇泉兴至未来一年持有混合C,21,014826,of014826,汇泉兴至未来一年持有混合C,,汇泉兴至未来一年持有混合C,99,1,,,";`
 	res = parseBasicSecurity(body2)
 	fmt.Println(res)
 }
@@ -39,8 +39,10 @@ func TestProfile(t *testing.T) {
 }
 
 func TestParseSinaInfoQuote(t *testing.T) {
+	// 0. A 股
+	exCode := "SH688047"
 	body := `"龙芯中科,106.000,99.680,119.620,119.620,104.500,119.620,0.000,8256723,938310086.000,25600,119.620,7255,119.610,3033,119.600,1767,119.570,6300,119.550,0,0.000,0,0.000,0,0.000,0,0.000,0,0.000,2024-09-30,15:00:01,00,"`
-	quote := parseSecQuote(body)
+	quote := parseSecQuote(exCode, body)
 	require.NotNil(t, quote)
 	require.Equal(t, "2024-09-30", quote.TradeDate)
 	require.EqualValues(t, "15:00:01", quote.Time)
@@ -53,6 +55,40 @@ func TestParseSinaInfoQuote(t *testing.T) {
 	require.EqualValues(t, 104.5, quote.Low)
 	require.EqualValues(t, 8256723, quote.TurnOver)
 	require.EqualValues(t, 938310086.000, quote.Volume)
+
+	// 1. H 股
+	exCode1 := "HK00700"
+	body1 := `"TENCENT,腾讯控股,508.500,510.000,514.500,507.000,512.000,2.000,0.392,512.00000,512.50000,7662280393,14986877,0.000,0.000,542.266,345.980,2025/05/27,16:08"`
+	quote1 := parseSecQuote(exCode1, body1)
+	require.NotNil(t, quote1)
+	require.Equal(t, "2025/05/27", quote1.TradeDate)
+	require.EqualValues(t, "16:08", quote1.Time)
+	require.Equal(t, "", quote1.Code)
+	require.Equal(t, "腾讯控股", quote1.Name)
+	require.EqualValues(t, 512.000, quote1.Current)
+	require.EqualValues(t, 508.500, quote1.Open)
+	require.EqualValues(t, 510.000, quote1.YClose)
+	require.EqualValues(t, 514.500, quote1.High)
+	require.EqualValues(t, 507.000, quote1.Low)
+	require.EqualValues(t, 14986877, quote1.TurnOver)
+	require.EqualValues(t, 7662280393, quote1.Volume)
+
+	// 2. 非 A/H 股
+	exCode2 := "xxx"
+	body2 := `"龙芯中科,106.000,99.680,119.620,119.620,104.500,119.620,0.000,8256723,938310086.000,25600,119.620,7255,119.610,3033,119.600,1767,119.570,6300,119.550,0,0.000,0,0.000,0,0.000,0,0.000,0,0.000,2024-09-30,15:00:01,00,"`
+	quote2 := parseSecQuote(exCode2, body2)
+	require.NotNil(t, quote2)
+	require.Equal(t, "", quote2.TradeDate)
+	require.EqualValues(t, "", quote2.Time)
+	require.Equal(t, "", quote2.Code)
+	require.Equal(t, "", quote2.Name)
+	require.EqualValues(t, 0, quote2.Current)
+	require.EqualValues(t, 0, quote2.Open)
+	require.EqualValues(t, 0, quote2.YClose)
+	require.EqualValues(t, 0, quote2.High)
+	require.EqualValues(t, 0, quote2.Low)
+	require.EqualValues(t, 0, quote2.TurnOver)
+	require.EqualValues(t, 0, quote2.Volume)
 }
 
 func TestDefaultHttpHeaders(t *testing.T) {
