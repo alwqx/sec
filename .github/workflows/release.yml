@@ -16,6 +16,16 @@ jobs:
             goos: windows
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set SEC_VERSION env
+        run: echo SEC_VERSION=$(git describe --tags --always) >> ${GITHUB_ENV}
+      - name: Set SEC_SHORT_SHA env
+        run: echo SEC_SHORT_SHA=$(git rev-parse --short HEAD) >> ${GITHUB_ENV}
+      - name: Set SEC_BUILD_TIME env
+        run: echo SEC_BUILD_TIME=$(git log -s --format=%cd --date=format:%Y%m%d HEAD -1) >> ${GITHUB_ENV}
+      - name: Environment Printer
+        uses: managedkaos/print-env@v1.0
+
       - uses: wangyoucao577/go-release-action@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }} # 一个默认的变量，用来实现往 Release 中添加文件
@@ -25,3 +35,5 @@ jobs:
           binary_name: "sec" # 可以指定二进制文件的名称
           extra_files: README.md # 需要包含的额外文件
           project_path: "./"
+          build_flags: -v
+          ldflags: -X "github.com/alwqx/sec/version.Version=${{ env.SEC_VERSION }}" -X "github.com/alwqx/sec/version.BuildTime=${{ env.SEC_BUILD_TIME }}" -X github.com/alwqx/sec/version.GitCommit=${{ env.SEC_SHORT_SHA }}
