@@ -50,3 +50,8 @@ func TestPrintDividends(t *testing.T) {
 	}
 	printDividends(dids)
 }
+
+func TestVersionHandler(t *testing.T) {
+	// version.Version=
+	versionHandler(nil, nil)
+}
