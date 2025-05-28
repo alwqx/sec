@@ -36,4 +36,4 @@ jobs:
           extra_files: README.md # 需要包含的额外文件
           project_path: "./"
           build_flags: -v
-          ldflags: -X "version.Version=${{ env.SEC_VERSION }}" -X "version.BuildTime=${{ env.BUILD_TIME }}" -X version.GitCommit=${{ github.sha }} -X version.GitRef=${{ github.ref }}
+          ldflags: -X "github.com/alwqx/sec/version.Version=${{ env.SEC_VERSION }}" -X "github.com/alwqx/sec/version.BuildTime=${{ env.BUILD_TIME }}" -X github.com/alwqx/sec/version.GitCommit=${{ github.sha }} -X github.com/alwqx/sec/version.GitRef=${{ github.ref }}
