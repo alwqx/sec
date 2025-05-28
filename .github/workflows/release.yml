@@ -16,6 +16,16 @@ jobs:
             goos: windows
     steps:
       - uses: actions/checkout@v4
+
+      - name: Set SEC_VERSION env
+        run: echo SEC_VERSION=$(git describe --tags --always) >> ${GITHUB_ENV}
+      - name: Set SEC_DEBUG_INFO env
+        run: echo SEC_DEBUG_INFO=$(echo ${GITHUB_REF} | rev | cut -d'/' -f 1 | rev ) >> ${GITHUB_ENV}
+      - name: Set BUILD_TIME env
+        run: echo BUILD_TIME=$(date) >> ${GITHUB_ENV}
+      - name: Environment Printer
+        uses: managedkaos/print-env@v1.0
+
       - uses: wangyoucao577/go-release-action@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }} # 一个默认的变量，用来实现往 Release 中添加文件
@@ -25,3 +35,5 @@ jobs:
           binary_name: "sec" # 可以指定二进制文件的名称
           extra_files: README.md # 需要包含的额外文件
           project_path: "./"
+          build_flags: -v
+          ldflags: -X "version.Version=${{ env.SEC_VERSION }}" -X "version.BuildTime=${{ env.BUILD_TIME }}" -X version.GitCommit=${{ github.sha }} -X version.GitRef=${{ github.ref }}

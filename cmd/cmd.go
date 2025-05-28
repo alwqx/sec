@@ -63,7 +63,11 @@ func NewCLI() *cobra.Command {
 
 // versionHandler print version
 func versionHandler(cmd *cobra.Command, _ []string) {
-	fmt.Printf("sec version is %s\n", version.Version)
+	fmt.Println("SEC:")
+	fmt.Printf("  version: %s\n", version.Version)
+	fmt.Printf("  build time: %s\n", version.BuildTime)
+	fmt.Printf("  git commit: %s\n", version.GitCommit)
+	fmt.Printf("  git ref: %s\n", version.GitRef)
 }
 
 // debugHandler set debug mode
