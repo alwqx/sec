@@ -19,10 +19,10 @@ jobs:
 
       - name: Set SEC_VERSION env
         run: echo SEC_VERSION=$(git describe --tags --always) >> ${GITHUB_ENV}
-      - name: Set SEC_DEBUG_INFO env
-        run: echo SEC_DEBUG_INFO=$(echo ${GITHUB_REF} | rev | cut -d'/' -f 1 | rev ) >> ${GITHUB_ENV}
+      - name: Set SEC_SHORT_SHA env
+        run: echo SEC_SHORT_SHA=$(git rev-parse --short HEAD) >> ${GITHUB_ENV}
       - name: Set BUILD_TIME env
-        run: echo BUILD_TIME=$(date) >> ${GITHUB_ENV}
+        run: echo BUILD_TIME=$(git log -s --format=%cd --date=format:%Y%m%d HEAD -1) >> ${GITHUB_ENV}
       - name: Environment Printer
         uses: managedkaos/print-env@v1.0
 
@@ -36,4 +36,4 @@ jobs:
           extra_files: README.md # 需要包含的额外文件
           project_path: "./"
           build_flags: -v
-          ldflags: -X "github.com/alwqx/sec/version.Version=${{ env.SEC_VERSION }}" -X "github.com/alwqx/sec/version.BuildTime=${{ env.BUILD_TIME }}" -X github.com/alwqx/sec/version.GitCommit=${{ github.sha }} -X github.com/alwqx/sec/version.GitRef=${{ github.ref }}
+          ldflags: -X "github.com/alwqx/sec/version.Version=${{ env.SEC_VERSION }}" -X "github.com/alwqx/sec/version.BuildTime=${{ env.BUILD_TIME }}" -X github.com/alwqx/sec/version.GitCommit=${{ env.SEC_SHORT_SHA }}
