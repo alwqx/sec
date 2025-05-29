@@ -3,6 +3,7 @@ package types
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 type SecurityType string
@@ -39,5 +40,19 @@ func HumanNum(cap float64) (res string) {
 	} else {
 		res = fmt.Sprintf("%-.2f万", cap/10_000.0)
 	}
+	return
+}
+
+// IsACode 判断证券代码是否是 A 股
+func IsACode(exCode string) (res bool) {
+	lowCode := strings.ToLower(exCode)
+	res = strings.HasPrefix(lowCode, "sh") || strings.HasPrefix(lowCode, "sz") || strings.HasPrefix(lowCode, "bj")
+	return
+}
+
+// IsHCode 判断证券代码是否是 h 股
+func IsHCode(exCode string) (res bool) {
+	lowCode := strings.ToLower(exCode)
+	res = strings.HasPrefix(lowCode, "hk")
 	return
 }
