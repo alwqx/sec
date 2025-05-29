@@ -359,10 +359,10 @@ func formatUSCode(in string) (out string) {
 // A 股 "龙芯中科,106.000,99.680,119.620,119.620,104.500,119.620,0.000,8256723,938310086.000,25600,119.620,7255,119.610,3033,119.600,1767,119.570,6300,119.550,0,0.000,0,0.000,0,0.000,0,0.000,0,0.000,2024-09-30,15:00:01,00,"
 // 港股 "TENCENT,腾讯控股,508.500,510.000,514.500,507.000,512.000,2.000,0.392,512.00000,512.50000,7662280393,14986877,0.000,0.000,542.266,345.980,2025/05/27,16:08";
 func parseSecQuote(exCode, quoteLine string) *SecurityQuote {
-	if strings.HasPrefix(exCode, "SH") {
+	if types.IsACode(exCode) {
 		return parseSecQuoteOfAstock(quoteLine)
 	}
-	if strings.HasPrefix(exCode, "HK") {
+	if types.IsHCode(exCode) {
 		return parseSecQuoteOfHstock(quoteLine)
 	}
 
@@ -471,11 +471,10 @@ type sinaPartProfile struct {
 }
 
 func parseInfoPartProfile(exCode, line string) (*sinaPartProfile, error) {
-	if strings.HasPrefix(exCode, "SH") {
+	if types.IsACode(exCode) {
 		return parseInfoPartProfileOfAstock(line)
 	}
-
-	if strings.HasPrefix(exCode, "HK") {
+	if types.IsHCode(exCode) {
 		return parseInfoPartProfileOfHstock(line)
 	}
 
