@@ -238,7 +238,6 @@ func QueryBasicCorp(exCode string) (*BasicCorp, error) {
 func Info(exCode string) (*SecurityQuote, *sinaPartProfile, error) {
 	lowerKey := strings.ToLower(exCode)
 	reqUrl := fmt.Sprintf("https://hq.sinajs.cn/list=%s,%s_i", lowerKey, lowerKey)
-	slog.Warn("Info", "exCode", exCode, "lowerKey", lowerKey, "URL", reqUrl)
 	resp, err := makeRequest(http.MethodGet, reqUrl, defaultHttpHeaders(), nil)
 	if err != nil {
 		return nil, nil, err
