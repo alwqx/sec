@@ -1,5 +1,9 @@
 # sec change log
 
+### v0.2.4
+
+1. 拆出 `utils`
+
 ### v0.2.3
 
 1. 删除 debug 日志
