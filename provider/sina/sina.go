@@ -111,15 +111,15 @@ func QuerySecQuote(exCode string) (*SecurityQuote, error) {
 	if len(lines) != 1 {
 		slog.Error("request %s get invalid body %s", reqUrl, body)
 	}
-	quote := parseSecQuote(exCode, string(lines[0]))
+	quote, err := parseSecQuote(exCode, string(lines[0]))
 
-	return quote, nil
+	return quote, err
 }
 
 // Profile 根据证券代码获取证券的基本信息，exCode SH600036
-func Profile(opts *types.InfoOptions) *CorpProfile {
+func Profile(opts *types.InfoOptions) (*CorpProfile, error) {
 	if opts == nil {
-		return nil
+		return nil, errors.New("opts is nil")
 	}
 
 	var (
@@ -144,9 +144,11 @@ func Profile(opts *types.InfoOptions) *CorpProfile {
 
 	if err1 != nil {
 		slog.Error(fmt.Sprintf("corp info error: %v", err1))
+		return nil, err1
 	}
 	if err2 != nil {
 		slog.Error(fmt.Sprintf("info error: %v", err2))
+		return nil, err2
 	}
 
 	profile := &CorpProfile{
@@ -181,7 +183,7 @@ func Profile(opts *types.InfoOptions) *CorpProfile {
 		profile.PeTTM = quote.Current * float64(partProfile.Cap) / partProfile.Profit / 10000.0
 	}
 
-	return profile
+	return profile, nil
 }
 
 // QueryDividends 查询分红送转信息
@@ -267,7 +269,10 @@ func Info(exCode string) (*SecurityQuote, *sinaPartProfile, error) {
 		return nil, nil, errors.New("invalid body, should have 2 lines but not")
 	}
 
-	quote := parseSecQuote(exCode, string(lines[0]))
+	quote, err := parseSecQuote(exCode, string(lines[0]))
+	if err != nil {
+		return nil, nil, err
+	}
 	partProfile, err := parseInfoPartProfile(exCode, string(lines[1]))
 	if err != nil {
 		return nil, nil, err
@@ -357,7 +362,7 @@ func formatUSCode(in string) (out string) {
 // parseSecQuote 从返回结果解析到结构化数据
 // A 股 "龙芯中科,106.000,99.680,119.620,119.620,104.500,119.620,0.000,8256723,938310086.000,25600,119.620,7255,119.610,3033,119.600,1767,119.570,6300,119.550,0,0.000,0,0.000,0,0.000,0,0.000,0,0.000,2024-09-30,15:00:01,00,"
 // 港股 "TENCENT,腾讯控股,508.500,510.000,514.500,507.000,512.000,2.000,0.392,512.00000,512.50000,7662280393,14986877,0.000,0.000,542.266,345.980,2025/05/27,16:08";
-func parseSecQuote(exCode, quoteLine string) *SecurityQuote {
+func parseSecQuote(exCode, quoteLine string) (*SecurityQuote, error) {
 	if types.IsACode(exCode) {
 		return parseSecQuoteOfAstock(quoteLine)
 	}
@@ -366,58 +371,66 @@ func parseSecQuote(exCode, quoteLine string) *SecurityQuote {
 	}
 
 	slog.Error("parseSecQuote", "unsupported code", exCode, "line", quoteLine)
-	return new(SecurityQuote)
+	return nil, fmt.Errorf("unsupported code %s", exCode)
 }
 
 // parseSecQuoteOfAstock 从 A 股返回结果解析到结构化数据
 // A 股 "龙芯中科,106.000,99.680,119.620,119.620,104.500,119.620,0.000,8256723,938310086.000,25600,119.620,7255,119.610,3033,119.600,1767,119.570,6300,119.550,0,0.000,0,0.000,0,0.000,0,0.000,0,0.000,2024-09-30,15:00:01,00,"
-func parseSecQuoteOfAstock(quoteLine string) *SecurityQuote {
+func parseSecQuoteOfAstock(quoteLine string) (*SecurityQuote, error) {
 	// 将首尾的双引号去掉
 	newQuote := strings.TrimPrefix(quoteLine, "\"")
 	newQuote = strings.TrimSuffix(newQuote, "\"")
 	items := strings.Split(newQuote, ",")
 	res := new(SecurityQuote)
 	res.Name = strings.TrimSpace(items[0])
-	slog.Debug("parseSecQuote", "quote string", quoteLine, "items", items)
+	slog.Debug("parseSecQuoteOfAstock", "quote string", quoteLine, "items", items)
+
 	var err error
 	res.Current, err = strconv.ParseFloat(strings.TrimSpace(items[3]), 64)
 	if err != nil {
 		slog.Error(err.Error())
+		return nil, err
 	}
 	res.Open, err = strconv.ParseFloat(strings.TrimSpace(items[1]), 64)
 	if err != nil {
 		slog.Error(err.Error())
+		return nil, err
 	}
 	res.YClose, err = strconv.ParseFloat(strings.TrimSpace(items[2]), 64)
 	if err != nil {
 		slog.Error(err.Error())
+		return nil, err
 	}
 	res.High, err = strconv.ParseFloat(strings.TrimSpace(items[4]), 64)
 	if err != nil {
 		slog.Error(err.Error())
+		return nil, err
 	}
 	res.Low, err = strconv.ParseFloat(strings.TrimSpace(items[5]), 64)
 	if err != nil {
 		slog.Error(err.Error())
+		return nil, err
 	}
 	res.Volume, err = strconv.ParseFloat(strings.TrimSpace(items[9]), 64)
 	if err != nil {
 		slog.Error(err.Error())
+		return nil, err
 	}
 	res.TurnOver, err = strconv.ParseInt(strings.TrimSpace(items[8]), 10, 64)
 	if err != nil {
 		slog.Error(err.Error())
+		return nil, err
 	}
 	res.TradeDate = strings.TrimSpace(items[30])
 	res.Time = strings.TrimSpace(items[31])
 
-	return res
+	return res, nil
 }
 
 // parseSecQuoteOfHstock 从 H 股返回结果解析到结构化数据
 // "TENCENT,腾讯控股,508.500,510.000,514.500,507.000,512.000,2.000,0.392,512.00000,512.50000,7662280393,14986877,0.000,0.000,542.266,345.980,2025/05/27,16:08";
 // d                2open  3yclose  4high   5low   6current 7     8     9         10        11成交额   12成交量股 13    14    15      16      17         18
-func parseSecQuoteOfHstock(quoteLine string) *SecurityQuote {
+func parseSecQuoteOfHstock(quoteLine string) (*SecurityQuote, error) {
 	// 将首尾的双引号去掉
 	newQuote := strings.TrimPrefix(quoteLine, "\"")
 	newQuote = strings.TrimSuffix(newQuote, "\"")
@@ -430,35 +443,42 @@ func parseSecQuoteOfHstock(quoteLine string) *SecurityQuote {
 	res.Current, err = strconv.ParseFloat(strings.TrimSpace(items[6]), 64)
 	if err != nil {
 		slog.Error(err.Error())
+		return nil, err
 	}
 	res.Open, err = strconv.ParseFloat(strings.TrimSpace(items[2]), 64)
 	if err != nil {
 		slog.Error(err.Error())
+		return nil, err
 	}
 	res.YClose, err = strconv.ParseFloat(strings.TrimSpace(items[3]), 64)
 	if err != nil {
 		slog.Error(err.Error())
+		return nil, err
 	}
 	res.High, err = strconv.ParseFloat(strings.TrimSpace(items[4]), 64)
 	if err != nil {
 		slog.Error(err.Error())
+		return nil, err
 	}
 	res.Low, err = strconv.ParseFloat(strings.TrimSpace(items[5]), 64)
 	if err != nil {
 		slog.Error(err.Error())
+		return nil, err
 	}
 	res.Volume, err = strconv.ParseFloat(strings.TrimSpace(items[11]), 64)
 	if err != nil {
 		slog.Error(err.Error())
+		return nil, err
 	}
 	res.TurnOver, err = strconv.ParseInt(strings.TrimSpace(items[12]), 10, 64)
 	if err != nil {
 		slog.Error(err.Error())
+		return nil, err
 	}
 	res.TradeDate = strings.TrimSpace(items[17])
 	res.Time = strings.TrimSpace(items[18])
 
-	return res
+	return res, nil
 }
 
 type sinaPartProfile struct {
