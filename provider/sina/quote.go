@@ -60,7 +60,7 @@ func parseQuoteWsBody(msg string) []*SecurityQuote {
 		slog.Debug("parseQuoteWsBody", "items", items)
 		quote, err := parseSecQuote(strings.ToUpper(items[0]), items[1])
 		if err != nil {
-			slog.Error("parseSecQuote", err)
+			slog.Error("parseSecQuote", "err", err)
 			continue
 		}
 		res = append(res, quote)

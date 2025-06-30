@@ -79,19 +79,8 @@ func TestParseSinaInfoQuote(t *testing.T) {
 	exCode2 := "xxx"
 	body2 := `"龙芯中科,106.000,99.680,119.620,119.620,104.500,119.620,0.000,8256723,938310086.000,25600,119.620,7255,119.610,3033,119.600,1767,119.570,6300,119.550,0,0.000,0,0.000,0,0.000,0,0.000,0,0.000,2024-09-30,15:00:01,00,"`
 	quote2, err := parseSecQuote(exCode2, body2)
-	require.Nil(t, err)
-	require.NotNil(t, quote2)
-	require.Equal(t, "", quote2.TradeDate)
-	require.EqualValues(t, "", quote2.Time)
-	require.Equal(t, "", quote2.Code)
-	require.Equal(t, "", quote2.Name)
-	require.EqualValues(t, 0, quote2.Current)
-	require.EqualValues(t, 0, quote2.Open)
-	require.EqualValues(t, 0, quote2.YClose)
-	require.EqualValues(t, 0, quote2.High)
-	require.EqualValues(t, 0, quote2.Low)
-	require.EqualValues(t, 0, quote2.TurnOver)
-	require.EqualValues(t, 0, quote2.Volume)
+	require.Equal(t, fmt.Errorf("unsupported code %s", exCode2), err)
+	require.Nil(t, quote2)
 }
 
 func TestDefaultHttpHeaders(t *testing.T) {
