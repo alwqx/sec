@@ -8,14 +8,13 @@ import (
 	"log/slog"
 	"net/http"
 	"regexp"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/alwqx/sec/types"
-	"github.com/alwqx/sec/version"
+	"github.com/alwqx/sec/utils"
 	"golang.org/x/text/encoding/simplifiedchinese"
 )
 
@@ -33,7 +32,7 @@ func defaultHttpHeaders() http.Header {
 // Search 根据关键字查询证券信息
 func Search(key string) []BasicSecurity {
 	reqUrl := fmt.Sprintf("https://suggest3.sinajs.cn/suggest/type=11,12,15,21,22,23,24,25,26,31,33,41&key=%s", key)
-	resp, err := makeRequest(http.MethodGet, reqUrl, defaultHttpHeaders(), nil)
+	resp, err := utils.MakeRequest(http.MethodGet, reqUrl, defaultHttpHeaders(), nil)
 	if err != nil {
 		return nil
 	}
@@ -90,7 +89,7 @@ func MultiSearch(keys []string) []BasicSecurity {
 func QuerySecQuote(exCode string) (*SecurityQuote, error) {
 	lowerKey := strings.ToLower(exCode)
 	reqUrl := fmt.Sprintf("https://hq.sinajs.cn/list=%s", lowerKey)
-	resp, err := makeRequest(http.MethodGet, reqUrl, defaultHttpHeaders(), nil)
+	resp, err := utils.MakeRequest(http.MethodGet, reqUrl, defaultHttpHeaders(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +188,7 @@ func Profile(opts *types.InfoOptions) (*CorpProfile, error) {
 // QueryDividends 查询分红送转信息
 func QueryDividends(code string) ([]Dividend, error) {
 	pageURL := fmt.Sprintf("https://vip.stock.finance.sina.com.cn/corp/go.php/vISSUE_ShareBonus/stockid/%s.phtml", code)
-	resp, err := makeRequest(http.MethodGet, pageURL, defaultHttpHeaders(), nil)
+	resp, err := utils.MakeRequest(http.MethodGet, pageURL, defaultHttpHeaders(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +210,7 @@ func QueryDividends(code string) ([]Dividend, error) {
 // QueryBasicCorp 根据证券代码获取公司信息
 func QueryBasicCorp(exCode string) (*BasicCorp, error) {
 	coraUrl := fmt.Sprintf("https://vip.stock.finance.sina.com.cn/corp/go.php/vCI_CorpInfo/stockid/%s.phtml", exCode)
-	resp, err := makeRequest(http.MethodGet, coraUrl, defaultHttpHeaders(), nil)
+	resp, err := utils.MakeRequest(http.MethodGet, coraUrl, defaultHttpHeaders(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -240,7 +239,7 @@ func QueryBasicCorp(exCode string) (*BasicCorp, error) {
 func Info(exCode string) (*SecurityQuote, *sinaPartProfile, error) {
 	lowerKey := strings.ToLower(exCode)
 	reqUrl := fmt.Sprintf("https://hq.sinajs.cn/list=%s,%s_i", lowerKey, lowerKey)
-	resp, err := makeRequest(http.MethodGet, reqUrl, defaultHttpHeaders(), nil)
+	resp, err := utils.MakeRequest(http.MethodGet, reqUrl, defaultHttpHeaders(), nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -587,30 +586,6 @@ func adjustRespBodyByEncode(resp *http.Response) error {
 
 	resp.Body = io.NopCloser(bytes.NewBuffer(newBodyBytes))
 	return nil
-}
-
-func makeRequest(method, reqURL string, headers http.Header, body io.Reader) (*http.Response, error) {
-	var (
-		resp *http.Response
-		err  error
-	)
-
-	req, err := http.NewRequest(method, reqURL, body)
-	if err != nil {
-		return nil, err
-	}
-	if headers != nil {
-		req.Header = headers
-	}
-
-	req.Header.Set("User-Agent", fmt.Sprintf("sec/%s (%s %s) Go/%s", version.Version, runtime.GOARCH, runtime.GOOS, runtime.Version()))
-
-	resp, err = http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	return resp, nil
 }
 
 // parseBasicCorp 解析 html 得到基本 corp 信息
