@@ -23,6 +23,7 @@ import (
 func NewQuoteCLI() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:           "quote",
+		Aliases:       []string{"q"},
 		Short:         "Secutiry quote root Command",
 		SilenceUsage:  true,
 		SilenceErrors: true,

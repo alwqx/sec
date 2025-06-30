@@ -3,6 +3,7 @@
 ### v0.2.3
 
 1. 删除 debug 日志
+2. 添加短命令 `info->i` `quote-q` `search-s`
 
 ### v0.2.2
 
