@@ -42,7 +42,8 @@ func TestParseSinaInfoQuote(t *testing.T) {
 	// 0. A 股
 	exCode := "SH688047"
 	body := `"龙芯中科,106.000,99.680,119.620,119.620,104.500,119.620,0.000,8256723,938310086.000,25600,119.620,7255,119.610,3033,119.600,1767,119.570,6300,119.550,0,0.000,0,0.000,0,0.000,0,0.000,0,0.000,2024-09-30,15:00:01,00,"`
-	quote := parseSecQuote(exCode, body)
+	quote, err := parseSecQuote(exCode, body)
+	require.Nil(t, err)
 	require.NotNil(t, quote)
 	require.Equal(t, "2024-09-30", quote.TradeDate)
 	require.EqualValues(t, "15:00:01", quote.Time)
@@ -59,7 +60,8 @@ func TestParseSinaInfoQuote(t *testing.T) {
 	// 1. H 股
 	exCode1 := "HK00700"
 	body1 := `"TENCENT,腾讯控股,508.500,510.000,514.500,507.000,512.000,2.000,0.392,512.00000,512.50000,7662280393,14986877,0.000,0.000,542.266,345.980,2025/05/27,16:08"`
-	quote1 := parseSecQuote(exCode1, body1)
+	quote1, err := parseSecQuote(exCode1, body1)
+	require.Nil(t, err)
 	require.NotNil(t, quote1)
 	require.Equal(t, "2025/05/27", quote1.TradeDate)
 	require.EqualValues(t, "16:08", quote1.Time)
@@ -76,7 +78,8 @@ func TestParseSinaInfoQuote(t *testing.T) {
 	// 2. 非 A/H 股
 	exCode2 := "xxx"
 	body2 := `"龙芯中科,106.000,99.680,119.620,119.620,104.500,119.620,0.000,8256723,938310086.000,25600,119.620,7255,119.610,3033,119.600,1767,119.570,6300,119.550,0,0.000,0,0.000,0,0.000,0,0.000,0,0.000,2024-09-30,15:00:01,00,"`
-	quote2 := parseSecQuote(exCode2, body2)
+	quote2, err := parseSecQuote(exCode2, body2)
+	require.Nil(t, err)
 	require.NotNil(t, quote2)
 	require.Equal(t, "", quote2.TradeDate)
 	require.EqualValues(t, "", quote2.Time)

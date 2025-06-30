@@ -4,6 +4,7 @@
 
 1. 删除 debug 日志
 2. 添加短命令 `info->i` `quote-q` `search-s`
+3. 修复 info 等查询美股 panic 问题
 
 ### v0.2.2
 

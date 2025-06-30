@@ -58,7 +58,11 @@ func parseQuoteWsBody(msg string) []*SecurityQuote {
 			slog.Error("parseQuoteWsBody", "invalid ws quote", line)
 		}
 		slog.Debug("parseQuoteWsBody", "items", items)
-		quote := parseSecQuote(strings.ToUpper(items[0]), items[1])
+		quote, err := parseSecQuote(strings.ToUpper(items[0]), items[1])
+		if err != nil {
+			slog.Error("parseSecQuote", err)
+			continue
+		}
 		res = append(res, quote)
 	}
 
