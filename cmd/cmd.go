@@ -39,18 +39,20 @@ func NewCLI() *cobra.Command {
 	rootCmd.Flags().BoolP("version", "v", false, "Show version information")
 
 	searchCmd := &cobra.Command{
-		Use:   "search",
-		Short: "Search code and name of a secutiry/stock",
-		Args:  cobra.ExactArgs(1),
-		RunE:  SearchHandler,
+		Use:     "search",
+		Aliases: []string{"s"},
+		Short:   "Search code and name of a secutiry/stock",
+		Args:    cobra.ExactArgs(1),
+		RunE:    SearchHandler,
 	}
 	searchCmd.Flags().BoolP("debug", "D", false, "Enable debug mode")
 
 	infoCmd := &cobra.Command{
-		Use:   "info",
-		Short: "Print basic information of a secutiry/stock",
-		Args:  cobra.ExactArgs(1),
-		RunE:  InfoHandler,
+		Use:     "info",
+		Aliases: []string{"i"},
+		Short:   "Print basic information of a secutiry/stock",
+		Args:    cobra.ExactArgs(1),
+		RunE:    InfoHandler,
 	}
 
 	infoCmd.Flags().BoolP("debug", "D", false, "Enable debug mode")
