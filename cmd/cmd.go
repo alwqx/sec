@@ -58,7 +58,7 @@ func NewCLI() *cobra.Command {
 	infoCmd.Flags().BoolP("debug", "D", false, "Enable debug mode")
 	infoCmd.Flags().BoolP("dividends", "d", false, "show dividend info")
 
-	rootCmd.AddCommand(searchCmd, infoCmd, quote.NewQuoteCLI())
+	rootCmd.AddCommand(searchCmd, infoCmd, quote.NewQuoteCLI(), quote.NewQuoteHistoryCLI())
 
 	return rootCmd
 }
