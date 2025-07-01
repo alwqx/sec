@@ -9,8 +9,8 @@ import (
 type SecurityType string
 
 const (
-	SecurityTypeFund  SecurityType = "fund"
-	SecurityTypeStock SecurityType = "stock"
+	SecurityTypeFund  SecurityType = "fund"  // 基金
+	SecurityTypeStock SecurityType = "stock" // 股票
 
 	// 交易所
 	ExChangeSse    = "sse"    // 上交所

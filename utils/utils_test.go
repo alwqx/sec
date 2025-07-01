@@ -3,6 +3,8 @@ package utils
 import (
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/alwqx/sec/version"
@@ -26,4 +28,25 @@ func TestMakeRequest(t *testing.T) {
 	body, err := io.ReadAll(resp.Body)
 	require.Nil(t, err)
 	require.Equal(t, "OK", string(body))
+}
+
+func TestWriteJson(t *testing.T) {
+	tmpDir := os.TempDir()
+	t.Cleanup(func() {
+		os.RemoveAll(tmpDir)
+	})
+	// 1. nil
+	err := WriteJson(nil, tmpDir)
+	require.Nil(t, err)
+
+	// 2 data
+	data := struct {
+		Name string
+	}{
+		Name: "TestFile",
+	}
+
+	filePath := filepath.Join(tmpDir, "data.json")
+	err = WriteJson(data, filePath)
+	require.Nil(t, err)
 }
