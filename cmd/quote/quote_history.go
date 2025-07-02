@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"sort"
 	"strconv"
 	"time"
 
@@ -33,6 +34,7 @@ func NewQuoteHistoryCLI() *cobra.Command {
 	}
 	rootCmd.Flags().BoolP("debug", "D", false, "Enable debug mode")
 	rootCmd.Flags().BoolP("realtime", "r", false, "Realtime updaet quote info")
+	rootCmd.Flags().BoolP("desc", "d", false, "Order by date in descending order")
 
 	return rootCmd
 }
@@ -74,6 +76,18 @@ func QuoteHistoryHandler(cmd *cobra.Command, args []string) error {
 		slog.Error("QuoteHistoryHandler", "eastmoney.GetQuoteHistory %d", req.Code, "error", err)
 		return err
 	}
+
+	// 判断是否重新排序
+	desc, err := cmd.Flags().GetBool("desc")
+	if err != nil {
+		return err
+	}
+	if desc {
+		sort.Slice(quotes, func(i, j int) bool {
+			return quotes[i].Date.After(quotes[j].Date)
+		})
+	}
+
 	printQuoteHistory(quotes)
 
 	return nil
@@ -85,7 +99,6 @@ func printQuoteHistory(quotes []*eastmoney.Quote) {
 		return
 	}
 
-	// headers := []string{"日期", "名称", "收盘", "开盘", "最高", "最低", "成交额", "成交量", "振幅", "涨跌幅", "涨跌额", "换手率", "证券代码"}
 	headers := []string{"日期", "名称", "收盘", "开盘", "最高", "最低", "成交额", "成交量", "振幅", "换手率", "证券代码"}
 	columnsStyles := make([][]tablewriter.Colors, 0, len(headers))
 
