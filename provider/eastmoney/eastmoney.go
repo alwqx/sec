@@ -17,8 +17,6 @@ import (
 
 // 东方财富接口封装
 
-type MarketType int
-
 const (
 	MarketTypeSzSe MarketType = 0 // 深圳证券交易所
 	MarketTypeSse  MarketType = 1 // 上海证券交易所
@@ -35,6 +33,22 @@ var (
 	ErrInvalidKLine = errors.New("invalid kline data")
 	ErrSkipValue    = errors.New("skip value")
 )
+
+type MarketType int
+
+func (m MarketType) String() string {
+	var res string
+	switch m {
+	case MarketTypeSzSe:
+		res = "SZ"
+	case MarketTypeSse:
+		res = "SH"
+	default:
+		res = fmt.Sprintf("unknown %d", m)
+	}
+
+	return res
+}
 
 // getOriginQuoteHistory 获取原始的证券历史行情信息
 // api: https://efinance.readthedocs.io/en/latest/api.html#efinance.stock.get_quote_history

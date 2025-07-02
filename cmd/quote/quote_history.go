@@ -2,6 +2,7 @@ package quote
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 	"strconv"
@@ -84,25 +85,25 @@ func printQuoteHistory(quotes []*eastmoney.Quote) {
 		return
 	}
 
-	headers := []string{"日期", "名称", "开盘", "收盘", "最高", "最低", "成交额", "成交量", "振幅", "涨跌幅", "涨跌额", "换手率", "证券代码"}
+	// headers := []string{"日期", "名称", "收盘", "开盘", "最高", "最低", "成交额", "成交量", "振幅", "涨跌幅", "涨跌额", "换手率", "证券代码"}
+	headers := []string{"日期", "名称", "收盘", "开盘", "最高", "最低", "成交额", "成交量", "振幅", "换手率", "证券代码"}
 	columnsStyles := make([][]tablewriter.Colors, 0, len(headers))
 
 	data := make([][]string, 0, len(quotes))
 	for _, quote := range quotes {
+		combineClose := fmt.Sprintf("%-.5g %-.5g %-.2g%s", quote.Close, quote.Change, quote.ChangeRate, "%")
 		row := []string{
 			utils.TimeYYMMDDString(quote.Date),
 			quote.Name,
+			combineClose,
 			strconv.FormatFloat(quote.Open, 'g', -1, 64),
-			strconv.FormatFloat(quote.Close, 'g', -1, 64),
 			strconv.FormatFloat(quote.High, 'g', -1, 64),
 			strconv.FormatFloat(quote.Low, 'g', -1, 64),
 			types.HumanNum(float64(quote.TurnOver)),
 			types.HumanNum(float64(quote.Volume)),
 			strconv.FormatFloat(quote.Amplitude, 'g', -1, 64),
-			strconv.FormatFloat(quote.ChangeRate, 'g', -1, 64),
-			strconv.FormatFloat(quote.Change, 'g', -1, 64),
 			strconv.FormatFloat(quote.Velocity, 'g', -1, 64),
-			quote.Code,
+			quote.Market.String() + quote.Code,
 		}
 
 		data = append(data, row)
@@ -110,18 +111,9 @@ func printQuoteHistory(quotes []*eastmoney.Quote) {
 		styles := make([]tablewriter.Colors, 0, len(headers))
 		for _, title := range headers {
 			var item tablewriter.Colors = tablewriter.Colors{}
-			// 涨跌幅
-			if title == headers[9] {
+			// 收盘
+			if title == headers[2] {
 				v := quote.ChangeRate
-				if v > 0 {
-					item = tablewriter.Colors{tablewriter.Bold, tablewriter.UnderlineSingle, tablewriter.FgRedColor}
-				} else if v < 0 {
-					item = tablewriter.Colors{tablewriter.Bold, tablewriter.UnderlineSingle, tablewriter.FgGreenColor}
-				}
-			}
-			// 涨跌额
-			if title == headers[10] {
-				v := quote.Change
 				if v > 0 {
 					item = tablewriter.Colors{tablewriter.Bold, tablewriter.UnderlineSingle, tablewriter.FgRedColor}
 				} else if v < 0 {
