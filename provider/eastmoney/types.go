@@ -50,21 +50,21 @@ type CurrentStockInfoResp struct {
 
 // Quote 基本行情
 type Quote struct {
-	Date       time.Time `json:"date"`        // 交易日期
-	Code       string    `json:"code"`        // 证券代码
-	Name       string    `json:"name"`        // 证券名称
-	Market     int       `json:"market"`      // 证券市场
-	Open       float64   `json:"open"`        // 开盘价
-	Close      float64   `json:"close"`       // 收盘价
-	High       float64   `json:"high"`        // 最高价
-	Low        float64   `json:"low"`         // 最低价
-	Volume     int64     `json:"volume"`      // 成交量
-	TurnOver   float64   `json:"turn_over"`   // 成交额
-	Amplitude  float64   `json:"amplitude"`   // 振幅
-	ChangeRate float64   `json:"change_rate"` // 涨跌幅
-	Change     float64   `json:"change"`      // 涨跌额
-	Velocity   float64   `json:"velocity"`    // TurnOver Rate 换手率
-	Fqt        int       `json:"fqt"`         // 复权类型
+	Date       time.Time  `json:"date"`        // 交易日期
+	Code       string     `json:"code"`        // 证券代码
+	Name       string     `json:"name"`        // 证券名称
+	Market     MarketType `json:"market"`      // 证券市场
+	Open       float64    `json:"open"`        // 开盘价
+	Close      float64    `json:"close"`       // 收盘价
+	High       float64    `json:"high"`        // 最高价
+	Low        float64    `json:"low"`         // 最低价
+	Volume     int64      `json:"volume"`      // 成交量
+	TurnOver   float64    `json:"turn_over"`   // 成交额
+	Amplitude  float64    `json:"amplitude"`   // 振幅
+	ChangeRate float64    `json:"change_rate"` // 涨跌幅
+	Change     float64    `json:"change"`      // 涨跌额
+	Velocity   float64    `json:"velocity"`    // TurnOver Rate 换手率
+	Fqt        int        `json:"fqt"`         // 复权类型
 }
 
 type GetQuoteHistoryReq struct {
@@ -88,16 +88,16 @@ type QuoteHistoryResp struct {
 
 // QuoteHistoryData 东方财富 K 线历史接口中 data 字段结构体
 type QuoteHistoryData struct {
-	Code       string   `json:"code"`
-	Market     int      `json:"market"`
-	Name       string   `json:"name"`
-	Decimal    int      `json:"decimal"` // 小数点精确度
-	Dktotal    int      `json:"dktotal"` // 总数据条数
-	PreKPrice  float64  `json:"preKPrice"`
-	PrePrice   float64  `json:"prePrice"`
-	QtMiscType int      `json:"qtMiscType"`
-	Version    int      `json:"version"`
-	Klines     []string `json:"klines"`
+	Code       string     `json:"code"`
+	Market     MarketType `json:"market"`
+	Name       string     `json:"name"`
+	Decimal    int        `json:"decimal"` // 小数点精确度
+	Dktotal    int        `json:"dktotal"` // 总数据条数
+	PreKPrice  float64    `json:"preKPrice"`
+	PrePrice   float64    `json:"prePrice"`
+	QtMiscType int        `json:"qtMiscType"`
+	Version    int        `json:"version"`
+	Klines     []string   `json:"klines"`
 }
 
 // KLineQuote K 线结构体

@@ -8,6 +8,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestMarketType_String(t *testing.T) {
+	var m1 MarketType = 0
+	var m2 MarketType = 1
+	var m3 MarketType = 3
+	require.Equal(t, "SZ", m1.String())
+	require.Equal(t, "SH", m2.String())
+	require.Equal(t, "unknown 3", m3.String())
+}
+
 func TestGetOriginQuoteHistory(t *testing.T) {
 	t.Skip("仅用于开发调试")
 	req := &GetQuoteHistoryReq{
