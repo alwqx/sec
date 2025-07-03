@@ -35,6 +35,8 @@ func NewQuoteHistoryCLI() *cobra.Command {
 	rootCmd.Flags().BoolP("debug", "D", false, "Enable debug mode")
 	rootCmd.Flags().BoolP("realtime", "r", false, "Realtime updaet quote info")
 	rootCmd.Flags().BoolP("desc", "d", false, "Order by date in descending order")
+	rootCmd.Flags().StringP("begin", "b", "", "Begin date 20250101")
+	rootCmd.Flags().StringP("end", "e", "", "End date 20250131")
 
 	return rootCmd
 }
@@ -59,9 +61,8 @@ func QuoteHistoryHandler(cmd *cobra.Command, args []string) error {
 	slog.Debug("QuoteHistoryHandler", "num", num, "excode", sec.ExCode, "code", sec.Code, "exchange", sec.ExChange)
 	now := time.Now()
 	req := &eastmoney.GetQuoteHistoryReq{
-		Code:  sec.Code,
-		Begin: now.Add(-30 * 24 * time.Hour).Format(eastmoney.TimeYYMMDD),
-		End:   now.Format(eastmoney.TimeYYMMDD),
+		Code: sec.Code,
+		End:  now.Format(eastmoney.TimeYYMMDD),
 	}
 
 	switch sec.ExChange {
@@ -69,6 +70,45 @@ func QuoteHistoryHandler(cmd *cobra.Command, args []string) error {
 		req.MarketCode = 1
 	case "sz":
 		req.MarketCode = 0
+	}
+
+	defaultBegin := now.Add(-30 * 24 * time.Hour)
+	defaultEnd := now
+
+	beginStr, err := cmd.Flags().GetString("begin")
+	if err != nil {
+		return err
+	}
+	// 校验
+	if beginStr != "" {
+		defaultBegin, err = time.Parse(eastmoney.TimeYYMMDD, beginStr)
+		if err != nil {
+			return err
+		}
+		req.Begin = beginStr
+	} else {
+		req.Begin = now.Add(-30 * 24 * time.Hour).Format(eastmoney.TimeYYMMDD)
+	}
+
+	endStr, err := cmd.Flags().GetString("end")
+	if err != nil {
+		return err
+	}
+	if endStr != "" {
+		defaultEnd, err = time.Parse(eastmoney.TimeYYMMDD, endStr)
+		if err != nil {
+			return err
+		}
+		req.End = endStr
+	} else {
+		req.End = now.Format(eastmoney.TimeYYMMDD)
+	}
+
+	if defaultEnd.Before(defaultBegin) {
+		bs := defaultBegin.Format(eastmoney.TimeYYMMDD)
+		es := defaultEnd.Format(eastmoney.TimeYYMMDD)
+		slog.Error("invalid begin and end time", "begin", bs, "end", es)
+		return fmt.Errorf("invalid begin %s and end %s", bs, es)
 	}
 
 	quotes, err := eastmoney.GetQuoteHistory(req)

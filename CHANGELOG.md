@@ -1,5 +1,9 @@
 # sec change log
 
+### v0.2.7
+
+1. `quote-history` 命令添加选项 `begin`、`end`
+
 ### v0.2.6
 
 1. 修复 github workflow 权限
