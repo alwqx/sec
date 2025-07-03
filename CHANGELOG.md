@@ -1,5 +1,9 @@
 # sec change log
 
+### v0.2.6
+
+1. 修复 github workflow 权限
+
 ### v0.2.5
 
 `quote-history` 命令改进：
