@@ -3,6 +3,10 @@
 ### v0.2.7
 
 1. `quote-history` 命令添加选项 `begin`、`end`
+2. `quote-history` 命令添加选项 `fqt` 复权类型，选项为
+   - bfq 不复权
+   - qfq 前复权
+   - hfq 后复权
 
 ### v0.2.6
 

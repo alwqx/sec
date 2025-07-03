@@ -37,6 +37,7 @@ func NewQuoteHistoryCLI() *cobra.Command {
 	rootCmd.Flags().BoolP("desc", "d", false, "Order by date in descending order")
 	rootCmd.Flags().StringP("begin", "b", "", "Begin date 20250101")
 	rootCmd.Flags().StringP("end", "e", "", "End date 20250131")
+	rootCmd.Flags().StringP("fq", "f", "", "FuQuan type choice: bfq none, qfq front, hfq post")
 
 	return rootCmd
 }
@@ -62,7 +63,6 @@ func QuoteHistoryHandler(cmd *cobra.Command, args []string) error {
 	now := time.Now()
 	req := &eastmoney.GetQuoteHistoryReq{
 		Code: sec.Code,
-		End:  now.Format(eastmoney.TimeYYMMDD),
 	}
 
 	switch sec.ExChange {
@@ -70,6 +70,23 @@ func QuoteHistoryHandler(cmd *cobra.Command, args []string) error {
 		req.MarketCode = 1
 	case "sz":
 		req.MarketCode = 0
+	}
+
+	// 复权类型
+	fqt, err := cmd.Flags().GetString("fq")
+	if err != nil {
+		return err
+	}
+	switch fqt {
+	case "bfq":
+		req.FQT = eastmoney.QuoteFQTDefault
+	case "qfq":
+		req.FQT = eastmoney.QuoteFQTFront
+	case "hfq":
+		req.FQT = eastmoney.QuoteFQTPost
+	default:
+		slog.Debug("QuoteHistoryHandler", "fqt", fqt)
+		req.FQT = eastmoney.QuoteFQTDefault
 	}
 
 	defaultBegin := now.Add(-30 * 24 * time.Hour)
