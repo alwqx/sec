@@ -3,6 +3,7 @@
 ### v0.2.6
 
 1. 修复 github workflow 权限
+2. 修复 go.mod 中 `golang.org/x/net` dependabot 版本告警
 
 ### v0.2.5
 
