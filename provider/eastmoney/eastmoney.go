@@ -21,34 +21,18 @@ const (
 	MarketTypeSzSe MarketType = 0 // 深圳证券交易所
 	MarketTypeSse  MarketType = 1 // 上海证券交易所
 
-	EastMoney80Push2ApiBase  = "http://80.push2.eastmoney.com"
-	EastMoneyPush2ApiBase    = "http://push2.eastmoney.com"
-	EastMoneyPush2HisApiBase = "https://push2his.eastmoney.com"
-	QuoteFQTDefault          = 0 // 不复权
-	QuoteFQTFront            = 1 // 前复权
-	QuoteFQTPost             = 2 // 后复权
+	EastMoney80Push2ApiBase             = "http://80.push2.eastmoney.com"
+	EastMoneyPush2ApiBase               = "http://push2.eastmoney.com"
+	EastMoneyPush2HisApiBase            = "https://push2his.eastmoney.com"
+	QuoteFQTDefault          FuQuanType = 0 // 不复权
+	QuoteFQTFront            FuQuanType = 1 // 前复权
+	QuoteFQTPost             FuQuanType = 2 // 后复权
 )
 
 var (
 	ErrInvalidKLine = errors.New("invalid kline data")
 	ErrSkipValue    = errors.New("skip value")
 )
-
-type MarketType int
-
-func (m MarketType) String() string {
-	var res string
-	switch m {
-	case MarketTypeSzSe:
-		res = "SZ"
-	case MarketTypeSse:
-		res = "SH"
-	default:
-		res = fmt.Sprintf("unknown %d", m)
-	}
-
-	return res
-}
 
 // getOriginQuoteHistory 获取原始的证券历史行情信息
 // api: https://efinance.readthedocs.io/en/latest/api.html#efinance.stock.get_quote_history

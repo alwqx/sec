@@ -1,10 +1,31 @@
 package eastmoney
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 const (
 	TimeYYMMDD = "20060102"
 )
+
+type MarketType int
+
+func (m MarketType) String() string {
+	var res string
+	switch m {
+	case MarketTypeSzSe:
+		res = "SZ"
+	case MarketTypeSse:
+		res = "SH"
+	default:
+		res = fmt.Sprintf("unknown %d", m)
+	}
+
+	return res
+}
+
+type FuQuanType int
 
 type CurrentStockInfoDiff struct {
 	F2   float64 `json:"f2"`   // 最新价格
@@ -69,10 +90,10 @@ type Quote struct {
 
 type GetQuoteHistoryReq struct {
 	Code       string
-	MarketCode int    // 市场 1 上证，2 深证
-	FQT        int    // 复权类型 0不复权 1前复权 2后复权，默认不复权
-	Begin      string // 开始时间 19000101 格式
-	End        string // 结束时间 20500101 格式
+	MarketCode int        // 市场 1 上证，2 深证
+	FQT        FuQuanType // 复权类型 0不复权 1前复权 2后复权，默认不复权
+	Begin      string     // 开始时间 19000101 格式
+	End        string     // 结束时间 20500101 格式
 }
 
 // QuoteHistoryResp 东方财富 K 线历史接口返回数据结构
