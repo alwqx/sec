@@ -21,7 +21,7 @@ func NewQuoteHistoryCLI() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:           "quote-history",
 		Aliases:       []string{"qh"},
-		Short:         "Print quote history of sec",
+		Short:         "Print quote history of specific security",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		CompletionOptions: cobra.CompletionOptions{
