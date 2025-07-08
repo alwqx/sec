@@ -1,5 +1,9 @@
 # sec change log
 
+### v0.2.8
+
+1. 更新`quote-history`命令描述
+
 ### v0.2.7
 
 1. `quote-history` 命令添加选项 `begin`、`end`
