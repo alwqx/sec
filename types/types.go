@@ -56,3 +56,10 @@ func IsHCode(exCode string) (res bool) {
 	res = strings.HasPrefix(lowCode, "hk")
 	return
 }
+
+// IsMCode 判断证券代码是否是美股
+func IsMCode(exCode string) (res bool) {
+	lowCode := strings.ToLower(exCode)
+	res = strings.HasPrefix(lowCode, "$")
+	return
+}
