@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"runtime"
@@ -74,4 +75,14 @@ func WriteJson(data interface{}, filePath string) error {
 
 	_, err = f.Write(v)
 	return err
+}
+
+// JSONify json 序列化
+func JSONify(data interface{}) string {
+	v, err := json.Marshal(data)
+	if err != nil {
+		slog.Error("JSONify", "err", err.Error())
+		return ""
+	}
+	return string(v)
 }

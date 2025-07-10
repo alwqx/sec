@@ -108,7 +108,8 @@ func quoteMultiSec(keys []string) error {
 		secMap[sec.Name] = secs[i]
 	}
 
-	res, err := sina.QuoteWs(codes)
+	// res, err := sina.QuoteWs(codes)
+	res, err := sina.QueryQuoteList(codes)
 	if err != nil {
 		return err
 	}
@@ -153,7 +154,8 @@ func quoteMultiSecRealtime(ctx context.Context, keys []string) error {
 		case <-ctx.Done():
 			return nil
 		default:
-			res, err := sina.QuoteWs(codes)
+			// res, err := sina.QuoteWs(codes)
+			res, err := sina.QueryQuoteList(codes)
 			if err != nil {
 				return err
 			}
