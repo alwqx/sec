@@ -4,6 +4,7 @@
 
 1. 更新`quote-history`命令描述
 2. `quote-history` 支持港股
+3. `quote-history` 支持美股
 
 ### v0.2.7
 

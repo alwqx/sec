@@ -18,8 +18,9 @@ import (
 // 东方财富接口封装
 
 const (
-	MarketTypeSzSe MarketType = 0 // 深圳证券交易所
-	MarketTypeSse  MarketType = 1 // 上海证券交易所
+	MarketTypeSzSe   MarketType = 0   // 深圳证券交易所
+	MarketTypeSse    MarketType = 1   // 上海证券交易所
+	MarketTypeNasdaq MarketType = 105 // 纳斯达克交易所
 
 	EastMoney80Push2ApiBase             = "http://80.push2.eastmoney.com"
 	EastMoneyPush2ApiBase               = "http://push2.eastmoney.com"
