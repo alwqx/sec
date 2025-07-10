@@ -18,6 +18,8 @@ func (m MarketType) String() string {
 		res = "SZ"
 	case MarketTypeSse:
 		res = "SH"
+	case MarketTypeNasdaq:
+		res = "$"
 	default:
 		res = fmt.Sprintf("unknown %d", m)
 	}

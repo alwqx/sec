@@ -70,8 +70,10 @@ func QuoteHistoryHandler(cmd *cobra.Command, args []string) error {
 		req.MarketCode = 1
 	case "sz":
 		req.MarketCode = 0
-	case "hk":
+	case types.ExChangeHKex:
 		req.MarketCode = 116
+	case types.ExChangeNasdaq:
+		req.MarketCode = 105
 	}
 
 	// 复权类型
