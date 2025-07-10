@@ -292,8 +292,10 @@ func parseBasicSecurity(body string) []BasicSecurity {
 
 	res := make([]BasicSecurity, 0, len(lines))
 	for _, item := range lines {
-		// 腾讯控股,31,00700,00700,腾讯控股,,腾讯控股,99,1,ESG,
-		// 腾讯控股,31,00700,00700,腾讯控股,,腾讯控股,99,1,ESG,,
+		// 深A  立讯精密,11,002475,sz002475,立讯精密,,立讯精密,99,1,ESG,,
+		// 港股 腾讯控股,31,00700,00700,腾讯控股,,腾讯控股,99,1,ESG,
+		// 港股 比亚迪电子,31,00285,00285,比亚迪电子,,比亚迪电子,99,1,ESG,,
+		// 美股 AMD,41,amd,amd,AMD,,AMD,99,1,ESG,,
 		// 1 5 7名称 2市场 3 4代码 8- 9在市 10- 11-
 		ss := strings.Split(item, ",")
 		if len(ss) != 12 {
