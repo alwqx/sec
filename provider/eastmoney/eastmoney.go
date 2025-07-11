@@ -21,6 +21,7 @@ const (
 	MarketTypeSzSe   MarketType = 0   // 深圳证券交易所
 	MarketTypeSse    MarketType = 1   // 上海证券交易所
 	MarketTypeNasdaq MarketType = 105 // 纳斯达克交易所
+	MarketTypeHK     MarketType = 116 // 香港证券交易所
 
 	EastMoney80Push2ApiBase             = "http://80.push2.eastmoney.com"
 	EastMoneyPush2ApiBase               = "http://push2.eastmoney.com"
@@ -96,11 +97,11 @@ func GetQuoteHistory(req *GetQuoteHistoryReq) (res []*Quote, err error) {
 		return nil, err
 	}
 
-	return ParseQuoteHistoryResp(tmpRes)
+	return parseQuoteHistoryResp(tmpRes)
 }
 
-// ParseQuoteHistoryResp 解析数据结构到标准结构体
-func ParseQuoteHistoryResp(resp *QuoteHistoryResp) ([]*Quote, error) {
+// parseQuoteHistoryResp 解析数据结构到标准结构体
+func parseQuoteHistoryResp(resp *QuoteHistoryResp) ([]*Quote, error) {
 	if resp == nil || resp.Data == nil {
 		return nil, errors.New("nil data")
 	}
@@ -108,9 +109,9 @@ func ParseQuoteHistoryResp(resp *QuoteHistoryResp) ([]*Quote, error) {
 	data := resp.Data
 	res := make([]*Quote, 0, len(data.Klines))
 	for _, kline := range data.Klines {
-		kl, err := ParseKlineItem(kline)
+		kl, err := parseKlineItem(kline)
 		if err != nil {
-			slog.Error("[ParseQuoteHistoryResp] parse %s error: %v", kline, err)
+			slog.Error("[parseQuoteHistoryResp] parse %s error: %v", kline, err)
 			return nil, err
 		}
 		item := &Quote{
@@ -129,18 +130,22 @@ func ParseQuoteHistoryResp(resp *QuoteHistoryResp) ([]*Quote, error) {
 			Change:     kl.Change,
 			Velocity:   kl.Velocity,
 		}
+		// 东方财富接口拿到的 A 股成交量单位是 手，A 股1手=100股，所以乘100
+		if data.Market == MarketTypeSse || data.Market == MarketTypeSzSe {
+			item.Volume *= 100
+		}
 		res = append(res, item)
 	}
 
 	return res, nil
 }
 
-// ParseKlineItem 解析单条 k 线数据
+// parseKlineItem 解析单条 k 线数据
 // "2024-12-26,39.40,39.48,39.54,39.01,539252,2125139425.00,1.35,0.20,0.08,0.26"
-func ParseKlineItem(line string) (kline KLineQuote, err error) {
+func parseKlineItem(line string) (kline KLineQuote, err error) {
 	toks := strings.Split(line, ",")
 	if len(toks) != 11 {
-		slog.Error("ParseKlineItem", "invalid kline data %s", line)
+		slog.Error("parseKlineItem", "invalid kline data %s", line)
 		err = ErrInvalidKLine
 		return
 	}

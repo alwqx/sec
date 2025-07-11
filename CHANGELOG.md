@@ -5,7 +5,9 @@
 1. 更新`quote-history`命令描述
 2. `quote-history` 支持港股
 3. `quote-history` 支持美股
-4. `quote` 支持美股
+4. `quote-history` A 股成交量单位从 `手` 改为 `股`，要乘 100
+5. `quote` 支持美股
+6. 东方财富 行情接口支持香港证券交易所
 
 ### v0.2.7
 
