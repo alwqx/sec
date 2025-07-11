@@ -35,12 +35,12 @@ func TestGetOriginQuoteHistory(t *testing.T) {
 
 func TestParseKlineItem(t *testing.T) {
 	// 1. empty
-	_, err := ParseKlineItem("")
+	_, err := parseKlineItem("")
 	require.Equal(t, ErrInvalidKLine, err)
 
 	// 2. common
 	line := "2024-12-26,39.40,39.48,39.54,39.01,539252,2125139425.00,1.35,0.20,0.08,0.26"
-	res, err := ParseKlineItem(line)
+	res, err := parseKlineItem(line)
 	require.Nil(t, err)
 	require.Equal(t, "2024-12-26", res.Date.Format(utils.LayoutYYMMDD))
 	require.EqualValues(t, 39.40, res.Open)
@@ -56,7 +56,7 @@ func TestParseKlineItem(t *testing.T) {
 }
 
 func TestParseQuoteHistoryResp(t *testing.T) {
-	res, err := ParseQuoteHistoryResp(nil)
+	res, err := parseQuoteHistoryResp(nil)
 	require.NotNil(t, err)
 	require.Nil(t, res)
 
@@ -87,13 +87,13 @@ func TestParseQuoteHistoryResp(t *testing.T) {
 	var resp QuoteHistoryResp
 	err = json.Unmarshal([]byte(rawJson), &resp)
 	require.Nil(t, err)
-	res, err = ParseQuoteHistoryResp(&resp)
+	res, err = parseQuoteHistoryResp(&resp)
 	require.Nil(t, err)
 	require.NotNil(t, res)
 	require.EqualValues(t, 3, len(res))
 	require.EqualValues(t, 38.35, res[0].Open)
 	require.EqualValues(t, 39.40, res[1].Close)
-	require.EqualValues(t, 539252, res[2].Volume)
+	require.EqualValues(t, 53925200, res[2].Volume)
 	require.EqualValues(t, 0.26, res[2].Velocity)
 
 	rawJsonEmptyKline := `{
@@ -119,7 +119,7 @@ func TestParseQuoteHistoryResp(t *testing.T) {
 	var resp2 QuoteHistoryResp
 	err = json.Unmarshal([]byte(rawJsonEmptyKline), &resp2)
 	require.Nil(t, err)
-	res, err = ParseQuoteHistoryResp(&resp2)
+	res, err = parseQuoteHistoryResp(&resp2)
 	require.Nil(t, err)
 	require.NotNil(t, res)
 	require.EqualValues(t, 0, len(res))
