@@ -1,6 +1,7 @@
 package sina
 
 import (
+	"context"
 	"strings"
 	"testing"
 
@@ -9,8 +10,9 @@ import (
 )
 
 func TestQuoteWs(t *testing.T) {
+	ctx := context.TODO()
 	keys := []string{"sh600036", "sh688047"}
-	res, err := QuoteWs(keys)
+	res, err := QuoteWs(ctx, keys)
 	require.Nil(t, err)
 	require.Equal(t, len(keys), len(res))
 }

@@ -1,6 +1,7 @@
 package sina
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
@@ -17,26 +18,24 @@ import (
 
 // QuoteWs 通过 websocket 请求多个证券行情信息
 // exCodes = {"$AMD", "SH600036", "HK09992"}
-func QuoteWs(exCodes []string) ([]*SecurityQuote, error) {
+func QuoteWs(ctx context.Context, exCodes []string) ([]*SecurityQuote, error) {
 	formatKeys := formatQuoteKeys(exCodes)
 	url := fmt.Sprintf("wss://hq.sinajs.cn/wskt?list=%s", strings.Join(formatKeys, ","))
 	headers := make(http.Header)
 	headers.Add("Origin", SinaReferer)
-	conn, _, err := websocket.DefaultDialer.Dial(url, headers)
+
+	conn, _, err := websocket.DefaultDialer.DialContext(ctx, url, headers)
 	if err != nil {
 		slog.Error(err.Error())
 		return nil, err
 	}
-
 	defer conn.Close()
 
 	_, msg, err := conn.ReadMessage()
 	if err != nil {
-		slog.Error(err.Error())
+		slog.ErrorContext(ctx, err.Error())
 		return nil, err
 	}
-
-	fmt.Println(string(msg))
 
 	return parseQuoteWsBody(string(msg)), nil
 }
