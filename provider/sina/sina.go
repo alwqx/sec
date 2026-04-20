@@ -30,7 +30,7 @@ func defaultHttpHeaders() http.Header {
 }
 
 // Search 根据关键字查询证券信息
-func Search(key string) []BasicSecurity {
+func Search(key string) []*BasicSecurity {
 	reqUrl := fmt.Sprintf("https://suggest3.sinajs.cn/suggest/type=11,12,15,21,22,23,24,25,26,31,33,41&key=%s", key)
 	resp, err := utils.MakeRequest(http.MethodGet, reqUrl, defaultHttpHeaders(), nil)
 	if err != nil {
@@ -55,7 +55,7 @@ func Search(key string) []BasicSecurity {
 
 // MultiSearch 根据关键字查询多个证券信息
 // 最多支持 8 条证券信息查询
-func MultiSearch(keys []string) []BasicSecurity {
+func MultiSearch(keys []string) []*BasicSecurity {
 	num := len(keys)
 	if num == 0 {
 		return nil
@@ -65,8 +65,8 @@ func MultiSearch(keys []string) []BasicSecurity {
 		keys = keys[:8]
 	}
 
-	res := make([]BasicSecurity, 0, num)
-	ch := make(chan BasicSecurity, num)
+	res := make([]*BasicSecurity, 0, num)
+	ch := make(chan *BasicSecurity, num)
 	for _, key := range keys {
 		go func(code string) {
 			secs := Search(code)
@@ -74,13 +74,17 @@ func MultiSearch(keys []string) []BasicSecurity {
 				slog.Debug("MultiSearch", "secs", secs)
 				ch <- secs[0]
 			} else {
-				ch <- BasicSecurity{}
+				ch <- nil
 			}
 		}(key)
 	}
 
 	for range num {
-		res = append(res, <-ch)
+		item := <-ch
+		if item == nil {
+			continue
+		}
+		res = append(res, item)
 	}
 
 	return res
@@ -253,7 +257,7 @@ func Info(exCode string) (*SecurityQuote, *sinaPartProfile, error) {
 
 // parseBasicSecurity 解析 sina 搜索结果字符串
 // var suggestvalue="龙芯中科,11,688047,sh688047,龙芯中科,,龙芯中科,99,1,,;绿叶制药,31,02186,02186,绿叶制药,,绿叶制药,99,1,ESG,";
-func parseBasicSecurity(body string) []BasicSecurity {
+func parseBasicSecurity(body string) []*BasicSecurity {
 	// 去除首部多余字符串
 	body1 := strings.ReplaceAll(body, `var suggestvalue="`, "")
 	// 去除尾部多余字符串
@@ -261,7 +265,7 @@ func parseBasicSecurity(body string) []BasicSecurity {
 	// 按照 ; 分隔成多行
 	lines := strings.Split(body2, ";")
 
-	res := make([]BasicSecurity, 0, len(lines))
+	res := make([]*BasicSecurity, 0, len(lines))
 	for _, item := range lines {
 		if item == "" {
 			continue
@@ -312,7 +316,7 @@ func parseBasicSecurity(body string) []BasicSecurity {
 			slog.Warn("can not recganize code: %s %s", ss[0], ss[2])
 		}
 
-		ssr := BasicSecurity{
+		ssr := &BasicSecurity{
 			Name:         name,
 			Code:         code,
 			ExCode:       exCode,

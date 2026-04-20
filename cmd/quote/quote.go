@@ -102,7 +102,7 @@ func quoteMultiSec(keys []string) error {
 	slog.Debug("quoteMultiSec", "secs", secs)
 
 	codes := make([]string, 0, len(secs))
-	secMap := make(map[string]sina.BasicSecurity, len(secs))
+	secMap := make(map[string]*sina.BasicSecurity, len(secs))
 	for i, sec := range secs {
 		codes = append(codes, sec.ExCode)
 		secMap[sec.Name] = secs[i]
@@ -143,7 +143,7 @@ func quoteMultiSecRealtime(ctx context.Context, keys []string) error {
 	slog.Debug("quoteMultiSecRealtime", "secs", secs)
 
 	codes := make([]string, 0, len(secs))
-	secMap := make(map[string]sina.BasicSecurity, len(secs))
+	secMap := make(map[string]*sina.BasicSecurity, len(secs))
 	for i, sec := range secs {
 		codes = append(codes, sec.ExCode)
 		secMap[sec.Name] = secs[i]
