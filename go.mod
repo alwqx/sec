@@ -2,8 +2,6 @@ module github.com/alwqx/sec
 
 go 1.23.0
 
-toolchain go1.24.4
-
 require (
 	github.com/PuerkitoBio/goquery v1.9.3
 	github.com/gorilla/websocket v1.5.3

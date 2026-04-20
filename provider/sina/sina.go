@@ -73,6 +73,8 @@ func MultiSearch(keys []string) []BasicSecurity {
 			if len(secs) >= 1 {
 				slog.Debug("MultiSearch", "secs", secs)
 				ch <- secs[0]
+			} else {
+				ch <- BasicSecurity{}
 			}
 		}(key)
 	}
@@ -261,6 +263,10 @@ func parseBasicSecurity(body string) []BasicSecurity {
 
 	res := make([]BasicSecurity, 0, len(lines))
 	for _, item := range lines {
+		if item == "" {
+			continue
+		}
+
 		// 深A  立讯精密,11,002475,sz002475,立讯精密,,立讯精密,99,1,ESG,,
 		// 港股 腾讯控股,31,00700,00700,腾讯控股,,腾讯控股,99,1,ESG,
 		// 港股 比亚迪电子,31,00285,00285,比亚迪电子,,比亚迪电子,99,1,ESG,,
