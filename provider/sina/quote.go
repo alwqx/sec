@@ -26,7 +26,7 @@ func QuoteWs(ctx context.Context, exCodes []string) ([]*SecurityQuote, error) {
 
 	conn, _, err := websocket.DefaultDialer.DialContext(ctx, url, headers)
 	if err != nil {
-		slog.Error(err.Error())
+		slog.ErrorContext(ctx, err.Error())
 		return nil, err
 	}
 	defer conn.Close()
@@ -61,12 +61,12 @@ func parseQuoteWsBody(msg string) []*SecurityQuote {
 		}
 		items := strings.Split(line, "=")
 		if len(items) != 2 {
-			slog.Error("parseQuoteWsBody", "invalid ws quote", line)
+			slog.Error("parseQuoteWsBody invalid ws quote", "line", line)
 		}
 		slog.Debug("parseQuoteWsBody", "items", items)
 		quote, err := parseSecQuote(strings.ToUpper(items[0]), items[1])
 		if err != nil {
-			slog.Error("parseSecQuote", "err", err)
+			slog.Error("parseSecQuote", "error", err)
 			continue
 		}
 		res = append(res, quote)
@@ -106,10 +106,10 @@ func formatQuoteKeys(keys []string) []string {
 
 // QuerySecQuote 查询证券行情
 // exCode SH600036 HK00700
-func QuerySecQuote(exCode string) (*SecurityQuote, error) {
+func QuerySecQuote(ctx context.Context, exCode string) (*SecurityQuote, error) {
 	lowerKey := strings.ToLower(exCode)
 	reqUrl := fmt.Sprintf("https://hq.sinajs.cn/list=%s", lowerKey)
-	resp, err := utils.MakeRequest(http.MethodGet, reqUrl, defaultHttpHeaders(), nil)
+	resp, err := utils.MakeRequest(ctx, http.MethodGet, reqUrl, defaultHttpHeaders(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +128,7 @@ func QuerySecQuote(exCode string) (*SecurityQuote, error) {
 	regstr := regexp.MustCompile(`\"(.*)\"`)
 	lines := regstr.FindAll(body, -1)
 	if len(lines) != 1 {
-		slog.Error("request %s get invalid body %s", reqUrl, body)
+		slog.ErrorContext(ctx, "get invalid body", "url", reqUrl, "body", body)
 	}
 	quote, err := parseSecQuote(exCode, string(lines[0]))
 
@@ -150,7 +150,7 @@ func parseSecQuote(exCode, quoteLine string) (quote *SecurityQuote, err error) {
 	}
 
 	if err != nil {
-		slog.Error("parseSecQuote", "unsupported code", exCode, "line", quoteLine)
+		slog.Error("parseSecQuote unsupported code", "code", exCode, "line", quoteLine)
 	} else {
 		quote.ExCode = exCode
 	}
@@ -167,7 +167,7 @@ func parseSecQuoteOfAstock(quoteLine string) (*SecurityQuote, error) {
 	items := strings.Split(newQuote, ",")
 	res := new(SecurityQuote)
 	res.Name = strings.TrimSpace(items[0])
-	slog.Debug("parseSecQuoteOfAstock", "quote string", quoteLine, "items", items)
+	slog.Debug("parseSecQuoteOfAstock", "quote line", quoteLine, "items", items)
 
 	var err error
 	res.Current, err = strconv.ParseFloat(strings.TrimSpace(items[3]), 64)
@@ -221,7 +221,7 @@ func parseSecQuoteOfHstock(quoteLine string) (*SecurityQuote, error) {
 	items := strings.Split(newQuote, ",")
 	res := new(SecurityQuote)
 	res.Name = strings.TrimSpace(items[1])
-	slog.Debug("parseSecQuote", "quote string", quoteLine, "items", items)
+	slog.Debug("parseSecQuote quote string", "quoteLine", quoteLine, "items", newQuote)
 
 	var err error
 	res.Current, err = strconv.ParseFloat(strings.TrimSpace(items[6]), 64)
@@ -275,7 +275,7 @@ func parseSecQuoteOfMstock(quoteLine string) (*SecurityQuote, error) {
 	items := strings.Split(newQuote, ",")
 	res := new(SecurityQuote)
 	res.Name = strings.TrimSpace(items[0])
-	slog.Debug("parseSecQuoteOfMstock", "quote string", quoteLine, "items", items)
+	slog.Debug("parseSecQuoteOfMstock quote string", "quoteLine", quoteLine, "items", newQuote)
 
 	var err error
 	res.Current, err = strconv.ParseFloat(strings.TrimSpace(items[1]), 64)
@@ -324,10 +324,10 @@ func parseSecQuoteOfMstock(quoteLine string) (*SecurityQuote, error) {
 // QueryQuoteList 查询多个证券行情
 // exCode SH600036 HK00700
 // exCodes = {"$AMD", "SH600036", "HK09992"}
-func QueryQuoteList(exCodes []string) ([]*SecurityQuote, error) {
+func QueryQuoteList(ctx context.Context, exCodes []string) ([]*SecurityQuote, error) {
 	formatKeys := formatQuoteKeys(exCodes)
 	reqUrl := fmt.Sprintf("https://hq.sinajs.cn/list=%s", strings.Join(formatKeys, ","))
-	resp, err := utils.MakeRequest(http.MethodGet, reqUrl, defaultHttpHeaders(), nil)
+	resp, err := utils.MakeRequest(ctx, http.MethodGet, reqUrl, defaultHttpHeaders(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -360,7 +360,7 @@ func parseQuoteListBody(body string) ([]*SecurityQuote, error) {
 		exCode, formatLine := formatQuoteListLine(line)
 		quote, err := parseSecQuote(exCode, formatLine)
 		if err != nil {
-			slog.Error("parseQuoteListBody error", "exCode", exCode, "error", err.Error())
+			slog.Error("parseQuoteListBody error", "code", exCode, "error", err)
 			return nil, err
 		}
 		res = append(res, quote)

@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -34,13 +35,13 @@ func UserAgent() string {
 }
 
 // MakeRequest 发送 http 请求，返回 *http.Response
-func MakeRequest(method, reqURL string, headers http.Header, body io.Reader) (*http.Response, error) {
+func MakeRequest(ctx context.Context, method, reqURL string, headers http.Header, body io.Reader) (*http.Response, error) {
 	var (
 		resp *http.Response
 		err  error
 	)
 
-	req, err := http.NewRequest(method, reqURL, body)
+	req, err := http.NewRequestWithContext(ctx, method, reqURL, body)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +82,7 @@ func WriteJson(data interface{}, filePath string) error {
 func JSONify(data interface{}) string {
 	v, err := json.Marshal(data)
 	if err != nil {
-		slog.Error("JSONify", "err", err.Error())
+		slog.Error("JSONify", "error", err)
 		return ""
 	}
 	return string(v)

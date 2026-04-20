@@ -1,6 +1,7 @@
 package eastmoney
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -38,7 +39,7 @@ var (
 
 // getOriginQuoteHistory 获取原始的证券历史行情信息
 // api: https://efinance.readthedocs.io/en/latest/api.html#efinance.stock.get_quote_history
-func getOriginQuoteHistory(req *GetQuoteHistoryReq) (res *QuoteHistoryResp, err error) {
+func getOriginQuoteHistory(ctx context.Context, req *GetQuoteHistoryReq) (res *QuoteHistoryResp, err error) {
 	if req == nil {
 		err = errors.New("req is nil")
 		return
@@ -67,15 +68,15 @@ func getOriginQuoteHistory(req *GetQuoteHistoryReq) (res *QuoteHistoryResp, err 
 	}
 
 	reqURL := fmt.Sprintf("%s/api/qt/stock/kline/get?%s", EastMoneyPush2HisApiBase, values.Encode())
-	resp, err := utils.MakeRequest(http.MethodGet, reqURL, nil, nil)
+	resp, err := utils.MakeRequest(ctx, http.MethodGet, reqURL, nil, nil)
 	if err != nil {
-		slog.Error("[GetCurrentStockInfo]", "request", reqURL, "error: %v", err)
+		slog.ErrorContext(ctx, "failed request", "url", reqURL, "error", err)
 		return nil, err
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		slog.Error("[GetCurrentStockInfo]", "read body error: %v", err)
+		slog.ErrorContext(ctx, "failed read body", "error", err)
 		return nil, err
 	}
 	err = json.Unmarshal(body, &res)
@@ -85,15 +86,15 @@ func getOriginQuoteHistory(req *GetQuoteHistoryReq) (res *QuoteHistoryResp, err 
 
 // GetQuoteHistory 获取标准证券历史行情信息
 // api: https://efinance.readthedocs.io/en/latest/api.html#efinance.stock.get_quote_history
-func GetQuoteHistory(req *GetQuoteHistoryReq) (res []*Quote, err error) {
+func GetQuoteHistory(ctx context.Context, req *GetQuoteHistoryReq) (res []*Quote, err error) {
 	if req == nil {
 		err = errors.New("req is nil")
 		return
 	}
 
-	tmpRes, err := getOriginQuoteHistory(req)
+	tmpRes, err := getOriginQuoteHistory(ctx, req)
 	if err != nil {
-		slog.Error("[GetCurrentStockInfo]", "request", req.Code, "error: %v", err)
+		slog.ErrorContext(ctx, "failed getOriginQuoteHistory", "error", err)
 		return nil, err
 	}
 
@@ -111,7 +112,7 @@ func parseQuoteHistoryResp(resp *QuoteHistoryResp) ([]*Quote, error) {
 	for _, kline := range data.Klines {
 		kl, err := parseKlineItem(kline)
 		if err != nil {
-			slog.Error("[parseQuoteHistoryResp] parse %s error: %v", kline, err)
+			slog.Error("parseQuoteHistoryResp failed parse kline", "kline", kline, "error", err)
 			return nil, err
 		}
 		item := &Quote{
@@ -145,7 +146,7 @@ func parseQuoteHistoryResp(resp *QuoteHistoryResp) ([]*Quote, error) {
 func parseKlineItem(line string) (kline KLineQuote, err error) {
 	toks := strings.Split(line, ",")
 	if len(toks) != 11 {
-		slog.Error("parseKlineItem", "invalid kline data %s", line)
+		slog.Error("parseKlineItem invalid kline data", "line", line)
 		err = ErrInvalidKLine
 		return
 	}

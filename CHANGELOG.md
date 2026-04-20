@@ -3,6 +3,9 @@
 ### v0.2.9
 
 1. 修复 [issue-57](https://github.com/alwqx/sec/issues/57)：`sec q nvdia` 查不到结果 hang 住
+2. sina 返回指针、QuoteWs 接口添加 context.Context 参数
+3. provider 中接口添加 context.Context 参数
+4. 修正 slog 用法
 
 ### v0.2.8
 

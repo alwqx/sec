@@ -126,7 +126,8 @@ func TestQueryQuoteList(t *testing.T) {
 		Reply(200).BodyString(body1).
 		Header.Add("content-type", "application/javascript; charset=gbk")
 
-	res, err := QueryQuoteList([]string{"SH688047"})
+	ctx := context.TODO()
+	res, err := QueryQuoteList(ctx, []string{"SH688047"})
 	require.Nil(t, err)
 	require.EqualValues(t, 1, len(res))
 	require.EqualValues(t, "SH688047", res[0].ExCode)
@@ -140,7 +141,7 @@ var hq_str_gb_amd="AMD,144.5500,4.44,2025-07-10 22:55:35,6.1400,143.0000,145.820
 		Reply(200).BodyString(body4).
 		Header.Add("content-type", "application/javascript; charset=gbk")
 
-	res4, err4 := QueryQuoteList([]string{"SH688047", "HK09992", "$AMD"})
+	res4, err4 := QueryQuoteList(ctx, []string{"SH688047", "HK09992", "$AMD"})
 	require.Nil(t, err4)
 	require.EqualValues(t, 3, len(res4))
 	require.EqualValues(t, "SH688047", res4[0].ExCode)
