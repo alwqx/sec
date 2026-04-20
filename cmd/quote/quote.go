@@ -60,7 +60,7 @@ func QuoteHandler(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if !realTime {
-		return quoteMultiSec(dedupKeys)
+		return quoteMultiSec(context.TODO(), dedupKeys)
 	}
 
 	ctx, cancel := context.WithCancel(cmd.Context())
@@ -86,20 +86,20 @@ func QuoteHandler(cmd *cobra.Command, args []string) error {
 	return err
 }
 
-func quoteMultiSec(keys []string) error {
+func quoteMultiSec(ctx context.Context, keys []string) error {
 	// keys 长度不能超过5
 	if len(keys) > 5 {
-		slog.Warn("quoteMultiSec support 5 secs at most, will choose top 5 keys")
+		slog.WarnContext(ctx, "quoteMultiSec support 5 secs at most, will choose top 5 keys")
 		keys = keys[:5]
 	}
 	// 1. search security
-	secs := sina.MultiSearch(keys)
+	secs := sina.MultiSearch(ctx, keys)
 	if len(secs) == 0 {
-		slog.Warn(fmt.Sprintf("no result of %v", keys))
+		slog.WarnContext(ctx, "no result", "keys", keys)
 		return nil
 	}
 
-	slog.Debug("quoteMultiSec", "secs", secs)
+	slog.DebugContext(ctx, "quoteMultiSec", "secs", secs)
 
 	codes := make([]string, 0, len(secs))
 	secMap := make(map[string]*sina.BasicSecurity, len(secs))
@@ -109,7 +109,7 @@ func quoteMultiSec(keys []string) error {
 	}
 
 	// res, err := sina.QuoteWs(codes)
-	res, err := sina.QueryQuoteList(codes)
+	res, err := sina.QueryQuoteList(ctx, codes)
 	if err != nil {
 		return err
 	}
@@ -134,13 +134,13 @@ func quoteMultiSecRealtime(ctx context.Context, keys []string) error {
 		keys = keys[:5]
 	}
 	// 1. search security
-	secs := sina.MultiSearch(keys)
+	secs := sina.MultiSearch(ctx, keys)
 	if len(secs) == 0 {
-		slog.Warn(fmt.Sprintf("no result of %v", keys))
+		slog.WarnContext(ctx, "no result", "keys", keys)
 		return nil
 	}
 
-	slog.Debug("quoteMultiSecRealtime", "secs", secs)
+	slog.DebugContext(ctx, "quoteMultiSecRealtime", "secs", secs)
 
 	codes := make([]string, 0, len(secs))
 	secMap := make(map[string]*sina.BasicSecurity, len(secs))
@@ -155,7 +155,7 @@ func quoteMultiSecRealtime(ctx context.Context, keys []string) error {
 			return nil
 		default:
 			// res, err := sina.QuoteWs(codes)
-			res, err := sina.QueryQuoteList(codes)
+			res, err := sina.QueryQuoteList(ctx, codes)
 			if err != nil {
 				return err
 			}

@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"os"
@@ -19,8 +20,9 @@ func TestUserAgent(t *testing.T) {
 
 func TestMakeRequest(t *testing.T) {
 	defer gock.Off()
+	ctx := context.TODO()
 	gock.New("http://abc.xyz").Get("/foo").Reply(200).JSON(`OK`)
-	resp, err := MakeRequest(http.MethodGet, "http://abc.xyz/foo", nil, nil)
+	resp, err := MakeRequest(ctx, http.MethodGet, "http://abc.xyz/foo", nil, nil)
 	require.Nil(t, err)
 	require.NotNil(t, resp)
 

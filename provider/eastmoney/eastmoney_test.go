@@ -1,6 +1,7 @@
 package eastmoney
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 
@@ -21,13 +22,14 @@ func TestMarketType_String(t *testing.T) {
 
 func TestGetOriginQuoteHistory(t *testing.T) {
 	t.Skip("仅用于开发调试")
+	ctx := context.TODO()
 	req := &GetQuoteHistoryReq{
 		Code:       "600036",
 		MarketCode: 1,
 		Begin:      "20250106",
 		End:        "20250106",
 	}
-	resp, err := getOriginQuoteHistory(req)
+	resp, err := getOriginQuoteHistory(ctx, req)
 	require.Nil(t, err)
 	err = utils.WriteJson(resp, "./quote_history.json")
 	require.Nil(t, err)

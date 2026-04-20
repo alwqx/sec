@@ -1,6 +1,7 @@
 package sina
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"testing"
@@ -31,8 +32,9 @@ func TestParseBasicSecuritys(t *testing.T) {
 
 func TestProfile(t *testing.T) {
 	t.Skip("just test for dev/debug")
+	ctx := context.TODO()
 	// Profile("688047")
-	quote, part, err := Info("SH688047")
+	quote, part, err := Info(ctx, "SH688047")
 	require.Nil(t, err)
 	require.NotNil(t, quote)
 	require.NotNil(t, part)
@@ -124,12 +126,13 @@ func TestParseDividend(t *testing.T) {
 
 func TestMultiSearch(t *testing.T) {
 	t.Skip("just test for dev/debug")
+	ctx := context.TODO()
 	// 1. empty
-	res := MultiSearch(nil)
+	res := MultiSearch(ctx, nil)
 	require.Equal(t, 0, len(res))
 
 	// 2. common
 	keys := []string{"lxjm", "lxzk"}
-	res = MultiSearch(keys)
+	res = MultiSearch(ctx, keys)
 	require.Equal(t, len(keys), len(res))
 }

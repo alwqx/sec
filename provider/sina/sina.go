@@ -2,6 +2,7 @@ package sina
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -20,6 +21,7 @@ import (
 
 const (
 	SinaReferer = "https://finance.sina.com.cn"
+	MAX_KEY_NUM = 8 // 最大查询证券数量
 )
 
 // defaultHttpHeaders 生成请求 sina 接口的默认 http.Header
@@ -30,23 +32,23 @@ func defaultHttpHeaders() http.Header {
 }
 
 // Search 根据关键字查询证券信息
-func Search(key string) []*BasicSecurity {
+func Search(ctx context.Context, key string) []*BasicSecurity {
 	reqUrl := fmt.Sprintf("https://suggest3.sinajs.cn/suggest/type=11,12,15,21,22,23,24,25,26,31,33,41&key=%s", key)
-	resp, err := utils.MakeRequest(http.MethodGet, reqUrl, defaultHttpHeaders(), nil)
+	resp, err := utils.MakeRequest(ctx, http.MethodGet, reqUrl, defaultHttpHeaders(), nil)
 	if err != nil {
 		return nil
 	}
 	err = adjustRespBodyByEncode(resp)
 	defer resp.Body.Close()
 	if err != nil {
-		slog.Error("[Search] request %s error: %v", reqUrl, err)
+		slog.ErrorContext(ctx, "adjust body encode failed", "error", err)
 		return nil
 	}
 
 	var resBytes []byte
 	resBytes, err = io.ReadAll(resp.Body)
 	if err != nil {
-		slog.Error("[Search] request %s error: %v", reqUrl, err)
+		slog.ErrorContext(ctx, "read body failed", "url", reqUrl, "error", err)
 		return nil
 	}
 
@@ -54,24 +56,24 @@ func Search(key string) []*BasicSecurity {
 }
 
 // MultiSearch 根据关键字查询多个证券信息
-// 最多支持 8 条证券信息查询
-func MultiSearch(keys []string) []*BasicSecurity {
+// 最多支持 MAX_KEY_NUM 条证券信息查询
+func MultiSearch(ctx context.Context, keys []string) []*BasicSecurity {
 	num := len(keys)
 	if num == 0 {
 		return nil
 	}
-	if num > 8 {
-		slog.Debug("MultiSearch: sec num>8, choose 8 keys to search")
-		keys = keys[:8]
+	if num > MAX_KEY_NUM {
+		slog.DebugContext(ctx, "keys num exceed", "max num", MAX_KEY_NUM)
+		keys = keys[:MAX_KEY_NUM]
 	}
 
 	res := make([]*BasicSecurity, 0, num)
 	ch := make(chan *BasicSecurity, num)
 	for _, key := range keys {
 		go func(code string) {
-			secs := Search(code)
+			secs := Search(ctx, code)
 			if len(secs) >= 1 {
-				slog.Debug("MultiSearch", "secs", secs)
+				slog.DebugContext(ctx, "MultiSearch results", "code", code, "secs", secs)
 				ch <- secs[0]
 			} else {
 				ch <- nil
@@ -91,7 +93,7 @@ func MultiSearch(keys []string) []*BasicSecurity {
 }
 
 // Profile 根据证券代码获取证券的基本信息，exCode SH600036
-func Profile(opts *types.InfoOptions) (*CorpProfile, error) {
+func Profile(ctx context.Context, opts *types.InfoOptions) (*CorpProfile, error) {
 	if opts == nil {
 		return nil, errors.New("opts is nil")
 	}
@@ -108,20 +110,20 @@ func Profile(opts *types.InfoOptions) (*CorpProfile, error) {
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		corp, err1 = QueryBasicCorp(opts.ExCode)
+		corp, err1 = QueryBasicCorp(ctx, opts.ExCode)
 	}()
 	go func() {
 		defer wg.Done()
-		quote, partProfile, err2 = Info(opts.ExCode)
+		quote, partProfile, err2 = Info(ctx, opts.ExCode)
 	}()
 	wg.Wait()
 
 	if err1 != nil {
-		slog.Error(fmt.Sprintf("corp info error: %v", err1))
+		slog.ErrorContext(ctx, "failed get corp info", "error", err1)
 		return nil, err1
 	}
 	if err2 != nil {
-		slog.Error(fmt.Sprintf("info error: %v", err2))
+		slog.ErrorContext(ctx, "failed get info", "error", err2)
 		return nil, err2
 	}
 
@@ -161,9 +163,9 @@ func Profile(opts *types.InfoOptions) (*CorpProfile, error) {
 }
 
 // QueryDividends 查询分红送转信息
-func QueryDividends(code string) ([]Dividend, error) {
+func QueryDividends(ctx context.Context, code string) ([]Dividend, error) {
 	pageURL := fmt.Sprintf("https://vip.stock.finance.sina.com.cn/corp/go.php/vISSUE_ShareBonus/stockid/%s.phtml", code)
-	resp, err := utils.MakeRequest(http.MethodGet, pageURL, defaultHttpHeaders(), nil)
+	resp, err := utils.MakeRequest(ctx, http.MethodGet, pageURL, defaultHttpHeaders(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -183,9 +185,9 @@ func QueryDividends(code string) ([]Dividend, error) {
 }
 
 // QueryBasicCorp 根据证券代码获取公司信息
-func QueryBasicCorp(exCode string) (*BasicCorp, error) {
+func QueryBasicCorp(ctx context.Context, exCode string) (*BasicCorp, error) {
 	coraUrl := fmt.Sprintf("https://vip.stock.finance.sina.com.cn/corp/go.php/vCI_CorpInfo/stockid/%s.phtml", exCode)
-	resp, err := utils.MakeRequest(http.MethodGet, coraUrl, defaultHttpHeaders(), nil)
+	resp, err := utils.MakeRequest(ctx, http.MethodGet, coraUrl, defaultHttpHeaders(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -211,10 +213,10 @@ func QueryBasicCorp(exCode string) (*BasicCorp, error) {
 // 港股
 // var hq_str_hk00700="TENCENT,腾讯控股,508.500,510.000,514.500,507.000,512.000,2.000,0.392,512.00000,512.50000,7662280393,14986877,0.000,0.000,542.266,345.980,2025/05/27,16:08";
 // var hq_str_hk00700_i="EQTY,MAIN,542.266,345.980,2.9127,0,0,9189794319,0,9189794319,0,195076015710.40,51819945047.20,5.69,1,腾讯控股,3.700,0.5,100,腾讯控股,50028.230,209573020603.860,216730058624.020,1216841671768.900,,,0.8788,122.528696,,413.391|473.070|518.000,4.756824,2.589747,51,HKD";
-func Info(exCode string) (*SecurityQuote, *sinaPartProfile, error) {
+func Info(ctx context.Context, exCode string) (*SecurityQuote, *sinaPartProfile, error) {
 	lowerKey := strings.ToLower(exCode)
 	reqUrl := fmt.Sprintf("https://hq.sinajs.cn/list=%s,%s_i", lowerKey, lowerKey)
-	resp, err := utils.MakeRequest(http.MethodGet, reqUrl, defaultHttpHeaders(), nil)
+	resp, err := utils.MakeRequest(ctx, http.MethodGet, reqUrl, defaultHttpHeaders(), nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -239,7 +241,7 @@ func Info(exCode string) (*SecurityQuote, *sinaPartProfile, error) {
 	regstr := regexp.MustCompile(`"(.*)"`)
 	lines := regstr.FindAll([]byte(body), -1)
 	if len(lines) != 2 {
-		slog.Error("request %s get invalid body %s", reqUrl, body)
+		slog.ErrorContext(ctx, "invalid body", "url", reqUrl, "body", body)
 		return nil, nil, errors.New("invalid body, should have 2 lines but not")
 	}
 
@@ -278,8 +280,7 @@ func parseBasicSecurity(body string) []*BasicSecurity {
 		// 1 5 7名称 2市场 3 4代码 8- 9在市 10- 11-
 		ss := strings.Split(item, ",")
 		if len(ss) != 12 {
-			slog.Debug("parseBasicSecurity", "body invalid", body)
-			slog.Warn("parseBasicSecurity", "line of body invalid", item)
+			slog.Warn("parseBasicSecurity invalid line ", "body", body, "item", item)
 			continue
 		}
 		if ss[8] != "1" {
@@ -299,7 +300,7 @@ func parseBasicSecurity(body string) []*BasicSecurity {
 			if len(ss[3]) >= 2 {
 				exChange = ss[3][:2]
 			} else {
-				slog.Warn("invalid code %s of %s", ss[0], ss[3])
+				slog.Warn("parseBasicSecurity invalid excode", "code", ss[0], "ss[3]", ss[3])
 			}
 			secType = types.SecurityTypeStock
 		case "21", "22", "23", "24", "25", "26":
@@ -313,7 +314,7 @@ func parseBasicSecurity(body string) []*BasicSecurity {
 			exChange = types.ExChangeNasdaq
 			exCode = formatUSCode(ss[3])
 		default:
-			slog.Warn("can not recganize code: %s %s", ss[0], ss[2])
+			slog.Warn("can not recganize", "code", ss[0], "ss[2]", ss[2])
 		}
 
 		ssr := &BasicSecurity{
@@ -355,7 +356,7 @@ func parseInfoPartProfile(exCode, line string) (*sinaPartProfile, error) {
 		return parseInfoPartProfileOfHstock(line)
 	}
 
-	slog.Error("parseInfoPartProfile", "unsuported excode", exCode)
+	slog.Error("parseInfoPartProfile unsuported", "excode", exCode)
 	return nil, fmt.Errorf("unsupported excode %s", exCode)
 }
 

@@ -1,6 +1,7 @@
 package quote
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -47,13 +48,14 @@ func QuoteHistoryHandler(cmd *cobra.Command, args []string) error {
 	if len(args) != 1 {
 		return errors.New("args of command should be one")
 	}
+	ctx := context.TODO()
 
 	// 查询参数由逗号分隔
 	key := args[0]
-	secs := sina.Search(key)
+	secs := sina.Search(ctx, key)
 	num := len(secs)
 	if num == 0 {
-		slog.Info("QuoteHistoryHandler", "no sec fund for %s", key)
+		slog.Info("search no sec", "code", key)
 		return nil
 	}
 
@@ -89,7 +91,7 @@ func QuoteHistoryHandler(cmd *cobra.Command, args []string) error {
 	case "hfq":
 		req.FQT = eastmoney.QuoteFQTPost
 	default:
-		slog.Debug("QuoteHistoryHandler", "fqt", fqt)
+		slog.Debug("QuoteHistoryHandler use default fqt", "fqt", fqt)
 		req.FQT = eastmoney.QuoteFQTDefault
 	}
 
@@ -128,13 +130,13 @@ func QuoteHistoryHandler(cmd *cobra.Command, args []string) error {
 	if defaultEnd.Before(defaultBegin) {
 		bs := defaultBegin.Format(eastmoney.TimeYYMMDD)
 		es := defaultEnd.Format(eastmoney.TimeYYMMDD)
-		slog.Error("invalid begin and end time", "begin", bs, "end", es)
+		slog.Error("invalid time range", "begin", bs, "end", es)
 		return fmt.Errorf("invalid begin %s and end %s", bs, es)
 	}
 
-	quotes, err := eastmoney.GetQuoteHistory(req)
+	quotes, err := eastmoney.GetQuoteHistory(ctx, req)
 	if err != nil {
-		slog.Error("QuoteHistoryHandler", "eastmoney.GetQuoteHistory %d", req.Code, "error", err)
+		slog.Error("failed QuoteHistoryHandler", "code", req.Code, "error", err)
 		return err
 	}
 
