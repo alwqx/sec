@@ -9,10 +9,10 @@ import (
 func TestPrintSecs(t *testing.T) {
 	// 1. empty
 	printSecs(nil)
-	printSecs([]sina.BasicSecurity{})
+	printSecs([]*sina.BasicSecurity{})
 
 	// 2. common
-	secs := []sina.BasicSecurity{
+	secs := []*sina.BasicSecurity{
 		{
 			Name:   "龙芯中科",
 			ExCode: "SH688047",

@@ -136,7 +136,7 @@ func InfoHandler(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func printSecs(secs []sina.BasicSecurity) {
+func printSecs(secs []*sina.BasicSecurity) {
 	num := len(secs)
 	if num == 0 {
 		return
