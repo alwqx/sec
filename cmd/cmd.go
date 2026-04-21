@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"sort"
 	"strings"
+	"time"
 
 	"github.com/alwqx/sec/cmd/quote"
+	"github.com/alwqx/sec/provider/bond"
 	"github.com/alwqx/sec/provider/sina"
 	"github.com/alwqx/sec/types"
 	"github.com/alwqx/sec/version"
@@ -55,11 +58,20 @@ func NewCLI() *cobra.Command {
 		Args:    cobra.ExactArgs(1),
 		RunE:    InfoHandler,
 	}
-
 	infoCmd.Flags().BoolP("debug", "D", false, "Enable debug mode")
 	infoCmd.Flags().BoolP("dividends", "d", false, "show dividend info")
 
-	rootCmd.AddCommand(searchCmd, infoCmd, quote.NewQuoteCLI(), quote.NewQuoteHistoryCLI())
+	bondCmd := &cobra.Command{
+		Use:     "bond",
+		Aliases: []string{"b"},
+		Short:   "Bond info",
+		RunE:    BondHandler,
+	}
+	bondCmd.Flags().BoolP("debug", "D", false, "Enable debug mode")
+	bondCmd.Flags().StringP("begin", "b", "", "Begin date 20250101")
+	bondCmd.Flags().StringP("end", "e", "", "End date 20250131")
+
+	rootCmd.AddCommand(searchCmd, infoCmd, bondCmd, quote.NewQuoteCLI(), quote.NewQuoteHistoryCLI())
 
 	return rootCmd
 }
@@ -210,6 +222,81 @@ func printDividends(dids []sina.Dividend) {
 	table.SetHeaderLine(false)
 	table.SetBorder(false)
 	table.SetNoWhiteSpace(true)
+	table.SetTablePadding("\t")
+	table.AppendBulk(data)
+	table.Render()
+}
+
+// BondHandler 国债相关命令
+func BondHandler(cmd *cobra.Command, args []string) error {
+	defaultEnd := time.Now()
+	defaultBegin := defaultEnd.Add(-30 * 24 * time.Hour)
+	beginStr, err := cmd.Flags().GetString("begin")
+	if err != nil {
+		return err
+	}
+
+	req := &bond.GetChinaBondReq{}
+	// 校验 begin
+	if beginStr != "" {
+		defaultBegin, err = time.Parse("20060102", beginStr)
+		if err != nil {
+			return err
+		}
+	}
+	req.Start = defaultBegin.Format("2006-01-02")
+
+	// 校验 end
+	endStr, err := cmd.Flags().GetString("end")
+	if err != nil {
+		return err
+	}
+	if endStr != "" {
+		defaultEnd, err = time.Parse("20060102", endStr)
+		if err != nil {
+			return err
+		}
+	}
+	req.End = defaultEnd.Format("2006-01-02")
+	slog.Debug("req info", "begin_str", beginStr, "end_str", endStr, "begin", req.Start, "end", req.End)
+
+	resp, err := bond.GetChinaBond(cmd.Context(), req)
+	if err != nil {
+		return err
+	}
+	printChinaBonds(resp.HeList)
+
+	return nil
+}
+
+func printChinaBonds(bonds []*bond.ChinaBondItem) {
+	num := len(bonds)
+	if num == 0 {
+		return
+	}
+
+	data := make([][]string, 0, num)
+	for _, bond := range bonds {
+		data = append(data, []string{bond.Date, bond.ThreeMonth, bond.SixMonth, bond.OneYear, bond.TwoYear, bond.ThreeYear, bond.FiveYear, bond.TenYear, bond.ThirtyYear})
+	}
+	sort.Slice(data, func(i, j int) bool {
+		return data[i][0] < data[j][0]
+	})
+
+	table := tablewriter.NewWriter(os.Stdout)
+	headers := []string{"日期", "3个月", "6个月", "1年", "2年", "3年", "5年", "10年", "30年"}
+	table.SetHeader(headers)
+	headerStyles := make([]tablewriter.Colors, 0, len(headers))
+	for range headers {
+		headerStyles = append(headerStyles, tablewriter.Colors{tablewriter.Bold})
+	}
+	table.SetHeaderColor(headerStyles...)
+
+	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
+	table.SetAlignment(tablewriter.ALIGN_LEFT)
+	table.SetHeaderLine(false)
+	table.SetBorder(false)
+	table.SetNoWhiteSpace(false)
 	table.SetTablePadding("\t")
 	table.AppendBulk(data)
 	table.Render()

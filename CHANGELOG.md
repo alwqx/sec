@@ -1,5 +1,9 @@
 # sec change log
 
+### v0.2.10
+
+1. `sec bond` 打印中国国债信息
+
 ### v0.2.9
 
 1. 修复 [issue-57](https://github.com/alwqx/sec/issues/57)：`sec q nvdia` 查不到结果 hang 住

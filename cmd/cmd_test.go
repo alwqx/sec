@@ -3,6 +3,7 @@ package cmd
 import (
 	"testing"
 
+	"github.com/alwqx/sec/provider/bond"
 	"github.com/alwqx/sec/provider/sina"
 )
 
@@ -54,4 +55,39 @@ func TestPrintDividends(t *testing.T) {
 func TestVersionHandler(t *testing.T) {
 	// version.Version=
 	versionHandler(nil, nil)
+}
+
+func TestPrintChinaBonds(t *testing.T) {
+	// 1. empty
+	printChinaBonds(nil)
+	printChinaBonds([]*bond.ChinaBondItem{})
+
+	// 2. common
+	data := []*bond.ChinaBondItem{
+		{
+			Date:       "2023-06-02",
+			ThreeMonth: "1.71",
+			SixMonth:   "1.85",
+			OneYear:    "1.97",
+			TwoYear:    "2.19",
+			ThreeYear:  "2.26",
+			FiveYear:   "2.45",
+			SevenYear:  "2.66",
+			TenYear:    "2.70",
+			ThirtyYear: "3.08",
+		},
+		{
+			Date:       "2023-06-01",
+			ThreeMonth: "1.01",
+			SixMonth:   "1.05",
+			OneYear:    "1.27",
+			TwoYear:    "2.09",
+			ThreeYear:  "2.16",
+			FiveYear:   "2.35",
+			SevenYear:  "2.56",
+			TenYear:    "2.88",
+			ThirtyYear: "3.18",
+		},
+	}
+	printChinaBonds(data)
 }
