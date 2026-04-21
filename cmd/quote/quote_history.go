@@ -1,7 +1,6 @@
 package quote
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -48,11 +47,10 @@ func QuoteHistoryHandler(cmd *cobra.Command, args []string) error {
 	if len(args) != 1 {
 		return errors.New("args of command should be one")
 	}
-	ctx := context.TODO()
 
 	// 查询参数由逗号分隔
 	key := args[0]
-	secs := sina.Search(ctx, key)
+	secs := sina.Search(cmd.Context(), key)
 	num := len(secs)
 	if num == 0 {
 		slog.Info("search no sec", "code", key)
@@ -134,7 +132,7 @@ func QuoteHistoryHandler(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid begin %s and end %s", bs, es)
 	}
 
-	quotes, err := eastmoney.GetQuoteHistory(ctx, req)
+	quotes, err := eastmoney.GetQuoteHistory(cmd.Context(), req)
 	if err != nil {
 		slog.Error("failed QuoteHistoryHandler", "code", req.Code, "error", err)
 		return err
