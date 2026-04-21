@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -95,9 +94,7 @@ func SearchHandler(cmd *cobra.Command, args []string) error {
 	if len(args) != 1 {
 		return errors.New("args of command should be one")
 	}
-	ctx := context.TODO()
-
-	secs := sina.Search(ctx, args[0])
+	secs := sina.Search(cmd.Context(), args[0])
 	printSecs(secs)
 
 	return nil
@@ -114,10 +111,9 @@ func InfoHandler(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	opts.Dividend = dividend
-	ctx := context.TODO()
 
 	// 1. search security
-	secs := sina.Search(ctx, args[0])
+	secs := sina.Search(cmd.Context(), args[0])
 	if len(secs) == 0 {
 		slog.Warn("no result", "code", args[0])
 		return nil
@@ -127,7 +123,7 @@ func InfoHandler(cmd *cobra.Command, args []string) error {
 	sec := secs[0]
 	opts.Code = sec.Code
 	opts.ExCode = sec.ExCode
-	profile, err := sina.Profile(ctx, opts)
+	profile, err := sina.Profile(cmd.Context(), opts)
 	if err != nil {
 		return err
 	}
@@ -139,7 +135,7 @@ func InfoHandler(cmd *cobra.Command, args []string) error {
 		profile.Current, profile.PB, profile.PeTTM, types.HumanNum(profile.MarketCap), types.HumanNum(profile.TradedMarketCap))
 
 	if opts.Dividend {
-		dids, err := sina.QueryDividends(ctx, opts.Code)
+		dids, err := sina.QueryDividends(cmd.Context(), opts.Code)
 		if err != nil {
 			slog.Error("failed query dividends", "code", opts.Code, "error", err)
 		} else {
