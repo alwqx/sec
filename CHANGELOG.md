@@ -1,5 +1,14 @@
 # sec change log
 
+### v0.2.12
+
+1. actions/checkout@v4 -> v6
+1. actions/setup-go@v4 -> v6
+
+### v0.2.11
+
+1. github tag `v0.2.10` 误设置成不可变导致发版失败，改正后新建 `v0.2.11`
+
 ### v0.2.10
 
 1. `sec bond` 打印中国国债信息

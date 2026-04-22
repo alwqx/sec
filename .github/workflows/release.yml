@@ -19,7 +19,7 @@ jobs:
           - goarch: arm64
             goos: windows
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set SEC_VERSION env
         run: echo SEC_VERSION=$(git describe --tags --always) >> ${GITHUB_ENV}
