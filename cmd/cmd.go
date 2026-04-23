@@ -67,10 +67,18 @@ func NewCLI() *cobra.Command {
 		RunE:    BondHandler,
 	}
 	bondCmd.Flags().BoolP("debug", "D", false, "Enable debug mode")
-	bondCmd.Flags().StringP("begin", "b", "", "Begin date 20250101")
-	bondCmd.Flags().StringP("end", "e", "", "End date 20250131")
 
-	rootCmd.AddCommand(searchCmd, infoCmd, bondCmd, quote.NewQuoteCLI(), quote.NewQuoteHistoryCLI())
+	bondHistoryCmd := &cobra.Command{
+		Use:     "bond-history",
+		Aliases: []string{"bh"},
+		Short:   "Bond history info",
+		RunE:    BondHistoryHandler,
+	}
+	bondHistoryCmd.Flags().BoolP("debug", "D", false, "Enable debug mode")
+	bondHistoryCmd.Flags().StringP("begin", "b", "", "Begin date 20250101")
+	bondHistoryCmd.Flags().StringP("end", "e", "", "End date 20250131")
+
+	rootCmd.AddCommand(searchCmd, infoCmd, bondCmd, bondHistoryCmd, quote.NewQuoteCLI(), quote.NewQuoteHistoryCLI())
 
 	return rootCmd
 }
@@ -225,42 +233,26 @@ func printDividends(dids []sina.Dividend) {
 
 // BondHandler 国债相关命令
 func BondHandler(cmd *cobra.Command, args []string) error {
+	// 默认请求最近10天(考虑中秋、春节等假期)的数据，取最新一条
 	defaultEnd := time.Now()
-	defaultBegin := defaultEnd.Add(-30 * 24 * time.Hour)
-	beginStr, err := cmd.Flags().GetString("begin")
-	if err != nil {
-		return err
+	defaultBegin := defaultEnd.Add(-10 * 24 * time.Hour)
+
+	req := &bond.GetChinaBondReq{
+		Start: defaultBegin.Format("2006-01-02"),
+		End:   defaultEnd.Format("2006-01-02"),
 	}
 
-	req := &bond.GetChinaBondReq{}
-	// 校验 begin
-	if beginStr != "" {
-		defaultBegin, err = time.Parse("20060102", beginStr)
-		if err != nil {
-			return err
-		}
-	}
-	req.Start = defaultBegin.Format("2006-01-02")
-
-	// 校验 end
-	endStr, err := cmd.Flags().GetString("end")
-	if err != nil {
-		return err
-	}
-	if endStr != "" {
-		defaultEnd, err = time.Parse("20060102", endStr)
-		if err != nil {
-			return err
-		}
-	}
-	req.End = defaultEnd.Format("2006-01-02")
-	slog.Debug("req info", "begin_str", beginStr, "end_str", endStr, "begin", req.Start, "end", req.End)
+	slog.Debug("bond req info", "begin", req.Start, "end", req.End)
 
 	resp, err := bond.GetChinaBond(cmd.Context(), req)
 	if err != nil {
 		return err
 	}
-	printChinaBonds(resp.HeList)
+	if len(resp.HeList) > 0 {
+		printChinaBonds(resp.HeList[:1])
+	} else {
+		fmt.Printf("no data of range %s - %s", req.Start, req.End)
+	}
 
 	return nil
 }
@@ -296,4 +288,46 @@ func printChinaBonds(bonds []*bond.ChinaBondItem) {
 	table.SetTablePadding("\t")
 	table.AppendBulk(data)
 	table.Render()
+}
+
+// BondHistoryHandler 国债相关命令
+func BondHistoryHandler(cmd *cobra.Command, args []string) error {
+	defaultEnd := time.Now()
+	defaultBegin := defaultEnd.Add(-30 * 24 * time.Hour)
+	beginStr, err := cmd.Flags().GetString("begin")
+	if err != nil {
+		return err
+	}
+
+	req := &bond.GetChinaBondReq{}
+	// 校验 begin
+	if beginStr != "" {
+		defaultBegin, err = time.Parse("20060102", beginStr)
+		if err != nil {
+			return err
+		}
+	}
+	req.Start = defaultBegin.Format("2006-01-02")
+
+	// 校验 end
+	endStr, err := cmd.Flags().GetString("end")
+	if err != nil {
+		return err
+	}
+	if endStr != "" {
+		defaultEnd, err = time.Parse("20060102", endStr)
+		if err != nil {
+			return err
+		}
+	}
+	req.End = defaultEnd.Format("2006-01-02")
+	slog.Debug("bond-history req info", "begin_str", beginStr, "end_str", endStr, "begin", req.Start, "end", req.End)
+
+	resp, err := bond.GetChinaBond(cmd.Context(), req)
+	if err != nil {
+		return err
+	}
+	printChinaBonds(resp.HeList)
+
+	return nil
 }
