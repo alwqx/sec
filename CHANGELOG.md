@@ -2,8 +2,12 @@
 
 ### v0.2.12
 
+[Deprecation of Node 20 on GitHub Actions runners](https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/)
+
 1. actions/checkout@v4 -> v6
-1. actions/setup-go@v4 -> v6
+2. actions/setup-go@v4 -> v6
+3. `bond` 命令只返回最新一条数据
+4. 新增 `bond—history` 命令
 
 ### v0.2.11
 
