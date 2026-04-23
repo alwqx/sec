@@ -1,5 +1,9 @@
 # sec change log
 
+### v0.2.13
+
+1. 移除 bond 相关代码
+
 ### v0.2.12
 
 [Deprecation of Node 20 on GitHub Actions runners](https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/)
