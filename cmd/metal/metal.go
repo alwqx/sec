@@ -23,10 +23,10 @@ func NewMetalCLI() *cobra.Command {
 
 // MetalHandler 打印贵金属最新行情数据，默认 Au999
 func MetalHandler(cmd *cobra.Command, args []string) error {
-	now := time.Now()
+	end := time.Now()
 	req := &metal.QueryAu999Req{
-		Start: now.Add(-10 * 24 * time.Hour).Format(utils.LayoutYYMMDD),
-		End:   now.Format(utils.LayoutYYMMDD),
+		Start: end.Add(-10 * 24 * time.Hour).Format(utils.LayoutYYMMDD),
+		End:   end.Format(utils.LayoutYYMMDD),
 	}
 	resp, err := metal.QueryAu999(cmd.Context(), req)
 	if err != nil {
