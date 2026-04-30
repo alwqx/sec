@@ -1,5 +1,9 @@
 # sec change log
 
+### v0.2.14
+
+1. `sec metal` 获取贵金属价格，默认 Au999
+
 ### v0.2.13
 
 1. 移除 bond 相关代码

@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/alwqx/sec/cmd/metal"
 	"github.com/alwqx/sec/cmd/quote"
 	"github.com/alwqx/sec/provider/sina"
 	"github.com/alwqx/sec/types"
@@ -57,7 +58,11 @@ func NewCLI() *cobra.Command {
 	infoCmd.Flags().BoolP("debug", "D", false, "Enable debug mode")
 	infoCmd.Flags().BoolP("dividends", "d", false, "show dividend info")
 
-	rootCmd.AddCommand(searchCmd, infoCmd, quote.NewQuoteCLI(), quote.NewQuoteHistoryCLI())
+	rootCmd.AddCommand(
+		searchCmd, infoCmd,
+		quote.NewQuoteCLI(), quote.NewQuoteHistoryCLI(),
+		metal.NewMetalCLI(), metal.NewMetalHistoryCLI(),
+	)
 
 	return rootCmd
 }
