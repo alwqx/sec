@@ -15,8 +15,10 @@ import (
 )
 
 const (
-	LayoutYYMMDD       = "2006-01-02"
-	StandardTimeLayout = "2006-01-02 15:04:05"
+	// 解析 metal 命令中的时间参数格式
+	ParseMetalCmdArgTimeLayout = "20060102"
+	LayoutYYMMDD               = "2006-01-02"
+	StandardTimeLayout         = "2006-01-02 15:04:05"
 )
 
 // StandardTimeString 返回标准格式的时间字符串

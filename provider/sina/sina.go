@@ -187,6 +187,7 @@ func QueryDividends(ctx context.Context, code string) ([]Dividend, error) {
 // QueryBasicCorp 根据证券代码获取公司信息
 func QueryBasicCorp(ctx context.Context, exCode string) (*BasicCorp, error) {
 	coraUrl := fmt.Sprintf("https://vip.stock.finance.sina.com.cn/corp/go.php/vCI_CorpInfo/stockid/%s.phtml", exCode)
+	slog.DebugContext(ctx, "QueryBasicCorp", "coraUrl", coraUrl)
 	resp, err := utils.MakeRequest(ctx, http.MethodGet, coraUrl, defaultHttpHeaders(), nil)
 	if err != nil {
 		return nil, err
