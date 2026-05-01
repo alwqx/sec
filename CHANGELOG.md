@@ -1,5 +1,9 @@
 # sec change log
 
+### v0.2.15
+
+1. 优化 `quote-history` 命令内部时间范围逻辑
+
 ### v0.2.14
 
 1. `sec metal` 获取贵金属价格，默认 Au999

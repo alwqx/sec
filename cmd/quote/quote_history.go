@@ -60,11 +60,9 @@ func QuoteHistoryHandler(cmd *cobra.Command, args []string) error {
 	// 默认选择第一个查询结果
 	sec := secs[0]
 	slog.Debug("QuoteHistoryHandler", "num", num, "excode", sec.ExCode, "code", sec.Code, "exchange", sec.ExChange)
-	now := time.Now()
 	req := &eastmoney.GetQuoteHistoryReq{
 		Code: sec.Code,
 	}
-
 	switch sec.ExChange {
 	case "sh":
 		req.MarketCode = 1
@@ -93,8 +91,8 @@ func QuoteHistoryHandler(cmd *cobra.Command, args []string) error {
 		req.FQT = eastmoney.QuoteFQTDefault
 	}
 
-	defaultBegin := now.Add(-30 * 24 * time.Hour)
-	defaultEnd := now
+	defaultEnd := time.Now()
+	defaultBegin := defaultEnd.Add(-30 * 24 * time.Hour)
 
 	beginStr, err := cmd.Flags().GetString("begin")
 	if err != nil {
@@ -106,10 +104,8 @@ func QuoteHistoryHandler(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-		req.Begin = beginStr
-	} else {
-		req.Begin = now.Add(-30 * 24 * time.Hour).Format(eastmoney.TimeYYMMDD)
 	}
+	req.Begin = defaultBegin.Format(eastmoney.TimeYYMMDD)
 
 	endStr, err := cmd.Flags().GetString("end")
 	if err != nil {
@@ -120,10 +116,8 @@ func QuoteHistoryHandler(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-		req.End = endStr
-	} else {
-		req.End = now.Format(eastmoney.TimeYYMMDD)
 	}
+	req.End = defaultEnd.Format(eastmoney.TimeYYMMDD)
 
 	if defaultEnd.Before(defaultBegin) {
 		bs := defaultBegin.Format(eastmoney.TimeYYMMDD)
