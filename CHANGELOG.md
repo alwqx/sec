@@ -3,6 +3,7 @@
 ### v0.2.15
 
 1. 优化 `quote-history` 命令内部时间范围逻辑
+2. 添加 [opencode.json](https://opencode.ai/docs/zh-cn/config/) 配置
 
 ### v0.2.14
 
