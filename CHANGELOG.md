@@ -4,6 +4,7 @@
 
 1. 优化 `quote-history` 命令内部时间范围逻辑
 2. 添加 [opencode.json](https://opencode.ai/docs/zh-cn/config/) 配置
+3. 美债收益率
 
 ### v0.2.14
 

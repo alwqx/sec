@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:home.treasury.gov)",
+      "Bash(go build *)",
+      "Bash(/tmp/sec bond *)",
+      "Bash(go test *)",
+      "Bash(/tmp/sec bh *)",
+      "Bash(go fmt *)"
+    ]
+  }
+}
