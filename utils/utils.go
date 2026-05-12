@@ -19,6 +19,8 @@ const (
 	ParseMetalCmdArgTimeLayout = "20060102"
 	LayoutYYMMDD               = "2006-01-02"
 	StandardTimeLayout         = "2006-01-02 15:04:05"
+
+	defaultHttpTimeout = 10 * time.Second
 )
 
 // StandardTimeString 返回标准格式的时间字符串
@@ -37,22 +39,24 @@ func UserAgent() string {
 }
 
 // MakeRequest 发送 http 请求，返回 *http.Response
-func MakeRequest(ctx context.Context, method, reqURL string, headers http.Header, body io.Reader) (*http.Response, error) {
-	var (
-		resp *http.Response
-		err  error
-	)
-
+// timeout 为请求超时时间（含响应体读取），0 表示不设置超时
+func MakeRequest(ctx context.Context, method, reqURL string, headers http.Header, body io.Reader, timeout time.Duration) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, method, reqURL, body)
 	if err != nil {
 		return nil, err
 	}
+	req.Header.Set("User-Agent", UserAgent())
 	if headers != nil {
 		req.Header = headers
 	}
 
-	req.Header.Set("User-Agent", UserAgent())
-	resp, err = http.DefaultClient.Do(req)
+	var client *http.Client
+	if timeout > 0 {
+		client = &http.Client{Timeout: timeout}
+	} else {
+		client = &http.Client{Timeout: defaultHttpTimeout}
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}

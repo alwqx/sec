@@ -159,7 +159,7 @@ func QueryBond(ctx context.Context, req *QueryBondReq) (*QueryBondResp, error) {
 func fetchYearData(ctx context.Context, year int) ([]*BondYieldItem, error) {
 	url := fmt.Sprintf(treasuryYieldCurveURL, year)
 	slog.DebugContext(ctx, "fetchYearData", "reqURL", url)
-	resp, err := utils.MakeRequest(ctx, http.MethodGet, url, nil, nil)
+	resp, err := utils.MakeRequest(ctx, http.MethodGet, url, nil, nil, 0)
 	if err != nil {
 		return nil, err
 	}

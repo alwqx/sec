@@ -6,6 +6,8 @@
 2. 添加 [opencode.json](https://opencode.ai/docs/zh-cn/config/) 配置
 3. 美债收益率
 4. 新增文档 `docs/basic.md` 和 `docs/quote.md`
+5. utils.MakeRequest 新增 timeout 参数
+6. 新增 `sec upgrade` 自更新命令
 
 ### v0.2.14
 

@@ -109,7 +109,7 @@ func formatQuoteKeys(keys []string) []string {
 func QuerySecQuote(ctx context.Context, exCode string) (*SecurityQuote, error) {
 	lowerKey := strings.ToLower(exCode)
 	reqUrl := fmt.Sprintf("https://hq.sinajs.cn/list=%s", lowerKey)
-	resp, err := utils.MakeRequest(ctx, http.MethodGet, reqUrl, defaultHttpHeaders(), nil)
+	resp, err := utils.MakeRequest(ctx, http.MethodGet, reqUrl, defaultHttpHeaders(), nil, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -327,7 +327,7 @@ func parseSecQuoteOfMstock(quoteLine string) (*SecurityQuote, error) {
 func QueryQuoteList(ctx context.Context, exCodes []string) ([]*SecurityQuote, error) {
 	formatKeys := formatQuoteKeys(exCodes)
 	reqUrl := fmt.Sprintf("https://hq.sinajs.cn/list=%s", strings.Join(formatKeys, ","))
-	resp, err := utils.MakeRequest(ctx, http.MethodGet, reqUrl, defaultHttpHeaders(), nil)
+	resp, err := utils.MakeRequest(ctx, http.MethodGet, reqUrl, defaultHttpHeaders(), nil, 0)
 	if err != nil {
 		return nil, err
 	}

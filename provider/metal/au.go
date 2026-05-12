@@ -44,7 +44,7 @@ type innerDailyHQResp struct {
 
 // getAllDailyQuote 获取 https://www.sge.com.cn/sjzx/mrhq 中的全部日行情数据
 func getAllDailyQuote(ctx context.Context) (*dailyHQResp, error) {
-	resp, err := utils.MakeRequest(ctx, http.MethodGet, sgeAu999DailyQuoteUrl, nil, nil)
+	resp, err := utils.MakeRequest(ctx, http.MethodGet, sgeAu999DailyQuoteUrl, nil, nil, 0)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed request", "url", sgeAu999DailyQuoteUrl)
 		return nil, err

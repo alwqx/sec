@@ -7,7 +7,14 @@
       "Bash(/tmp/sec bond *)",
       "Bash(go test *)",
       "Bash(/tmp/sec bh *)",
-      "Bash(go fmt *)"
+      "Bash(go fmt *)",
+      "Bash(curl -s \"https://api.github.com/repos/alwqx/sec/releases/latest\")",
+      "Bash(python3 -c \"import json,sys; data=json.load\\(sys.stdin\\); [print\\(f'{a[\\\\\"name\\\\\"]}'\\) for a in data['assets']]\")",
+      "Bash(/tmp/sec -v)",
+      "Bash(echo \"=== version: $\\(/tmp/sec -v 2>&1\\)\")",
+      "Bash(/tmp/sec upgrade *)",
+      "Bash(/tmp/sec-latest upgrade *)",
+      "Bash(curl -sL -o /dev/null -w \"HTTP %{http_code}, size %{size_download}\\\\n\" \"https://github.com/alwqx/sec/releases/download/v0.2.14/sec-v0.2.14-darwin-arm64.tar.gz\")"
     ]
   }
 }
