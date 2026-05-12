@@ -22,7 +22,7 @@ func TestMakeRequest(t *testing.T) {
 	defer gock.Off()
 	ctx := context.TODO()
 	gock.New("http://abc.xyz").Get("/foo").Reply(200).JSON(`OK`)
-	resp, err := MakeRequest(ctx, http.MethodGet, "http://abc.xyz/foo", nil, nil)
+	resp, err := MakeRequest(ctx, http.MethodGet, "http://abc.xyz/foo", nil, nil, 0)
 	require.Nil(t, err)
 	require.NotNil(t, resp)
 

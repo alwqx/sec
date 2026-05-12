@@ -68,7 +68,7 @@ func getOriginQuoteHistory(ctx context.Context, req *GetQuoteHistoryReq) (res *Q
 	}
 
 	reqURL := fmt.Sprintf("%s/api/qt/stock/kline/get?%s", EastMoneyPush2HisApiBase, values.Encode())
-	resp, err := utils.MakeRequest(ctx, http.MethodGet, reqURL, nil, nil)
+	resp, err := utils.MakeRequest(ctx, http.MethodGet, reqURL, nil, nil, 0)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed request", "url", reqURL, "error", err)
 		return nil, err

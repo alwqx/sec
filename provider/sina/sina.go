@@ -34,7 +34,7 @@ func defaultHttpHeaders() http.Header {
 // Search 根据关键字查询证券信息
 func Search(ctx context.Context, key string) []*BasicSecurity {
 	reqUrl := fmt.Sprintf("https://suggest3.sinajs.cn/suggest/type=11,12,15,21,22,23,24,25,26,31,33,41&key=%s", key)
-	resp, err := utils.MakeRequest(ctx, http.MethodGet, reqUrl, defaultHttpHeaders(), nil)
+	resp, err := utils.MakeRequest(ctx, http.MethodGet, reqUrl, defaultHttpHeaders(), nil, 0)
 	if err != nil {
 		return nil
 	}
@@ -165,7 +165,7 @@ func Profile(ctx context.Context, opts *types.InfoOptions) (*CorpProfile, error)
 // QueryDividends 查询分红送转信息
 func QueryDividends(ctx context.Context, code string) ([]Dividend, error) {
 	pageURL := fmt.Sprintf("https://vip.stock.finance.sina.com.cn/corp/go.php/vISSUE_ShareBonus/stockid/%s.phtml", code)
-	resp, err := utils.MakeRequest(ctx, http.MethodGet, pageURL, defaultHttpHeaders(), nil)
+	resp, err := utils.MakeRequest(ctx, http.MethodGet, pageURL, defaultHttpHeaders(), nil, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -188,7 +188,7 @@ func QueryDividends(ctx context.Context, code string) ([]Dividend, error) {
 func QueryBasicCorp(ctx context.Context, exCode string) (*BasicCorp, error) {
 	coraUrl := fmt.Sprintf("https://vip.stock.finance.sina.com.cn/corp/go.php/vCI_CorpInfo/stockid/%s.phtml", exCode)
 	slog.DebugContext(ctx, "QueryBasicCorp", "coraUrl", coraUrl)
-	resp, err := utils.MakeRequest(ctx, http.MethodGet, coraUrl, defaultHttpHeaders(), nil)
+	resp, err := utils.MakeRequest(ctx, http.MethodGet, coraUrl, defaultHttpHeaders(), nil, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -217,7 +217,7 @@ func QueryBasicCorp(ctx context.Context, exCode string) (*BasicCorp, error) {
 func Info(ctx context.Context, exCode string) (*SecurityQuote, *sinaPartProfile, error) {
 	lowerKey := strings.ToLower(exCode)
 	reqUrl := fmt.Sprintf("https://hq.sinajs.cn/list=%s,%s_i", lowerKey, lowerKey)
-	resp, err := utils.MakeRequest(ctx, http.MethodGet, reqUrl, defaultHttpHeaders(), nil)
+	resp, err := utils.MakeRequest(ctx, http.MethodGet, reqUrl, defaultHttpHeaders(), nil, 0)
 	if err != nil {
 		return nil, nil, err
 	}
