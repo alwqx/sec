@@ -72,6 +72,8 @@ func QuoteHistoryHandler(cmd *cobra.Command, args []string) error {
 		req.MarketCode = 116
 	case types.ExChangeNasdaq:
 		req.MarketCode = 105
+	default:
+		return fmt.Errorf("unsupported exchange: %s", sec.ExChange)
 	}
 
 	// 复权类型
