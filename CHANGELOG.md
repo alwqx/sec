@@ -1,5 +1,9 @@
 # sec change log
 
+1. 修复 `sec upgrade` 报错
+
+> 2026/05/14 20:29:24 ERROR replaceBinary failed to remove tmpPath tmpPath=/var/folders/d6/qd0kj49d5jv2bsyj3trs41mw0000gn/T/.sec-new-2675584278 error="remove /var/folders/d6/qd0kj49d5jv2bsyj3trs41mw0000gn/T/.sec-new-2675584278: no such file or directory"
+
 ### v0.2.16
 
 1. `sec kline` 终端绘制 K 线图显示行情数据

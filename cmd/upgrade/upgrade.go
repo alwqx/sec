@@ -305,7 +305,11 @@ func replaceBinary(execPath string, data []byte) error {
 	}()
 
 	tmpPath := tmpFile.Name()
+	removeTmp := true // true defer 中删除 tmpPath
 	defer func() {
+		if !removeTmp {
+			return
+		}
 		removeErr := os.Remove(tmpPath)
 		if removeErr != nil {
 			slog.Error("replaceBinary failed to remove tmpPath", "tmpPath", tmpPath, "error", removeErr)
@@ -327,6 +331,9 @@ func replaceBinary(execPath string, data []byte) error {
 	if err := os.Rename(tmpPath, execPath); err != nil {
 		return copyFile(tmpPath, execPath)
 	}
+	// os.Rename 执行成功，tmpPath 已经被 mv 到 execPath
+	// tmpPath 不存在，defer 中不再执行删除目录操作
+	removeTmp = false
 
 	return nil
 }
