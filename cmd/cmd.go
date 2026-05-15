@@ -127,7 +127,7 @@ func InfoHandler(cmd *cobra.Command, args []string) error {
 	}
 
 	profile.ExCode = sec.ExChange
-	fmt.Printf("证券代码\t%s\n简称历史\t%s\n公司名称\t%s\n上市日期\t%s\n发行价格\t%.2f\n行业分类\t%s\n主营业务\t%s\n办公地址\t%s\n公司网址\t%s\n当前价格\t%.2f\n市净率PB\t%.2f\n市盈率TTM\t%.2f\n总市值  \t%s\n流通市值\t%s\n",
+	fmt.Fprintf(cmd.OutOrStdout(), "证券代码\t%s\n简称历史\t%s\n公司名称\t%s\n上市日期\t%s\n发行价格\t%.2f\n行业分类\t%s\n主营业务\t%s\n办公地址\t%s\n公司网址\t%s\n当前价格\t%.2f\n市净率PB\t%.2f\n市盈率TTM\t%.2f\n总市值  \t%s\n流通市值\t%s\n",
 		sec.ExCode, profile.HistoryName, profile.Name, profile.ListingDate, profile.ListingPrice,
 		profile.Category, profile.MainBusiness, profile.BusinessAddress, profile.WebSite,
 		profile.Current, profile.PB, profile.PeTTM, types.HumanNum(profile.MarketCap), types.HumanNum(profile.TradedMarketCap))

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/alwqx/sec/provider/eastmoney"
@@ -116,17 +117,49 @@ func KLineHandler(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid begin %s and end %s", bs, es)
 	}
 
-	quotes, err := eastmoney.GetQuoteHistory(cmd.Context(), req)
-	if err != nil {
-		slog.Error("failed GetQuoteHistory", "code", req.Code, "error", err)
-		return err
+	var (
+		quotes     []*eastmoney.Quote
+		profile    *sina.CorpProfile
+		err1, err2 error
+		wg         sync.WaitGroup
+	)
+	wg.Add(2)
+
+	opts := new(types.InfoOptions)
+	opts.Code = sec.Code
+	opts.ExCode = sec.ExCode
+	go func() {
+		defer wg.Done()
+		profile, err1 = sina.Profile(cmd.Context(), opts)
+	}()
+	go func() {
+		defer wg.Done()
+		quotes, err2 = eastmoney.GetQuoteHistory(cmd.Context(), req)
+	}()
+	wg.Wait()
+
+	if err1 != nil {
+		slog.Error("failed sina.Profile", "code", sec.Code, "error", err1)
+		return err1
 	}
 
+	if err2 != nil {
+		slog.Error("failed GetQuoteHistory", "code", req.Code, "error", err2)
+		return err2
+	}
 	if len(quotes) == 0 {
 		slog.Info("no quote data", "code", req.Code)
 		return nil
 	}
 
+	// 打印基本信息
+	profile.ExCode = sec.ExChange
+	fmt.Fprintf(cmd.OutOrStdout(), "证券代码\t%s\n公司名称\t%s\n主营业务\t%s\n发行价格\t%.2f\n当前价格\t%.2f\n市净率PB\t%.2f\n市盈率TTM\t%.2f\n总市值  \t%s\n流通市值\t%s\n",
+		sec.ExCode, profile.Name, profile.MainBusiness,
+		profile.ListingPrice, profile.Current, profile.PB, profile.PeTTM,
+		types.HumanNum(profile.MarketCap), types.HumanNum(profile.TradedMarketCap))
+
+	// 渲染蜡烛图
 	noVolume, _ := cmd.Flags().GetBool("no-volume")
 	paging, _ := cmd.Flags().GetBool("paging")
 	halfBlock, _ := cmd.Flags().GetBool("half-block")
