@@ -1,10 +1,13 @@
 # sec change log
 
+### v0.3.0
+
 1. 修复 `sec upgrade` 报错
 
-> 2026/05/14 20:29:24 ERROR replaceBinary failed to remove tmpPath tmpPath=/var/folders/d6/qd0kj49d5jv2bsyj3trs41mw0000gn/T/.sec-new-2675584278 error="remove /var/folders/d6/qd0kj49d5jv2bsyj3trs41mw0000gn/T/.sec-new-2675584278: no such file or directory"
+   > 2026/05/14 20:29:24 ERROR replaceBinary failed to remove tmpPath tmpPath=/ error="remove : no such file or directory"
 
 2. `sec kline` 添加基本证券信息
+3. 更新 README
 
 ### v0.2.16
 
