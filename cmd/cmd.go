@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/alwqx/sec/cmd/balancesheet"
 	"github.com/alwqx/sec/cmd/bond"
 	"github.com/alwqx/sec/cmd/kline"
 	"github.com/alwqx/sec/cmd/metal"
@@ -63,6 +64,7 @@ func NewCLI() *cobra.Command {
 
 	rootCmd.AddCommand(
 		searchCmd, infoCmd,
+		balancesheet.NewBalanceSheetCLI(),
 		bond.NewBondCLI(), bond.NewBondHistoryCLI(),
 		kline.NewKLineCLI(),
 		quote.NewQuoteCLI(), quote.NewQuoteHistoryCLI(),
