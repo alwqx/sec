@@ -1,5 +1,9 @@
 # sec change log
 
+### v0.3.1
+
+1. `sec balance-sheet` 显示财报信息
+
 ### v0.3.0
 
 1. 修复 `sec upgrade` 报错
