@@ -27,9 +27,6 @@ func NewQuoteHistoryCLI() *cobra.Command {
 		CompletionOptions: cobra.CompletionOptions{
 			DisableDefaultCmd: true,
 		},
-		Run: func(cmd *cobra.Command, args []string) {
-			cmd.Print(cmd.UsageString())
-		},
 		RunE: QuoteHistoryHandler,
 	}
 	rootCmd.Flags().BoolP("debug", "D", false, "Enable debug mode")

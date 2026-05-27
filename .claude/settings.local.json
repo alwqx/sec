@@ -17,7 +17,9 @@
       "Bash(curl -sL -o /dev/null -w \"HTTP %{http_code}, size %{size_download}\\\\n\" \"https://github.com/alwqx/sec/releases/download/v0.2.14/sec-v0.2.14-darwin-arm64.tar.gz\")",
       "Bash(go vet *)",
       "Bash(go run *)",
-      "Bash(python3 *)"
+      "Bash(python3 *)",
+      "Bash(go list *)",
+      "Bash(staticcheck *)"
     ]
   }
 }

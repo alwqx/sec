@@ -1,5 +1,9 @@
 ## sec change log
 
+### v0.3.3
+
+1. 修复 cmd 中 RunE 和 Run 重复
+
 ### v0.3.2
 
 1. `sec balance-sheet` 支持下载报表信息
