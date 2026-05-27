@@ -1,7 +1,6 @@
 package types
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 )
@@ -25,11 +24,6 @@ type InfoOptions struct {
 	Code     string // 证券代码 600036
 	ExCode   string // 带交易所前缀的证券代码  SH600036
 	Dividend bool   // 是否显示分红送转信息，true显示，false不显示
-}
-
-func JSONify(data interface{}) {
-	b, _ := json.MarshalIndent(data, "", "\t")
-	fmt.Println(string(b))
 }
 
 func HumanNum(cap float64) (res string) {
