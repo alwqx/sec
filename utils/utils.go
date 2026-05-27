@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
 	"runtime"
 	"time"
 
@@ -82,6 +83,20 @@ func WriteJson(data interface{}, filePath string) error {
 
 	_, err = f.Write(v)
 	return err
+}
+
+// SecDir returns the path to the ~/.sec directory, creating it and any
+// specified subdirectories if they don't exist.
+func SecDir(sub ...string) (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	dir := filepath.Join(append([]string{home, ".sec"}, sub...)...)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return "", err
+	}
+	return dir, nil
 }
 
 // JSONify json 序列化

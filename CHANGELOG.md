@@ -1,4 +1,8 @@
-# sec change log
+## sec change log
+
+### v0.3.2
+
+1. `sec balance-sheet` 支持下载报表信息
 
 ### v0.3.1
 

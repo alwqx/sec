@@ -36,7 +36,7 @@ func TestStripJSONP(t *testing.T) {
 		{
 			name:  "whitespace only",
 			input: `  `,
-			want: `  `,
+			want:  `  `,
 		},
 		{
 			name:    "no closing paren",

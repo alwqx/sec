@@ -52,3 +52,15 @@ func TestWriteJson(t *testing.T) {
 	err = WriteJson(data, filePath)
 	require.Nil(t, err)
 }
+
+func TestSecDir(t *testing.T) {
+	dir, err := SecDir("cache")
+	require.Nil(t, err)
+	require.NotEmpty(t, dir)
+	require.Contains(t, dir, ".sec")
+	require.Contains(t, dir, "cache")
+
+	info, err := os.Stat(dir)
+	require.Nil(t, err)
+	require.True(t, info.IsDir())
+}

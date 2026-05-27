@@ -28,3 +28,6 @@ go.work.sum
 
 # vscode
 sec.code-workspace
+
+*.pdf
+main.py
