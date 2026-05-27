@@ -38,8 +38,8 @@ func Search(ctx context.Context, key string) []*BasicSecurity {
 	if err != nil {
 		return nil
 	}
-	err = adjustRespBodyByEncode(resp)
 	defer resp.Body.Close()
+	err = adjustRespBodyByEncode(resp)
 	if err != nil {
 		slog.ErrorContext(ctx, "adjust body encode failed", "error", err)
 		return nil
@@ -430,6 +430,7 @@ func adjustRespBodyByEncode(resp *http.Response) error {
 	}
 
 	resBytes, err := io.ReadAll(resp.Body)
+	resp.Body.Close()
 	if err != nil {
 		return err
 	}
