@@ -4,6 +4,7 @@
 
 1. 修复 cmd 中 RunE 和 Run 重复
 2. 修复 sina.go 中赋值错误
+3. 修复 cmd/quote/quote.go 中上下文丢失
 
 ### v0.3.2
 

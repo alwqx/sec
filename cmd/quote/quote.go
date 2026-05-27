@@ -57,7 +57,7 @@ func QuoteHandler(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if !realTime {
-		return quoteMultiSec(context.TODO(), dedupKeys)
+		return quoteMultiSec(cmd.Context(), dedupKeys)
 	}
 
 	ctx, cancel := context.WithCancel(cmd.Context())
