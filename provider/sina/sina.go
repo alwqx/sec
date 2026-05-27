@@ -134,7 +134,7 @@ func Profile(ctx context.Context, opts *types.InfoOptions) (*CorpProfile, error)
 		ListingPrice:    corp.Price,
 		ListingDate:     corp.Date,
 		WebSite:         corp.WebSite,
-		RegisterAddress: corp.WebSite,
+		RegisterAddress: corp.RegisterAddress,
 		BusinessAddress: corp.BusinessAddress,
 		MainBusiness:    corp.MainBussiness,
 		Current:         quote.Current,
