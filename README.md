@@ -25,13 +25,13 @@ Available Commands:
   bond          Print US Treasury yield curve (1M/3M/6M/5Y/10Y)
   bond-history  Print US Treasury yield curve history
   help          Help about any command
-  info          Print basic information of a secutiry/stock
+  info          Print basic information of a security/stock
   kline         Print candlestick chart of specific security
   metal         Print quote of precious metal(default au999)
   metal-history Print quote history of precious metal(default au999)
-  quote         Secutiry quote root Command
+  quote         Security quote root Command
   quote-history Print quote history of specific security
-  search        Search code and name of a secutiry/stock
+  search        Search code and name of a security/stock
   upgrade       Upgrade sec to the latest version from GitHub releases
 
 Flags:
