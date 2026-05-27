@@ -65,6 +65,7 @@ func NewCLI() *cobra.Command {
 	rootCmd.AddCommand(
 		searchCmd, infoCmd,
 		balancesheet.NewBalanceSheetCLI(),
+		balancesheet.NewBalanceSheetDownloadCLI(),
 		bond.NewBondCLI(), bond.NewBondHistoryCLI(),
 		kline.NewKLineCLI(),
 		quote.NewQuoteCLI(), quote.NewQuoteHistoryCLI(),

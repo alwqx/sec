@@ -173,9 +173,86 @@ Go 侧处理：正则 `/jQuery.*?\((.*)\);?$/s` 提取中间 JSON，再 `json.Un
 | **JSON**         | 原始结构化数据                 | `encoding/json`（标准库） |
 | **Excel (XLSX)** | 原生 Excel 格式                | `excelize` 第三方库       |
 
-### 方式二：原始 PDF 公告（未来可扩展）
+### 方式二：原始 PDF 年报 — 巨潮资讯网 CNINFO（已实现）
 
-上市公司正式的财务报告 PDF 文件发布在**巨潮资讯网**（`cninfo.com.cn`），可通过爬取获取。此方案复杂度高，暂不纳入本次实现范围。
+巨潮资讯网（`cninfo.com.cn`）是中国证监会指定的法定信息披露平台，覆盖沪深北三市全部 A 股上市公司。
+
+#### CNINFO API 端点
+
+| 端点                                                  | 方法 | 说明                               |
+| ----------------------------------------------------- | ---- | ---------------------------------- |
+| `https://www.cninfo.com.cn/new/data/szse_stock.json`  | GET  | 获取全部 A 股列表（含 orgId 映射） |
+| `https://www.cninfo.com.cn/new/hisAnnouncement/query` | POST | 历史公告查询                       |
+| `http://static.cninfo.com.cn/{adjunctUrl}`            | GET  | PDF 文件下载（公开 CDN）           |
+
+#### 认证要求
+
+- **无需认证**，无需 Cookie 或 Token
+- 公告查询需要设置 `X-Requested-With: XMLHttpRequest` 和 `Referer` 头
+- PDF 下载无任何限制
+
+#### 公告分类代码
+
+| 代码                  | 含义   |
+| --------------------- | ------ |
+| `category_ndbg_szsh`  | 年报   |
+| `category_bndbg_szsh` | 半年报 |
+| `category_yjdbg_szsh` | 一季报 |
+| `category_sjdbg_szsh` | 三季报 |
+
+#### 查询参数（POST body，form-urlencoded）
+
+| 参数        | 必填 | 说明                      | 示例                    |
+| ----------- | ---- | ------------------------- | ----------------------- |
+| `pageNum`   | 是   | 页码                      | `1`                     |
+| `pageSize`  | 是   | 每页条数                  | `30`                    |
+| `column`    | 是   | 交易所：`szse`/`sse`/`bj` | `sse`                   |
+| `tabName`   | 是   | 固定为 `fulltext`         | `fulltext`              |
+| `plate`     | 是   | 板块：`sz`/`sh`/`bj`      | `sh`                    |
+| `stock`     | 否   | 格式 `{code},{orgId}`     | `600036,gssh0600036`    |
+| `category`  | 否   | 公告分类                  | `category_ndbg_szsh`    |
+| `seDate`    | 否   | 日期范围                  | `2024-01-01~2024-04-30` |
+| `searchkey` | 否   | 全文搜索关键词            | `年度报告`              |
+
+#### stock → orgId 映射
+
+通过 `szse_stock.json` 获取映射表（约 500KB，缓存 24 小时）：
+
+| 交易所       | 代码前缀 | orgId 示例               |
+| ------------ | -------- | ------------------------ |
+| 深交所主板   | `00`     | `000001` → `gssz0000001` |
+| 深交所创业板 | `30`     | `300750` → `gssz0300750` |
+| 上交所主板   | `60`     | `600036` → `gssh0600036` |
+| 上交所科创板 | `68`     | `688001` → `gssh0688001` |
+
+#### PDF 文件命名规则
+
+PDF 保存在 CNINFO 的静态 CDN 上，URL 格式：
+
+```
+http://static.cninfo.com.cn/{adjunctUrl}
+```
+
+其中 `adjunctUrl` 由公告查询 API 返回（如 `finalpage/2024-03-29/1205958883.PDF`）。
+
+#### 过滤无效公告
+
+API 返回结果可能包含摘要、英文版、更正公告等，需要通过以下条件过滤：
+
+- `existFlag == 1`（文件存在）
+- `invalidationFlag == 0`（未被撤销）
+- 标题不含：`摘要`、`英文`、`已取消`、`更正`、`修订`
+
+#### 其他官方平台对比
+
+| 平台                | 覆盖范围        | API 格式             | 认证                      | 推荐度 |
+| ------------------- | --------------- | -------------------- | ------------------------- | ------ |
+| **CNINFO （巨潮）** | 沪深北全部 A 股 | form-urlencoded POST | 无                        | ★★★★★  |
+| SZSE （深交所）     | 仅深市          | JSON POST            | 无（需 `X-Request-Type`） | ★★★    |
+| SSE （上交所）      | 仅沪市          | GET + JSONP          | 无（需 `Referer`）        | ★★     |
+| NEEQ （新三板）     | 新三板          | POST + JSONP         | 无                        | ★★     |
+
+**结论：CNINFO 是唯一能一站式覆盖沪深北三市的官方平台，API 简洁、无认证、PDF 直链。**
 
 ---
 
@@ -183,43 +260,56 @@ Go 侧处理：正则 `/jQuery.*?\((.*)\);?$/s` 提取中间 JSON，再 `json.Un
 
 ### 命令设计
 
-新增 `sec balance-sheet`（别名 `sec bs`）命令：
+新增两个命令：
+
+**`sec balance-sheet`（别名 `sec bs`）** — 结构化财务数据查询：
 
 ```bash
-# 列出所有可用财务报表（默认近 5 年年报+最新季报）
+# 列出所有可用财务报表
 sec bs 600036
 
 # 指定报表类型
 sec bs 600036 --type balance    # 资产负债表
-sec bs 600036 --type income      # 利润表
-sec bs 600036 --type cashflow    # 现金流量表
+sec bs 600036 --type income     # 利润表
+sec bs 600036 --type cashflow   # 现金流量表
 
 # 指定报告期
-sec bs 600036 --period annual    # 仅年报
-sec bs 600036 --period all       # 全部报告期
-
-# 指定年份范围
-sec bs 600036 --from 2020 --to 2025
-
-# 下载/导出（输出到表格）
-sec bs 600036 --type balance --period annual
+sec bs 600036 --period annual   # 仅年报
 
 # 导出到文件
 sec bs 600036 --type income --output report.csv
 sec bs 600036 --type balance --output report.json
-sec bs 600036 --type cashflow --output report.xlsx
+```
+
+**`sec balance-sheet-download`（别名 `sec bsd`）** — 从巨潮资讯网下载原始年报 PDF：
+
+```bash
+# 下载当年年报 PDF
+sec bsd 600036
+
+# 下载指定年份
+sec bsd 600036 --year 2024
+
+# 下载年份范围
+sec bsd 600036 --start-year 2020 --end-year 2023
+
+# 指定输出目录
+sec bsd 600036 -y 2024 -o ./reports
 ```
 
 ### 架构设计
 
 ```
-cmd/balancesheet/bs.go          CLI 命令处理器
+sec bs (balance-sheet.go)
     ↓
-provider/eastmoney/bs.go        财务报表数据获取（复用 datacenter-web API）
+provider/eastmoney/balancesheet.go   东方财富 datacenter-web API
+    → 终端表格 / CSV / JSON 输出
+
+sec bsd (download.go)
     ↓
-provider/eastmoney/types.go     新增财务报表相关类型定义
-    ↓
-输出：tablewriter 终端表格 或 CSV/JSON/XLSX 文件
+provider/cninfo/cninfo.go            巨潮资讯网 CNINFO
+    → 公告查询 + PDF 下载到本地
+    → 股票列表缓存 (~/.sec/cache/cninfo_stocks.json)
 ```
 
 ### 文件结构
@@ -232,8 +322,16 @@ provider/eastmoney/
 └── balancesheet_test.go  # 单元测试
 
 cmd/balancesheet/
-├── bs.go                 # sec bs / sec balance-sheet 命令
-└── bs_test.go            # CLI 测试
+├── balance-sheet.go      # sec bs — 结构化财务数据查询 + CSV/JSON 导出
+├── balance-sheet_test.go # formatFieldValue / formatDate / printSummary / printDetailed 测试
+├── download.go           # sec bsd — CNINFO 年报 PDF 下载
+└── download_test.go      # extractYear / genStartEndDate 测试
+
+provider/cninfo/
+└── cninfo.go             # CNINFO 公告查询 + PDF 下载
+
+utils/
+└── utils.go              # SecDir() — ~/.sec/ 统一配置缓存目录
 ```
 
 ### 核心类型设计
@@ -287,43 +385,37 @@ type GetFinancialReportResp struct {
 
 3. **数值格式化**：财务数据以"元"为单位（如 `146695000000` = 1466.95 亿），复用 `types.HumanNum()` 进行格式化
 
-4. **下载实现**：
-   - CSV：`encoding/csv` 直接输出，UTF-8 BOM 头保证 Excel 兼容
-   - JSON：`json.MarshalIndent` 格式化输出
-   - XLSX：可选，如需支持则引入 `github.com/xuri/excelize/v2`
+4. **CNINFO PDF 下载**：`sec bsd` 命令查询巨潮资讯网公告列表 → 过滤有效 PDF（排除摘要/英文/更正） → 下载到本地
 
-5. **环境适配**：`--output` 指定文件路径，默认输出到终端（tablewriter 表格）
+5. **缓存机制**：CNINFO 股票列表缓存到 `~/.sec/cache/cninfo_stocks.json`（24h 有效期），通过 `utils.SecDir("cache")` 管理路径
+
+6. **环境适配**：`--output` 指定 CSV/JSON 文件路径，默认输出到终端（tablewriter 表格）；PDF 下载默认输出到当前目录
 
 ### 与现有代码的复用
 
-| 功能       | 复用来源                                                         |
-| ---------- | ---------------------------------------------------------------- |
-| HTTP 请求  | `utils.MakeRequest(ctx, http.MethodGet, url, nil, nil, timeout)` |
-| 证券搜索   | `sina.Search(ctx, key)`                                          |
-| 大数格式化 | `types.HumanNum(value)`                                          |
-| 终端表格   | `github.com/olekukonko/tablewriter`（已有依赖）                  |
-| 日期解析   | `time.Parse(utils.LayoutYYMMDD, ...)`                            |
-| 交易所映射 | `sina.BasicSecurity.ExChange` → 已在 `kline.go` 中使用           |
+| 功能 | 复用来源 |
+|---|---|
+| HTTP 请求 | `utils.MakeRequest(ctx, http.MethodGet, url, nil, nil, timeout)` |
+| 证券搜索 | `sina.Search(ctx, key)` |
+| 大数格式化 | `types.HumanNum(value)` |
+| 终端表格 | `github.com/olekukonko/tablewriter`（已有依赖） |
+| 配置目录 | `utils.SecDir("cache")` → `~/.sec/cache/` |
 
-### 实现步骤
+### 已实现的 Phase
 
-1. **Phase 1：数据层** (`provider/eastmoney/balancesheet.go`)
-   - 实现 `GetFinancialStatements(ctx, req)` 函数
+1. **Phase 1：数据层**
+   - `provider/eastmoney/balancesheet.go` — 东方财富结构化财务数据
+   - `provider/cninfo/cninfo.go` — 巨潮资讯网公告查询 + PDF 下载
    - JSONP 解析、类型定义、错误处理
-   - 单元测试
+   - 单元测试完成
 
-2. **Phase 2：CLI 命令** (`cmd/balancesheet/bs.go`)
-   - `sec balance-sheet` / `sec bs` 命令
-   - 默认表格输出（终端）
-   - `--output` 导出到 CSV/JSON
+2. **Phase 2：CLI 命令**
+   - `sec bs` — 终端表格 + CSV/JSON 导出
+   - `sec bsd` — 年报 PDF 下载（`--year` / `--start-year` / `--end-year`）
+   - 单元测试完成（formatFieldValue / formatDate / printSummary / printDetailed / extractYear / genStartEndDate）
 
-3. **Phase 3：下载功能**
-   - `--output report.csv` CSV 导出
-   - `--output report.json` JSON 导出
-   - Excel BOM 头处理
-
-4. **Phase 4：文档**
-   - `docs/balance-sheet.md`（本文件）
+3. **Phase 3：基础设施**
+   - `utils.SecDir()` — `~/.sec/` 统一配置缓存目录
 
 ## 终端输出示例
 
