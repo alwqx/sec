@@ -3,6 +3,7 @@
 ### v0.3.2
 
 1. `sec balance-sheet` 支持下载报表信息
+2. 新增 HumanBytes 优化文件大小显示
 
 ### v0.3.1
 
