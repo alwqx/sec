@@ -30,9 +30,6 @@ func NewQuoteCLI() *cobra.Command {
 		CompletionOptions: cobra.CompletionOptions{
 			DisableDefaultCmd: true,
 		},
-		Run: func(cmd *cobra.Command, args []string) {
-			cmd.Print(cmd.UsageString())
-		},
 		RunE: QuoteHandler,
 	}
 	rootCmd.Flags().BoolP("debug", "D", false, "Enable debug mode")
