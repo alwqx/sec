@@ -30,7 +30,7 @@ func NewQuoteHistoryCLI() *cobra.Command {
 		RunE: QuoteHistoryHandler,
 	}
 	rootCmd.Flags().BoolP("debug", "D", false, "Enable debug mode")
-	rootCmd.Flags().BoolP("realtime", "r", false, "Realtime updaet quote info")
+	rootCmd.Flags().BoolP("realtime", "r", false, "Realtime update quote info")
 	rootCmd.Flags().BoolP("desc", "d", false, "Order by date in descending order")
 	rootCmd.Flags().StringP("begin", "b", "", "Begin date 20250101")
 	rootCmd.Flags().StringP("end", "e", "", "End date 20250131")

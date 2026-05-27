@@ -23,7 +23,7 @@ import (
 func NewCLI() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:           "sec",
-		Short:         "Secutiry Information Client",
+		Short:         "Security Information Client",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		CompletionOptions: cobra.CompletionOptions{
@@ -46,7 +46,7 @@ func NewCLI() *cobra.Command {
 	searchCmd := &cobra.Command{
 		Use:     "search",
 		Aliases: []string{"s"},
-		Short:   "Search code and name of a secutiry/stock",
+		Short:   "Search code and name of a security/stock",
 		Args:    cobra.ExactArgs(1),
 		RunE:    SearchHandler,
 	}
@@ -55,7 +55,7 @@ func NewCLI() *cobra.Command {
 	infoCmd := &cobra.Command{
 		Use:     "info",
 		Aliases: []string{"i"},
-		Short:   "Print basic information of a secutiry/stock",
+		Short:   "Print basic information of a security/stock",
 		Args:    cobra.ExactArgs(1),
 		RunE:    InfoHandler,
 	}

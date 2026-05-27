@@ -28,7 +28,7 @@ type BasicCorp struct {
 	WebSite         string  // 公司网址
 	RegisterAddress string  // 注册地址
 	BusinessAddress string  // 办公地址
-	MainBussiness   string  // 主营业务
+	MainBusiness   string  // 主营业务
 }
 
 type CorpProfile struct {

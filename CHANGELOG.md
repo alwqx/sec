@@ -6,6 +6,7 @@
 2. 修复 sina.go 中赋值错误
 3. 修复 cmd/quote/quote.go 中上下文丢失
 4. 删除 types.go 中重复 JSONify
+5. 修复 typos
 
 ### v0.3.2
 

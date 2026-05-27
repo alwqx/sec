@@ -24,7 +24,7 @@ func NewQuoteCLI() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:           "quote",
 		Aliases:       []string{"q"},
-		Short:         "Secutiry quote root Command",
+		Short:         "Security quote root Command",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		CompletionOptions: cobra.CompletionOptions{
@@ -33,7 +33,7 @@ func NewQuoteCLI() *cobra.Command {
 		RunE: QuoteHandler,
 	}
 	rootCmd.Flags().BoolP("debug", "D", false, "Enable debug mode")
-	rootCmd.Flags().BoolP("realtime", "r", false, "Realtime updaet quote info")
+	rootCmd.Flags().BoolP("realtime", "r", false, "Realtime update quote info")
 
 	return rootCmd
 }

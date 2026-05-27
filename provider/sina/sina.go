@@ -136,9 +136,9 @@ func Profile(ctx context.Context, opts *types.InfoOptions) (*CorpProfile, error)
 		WebSite:         corp.WebSite,
 		RegisterAddress: corp.RegisterAddress,
 		BusinessAddress: corp.BusinessAddress,
-		MainBusiness:    corp.MainBussiness,
+		MainBusiness:    corp.MainBusiness,
 		Current:         quote.Current,
-		Category:        partProfile.Categray,
+		Category:        partProfile.Category,
 		MarketCap:       quote.Current * float64(partProfile.Cap) * 10000.0,
 		TradedMarketCap: quote.Current * float64(partProfile.TradeCap) * 10000.0,
 	}
@@ -346,7 +346,7 @@ type sinaPartProfile struct {
 	Cap      float64 // 总股本
 	TradeCap float64 // 流通股本
 	Profit   float64 // 净利润
-	Categray string  // 行业分类
+	Category string  // 行业分类
 }
 
 func parseInfoPartProfile(exCode, line string) (*sinaPartProfile, error) {
@@ -387,7 +387,7 @@ func parseInfoPartProfileOfAstock(line string) (*sinaPartProfile, error) {
 	if err != nil {
 		return nil, err
 	}
-	partProfile.Categray = strings.TrimSpace(items[34])
+	partProfile.Category = strings.TrimSpace(items[34])
 
 	return &partProfile, nil
 }
@@ -418,7 +418,7 @@ func parseInfoPartProfileOfHstock(line string) (*sinaPartProfile, error) {
 	if err != nil {
 		return nil, err
 	}
-	partProfile.Categray = strings.TrimSpace(items[32])
+	partProfile.Category = strings.TrimSpace(items[32])
 
 	return &partProfile, nil
 }
@@ -486,7 +486,7 @@ func parseBasicCorp(body []byte) (*BasicCorp, error) {
 		case 45:
 			res.BusinessAddress = strings.TrimSpace(s.Text())
 		case 49:
-			res.MainBussiness = strings.TrimSpace(s.Text())
+			res.MainBusiness = strings.TrimSpace(s.Text())
 		}
 	})
 
