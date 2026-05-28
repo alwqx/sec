@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/alwqx/sec/version"
 	"github.com/stretchr/testify/require"
@@ -51,6 +52,84 @@ func TestWriteJson(t *testing.T) {
 	filePath := filepath.Join(tmpDir, "data.json")
 	err = WriteJson(data, filePath)
 	require.Nil(t, err)
+}
+
+func TestParseBeginEnd(t *testing.T) {
+	layout20060102 := "20060102"
+	layoutYYYYMMDD := "2006-01-02"
+	today := time.Now()
+
+	t.Run("defaults", func(t *testing.T) {
+		begin, end, err := ParseBeginEnd("", "", 30, layout20060102, layout20060102)
+		require.NoError(t, err)
+		require.Equal(t, today.Add(-30*24*time.Hour).Format(layout20060102), begin)
+		require.Equal(t, today.Format(layout20060102), end)
+	})
+
+	t.Run("defaults with different output layout", func(t *testing.T) {
+		begin, end, err := ParseBeginEnd("", "", 30, layout20060102, layoutYYYYMMDD)
+		require.NoError(t, err)
+		require.Equal(t, today.Add(-30*24*time.Hour).Format(layoutYYYYMMDD), begin)
+		require.Equal(t, today.Format(layoutYYYYMMDD), end)
+	})
+
+	t.Run("both specified", func(t *testing.T) {
+		begin, end, err := ParseBeginEnd("20260101", "20260131", 30, layout20060102, layout20060102)
+		require.NoError(t, err)
+		require.Equal(t, "20260101", begin)
+		require.Equal(t, "20260131", end)
+	})
+
+	t.Run("both specified with different output layout", func(t *testing.T) {
+		begin, end, err := ParseBeginEnd("20260101", "20260131", 30, layout20060102, layoutYYYYMMDD)
+		require.NoError(t, err)
+		require.Equal(t, "2026-01-01", begin)
+		require.Equal(t, "2026-01-31", end)
+	})
+
+	t.Run("only begin", func(t *testing.T) {
+		begin, end, err := ParseBeginEnd("20260101", "", 30, layout20060102, layout20060102)
+		require.NoError(t, err)
+		require.Equal(t, "20260101", begin)
+		require.Equal(t, today.Format(layout20060102), end)
+	})
+
+	t.Run("only end", func(t *testing.T) {
+		begin, end, err := ParseBeginEnd("", "20261231", 90, layout20060102, layout20060102)
+		require.NoError(t, err)
+		require.Equal(t, today.Add(-90*24*time.Hour).Format(layout20060102), begin)
+		require.Equal(t, "20261231", end)
+	})
+
+	t.Run("invalid begin format", func(t *testing.T) {
+		_, _, err := ParseBeginEnd("2026-01-01", "", 30, layout20060102, layout20060102)
+		require.Error(t, err)
+	})
+
+	t.Run("invalid end format", func(t *testing.T) {
+		_, _, err := ParseBeginEnd("", "2026-01-31", 30, layout20060102, layout20060102)
+		require.Error(t, err)
+	})
+
+	t.Run("begin after end", func(t *testing.T) {
+		_, _, err := ParseBeginEnd("20261231", "20260101", 30, layout20060102, layout20060102)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "invalid time range")
+	})
+
+	t.Run("same day", func(t *testing.T) {
+		begin, end, err := ParseBeginEnd("20260115", "20260115", 30, layout20060102, layout20060102)
+		require.NoError(t, err)
+		require.Equal(t, "20260115", begin)
+		require.Equal(t, "20260115", end)
+	})
+
+	t.Run("custom default days", func(t *testing.T) {
+		begin, end, err := ParseBeginEnd("", "", 7, layout20060102, layout20060102)
+		require.NoError(t, err)
+		require.Equal(t, today.Add(-7*24*time.Hour).Format(layout20060102), begin)
+		require.Equal(t, today.Format(layout20060102), end)
+	})
 }
 
 func TestSecDir(t *testing.T) {

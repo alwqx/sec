@@ -2,10 +2,8 @@ package metal
 
 import (
 	"fmt"
-	"log/slog"
 	"os"
 	"strconv"
-	"time"
 
 	"github.com/alwqx/sec/provider/metal"
 	"github.com/alwqx/sec/utils"
@@ -30,39 +28,12 @@ func NewMetalHistoryCLI() *cobra.Command {
 // MetalHistoryHandler 打印贵金属历史数据，默认 Au999
 func MetalHistoryHandler(cmd *cobra.Command, args []string) error {
 	req := &metal.QueryAu999Req{}
-	defaultEnd := time.Now()
-	defaultBegin := defaultEnd.Add(-30 * 24 * time.Hour)
-
-	beginStr, err := cmd.Flags().GetString("begin")
+	var err error
+	beginStr, _ := cmd.Flags().GetString("begin")
+	endStr, _ := cmd.Flags().GetString("end")
+	req.Start, req.End, err = utils.ParseBeginEnd(beginStr, endStr, 30, utils.ParseMetalCmdArgTimeLayout, utils.LayoutYYMMDD)
 	if err != nil {
 		return err
-	}
-	// 校验
-	if beginStr != "" {
-		defaultBegin, err = time.Parse(utils.ParseMetalCmdArgTimeLayout, beginStr)
-		if err != nil {
-			return err
-		}
-	}
-	req.Start = defaultBegin.Format(utils.LayoutYYMMDD)
-
-	endStr, err := cmd.Flags().GetString("end")
-	if err != nil {
-		return err
-	}
-	if endStr != "" {
-		defaultEnd, err = time.Parse(utils.ParseMetalCmdArgTimeLayout, endStr)
-		if err != nil {
-			return err
-		}
-	}
-	req.End = defaultEnd.Format(utils.LayoutYYMMDD)
-
-	if defaultEnd.Before(defaultBegin) {
-		bs := defaultBegin.Format(utils.LayoutYYMMDD)
-		es := defaultEnd.Format(utils.LayoutYYMMDD)
-		slog.Error("invalid time range", "begin", bs, "end", es)
-		return fmt.Errorf("invalid begin %s and end %s", bs, es)
 	}
 
 	resp, err := metal.QueryAu999(cmd.Context(), req)
