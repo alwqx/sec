@@ -34,7 +34,6 @@ const (
 
 var (
 	ErrInvalidKLine = errors.New("invalid kline data")
-	ErrSkipValue    = errors.New("skip value")
 )
 
 // getOriginQuoteHistory 获取原始的证券历史行情信息
@@ -113,7 +112,7 @@ func parseQuoteHistoryResp(resp *QuoteHistoryResp) ([]*Quote, error) {
 		kl, err := parseKlineItem(kline)
 		if err != nil {
 			slog.Error("parseQuoteHistoryResp failed parse kline", "kline", kline, "error", err)
-			return nil, err
+			continue
 		}
 		item := &Quote{
 			Date:       kl.Date,

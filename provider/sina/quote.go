@@ -2,6 +2,7 @@ package sina
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -37,23 +38,19 @@ func QuoteWs(ctx context.Context, exCodes []string) ([]*SecurityQuote, error) {
 		return nil, err
 	}
 
-	return parseQuoteWsBody(string(msg)), nil
+	return parseQuoteWsBody(string(msg))
 }
 
 // parseQuoteWsBody 解析 QuoteWs 请求的多个 证券信息
 // sh600036=招商银行,36.350,35.630,37.610,38.000,35.920,37.610,37.620,256101260,9443438268.000,690801,37.610,286600,37.600,17000,37.590,55400,37.580,12200,37.570,161925,37.620,90600,37.630,50400,37.640,104100,37.650,126000,37.660,2024-09-30,15:00:00,00,
 // sh688047=龙芯中科,106.000,99.680,119.620,119.620,104.500,119.620,0.000,8256723,938310086.000,25600,119.620,7255,119.610,3033,119.600,1767,119.570,6300,119.550,0,0.000,0,0.000,0,0.000,0,0.000,0,0.000,2024-09-30,15:00:01,00,
-func parseQuoteWsBody(msg string) []*SecurityQuote {
+func parseQuoteWsBody(msg string) ([]*SecurityQuote, error) {
 	slog.Debug("parseQuoteWsBody", "msg", parseQuoteWsBody)
 	if msg == "" {
-		return nil
+		return nil, errors.New("msg is empty")
 	}
 
 	lines := strings.Split(msg, "\n")
-	if len(lines) == 0 {
-		return nil
-	}
-
 	res := make([]*SecurityQuote, 0, len(lines))
 	for _, line := range lines {
 		if line == "" || strings.Contains(line, "sys_nxkey") {
@@ -62,12 +59,13 @@ func parseQuoteWsBody(msg string) []*SecurityQuote {
 		items := strings.Split(line, "=")
 		if len(items) != 2 {
 			slog.Error("parseQuoteWsBody invalid ws quote", "line", line)
+			return nil, fmt.Errorf("items num shoud be 2 but get %d", len(items))
 		}
 		slog.Debug("parseQuoteWsBody", "items", items)
 		quote, err := parseSecQuote(strings.ToUpper(items[0]), items[1])
 		if err != nil {
 			slog.Error("parseSecQuote", "error", err)
-			continue
+			return nil, err
 		}
 		res = append(res, quote)
 	}
@@ -76,7 +74,7 @@ func parseQuoteWsBody(msg string) []*SecurityQuote {
 		return res[i].Name < res[j].Name
 	})
 
-	return res
+	return res, nil
 }
 
 // formatQuoteKeys
@@ -109,7 +107,7 @@ func formatQuoteKeys(keys []string) []string {
 func QuerySecQuote(ctx context.Context, exCode string) (*SecurityQuote, error) {
 	lowerKey := strings.ToLower(exCode)
 	reqUrl := fmt.Sprintf("https://hq.sinajs.cn/list=%s", lowerKey)
-	resp, err := utils.MakeRequest(ctx, http.MethodGet, reqUrl, defaultHttpHeaders(), nil, 0)
+	resp, err := utils.MakeRequest(ctx, http.MethodGet, reqUrl, defaultHTTPHeaders(), nil, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -129,6 +127,7 @@ func QuerySecQuote(ctx context.Context, exCode string) (*SecurityQuote, error) {
 	lines := regstr.FindAll(body, -1)
 	if len(lines) != 1 {
 		slog.ErrorContext(ctx, "get invalid body", "url", reqUrl, "body", body)
+		return nil, fmt.Errorf("body result num not 1, body %s", body)
 	}
 	quote, err := parseSecQuote(exCode, string(lines[0]))
 
@@ -327,7 +326,7 @@ func parseSecQuoteOfMstock(quoteLine string) (*SecurityQuote, error) {
 func QueryQuoteList(ctx context.Context, exCodes []string) ([]*SecurityQuote, error) {
 	formatKeys := formatQuoteKeys(exCodes)
 	reqUrl := fmt.Sprintf("https://hq.sinajs.cn/list=%s", strings.Join(formatKeys, ","))
-	resp, err := utils.MakeRequest(ctx, http.MethodGet, reqUrl, defaultHttpHeaders(), nil, 0)
+	resp, err := utils.MakeRequest(ctx, http.MethodGet, reqUrl, defaultHTTPHeaders(), nil, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -383,9 +382,9 @@ func formatQuoteListLine(line string) (exCode string, res string) {
 		slog.Debug("invalid line", "line", line)
 		return
 	}
-	formatedCode := toks[0]
-	formatedCode = strings.Replace(formatedCode, "gb_", "$", -1)
-	exCode = strings.ToUpper(formatedCode)
+	formattedCode := toks[0]
+	formattedCode = strings.Replace(formattedCode, "gb_", "$", -1)
+	exCode = strings.ToUpper(formattedCode)
 
 	// 去掉首尾双引号
 	res = strings.TrimPrefix(toks[1], "\"")

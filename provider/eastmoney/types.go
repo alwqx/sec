@@ -31,48 +31,6 @@ func (m MarketType) String() string {
 
 type FuQuanType int
 
-type CurrentStockInfoDiff struct {
-	F2   float64 `json:"f2"`   // 最新价格
-	F3   float64 `json:"f3"`   // 涨跌幅
-	F4   float64 `json:"f4"`   // 涨跌额
-	F5   float64 `json:"f5"`   // 成交量
-	F6   float64 `json:"f6"`   // 成交额
-	F7   float64 `json:"f7"`   // 振幅
-	F8   float64 `json:"f8"`   // 换手率
-	F9   float64 `json:"f9"`   // 动态市盈率
-	F10  float64 `json:"f10"`  // 量比
-	F12  string  `json:"f12"`  // 证券代码
-	F13  int     `json:"f13"`  // 市场编号 0深证 1上证
-	F14  string  `json:"f14"`  // 证券名称
-	F15  float64 `json:"f15"`  // high
-	F16  float64 `json:"f16"`  // low
-	F17  float64 `json:"f17"`  // open
-	F18  float64 `json:"f18"`  // yclose
-	F20  float64 `json:"f20"`  // 总市值 "-" 表示非股票
-	F21  float64 `json:"f21"`  // 流通市值 "-" 表示非股票
-	F23  float64 `json:"f23"`  // 市净率
-	F37  float64 `json:"f37"`  // 净资产收益率
-	F38  float64 `json:"f38"`  // 总股本
-	F39  float64 `json:"f39"`  // 流通股本
-	F124 int64   `json:"f124"` // 更新时间戳
-	F297 int64   `json:"f297"` // 最新交易日 20241227
-}
-
-type CurrentStockInfoData struct {
-	Total int                      `json:"total"`
-	Diff  []map[string]interface{} `json:"diff"`
-}
-
-type CurrentStockInfoResp struct {
-	Rc     int                   `json:"rc"`
-	Rt     int                   `json:"rt"`
-	Svr    int64                 `json:"svr"`
-	Lt     int                   `json:"lt"`
-	Full   int                   `json:"full"`
-	Dlmkts string                `json:"dlmkts"`
-	Data   *CurrentStockInfoData `json:"data"`
-}
-
 // Quote 基本行情
 type Quote struct {
 	Date       time.Time  `json:"date"`        // 交易日期
