@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -92,9 +91,6 @@ func debugHandler(cmd *cobra.Command, args []string) {
 }
 
 func SearchHandler(cmd *cobra.Command, args []string) error {
-	if len(args) != 1 {
-		return errors.New("args of command should be one")
-	}
 	secs := sina.Search(cmd.Context(), args[0])
 	printSecs(secs)
 
@@ -102,9 +98,6 @@ func SearchHandler(cmd *cobra.Command, args []string) error {
 }
 
 func InfoHandler(cmd *cobra.Command, args []string) error {
-	if len(args) != 1 {
-		return errors.New("args of command should be one")
-	}
 	opts := new(types.InfoOptions)
 
 	dividend, err := cmd.Flags().GetBool("dividends")

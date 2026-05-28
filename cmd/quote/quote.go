@@ -2,7 +2,6 @@ package quote
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -30,6 +29,7 @@ func NewQuoteCLI() *cobra.Command {
 		CompletionOptions: cobra.CompletionOptions{
 			DisableDefaultCmd: true,
 		},
+		Args: cobra.ExactArgs(1),
 		RunE: QuoteHandler,
 	}
 	rootCmd.Flags().BoolP("debug", "D", false, "Enable debug mode")
@@ -39,9 +39,6 @@ func NewQuoteCLI() *cobra.Command {
 }
 
 func QuoteHandler(cmd *cobra.Command, args []string) error {
-	if len(args) != 1 {
-		return errors.New("args of command should be one")
-	}
 
 	// 查询参数由逗号分隔
 	keys := strings.Split(args[0], ",")
