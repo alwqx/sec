@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
-	"time"
 
 	"github.com/alwqx/sec/provider/eastmoney"
 	"github.com/alwqx/sec/provider/sina"
 	"github.com/alwqx/sec/render"
 	"github.com/alwqx/sec/types"
+	"github.com/alwqx/sec/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -80,38 +80,11 @@ func KLineHandler(cmd *cobra.Command, args []string) error {
 		req.FQT = eastmoney.QuoteFQTDefault
 	}
 
-	defaultEnd := time.Now()
-	defaultBegin := defaultEnd.Add(-90 * 24 * time.Hour)
-
-	beginStr, err := cmd.Flags().GetString("begin")
+	beginStr, _ := cmd.Flags().GetString("begin")
+	endStr, _ := cmd.Flags().GetString("end")
+	req.Begin, req.End, err = utils.ParseBeginEnd(beginStr, endStr, 90, eastmoney.TimeYYMMDD, eastmoney.TimeYYMMDD)
 	if err != nil {
 		return err
-	}
-	if beginStr != "" {
-		defaultBegin, err = time.Parse(eastmoney.TimeYYMMDD, beginStr)
-		if err != nil {
-			return err
-		}
-	}
-	req.Begin = defaultBegin.Format(eastmoney.TimeYYMMDD)
-
-	endStr, err := cmd.Flags().GetString("end")
-	if err != nil {
-		return err
-	}
-	if endStr != "" {
-		defaultEnd, err = time.Parse(eastmoney.TimeYYMMDD, endStr)
-		if err != nil {
-			return err
-		}
-	}
-	req.End = defaultEnd.Format(eastmoney.TimeYYMMDD)
-
-	if defaultEnd.Before(defaultBegin) {
-		bs := defaultBegin.Format(eastmoney.TimeYYMMDD)
-		es := defaultEnd.Format(eastmoney.TimeYYMMDD)
-		slog.Error("invalid time range", "begin", bs, "end", es)
-		return fmt.Errorf("invalid begin %s and end %s", bs, es)
 	}
 
 	var (

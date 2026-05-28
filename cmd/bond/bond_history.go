@@ -2,9 +2,7 @@ package bond
 
 import (
 	"fmt"
-	"log/slog"
 	"os"
-	"time"
 
 	"github.com/alwqx/sec/provider/bond"
 	"github.com/alwqx/sec/utils"
@@ -29,38 +27,12 @@ func NewBondHistoryCLI() *cobra.Command {
 // BondHistoryHandler 打印美国国债收益率历史数据
 func BondHistoryHandler(cmd *cobra.Command, args []string) error {
 	req := &bond.QueryBondReq{}
-	defaultEnd := time.Now()
-	defaultBegin := defaultEnd.Add(-30 * 24 * time.Hour)
-
-	beginStr, err := cmd.Flags().GetString("begin")
+	var err error
+	beginStr, _ := cmd.Flags().GetString("begin")
+	endStr, _ := cmd.Flags().GetString("end")
+	req.Start, req.End, err = utils.ParseBeginEnd(beginStr, endStr, 30, utils.ParseMetalCmdArgTimeLayout, utils.LayoutYYMMDD)
 	if err != nil {
 		return err
-	}
-	if beginStr != "" {
-		defaultBegin, err = time.Parse(utils.ParseMetalCmdArgTimeLayout, beginStr)
-		if err != nil {
-			return err
-		}
-	}
-	req.Start = defaultBegin.Format(utils.LayoutYYMMDD)
-
-	endStr, err := cmd.Flags().GetString("end")
-	if err != nil {
-		return err
-	}
-	if endStr != "" {
-		defaultEnd, err = time.Parse(utils.ParseMetalCmdArgTimeLayout, endStr)
-		if err != nil {
-			return err
-		}
-	}
-	req.End = defaultEnd.Format(utils.LayoutYYMMDD)
-
-	if defaultEnd.Before(defaultBegin) {
-		bs := defaultBegin.Format(utils.LayoutYYMMDD)
-		es := defaultEnd.Format(utils.LayoutYYMMDD)
-		slog.Error("invalid time range", "begin", bs, "end", es)
-		return fmt.Errorf("invalid begin %s and end %s", bs, es)
 	}
 
 	resp, err := bond.QueryBond(cmd.Context(), req)

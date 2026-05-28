@@ -34,6 +34,40 @@ func TimeYYMMDDString(t time.Time) string {
 	return t.Format(LayoutYYMMDD)
 }
 
+// ParseBeginEnd parses --begin/--end CLI flags into formatted date strings.
+// If beginStr or endStr is empty, defaults are computed as:
+//
+//	end   = now
+//	begin = end - defaultDays days
+//
+// parseLayout is used to decode the user-provided strings (e.g. "20060102").
+// outputLayout is used to format the returned strings (e.g. "2006-01-02").
+// Returns an error if begin > end or if parsing fails.
+func ParseBeginEnd(beginStr, endStr string, defaultDays int, parseLayout, outputLayout string) (string, string, error) {
+	end := time.Now()
+	begin := end.Add(-time.Duration(defaultDays) * 24 * time.Hour)
+
+	var err error
+	if beginStr != "" {
+		begin, err = time.Parse(parseLayout, beginStr)
+		if err != nil {
+			return "", "", err
+		}
+	}
+	if endStr != "" {
+		end, err = time.Parse(parseLayout, endStr)
+		if err != nil {
+			return "", "", err
+		}
+	}
+
+	if end.Before(begin) {
+		return "", "", fmt.Errorf("invalid time range: begin=%s end=%s", begin.Format(outputLayout), end.Format(outputLayout))
+	}
+
+	return begin.Format(outputLayout), end.Format(outputLayout), nil
+}
+
 // UserAgent 生成 user-agent
 func UserAgent() string {
 	return fmt.Sprintf("sec/%s (%s %s) Go/%s", version.Version, runtime.GOARCH, runtime.GOOS, runtime.Version())
