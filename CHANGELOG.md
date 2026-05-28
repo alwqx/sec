@@ -8,6 +8,7 @@
 4. 删除 types.go 中重复 JSONify
 5. 修复 typos
 6. adjustRespBodyByEncode 读完 body 后关闭 http 连接
+7. 修复参数判断
 
 ### v0.3.2
 

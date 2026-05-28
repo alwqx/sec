@@ -222,15 +222,15 @@ func TestPrintDetailed(t *testing.T) {
 					SecurityCode: "000001",
 					SecurityName: "平安银行",
 					Fields: map[string]interface{}{
-						"REPORT_DATE":                "2023-12-31 00:00:00",
-						"TOTAL_ASSETS":               558000000000.0,
-						"TOTAL_LIABILITIES":          510000000000.0,
-						"TOTAL_EQUITY":               48000000000.0,
-						"TOTAL_CURRENT_ASSETS":       nil,
-						"TOTAL_NON_CURRENT_ASSETS":   nil,
-						"TOTAL_CURRENT_LIABILITIES":  nil,
+						"REPORT_DATE":                   "2023-12-31 00:00:00",
+						"TOTAL_ASSETS":                  558000000000.0,
+						"TOTAL_LIABILITIES":             510000000000.0,
+						"TOTAL_EQUITY":                  48000000000.0,
+						"TOTAL_CURRENT_ASSETS":          nil,
+						"TOTAL_NON_CURRENT_ASSETS":      nil,
+						"TOTAL_CURRENT_LIABILITIES":     nil,
 						"TOTAL_NON_CURRENT_LIABILITIES": nil,
-						"MONETARYFUNDS":              nil,
+						"MONETARYFUNDS":                 nil,
 					},
 				},
 			},
@@ -254,11 +254,11 @@ func TestPrintDetailed(t *testing.T) {
 					SecurityCode: "600036",
 					SecurityName: "招商银行",
 					Fields: map[string]interface{}{
-						"REPORT_DATE":                "2024-12-31 00:00:00",
-						"NETCASH_OPERATE":            50000000000.0,
-						"NETCASH_INVEST":             -20000000000.0,
-						"NETCASH_FINANCE":            -10000000000.0,
-						"CASH_EQUIVALENTS_INCREASE":  20000000000.0,
+						"REPORT_DATE":               "2024-12-31 00:00:00",
+						"NETCASH_OPERATE":           50000000000.0,
+						"NETCASH_INVEST":            -20000000000.0,
+						"NETCASH_FINANCE":           -10000000000.0,
+						"CASH_EQUIVALENTS_INCREASE": 20000000000.0,
 					},
 				},
 				{
@@ -266,11 +266,11 @@ func TestPrintDetailed(t *testing.T) {
 					SecurityCode: "600036",
 					SecurityName: "招商银行",
 					Fields: map[string]interface{}{
-						"REPORT_DATE":                "2023-12-31 00:00:00",
-						"NETCASH_OPERATE":            45000000000.0,
-						"NETCASH_INVEST":             -15000000000.0,
-						"NETCASH_FINANCE":            -8000000000.0,
-						"CASH_EQUIVALENTS_INCREASE":  22000000000.0,
+						"REPORT_DATE":               "2023-12-31 00:00:00",
+						"NETCASH_OPERATE":           45000000000.0,
+						"NETCASH_INVEST":            -15000000000.0,
+						"NETCASH_FINANCE":           -8000000000.0,
+						"CASH_EQUIVALENTS_INCREASE": 22000000000.0,
 					},
 				},
 			},
@@ -281,8 +281,8 @@ func TestPrintDetailed(t *testing.T) {
 		require.Contains(t, out, "经营活动现金流")
 		require.Contains(t, out, "投资活动现金流")
 		require.Contains(t, out, "现金净增加额")
-			require.Contains(t, out, "500.00亿")
-			require.Contains(t, out, "2024-12-31")
-			require.Contains(t, out, "2023-12-31")
+		require.Contains(t, out, "500.00亿")
+		require.Contains(t, out, "2024-12-31")
+		require.Contains(t, out, "2023-12-31")
 	})
 }

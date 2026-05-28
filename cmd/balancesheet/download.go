@@ -1,7 +1,6 @@
 package balancesheet
 
 import (
-	"errors"
 	"fmt"
 	"log/slog"
 	"path/filepath"
@@ -25,6 +24,7 @@ func NewBalanceSheetDownloadCLI() *cobra.Command {
 		CompletionOptions: cobra.CompletionOptions{
 			DisableDefaultCmd: true,
 		},
+		Args: cobra.ExactArgs(1),
 		RunE: BalanceSheetDownloadHandler,
 	}
 	cmd.Flags().BoolP("debug", "D", false, "Enable debug mode")
@@ -37,9 +37,6 @@ func NewBalanceSheetDownloadCLI() *cobra.Command {
 }
 
 func BalanceSheetDownloadHandler(cmd *cobra.Command, args []string) error {
-	if len(args) != 1 {
-		return errors.New("args of command should be one")
-	}
 
 	key := args[0]
 	secs := sina.Search(cmd.Context(), key)

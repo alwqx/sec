@@ -1,7 +1,6 @@
 package quote
 
 import (
-	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -27,6 +26,7 @@ func NewQuoteHistoryCLI() *cobra.Command {
 		CompletionOptions: cobra.CompletionOptions{
 			DisableDefaultCmd: true,
 		},
+		Args: cobra.ExactArgs(1),
 		RunE: QuoteHistoryHandler,
 	}
 	rootCmd.Flags().BoolP("debug", "D", false, "Enable debug mode")
@@ -41,9 +41,6 @@ func NewQuoteHistoryCLI() *cobra.Command {
 
 // QuoteHistoryHandler 查询行情历史
 func QuoteHistoryHandler(cmd *cobra.Command, args []string) error {
-	if len(args) != 1 {
-		return errors.New("args of command should be one")
-	}
 
 	// 查询参数由逗号分隔
 	key := args[0]

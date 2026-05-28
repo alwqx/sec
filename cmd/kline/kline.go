@@ -1,7 +1,6 @@
 package kline
 
 import (
-	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -24,6 +23,7 @@ func NewKLineCLI() *cobra.Command {
 		CompletionOptions: cobra.CompletionOptions{
 			DisableDefaultCmd: true,
 		},
+		Args: cobra.ExactArgs(1),
 		RunE: KLineHandler,
 	}
 	rootCmd.Flags().StringP("begin", "b", "", "Begin date 20260101")
@@ -39,9 +39,6 @@ func NewKLineCLI() *cobra.Command {
 
 // KLineHandler is the handler for sec kline command.
 func KLineHandler(cmd *cobra.Command, args []string) error {
-	if len(args) != 1 {
-		return errors.New("args of command should be one")
-	}
 
 	key := args[0]
 	secs := sina.Search(cmd.Context(), key)
