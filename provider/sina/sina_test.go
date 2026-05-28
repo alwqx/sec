@@ -86,7 +86,7 @@ func TestParseSinaInfoQuote(t *testing.T) {
 }
 
 func TestDefaultHttpHeaders(t *testing.T) {
-	hs := defaultHttpHeaders()
+	hs := defaultHTTPHeaders()
 	require.Equal(t, 1, len(hs))
 	require.Equal(t, SinaReferer, hs.Get("Referer"))
 	require.Equal(t, "", hs.Get("Others"))

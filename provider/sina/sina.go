@@ -24,8 +24,8 @@ const (
 	MAX_KEY_NUM = 8 // 最大查询证券数量
 )
 
-// defaultHttpHeaders 生成请求 sina 接口的默认 http.Header
-func defaultHttpHeaders() http.Header {
+// defaultHTTPHeaders 生成请求 sina 接口的默认 http.Header
+func defaultHTTPHeaders() http.Header {
 	headers := make(http.Header)
 	headers.Add("Referer", SinaReferer)
 	return headers
@@ -34,7 +34,7 @@ func defaultHttpHeaders() http.Header {
 // Search 根据关键字查询证券信息
 func Search(ctx context.Context, key string) []*BasicSecurity {
 	reqUrl := fmt.Sprintf("https://suggest3.sinajs.cn/suggest/type=11,12,15,21,22,23,24,25,26,31,33,41&key=%s", key)
-	resp, err := utils.MakeRequest(ctx, http.MethodGet, reqUrl, defaultHttpHeaders(), nil, 0)
+	resp, err := utils.MakeRequest(ctx, http.MethodGet, reqUrl, defaultHTTPHeaders(), nil, 0)
 	if err != nil {
 		return nil
 	}
@@ -165,7 +165,7 @@ func Profile(ctx context.Context, opts *types.InfoOptions) (*CorpProfile, error)
 // QueryDividends 查询分红送转信息
 func QueryDividends(ctx context.Context, code string) ([]Dividend, error) {
 	pageURL := fmt.Sprintf("https://vip.stock.finance.sina.com.cn/corp/go.php/vISSUE_ShareBonus/stockid/%s.phtml", code)
-	resp, err := utils.MakeRequest(ctx, http.MethodGet, pageURL, defaultHttpHeaders(), nil, 0)
+	resp, err := utils.MakeRequest(ctx, http.MethodGet, pageURL, defaultHTTPHeaders(), nil, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -186,9 +186,9 @@ func QueryDividends(ctx context.Context, code string) ([]Dividend, error) {
 
 // QueryBasicCorp 根据证券代码获取公司信息
 func QueryBasicCorp(ctx context.Context, exCode string) (*BasicCorp, error) {
-	coraUrl := fmt.Sprintf("https://vip.stock.finance.sina.com.cn/corp/go.php/vCI_CorpInfo/stockid/%s.phtml", exCode)
-	slog.DebugContext(ctx, "QueryBasicCorp", "coraUrl", coraUrl)
-	resp, err := utils.MakeRequest(ctx, http.MethodGet, coraUrl, defaultHttpHeaders(), nil, 0)
+	corpUrl := fmt.Sprintf("https://vip.stock.finance.sina.com.cn/corp/go.php/vCI_CorpInfo/stockid/%s.phtml", exCode)
+	slog.DebugContext(ctx, "QueryBasicCorp", "corpUrl", corpUrl)
+	resp, err := utils.MakeRequest(ctx, http.MethodGet, corpUrl, defaultHTTPHeaders(), nil, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -217,7 +217,7 @@ func QueryBasicCorp(ctx context.Context, exCode string) (*BasicCorp, error) {
 func Info(ctx context.Context, exCode string) (*SecurityQuote, *sinaPartProfile, error) {
 	lowerKey := strings.ToLower(exCode)
 	reqUrl := fmt.Sprintf("https://hq.sinajs.cn/list=%s,%s_i", lowerKey, lowerKey)
-	resp, err := utils.MakeRequest(ctx, http.MethodGet, reqUrl, defaultHttpHeaders(), nil, 0)
+	resp, err := utils.MakeRequest(ctx, http.MethodGet, reqUrl, defaultHTTPHeaders(), nil, 0)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -315,7 +315,7 @@ func parseBasicSecurity(body string) []*BasicSecurity {
 			exChange = types.ExChangeNasdaq
 			exCode = formatUSCode(ss[3])
 		default:
-			slog.Warn("can not recganize", "code", ss[0], "ss[2]", ss[2])
+			slog.Warn("can not recognize", "code", ss[0], "ss[2]", ss[2])
 		}
 
 		ssr := &BasicSecurity{
@@ -366,10 +366,11 @@ func parseInfoPartProfile(exCode, line string) (*sinaPartProfile, error) {
 // 0  1    2       3       4       5      6       7     8          9          10 11 12      13      14      15  16    17     18      19     20   21  22      23               24                                  25              26 27 28 29 30 31  32                     33    34     35 36
 func parseInfoPartProfileOfAstock(line string) (*sinaPartProfile, error) {
 	items := strings.Split(line, ",")
-	var (
-		err error
-	)
+	if len(items) < 35 {
+		return nil, fmt.Errorf("invalid items %s, num should >= 35 but get %d", line, len(items))
+	}
 
+	var err error
 	partProfile := sinaPartProfile{}
 	partProfile.VPS, err = strconv.ParseFloat(items[5], 64)
 	if err != nil {
@@ -397,10 +398,11 @@ func parseInfoPartProfileOfAstock(line string) (*sinaPartProfile, error) {
 // 0     1    2       3       4      5 6 7总股本     8 9流通股本   10 11              12             13  14 15     16    17   18  19    20         21               22               23               24 25 26  27
 func parseInfoPartProfileOfHstock(line string) (*sinaPartProfile, error) {
 	items := strings.Split(line, ",")
-	var (
-		err error
-	)
+	if len(items) < 33 {
+		return nil, fmt.Errorf("invalid items %s, num should >= 33 but get %d", line, len(items))
+	}
 
+	var err error
 	partProfile := sinaPartProfile{}
 	partProfile.VPS, err = strconv.ParseFloat(items[27], 64)
 	if err != nil {
@@ -474,7 +476,7 @@ func parseBasicCorp(body []byte) (*BasicCorp, error) {
 			res.Date = strings.TrimSpace(s.Text())
 		case 9:
 			str := strings.TrimSpace(s.Text())
-			pf, err := strconv.ParseFloat(str, 32)
+			pf, err := strconv.ParseFloat(str, 64)
 			if err == nil {
 				res.Price = pf
 			}
@@ -545,6 +547,13 @@ func parseDividend(body []byte) ([]Dividend, error) {
 			res = append(res, d)
 		}
 	})
+
+	if len(errs) != 0 {
+		for i := range errs {
+			slog.Error("parsed element error", "error", errs[i])
+		}
+		return nil, errs[0]
+	}
 
 	return res, nil
 }

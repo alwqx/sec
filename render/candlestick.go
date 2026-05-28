@@ -52,7 +52,6 @@ const (
 	ansiBgGreen  = "\033[42m"
 	ansiBgYellow = "\033[43m"
 	ansiBgDim    = "\033[47m" // white bg for dim
-	ansiBgNone   = "\033[49m"
 )
 
 // fgToBG maps foreground colors to background equivalent for half-block pairs.

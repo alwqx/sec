@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"net/http"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -138,7 +137,11 @@ func QueryBond(ctx context.Context, req *QueryBondReq) (*QueryBondResp, error) {
 		} else {
 			allItems[i].YClose = allItems[i-1].BC10Year
 			allItems[i].Change = allItems[i].BC10Year - allItems[i].YClose
-			allItems[i].ChangeRate = allItems[i].Change / allItems[i].YClose
+			if allItems[i].YClose == 0.0 {
+				allItems[i].ChangeRate = -1
+			} else {
+				allItems[i].ChangeRate = allItems[i].Change / allItems[i].YClose
+			}
 		}
 	}
 
@@ -234,21 +237,4 @@ func parseAtomFeed(data []byte) ([]*BondYieldItem, error) {
 	}
 
 	return deduped, nil
-}
-
-// formatBasisPoint 将收益率变化转换为基点 (basis points) 显示
-func formatBasisPoint(change float64) string {
-	bp := change * 100 // 1% = 100 basis points
-	return fmt.Sprintf("%+.1fbp", bp)
-}
-
-// FormatYield 格式化收益率显示
-func FormatYield(item *BondYieldItem) string {
-	changeStr := ""
-	if item.YClose == -1 {
-		changeStr = strconv.FormatFloat(0, 'g', -1, 64)
-	} else {
-		changeStr = formatBasisPoint(item.Change)
-	}
-	return fmt.Sprintf("%.2f%% %s", item.BC10Year, changeStr)
 }
