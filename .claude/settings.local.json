@@ -19,7 +19,8 @@
       "Bash(go run *)",
       "Bash(python3 *)",
       "Bash(go list *)",
-      "Bash(staticcheck *)"
+      "Bash(staticcheck *)",
+      "Bash(go clean *)"
     ]
   }
 }

@@ -1,5 +1,9 @@
 ## sec change log
 
+### v0.3.4
+
+1. 新增 `sec valuation` 命令，给个股粗略估值
+
 ### v0.3.3
 
 1. 修复 cmd 中 RunE 和 Run 重复
