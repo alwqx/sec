@@ -393,13 +393,13 @@ type GetFinancialReportResp struct {
 
 ### 与现有代码的复用
 
-| 功能 | 复用来源 |
-|---|---|
-| HTTP 请求 | `utils.MakeRequest(ctx, http.MethodGet, url, nil, nil, timeout)` |
-| 证券搜索 | `sina.Search(ctx, key)` |
-| 大数格式化 | `types.HumanNum(value)` |
-| 终端表格 | `github.com/olekukonko/tablewriter`（已有依赖） |
-| 配置目录 | `utils.SecDir("cache")` → `~/.sec/cache/` |
+| 功能       | 复用来源                                                         |
+| ---------- | ---------------------------------------------------------------- |
+| HTTP 请求  | `utils.MakeRequest(ctx, http.MethodGet, url, nil, nil, timeout)` |
+| 证券搜索   | `sina.Search(ctx, key)`                                          |
+| 大数格式化 | `types.HumanNum(value)`                                          |
+| 终端表格   | `github.com/olekukonko/tablewriter`（已有依赖）                  |
+| 配置目录   | `utils.SecDir("cache")` → `~/.sec/cache/`                        |
 
 ### 已实现的 Phase
 
