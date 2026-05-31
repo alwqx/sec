@@ -18,13 +18,13 @@ func makeIncomeItem(profit, eps float64, date string) *eastmoney.FinancialReport
 }
 
 func TestComputePEG(t *testing.T) {
-	require.Equal(t, 0.0, computePEG(0, 10))       // negative PE
-	require.Equal(t, 0.0, computePEG(10, 0))       // zero growth
-	require.Equal(t, 0.0, computePEG(10, -5))      // negative growth
-	require.Equal(t, 1.0, computePEG(10, 10))      // PEG = 1 (fair)
-	require.Equal(t, 0.5, computePEG(5, 10))       // PEG < 1 (undervalued)
-	require.Equal(t, 2.0, computePEG(20, 10))      // PEG = 2 (overvalued)
-	require.Equal(t, 0.25, computePEG(5, 20))      // high growth, low PE
+	require.Equal(t, 0.0, computePEG(0, 10))  // negative PE
+	require.Equal(t, 0.0, computePEG(10, 0))  // zero growth
+	require.Equal(t, 0.0, computePEG(10, -5)) // negative growth
+	require.Equal(t, 1.0, computePEG(10, 10)) // PEG = 1 (fair)
+	require.Equal(t, 0.5, computePEG(5, 10))  // PEG < 1 (undervalued)
+	require.Equal(t, 2.0, computePEG(20, 10)) // PEG = 2 (overvalued)
+	require.Equal(t, 0.25, computePEG(5, 20)) // high growth, low PE
 }
 
 func TestComputeGrowthRate(t *testing.T) {
@@ -91,16 +91,16 @@ func TestComputeHistPE(t *testing.T) {
 	t.Run("with data", func(t *testing.T) {
 		m := &Metrics{Price: 50}
 		items := []*eastmoney.FinancialReportItem{
-			makeIncomeItem(100, 5.0, "2024-12-31"),  // PE = 50/5 = 10
-			makeIncomeItem(80, 2.0, "2023-12-31"),   // PE = 50/2 = 25
-			makeIncomeItem(60, 6.25, "2022-12-31"),   // PE = 50/6.25 = 8
+			makeIncomeItem(100, 5.0, "2024-12-31"), // PE = 50/5 = 10
+			makeIncomeItem(80, 2.0, "2023-12-31"),  // PE = 50/2 = 25
+			makeIncomeItem(60, 6.25, "2022-12-31"), // PE = 50/6.25 = 8
 		}
 		computeHistPE(m, items)
 
 		require.Equal(t, 3, len(m.HistPE))
 		require.Equal(t, 8.0, m.HistMin)
 		require.Equal(t, 25.0, m.HistMax)
-		require.Equal(t, 10.0, m.HistMedian)  // sorted: [8, 10, 25]
+		require.Equal(t, 10.0, m.HistMedian) // sorted: [8, 10, 25]
 		require.Equal(t, 3, len(m.HistYears))
 		require.Equal(t, "2024", m.HistYears[0])
 	})

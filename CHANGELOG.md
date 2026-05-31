@@ -1,5 +1,9 @@
 ## sec change log
 
+### v0.3.5
+
+1. `sec strategy` 基础策略
+
 ### v0.3.4
 
 1. 新增 `sec valuation` 命令，给个股粗略估值
