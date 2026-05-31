@@ -11,6 +11,7 @@ import (
 	"github.com/alwqx/sec/cmd/kline"
 	"github.com/alwqx/sec/cmd/metal"
 	"github.com/alwqx/sec/cmd/quote"
+	"github.com/alwqx/sec/cmd/strategy"
 	"github.com/alwqx/sec/cmd/upgrade"
 	"github.com/alwqx/sec/cmd/valuation"
 	"github.com/alwqx/sec/provider/sina"
@@ -72,6 +73,7 @@ func NewCLI() *cobra.Command {
 		metal.NewMetalCLI(), metal.NewMetalHistoryCLI(),
 		upgrade.NewUpgradeCLI(),
 		valuation.NewValuationCLI(),
+		strategy.NewStrategyCLI(),
 	)
 
 	return rootCmd
