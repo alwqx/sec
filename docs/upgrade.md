@@ -10,8 +10,8 @@ sec upgrade
 
 ## 选项
 
-| 选项 | 说明 |
-|------|------|
+| 选项          | 说明            |
+| ------------- | --------------- |
 | `-D, --debug` | 开启 debug 日志 |
 
 ## 工作流程
@@ -31,17 +31,18 @@ sec upgrade
 
 ## 平台支持
 
-| OS | Arch | Archive |
-|----|------|---------|
+| OS             | Arch          | Archive   |
+| -------------- | ------------- | --------- |
 | macOS (darwin) | amd64 / arm64 | `.tar.gz` |
-| Linux | amd64 / arm64 | `.tar.gz` |
-| Windows | amd64 | `.zip` |
+| Linux          | amd64 / arm64 | `.tar.gz` |
+| Windows        | amd64         | `.zip`    |
 
 ## 二进制替换策略
 
 **Linux / macOS**：将新二进制写入同目录临时文件（`.sec-new-*`），`chmod 755` 后 `os.Rename` 原子替换。跨设备时回退到 copy 方式。
 
 **Windows**：因运行中的 `.exe` 无法被覆盖，采用延迟替换策略：
+
 1. 将新二进制写入 `sec.exe.new`
 2. 创建 `sec.exe.upgrade.bat` 批处理脚本
 3. 用户下次启动 `sec` 前，脚本会自动完成替换

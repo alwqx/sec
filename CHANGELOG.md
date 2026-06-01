@@ -3,6 +3,7 @@
 ### v0.3.5
 
 1. `sec strategy` 基础策略
+2. 格式化 markdown
 
 ### v0.3.4
 
