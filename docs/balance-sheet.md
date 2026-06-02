@@ -383,7 +383,7 @@ type GetFinancialReportResp struct {
 
 2. **字段映射**：`ALL` 列返回大量字段（每种报表 100+ 字段），终端表格展示需要精选 10-15 个核心字段
 
-3. **数值格式化**：财务数据以"元"为单位（如 `146695000000` = 1466.95 亿），复用 `types.HumanNum()` 进行格式化
+3. **数值格式化**：财务数据以"元"为单位（如 `146695000000` = 1466.95 亿），复用 `utils.HumanNum()` 进行格式化
 
 4. **CNINFO PDF 下载**：`sec bsd` 命令查询巨潮资讯网公告列表 → 过滤有效 PDF（排除摘要/英文/更正） → 下载到本地
 
@@ -397,7 +397,7 @@ type GetFinancialReportResp struct {
 | ---------- | ---------------------------------------------------------------- |
 | HTTP 请求  | `utils.MakeRequest(ctx, http.MethodGet, url, nil, nil, timeout)` |
 | 证券搜索   | `sina.Search(ctx, key)`                                          |
-| 大数格式化 | `types.HumanNum(value)`                                          |
+| 大数格式化 | `utils.HumanNum(value)`                                          |
 | 终端表格   | `github.com/olekukonko/tablewriter`（已有依赖）                  |
 | 配置目录   | `utils.SecDir("cache")` → `~/.sec/cache/`                        |
 

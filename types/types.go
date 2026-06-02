@@ -1,7 +1,6 @@
 package types
 
 import (
-	"fmt"
 	"strings"
 )
 
@@ -24,32 +23,6 @@ type InfoOptions struct {
 	Code     string // 证券代码 600036
 	ExCode   string // 带交易所前缀的证券代码  SH600036
 	Dividend bool   // 是否显示分红送转信息，true显示，false不显示
-}
-
-func HumanNum(cap float64) (res string) {
-	if cap <= 0.0 {
-		res = " - "
-	} else if cap > 100_000_000.0 {
-		res = fmt.Sprintf("%-.2f亿", cap/100_000_000.0)
-	} else {
-		res = fmt.Sprintf("%-.2f万", cap/10_000.0)
-	}
-	return
-}
-
-func HumanByte(cap float64) (res string) {
-	if cap <= 0.0 {
-		res = " - "
-	} else if cap >= 1_073_741_824.0 { // 1024 * 1024 * 1024
-		res = fmt.Sprintf("%-.2f GB", cap/1_073_741_824.0)
-	} else if cap >= 1_048_576.0 { // 1024 * 1024
-		res = fmt.Sprintf("%-.2f MB", cap/1_048_576.0)
-	} else if cap >= 1_024.0 {
-		res = fmt.Sprintf("%-.2f KB", cap/1_024.0)
-	} else {
-		res = fmt.Sprintf("%-.0f B", cap)
-	}
-	return
 }
 
 // IsACode 判断证券代码是否是 A 股

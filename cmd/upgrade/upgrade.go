@@ -18,7 +18,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alwqx/sec/types"
 	"github.com/alwqx/sec/utils"
 	"github.com/alwqx/sec/version"
 	"github.com/spf13/cobra"
@@ -81,7 +80,7 @@ func UpgradeHandler(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Printf("Downloading %s (%s)...\n", asset.Name, types.HumanByte(float64(asset.Size)))
+	fmt.Printf("Downloading %s (%s)...\n", asset.Name, utils.HumanByte(float64(asset.Size)))
 
 	// 获取当前二进制路径
 	execPath, err := os.Executable()

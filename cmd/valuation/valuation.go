@@ -9,6 +9,7 @@ import (
 	"github.com/alwqx/sec/provider/eastmoney"
 	"github.com/alwqx/sec/provider/sina"
 	"github.com/alwqx/sec/types"
+	"github.com/alwqx/sec/utils"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 )
@@ -312,7 +313,7 @@ func assess(m *Metrics) string {
 
 func printHeader(cmd *cobra.Command, m *Metrics) {
 	fmt.Fprintf(cmd.OutOrStdout(), "\n证券代码: %s  证券名称: %s\n", m.Code, m.Name)
-	fmt.Fprintf(cmd.OutOrStdout(), "当前股价: %.2f  总市值: %s\n\n", m.Price, types.HumanNum(m.MktCap))
+	fmt.Fprintf(cmd.OutOrStdout(), "当前股价: %.2f  总市值: %s\n\n", m.Price, utils.HumanNum(m.MktCap))
 }
 
 func printOverview(cmd *cobra.Command, m *Metrics, incomeItems []*eastmoney.FinancialReportItem) {
@@ -324,7 +325,7 @@ func printOverview(cmd *cobra.Command, m *Metrics, incomeItems []*eastmoney.Fina
 	mt.SetHeader([]string{"当前股价", "总市值", "EPS", "BVPS"})
 	mt.SetHeaderColor(tablewriter.Colors{tablewriter.Bold}, tablewriter.Colors{tablewriter.Bold},
 		tablewriter.Colors{tablewriter.Bold}, tablewriter.Colors{tablewriter.Bold})
-	mt.Append([]string{fmt.Sprintf("%.2f", m.Price), types.HumanNum(m.MktCap),
+	mt.Append([]string{fmt.Sprintf("%.2f", m.Price), utils.HumanNum(m.MktCap),
 		fmt.Sprintf("%.2f", m.EPS), fmt.Sprintf("%.2f", m.BVPS)})
 	mt.SetHeaderLine(false)
 	mt.SetBorder(false)
@@ -369,8 +370,8 @@ func printOverview(cmd *cobra.Command, m *Metrics, incomeItems []*eastmoney.Fina
 			rows = append(rows, []string{
 				date,
 				fmt.Sprintf("%.2f", fieldFloat(item, "BASIC_EPS")),
-				types.HumanNum(fieldFloat(item, "TOTAL_OPERATE_INCOME")),
-				types.HumanNum(fieldFloat(item, "PARENT_NETPROFIT")),
+				utils.HumanNum(fieldFloat(item, "TOTAL_OPERATE_INCOME")),
+				utils.HumanNum(fieldFloat(item, "PARENT_NETPROFIT")),
 			})
 		}
 		richTable(out, []string{"报告期", "EPS", "营收", "净利润"}, rows)
@@ -436,8 +437,8 @@ func printPSMethod(cmd *cobra.Command, m *Metrics) {
 
 	richTable(out, []string{"项目", "数值"}, [][]string{
 		{"当前 P/S", ff(m.PS)},
-		{"营业收入 (TTM)", types.HumanNum(m.RevenueTTM)},
-		{"总市值", types.HumanNum(m.MktCap)},
+		{"营业收入 (TTM)", utils.HumanNum(m.RevenueTTM)},
+		{"总市值", utils.HumanNum(m.MktCap)},
 	})
 
 	fmt.Fprintf(out, "\n【评估】")
@@ -470,7 +471,7 @@ func printPEGMethod(cmd *cobra.Command, m *Metrics, incomeItems []*eastmoney.Fin
 			if len(date) >= 10 {
 				date = date[:10]
 			}
-			fmt.Fprintf(out, "  %s  %s\n", date, types.HumanNum(fieldFloat(item, "PARENT_NETPROFIT")))
+			fmt.Fprintf(out, "  %s  %s\n", date, utils.HumanNum(fieldFloat(item, "PARENT_NETPROFIT")))
 		}
 	}
 
@@ -535,7 +536,7 @@ func printDCFMethod(cmd *cobra.Command, m *Metrics,
 
 	fmt.Fprintf(out, "【DCF 参数】\n")
 	richTable(out, []string{"参数", "数值", "说明"}, [][]string{
-		{"当前 FCF (近似)", types.HumanNum(fcf), "净利润 × 70%"},
+		{"当前 FCF (近似)", utils.HumanNum(fcf), "净利润 × 70%"},
 		{"增长阶段", fmt.Sprintf("%d 年", years), "高增长期"},
 		{"增长率", fpct(growthRate), "--growth-rate"},
 		{"永续增长率", fpct(terminalGrowth), "--terminal-growth"},
@@ -559,9 +560,9 @@ func printDCFMethod(cmd *cobra.Command, m *Metrics,
 
 	fmt.Fprintf(out, "\n【DCF 估值结果】\n")
 	richTable(out, []string{"项目", "数值"}, [][]string{
-		{"增长期现值", types.HumanNum(pv)},
-		{"终值现值", types.HumanNum(pvTerminal)},
-		{"企业价值", types.HumanNum(enterpriseValue)},
+		{"增长期现值", utils.HumanNum(pv)},
+		{"终值现值", utils.HumanNum(pvTerminal)},
+		{"企业价值", utils.HumanNum(enterpriseValue)},
 		{"每股内在价值", fmt.Sprintf("%.2f", equityValue)},
 		{"安全边际后合理价", fmt.Sprintf("%.2f", fairPrice)},
 		{"当前股价", fmt.Sprintf("%.2f", m.Price)},

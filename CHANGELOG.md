@@ -3,6 +3,7 @@
 ### v0.3.6
 
 1. `sec upgrade` 升级时下载文件大小使用 HumanByte 可读改造
+2. `HumanByte/HumanNum` 从 types 迁移到 utils
 
 ### v0.3.5
 

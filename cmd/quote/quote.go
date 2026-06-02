@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/alwqx/sec/provider/sina"
-	"github.com/alwqx/sec/types"
+	"github.com/alwqx/sec/utils"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 )
@@ -193,8 +193,8 @@ func printQuote(quotes []*sina.SecurityQuote) {
 			strconv.FormatFloat(quote.Open, 'g', -1, 64),
 			strconv.FormatFloat(quote.High, 'g', -1, 64),
 			strconv.FormatFloat(quote.Low, 'g', -1, 64),
-			types.HumanNum(float64(quote.TurnOver)),
-			types.HumanNum(quote.Volume),
+			utils.HumanNum(float64(quote.TurnOver)),
+			utils.HumanNum(quote.Volume),
 			quote.ExCode,
 		}
 
