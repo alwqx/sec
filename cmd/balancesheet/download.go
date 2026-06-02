@@ -10,7 +10,7 @@ import (
 
 	"github.com/alwqx/sec/provider/cninfo"
 	"github.com/alwqx/sec/provider/sina"
-	"github.com/alwqx/sec/types"
+	"github.com/alwqx/sec/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -119,7 +119,7 @@ func BalanceSheetDownloadHandler(cmd *cobra.Command, args []string) error {
 	summaryData := make([][]string, 0, len(validPDFs))
 	for _, a := range validPDFs {
 		t := time.Unix(a.Time/1000, 0).Format("2006-01-02")
-		size := types.HumanByte(float64(a.AdjunctSize))
+		size := utils.HumanByte(float64(a.AdjunctSize))
 		summaryData = append(summaryData, []string{a.Title, t, size})
 	}
 	renderTable(cmd, summaryHeaders, summaryData)
@@ -138,7 +138,7 @@ func BalanceSheetDownloadHandler(cmd *cobra.Command, args []string) error {
 			fmt.Fprintf(cmd.OutOrStdout(), " ... 失败: %v\n", err)
 			continue
 		}
-		fmt.Fprintf(cmd.OutOrStdout(), " ... 完成 (%s)\n", types.HumanNum(float64(a.AdjunctSize)))
+		fmt.Fprintf(cmd.OutOrStdout(), " ... 完成 (%s)\n", utils.HumanByte(float64(a.AdjunctSize)))
 	}
 
 	fmt.Fprintln(cmd.OutOrStdout())

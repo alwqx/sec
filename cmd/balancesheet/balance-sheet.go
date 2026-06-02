@@ -10,7 +10,7 @@ import (
 
 	"github.com/alwqx/sec/provider/eastmoney"
 	"github.com/alwqx/sec/provider/sina"
-	"github.com/alwqx/sec/types"
+	"github.com/alwqx/sec/utils"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 )
@@ -328,7 +328,7 @@ func formatFieldValue(apiField string, v interface{}) string {
 		}
 	default:
 		if n, ok := v.(float64); ok {
-			return types.HumanNum(n)
+			return utils.HumanNum(n)
 		}
 	}
 

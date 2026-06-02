@@ -126,7 +126,7 @@ func KLineHandler(cmd *cobra.Command, args []string) error {
 	fmt.Fprintf(cmd.OutOrStdout(), "证券代码\t%s\n公司名称\t%s\n主营业务\t%s\n发行价格\t%.2f\n当前价格\t%.2f\n市净率PB\t%.2f\n市盈率TTM\t%.2f\n总市值  \t%s\n流通市值\t%s\n",
 		sec.ExCode, profile.Name, profile.MainBusiness,
 		profile.ListingPrice, profile.Current, profile.PB, profile.PeTTM,
-		types.HumanNum(profile.MarketCap), types.HumanNum(profile.TradedMarketCap))
+		utils.HumanNum(profile.MarketCap), utils.HumanNum(profile.TradedMarketCap))
 
 	// 渲染蜡烛图
 	noVolume, _ := cmd.Flags().GetBool("no-volume")
