@@ -21,13 +21,22 @@ type Candle struct {
 	Volume int64
 }
 
+// OverlayLine defines an indicator line to overlay on the candlestick chart.
+type OverlayLine struct {
+	Values []float64 // one per candle, 0 = no value at this position
+	Color  string    // ANSI foreground color
+	Label  string    // legend label
+	Style  rune      // marker char, default '●'
+}
+
 // CandlestickConfig holds configuration for candlestick chart rendering.
 type CandlestickConfig struct {
-	Width     int  // chart width in columns, 0 = auto-detect terminal width
-	Height    int  // price chart height in rows, default 20
-	Volume    bool // show volume subgraph below the chart
-	Paging    bool // fixed candle width instead of scaling to fit
-	HalfBlock bool // use half-block characters for 2x vertical resolution
+	Width     int           // chart width in columns, 0 = auto-detect terminal width
+	Height    int           // price chart height in rows, default 20
+	Volume    bool          // show volume subgraph below the chart
+	Paging    bool          // fixed candle width instead of scaling to fit
+	HalfBlock bool          // use half-block characters for 2x vertical resolution
+	Overlays  []OverlayLine // indicator lines to overlay on the chart
 }
 
 // DefaultConfig returns a sensible default configuration.
@@ -45,7 +54,17 @@ const (
 	ansiRed    = "\033[31m"
 	ansiGreen  = "\033[32m"
 	ansiYellow = "\033[33m"
+	ansiBlue   = "\033[34m"
+	ansiCyan   = "\033[36m"
+	ansiWhite  = "\033[37;1m"
 	ansiDim    = "\033[2m"
+	// Exported color aliases for external packages
+	AnsiYellow = ansiYellow
+	AnsiCyan   = ansiCyan
+	AnsiBlue   = ansiBlue
+	AnsiWhite  = ansiWhite
+
+	// Exported color aliases for external packages
 
 	// Background color equivalents for half-block rendering
 	ansiBgRed    = "\033[41m"
@@ -190,6 +209,24 @@ func Render(w io.Writer, candles []Candle, cfg CandlestickConfig) error {
 	if cfg.HalfBlock {
 		grid = combineHalfBlock(grid, logicalHeight)
 		logicalHeight = chartHeight
+	}
+
+	// Draw indicator overlays (MA, Bollinger, etc.)
+	if len(cfg.Overlays) > 0 {
+		drawOverlays(grid, logicalHeight, cfg.Overlays, displayCandles, leftMargin, candleWidth, minLow, maxHigh)
+		// Legend row: add after volume or before x-axis if no volume
+		legendRow := logicalHeight + 1
+		if volHeight > 0 {
+			legendRow += 1 + volHeight // after separator + volume
+		}
+		// Extend grid if needed
+		for len(grid) <= legendRow {
+			grid = append(grid, make([]cell, gridWidth))
+			for j := range grid[len(grid)-1] {
+				grid[len(grid)-1][j] = cell{r: ' '}
+			}
+		}
+		drawLegend(grid, legendRow, cfg.Overlays, leftMargin)
 	}
 
 	// Draw X-axis date labels
@@ -492,6 +529,49 @@ func drawVolume(grid [][]cell, startRow, volHeight int, candles []Candle, leftMa
 				grid[row][col] = cell{r: '█', fg: ansiDim}
 			}
 		}
+	}
+}
+
+// drawOverlays plots indicator lines (MA, Bollinger, etc.) as colored marker
+// characters on the candlestick chart grid.
+func drawOverlays(grid [][]cell, chartHeight int, overlays []OverlayLine,
+	candles []Candle, leftMargin, candleWidth int, minLow, maxHigh float64) {
+
+	for _, ol := range overlays {
+		style := ol.Style
+		if style == 0 {
+			style = '●'
+		}
+		for i, v := range ol.Values {
+			if v <= 0 {
+				continue
+			}
+			col := leftMargin + i*candleWidth + candleWidth/2
+			row := priceToRow(v, minLow, maxHigh, chartHeight)
+			if row >= 0 && row < chartHeight && col < len(grid[row]) {
+				grid[row][col] = cell{r: style, fg: ol.Color}
+			}
+		}
+	}
+}
+
+// drawLegend renders indicator labels with colors below the chart.
+func drawLegend(grid [][]cell, legendRow int, overlays []OverlayLine, leftMargin int) {
+	col := leftMargin
+	for _, ol := range overlays {
+		// Render colored marker + label
+		style := ol.Style
+		if style == 0 {
+			style = '●'
+		}
+		label := fmt.Sprintf("%c %s  ", style, ol.Label)
+		for i, ch := range label {
+			c := col + i
+			if c < len(grid[legendRow]) {
+				grid[legendRow][c] = cell{r: ch, fg: ol.Color}
+			}
+		}
+		col += len(label)
 	}
 }
 

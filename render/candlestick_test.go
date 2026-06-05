@@ -304,3 +304,83 @@ func TestRenderOverflowDownsample(t *testing.T) {
 	// Should be a reasonable height (not thousands of columns wide)
 	require.True(t, len(lines) < 50, "expected reasonable height, got %d lines", len(lines))
 }
+
+func TestRenderWithMAOverlay(t *testing.T) {
+	candles := makeTestCandles(30)
+	// Compute MA5 overlay
+	ma5 := make([]float64, len(candles))
+	sum := 0.0
+	for i, c := range candles {
+		sum += c.Close
+		if i >= 4 {
+			ma5[i] = sum / 5.0
+			sum -= candles[i-4].Close
+		}
+	}
+
+	var buf bytes.Buffer
+	cfg := DefaultConfig()
+	cfg.Width = 120
+	cfg.Overlays = []OverlayLine{
+		{Values: ma5, Color: AnsiWhite, Label: "MA5"},
+	}
+	err := Render(&buf, candles, cfg)
+	require.Nil(t, err)
+
+	out := buf.String()
+	require.NotEmpty(t, out)
+	// Should contain legend
+	require.Contains(t, out, "MA5")
+}
+
+func TestRenderWithBollOverlay(t *testing.T) {
+	candles := makeTestCandles(30)
+	// Compute Bollinger mid line
+	mid := make([]float64, len(candles))
+	upper := make([]float64, len(candles))
+	lower := make([]float64, len(candles))
+
+	var buf bytes.Buffer
+	cfg := DefaultConfig()
+	cfg.Width = 120
+	cfg.Overlays = []OverlayLine{
+		{Values: mid, Color: AnsiYellow, Label: "MID20", Style: '─'},
+		{Values: upper, Color: AnsiCyan, Label: "UP", Style: '·'},
+		{Values: lower, Color: AnsiCyan, Label: "LO", Style: '·'},
+	}
+	err := Render(&buf, candles, cfg)
+	require.Nil(t, err)
+
+	out := buf.String()
+	require.NotEmpty(t, out)
+	// Should contain all three legend entries
+	require.Contains(t, out, "MID20")
+	require.Contains(t, out, "UP")
+	require.Contains(t, out, "LO")
+}
+
+func TestRenderWithMultipleOverlays(t *testing.T) {
+	candles := makeTestCandles(30)
+	ma5 := make([]float64, len(candles))
+	ma20 := make([]float64, len(candles))
+	// Just fill with dummy values
+	for i := range candles {
+		ma5[i] = candles[i].Close
+		ma20[i] = candles[i].Close
+	}
+
+	var buf bytes.Buffer
+	cfg := DefaultConfig()
+	cfg.Width = 120
+	cfg.Overlays = []OverlayLine{
+		{Values: ma5, Color: AnsiWhite, Label: "MA5"},
+		{Values: ma20, Color: AnsiYellow, Label: "MA20"},
+	}
+	err := Render(&buf, candles, cfg)
+	require.Nil(t, err)
+
+	out := buf.String()
+	require.NotEmpty(t, out)
+	require.Contains(t, out, "MA5")
+	require.Contains(t, out, "MA20")
+}
