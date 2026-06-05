@@ -21,11 +21,14 @@ terminal stdout             Unicode + ANSI color output
 ### Layer Separation
 
 - **`render/`** — Pure rendering engine, no dependencies on providers or CLI framework
-  - `Candle` struct: minimal OHLCV interface (`Date`, `Open`, `Close`, `High`, `Low`, `Volume`)
-  - `CandlestickConfig`: rendering parameters (height, width, paging, half-block, volume)
+  - `Candle` struct: minimal OHLCV interface
+  - `OverlayLine` struct: indicator overlay (`Values`, `Color`, `Label`, `Style`)
+  - `CandlestickConfig`: rendering parameters (height, width, paging, half-block, volume, overlays)
   - `Render(w io.Writer, candles []Candle, cfg CandlestickConfig) error`
 - **`cmd/kline/`** — Cobra command, data fetching, `[]*eastmoney.Quote` → `[]render.Candle` adapter
   - `toCandles()` converts provider-specific types to the generic `Candle` type
+  - `computeMAOverlay()` / `computeBollOverlay()` calculate indicator values for overlay rendering
+  - `maColor()` assigns colors by MA period
 
 This separation allows future data sources (e.g., bond yields) to reuse the rendering engine by implementing a `→ []render.Candle` adapter.
 
@@ -53,6 +56,15 @@ sec kline 600036 --no-volume
 # With 复权 type
 sec kline 600036 -f qfq
 
+# MA overlays (comma-separated periods)
+sec kline 600036 --ma 5,20,60
+
+# Bollinger Bands overlay (period,k)
+sec kline 600036 --boll 20,2.0
+
+# Combined: K-line + MA + Bollinger
+sec kline 600036 --ma 5,20 --boll 20,2.0
+
 # Alias
 sec kl 600036
 ```
@@ -68,6 +80,57 @@ sec kl 600036
 | `--paging`     |       | false       | Fixed 5-col candle width; navigate via `--begin`/`--end` |
 | `--no-volume`  |       | false       | Hide volume subgraph                                     |
 | `--fq`         | `-f`  | bfq         | 复权：bfq (none), qfq (front), hfq (post)                |
+| `--ma`         |       | —           | MA periods, comma-separated (e.g. `5,20,60`)             |
+| `--boll`       |       | —           | Bollinger Bands: `period,k` (e.g. `20,2.0`)              |
+
+## Indicator Overlays
+
+`--ma` and `--boll` overlay technical indicator lines on the candlestick chart using colored
+Unicode markers and a legend at the bottom of the chart.
+
+### MA (Moving Average)
+
+```bash
+sec kline 600036 --ma 5,20,60
+```
+
+Each MA period is rendered with a distinctive color and `●` marker:
+
+| Period          | Color  | ANSI   |
+| --------------- | ------ | ------ |
+| ≤5 (short-term) | White  | `37;1` |
+| ≤10 (medium)    | Yellow | `33`   |
+| ≤30 (long)      | Cyan   | `36`   |
+| >30 (very long) | Blue   | `34`   |
+
+### Bollinger Bands
+
+```bash
+sec kline 600036 --boll 20,2.0
+```
+
+Three lines are overlaid:
+
+| Line   | Character | Color  | Meaning        |
+| ------ | --------- | ------ | -------------- |
+| Middle | `─`       | Yellow | SMA(period)    |
+| Upper  | `·`       | Cyan   | Middle + k × σ |
+| Lower  | `·`       | Cyan   | Middle − k × σ |
+
+### Legend
+
+A colored legend row is printed below the chart:
+
+```text
+ ● MA5  ● MA20  ● MA60  ─ MID20  · UP2.0  · LO2.0
+```
+
+### Implementation
+
+The `drawOverlays()` function maps indicator values to grid rows using the same
+`priceToRow()` mapping as candles, then places colored marker characters at the
+corresponding grid cells. The `drawLegend()` function appends an extra row below
+the chart area with colored labels.
 
 ## Rendering Techniques
 

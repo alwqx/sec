@@ -5,6 +5,10 @@ import (
 	"log/slog"
 	"sync"
 
+	"math"
+	"strconv"
+	"strings"
+
 	"github.com/alwqx/sec/provider/eastmoney"
 	"github.com/alwqx/sec/provider/sina"
 	"github.com/alwqx/sec/render"
@@ -33,13 +37,15 @@ func NewKLineCLI() *cobra.Command {
 	rootCmd.Flags().Bool("half-block", false, "Use half-block chars for 2x resolution")
 	rootCmd.Flags().Bool("paging", false, "Fixed candle width instead of auto-scaling")
 	rootCmd.Flags().Bool("no-volume", false, "Hide volume subgraph")
+	// Indicator overlays
+	rootCmd.Flags().String("ma", "", "MA periods, comma-separated (e.g. 5,20,60)")
+	rootCmd.Flags().String("boll", "", "Bollinger Bands: period,k (e.g. 20,2.0)")
 
 	return rootCmd
 }
 
 // KLineHandler is the handler for sec kline command.
 func KLineHandler(cmd *cobra.Command, args []string) error {
-
 	key := args[0]
 	secs := sina.Search(cmd.Context(), key)
 	if len(secs) == 0 {
@@ -144,6 +150,55 @@ func KLineHandler(cmd *cobra.Command, args []string) error {
 		HalfBlock: halfBlock,
 	}
 
+	// Compute indicator overlays
+	if maStr, _ := cmd.Flags().GetString("ma"); maStr != "" {
+		for _, s := range strings.Split(maStr, ",") {
+			token := strings.TrimSpace(s)
+			period, err := strconv.Atoi(strings.TrimSpace(s))
+			if err != nil || period <= 0 {
+				return fmt.Errorf("invalid --ma value %q: expected positive integer", token)
+			}
+			ma := computeMAOverlay(quotes, period)
+			cfg.Overlays = append(cfg.Overlays, render.OverlayLine{
+				Values: ma,
+				Color:  maColor(period),
+				Label:  fmt.Sprintf("MA%d", period),
+			})
+		}
+	}
+
+	if bollStr, _ := cmd.Flags().GetString("boll"); bollStr != "" {
+		parts := strings.Split(bollStr, ",")
+		if len(parts) < 2 {
+			return fmt.Errorf("invalid --boll value %q: expected period,k", bollStr)
+		}
+
+		periodStr := strings.TrimSpace(parts[0])
+		kStr := strings.TrimSpace(parts[1])
+		period, err := strconv.Atoi(strings.TrimSpace(periodStr))
+		if err != nil {
+			return err
+		}
+		if period <= 0 {
+			return fmt.Errorf("invalid --boll period %q: expected positive integer", periodStr)
+		}
+
+		k, err := strconv.ParseFloat(strings.TrimSpace(kStr), 64)
+		if err != nil {
+			return err
+		}
+		if k <= 0 {
+			return fmt.Errorf("invalid --boll k %q: expected positive number", kStr)
+		}
+
+		mid, upper, lower := computeBollOverlay(quotes, period, k)
+		cfg.Overlays = append(cfg.Overlays,
+			render.OverlayLine{Values: mid, Color: render.AnsiYellow, Label: fmt.Sprintf("MID%d", period), Style: '─'},
+			render.OverlayLine{Values: upper, Color: render.AnsiCyan, Label: fmt.Sprintf("UP%.1f", k), Style: '·'},
+			render.OverlayLine{Values: lower, Color: render.AnsiCyan, Label: fmt.Sprintf("LO%.1f", k), Style: '·'},
+		)
+	}
+
 	candles := toCandles(quotes)
 	return render.Render(cmd.OutOrStdout(), candles, cfg)
 }
@@ -162,4 +217,70 @@ func toCandles(quotes []*eastmoney.Quote) []render.Candle {
 		})
 	}
 	return candles
+}
+
+// computeMAOverlay returns the SMA values for the given period, aligned with quotes.
+// Values before the period is complete are set to 0 (not drawn).
+func computeMAOverlay(quotes []*eastmoney.Quote, period int) []float64 {
+	result := make([]float64, len(quotes))
+	if len(quotes) < period {
+		return result
+	}
+	sum := 0.0
+	for i := 0; i < period-1; i++ {
+		sum += quotes[i].Close
+	}
+	for i := period - 1; i < len(quotes); i++ {
+		sum += quotes[i].Close
+		result[i] = sum / float64(period)
+		sum -= quotes[i-period+1].Close
+	}
+	return result
+}
+
+// computeBollOverlay returns mid, upper, lower Bollinger Band values.
+func computeBollOverlay(quotes []*eastmoney.Quote, period int, k float64) (mid, upper, lower []float64) {
+	n := len(quotes)
+	mid = make([]float64, n)
+	upper = make([]float64, n)
+	lower = make([]float64, n)
+	if n < period {
+		return
+	}
+
+	// Compute mid line (SMA)
+	sum := 0.0
+	for i := 0; i < period-1; i++ {
+		sum += quotes[i].Close
+	}
+	for i := period - 1; i < n; i++ {
+		sum += quotes[i].Close
+		mid[i] = sum / float64(period)
+		sum -= quotes[i-period+1].Close
+
+		// Stddev
+		sqSum := 0.0
+		for j := i - period + 1; j <= i; j++ {
+			diff := quotes[j].Close - mid[i]
+			sqSum += diff * diff
+		}
+		stddev := math.Sqrt(sqSum / float64(period))
+		upper[i] = mid[i] + k*stddev
+		lower[i] = mid[i] - k*stddev
+	}
+	return
+}
+
+// maColor returns a color for the MA line based on period.
+func maColor(period int) string {
+	switch {
+	case period <= 5:
+		return render.AnsiWhite
+	case period <= 10:
+		return render.AnsiYellow
+	case period <= 30:
+		return render.AnsiCyan
+	default:
+		return render.AnsiBlue
+	}
 }
