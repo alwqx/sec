@@ -1,5 +1,9 @@
 ## sec change log
 
+### v0.3.7
+
+1. 初始化 `sec watch` 命令
+
 ### v0.3.6
 
 1. `sec upgrade` 升级时下载文件大小使用 HumanByte 可读改造

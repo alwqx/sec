@@ -325,7 +325,9 @@ func parseSecQuoteOfMstock(quoteLine string) (*SecurityQuote, error) {
 // exCodes = {"$AMD", "SH600036", "HK09992"}
 func QueryQuoteList(ctx context.Context, exCodes []string) ([]*SecurityQuote, error) {
 	formatKeys := formatQuoteKeys(exCodes)
-	reqUrl := fmt.Sprintf("https://hq.sinajs.cn/list=%s", strings.Join(formatKeys, ","))
+	keys := strings.Join(formatKeys, ",")
+	reqUrl := fmt.Sprintf("https://hq.sinajs.cn/list=%s", keys)
+	slog.DebugContext(ctx, "QueryQuoteList", "exCodes", strings.Join(exCodes, ", "), "search_keys", keys, "req_url", reqUrl)
 	resp, err := utils.MakeRequest(ctx, http.MethodGet, reqUrl, defaultHTTPHeaders(), nil, 0)
 	if err != nil {
 		return nil, err
