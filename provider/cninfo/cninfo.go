@@ -209,8 +209,11 @@ func QueryAnnouncements(ctx context.Context, req *QueryRequest) (*QueryResponse,
 	if pageNum <= 0 {
 		pageNum = 1
 	}
+	// 经过在页面 https://www.cninfo.com.cn/new/disclosure/stock?stockCode=600036&orgId=gssh0600036&sjstsBond=false#latestAnnouncement
+	// 测试，page-size=30 是固定的，如果调整成其它值，会导致查询参数失效，默认返回第一页的结果
 	pageSize := req.PageSize
-	if pageSize <= 0 {
+	if req.PageSize != 30 {
+		slog.DebugContext(ctx, "QueryAnnouncements page is fixed to 30", "PageSize", req.PageSize)
 		pageSize = 30
 	}
 
@@ -252,7 +255,7 @@ func QueryAnnouncements(ctx context.Context, req *QueryRequest) (*QueryResponse,
 	// Send parameters as query string in a POST request
 	reqURL := queryURL + "?" + form.Encode()
 
-	slog.DebugContext(ctx, "QueryAnnouncements", "reqURL", reqURL)
+	slog.DebugContext(ctx, "QueryAnnouncements", "params", form.Encode(), "reqURL", reqURL)
 
 	resp, err := utils.MakeRequest(ctx, http.MethodPost, reqURL, headers, nil, 0)
 	if err != nil {
