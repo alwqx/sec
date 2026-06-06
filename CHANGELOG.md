@@ -5,6 +5,7 @@
 1. 初始化 `sec watch` 命令
 2. `sec kline` 新增叠加指标
 3. 初始化 `sec announcements` 命令
+4. 初始化 `sec insider` 命令
 
 ### v0.3.6
 
