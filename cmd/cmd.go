@@ -9,6 +9,7 @@ import (
 	"github.com/alwqx/sec/cmd/announcements"
 	"github.com/alwqx/sec/cmd/balancesheet"
 	"github.com/alwqx/sec/cmd/bond"
+	"github.com/alwqx/sec/cmd/insider"
 	"github.com/alwqx/sec/cmd/kline"
 	"github.com/alwqx/sec/cmd/metal"
 	"github.com/alwqx/sec/cmd/quote"
@@ -79,6 +80,7 @@ func NewCLI() *cobra.Command {
 		strategy.NewStrategyCLI(),
 		watch.NewWatchCLI(),
 		announcements.NewAnnouncementsCLI(),
+		insider.NewInsiderCLI(),
 	)
 
 	return rootCmd
