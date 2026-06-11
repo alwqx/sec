@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"log/slog"
-	"os"
 	"strings"
 
 	"github.com/alwqx/sec/cmd/announcements"
@@ -103,7 +103,7 @@ func debugHandler(cmd *cobra.Command, args []string) {
 
 func SearchHandler(cmd *cobra.Command, args []string) error {
 	secs := sina.Search(cmd.Context(), args[0])
-	printSecs(secs)
+	printSecs(cmd.OutOrStdout(), secs)
 
 	return nil
 }
@@ -143,15 +143,15 @@ func InfoHandler(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			slog.Error("failed query dividends", "code", opts.Code, "error", err)
 		} else {
-			fmt.Println()
-			printDividends(dids)
+			fmt.Fprintln(cmd.OutOrStdout())
+			printDividends(cmd.OutOrStdout(), dids)
 		}
 	}
 
 	return nil
 }
 
-func printSecs(secs []*sina.BasicSecurity) {
+func printSecs(out io.Writer, secs []*sina.BasicSecurity) {
 	num := len(secs)
 	if num == 0 {
 		return
@@ -162,7 +162,7 @@ func printSecs(secs []*sina.BasicSecurity) {
 		data = append(data, []string{sec.ExCode, sec.Name, string(sec.SecurityType), sec.ExChange})
 	}
 
-	table := tablewriter.NewWriter(os.Stdout)
+	table := tablewriter.NewWriter(out)
 	headers := []string{"证券代码", "证券名称", "证券类型", "交易所"}
 	table.SetHeader(headers)
 	headerStyles := make([]tablewriter.Colors, 0, len(headers))
@@ -181,7 +181,7 @@ func printSecs(secs []*sina.BasicSecurity) {
 	table.Render()
 }
 
-func printDividends(dids []sina.Dividend) {
+func printDividends(out io.Writer, dids []sina.Dividend) {
 	num := len(dids)
 	if num == 0 {
 		return
@@ -208,7 +208,7 @@ func printDividends(dids []sina.Dividend) {
 		data = append(data, []string{did.PublicDate, bonus, did.DividendedDate, did.RecordDate})
 	}
 
-	table := tablewriter.NewWriter(os.Stdout)
+	table := tablewriter.NewWriter(out)
 	headers := []string{"公告日期", "分红送配", "除权除息日", "股权登记日"}
 	table.SetHeader(headers)
 	headerStyles := make([]tablewriter.Colors, 0, len(headers))

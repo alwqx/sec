@@ -36,7 +36,7 @@ func MetalHandler(cmd *cobra.Command, args []string) error {
 	if num == 0 {
 		slog.Warn("no data")
 	} else {
-		printAu999History(resp.Data[num-1:])
+		printAu999History(cmd.OutOrStdout(), resp.Data[num-1:])
 	}
 
 	return nil

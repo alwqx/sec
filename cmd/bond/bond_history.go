@@ -2,7 +2,7 @@ package bond
 
 import (
 	"fmt"
-	"os"
+	"io"
 
 	"github.com/alwqx/sec/provider/bond"
 	"github.com/alwqx/sec/utils"
@@ -39,13 +39,13 @@ func BondHistoryHandler(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	printBondHistory(resp.Data)
+	printBondHistory(cmd.OutOrStdout(), resp.Data)
 
 	return nil
 }
 
 // printBondHistory 打印美国国债收益率历史数据
-func printBondHistory(items []*bond.BondYieldItem) {
+func printBondHistory(out io.Writer, items []*bond.BondYieldItem) {
 	num := len(items)
 	if num == 0 {
 		return
@@ -87,7 +87,7 @@ func printBondHistory(items []*bond.BondYieldItem) {
 		columnsStyles = append(columnsStyles, styles)
 	}
 
-	table := tablewriter.NewWriter(os.Stdout)
+	table := tablewriter.NewWriter(out)
 	table.SetHeader(headers)
 
 	for i, row := range data {

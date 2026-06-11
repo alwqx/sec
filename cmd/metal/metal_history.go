@@ -2,7 +2,7 @@ package metal
 
 import (
 	"fmt"
-	"os"
+	"io"
 	"strconv"
 
 	"github.com/alwqx/sec/provider/metal"
@@ -40,13 +40,13 @@ func MetalHistoryHandler(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	printAu999History(resp.Data)
+	printAu999History(cmd.OutOrStdout(), resp.Data)
 
 	return nil
 }
 
 // printAu999History 打印 Au999 信息
-func printAu999History(aus []*metal.DailyHQItem) {
+func printAu999History(out io.Writer, aus []*metal.DailyHQItem) {
 	num := len(aus)
 	if num == 0 {
 		return
@@ -91,7 +91,7 @@ func printAu999History(aus []*metal.DailyHQItem) {
 		columnsStyles = append(columnsStyles, styles)
 	}
 
-	table := tablewriter.NewWriter(os.Stdout)
+	table := tablewriter.NewWriter(out)
 	table.SetHeader(headers)
 
 	for i, row := range data {
