@@ -1,6 +1,7 @@
 package quote
 
 import (
+	"os"
 	"testing"
 	"time"
 
@@ -45,5 +46,5 @@ func TestPrintQuoteHistory(t *testing.T) {
 		Velocity:   1.16,
 	}
 
-	printQuoteHistory([]*eastmoney.Quote{quote1, quote2})
+	printQuoteHistory(os.Stdout, []*eastmoney.Quote{quote1, quote2})
 }

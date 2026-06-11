@@ -2,8 +2,8 @@ package bond
 
 import (
 	"fmt"
+	"io"
 	"log/slog"
-	"os"
 	"time"
 
 	"github.com/alwqx/sec/provider/bond"
@@ -39,14 +39,14 @@ func BondHandler(cmd *cobra.Command, args []string) error {
 	if num == 0 {
 		slog.Warn("no data")
 	} else {
-		printBondYield(resp.Data[num-1:])
+		printBondYield(cmd.OutOrStdout(), resp.Data[num-1:])
 	}
 
 	return nil
 }
 
 // printBondYield 打印美国国债收益率曲线
-func printBondYield(items []*bond.BondYieldItem) {
+func printBondYield(out io.Writer, items []*bond.BondYieldItem) {
 	num := len(items)
 	if num == 0 {
 		return
@@ -92,7 +92,7 @@ func printBondYield(items []*bond.BondYieldItem) {
 		columnsStyles = append(columnsStyles, styles)
 	}
 
-	table := tablewriter.NewWriter(os.Stdout)
+	table := tablewriter.NewWriter(out)
 	table.SetHeader(headers)
 
 	for i, row := range data {

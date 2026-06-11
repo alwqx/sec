@@ -2,6 +2,7 @@ package bond
 
 import (
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
@@ -11,15 +12,15 @@ import (
 
 func TestPrintBondYield(t *testing.T) {
 	// 1. nil data
-	printBondYield(nil)
+	printBondYield(os.Stdout, nil)
 
 	// 2. empty data
-	printBondYield([]*bond.BondYieldItem{})
+	printBondYield(os.Stdout, []*bond.BondYieldItem{})
 
 	// 3. first trading day (no previous data, YClose = -1)
 	date1, _ := time.Parse(utils.LayoutYYMMDD, "2026-05-01")
 	fmt.Println("first day (no previous):")
-	printBondYield([]*bond.BondYieldItem{
+	printBondYield(os.Stdout, []*bond.BondYieldItem{
 		{
 			Date:     "2026-05-01",
 			DateTime: date1,
@@ -35,7 +36,7 @@ func TestPrintBondYield(t *testing.T) {
 	// 4. yield up (red)
 	date2, _ := time.Parse(utils.LayoutYYMMDD, "2026-05-04")
 	fmt.Println("yield up (red):")
-	printBondYield([]*bond.BondYieldItem{
+	printBondYield(os.Stdout, []*bond.BondYieldItem{
 		{
 			Date:       "2026-05-04",
 			DateTime:   date2,
@@ -53,7 +54,7 @@ func TestPrintBondYield(t *testing.T) {
 	// 5. yield down (green)
 	date3, _ := time.Parse(utils.LayoutYYMMDD, "2026-05-06")
 	fmt.Println("yield down (green):")
-	printBondYield([]*bond.BondYieldItem{
+	printBondYield(os.Stdout, []*bond.BondYieldItem{
 		{
 			Date:       "2026-05-06",
 			DateTime:   date3,
@@ -71,15 +72,15 @@ func TestPrintBondYield(t *testing.T) {
 
 func TestPrintBondHistory(t *testing.T) {
 	// 1. nil data
-	printBondHistory(nil)
+	printBondHistory(os.Stdout, nil)
 
 	// 2. empty data
-	printBondHistory([]*bond.BondYieldItem{})
+	printBondHistory(os.Stdout, []*bond.BondYieldItem{})
 
 	// 3. single item with no previous data
 	date1, _ := time.Parse(utils.LayoutYYMMDD, "2026-05-01")
 	fmt.Println("single item (no previous):")
-	printBondHistory([]*bond.BondYieldItem{
+	printBondHistory(os.Stdout, []*bond.BondYieldItem{
 		{
 			Date:     "2026-05-01",
 			DateTime: date1,
@@ -139,7 +140,7 @@ func TestPrintBondHistory(t *testing.T) {
 		},
 	}
 	fmt.Println("multi-day history (up/down/no-prev):")
-	printBondHistory(data)
+	printBondHistory(os.Stdout, data)
 }
 
 // TestPrintBondHistoryEdgeCases 覆盖边界场景
@@ -153,7 +154,7 @@ func TestPrintBondHistoryEdgeCases(t *testing.T) {
 	// 1. flat: yield unchanged from previous day (ChangeRate == 0, no color)
 	t.Run("unchanged yield (flat)", func(t *testing.T) {
 		fmt.Println("--- unchanged yield (flat, no color) ---")
-		printBondHistory([]*bond.BondYieldItem{
+		printBondHistory(os.Stdout, []*bond.BondYieldItem{
 			{
 				Date: "2026-05-04", DateTime: date1,
 				BC1Month: 3.70, BC3Month: 3.69, BC6Month: 3.74,
@@ -166,7 +167,7 @@ func TestPrintBondHistoryEdgeCases(t *testing.T) {
 	// 2. very small increase (borderline positive ChangeRate)
 	t.Run("tiny increase", func(t *testing.T) {
 		fmt.Println("--- tiny increase (0.1 bp, red) ---")
-		printBondHistory([]*bond.BondYieldItem{
+		printBondHistory(os.Stdout, []*bond.BondYieldItem{
 			{
 				Date: "2026-05-04", DateTime: date1,
 				BC1Month: 3.70, BC3Month: 3.69, BC6Month: 3.74,
@@ -179,7 +180,7 @@ func TestPrintBondHistoryEdgeCases(t *testing.T) {
 	// 3. very small decrease (borderline negative ChangeRate)
 	t.Run("tiny decrease", func(t *testing.T) {
 		fmt.Println("--- tiny decrease (0.1 bp, green) ---")
-		printBondHistory([]*bond.BondYieldItem{
+		printBondHistory(os.Stdout, []*bond.BondYieldItem{
 			{
 				Date: "2026-05-04", DateTime: date1,
 				BC1Month: 3.70, BC3Month: 3.69, BC6Month: 3.74,
@@ -192,7 +193,7 @@ func TestPrintBondHistoryEdgeCases(t *testing.T) {
 	// 4. large change (+50 bp)
 	t.Run("large increase", func(t *testing.T) {
 		fmt.Println("--- large increase (+50 bp, red) ---")
-		printBondHistory([]*bond.BondYieldItem{
+		printBondHistory(os.Stdout, []*bond.BondYieldItem{
 			{
 				Date: "2026-05-05", DateTime: date2,
 				BC1Month: 4.20, BC3Month: 4.19, BC6Month: 4.24,
@@ -205,7 +206,7 @@ func TestPrintBondHistoryEdgeCases(t *testing.T) {
 	// 5. large change (-50 bp)
 	t.Run("large decrease", func(t *testing.T) {
 		fmt.Println("--- large decrease (-50 bp, green) ---")
-		printBondHistory([]*bond.BondYieldItem{
+		printBondHistory(os.Stdout, []*bond.BondYieldItem{
 			{
 				Date: "2026-05-06", DateTime: date3,
 				BC1Month: 3.20, BC3Month: 3.19, BC6Month: 3.24,
@@ -218,7 +219,7 @@ func TestPrintBondHistoryEdgeCases(t *testing.T) {
 	// 6. mixed: first day (no prev) + flat + up + down together
 	t.Run("mixed all states", func(t *testing.T) {
 		fmt.Println("--- mixed: no-prev + flat + up + down ---")
-		printBondHistory([]*bond.BondYieldItem{
+		printBondHistory(os.Stdout, []*bond.BondYieldItem{
 			{
 				Date: "2026-05-01", DateTime: date0,
 				BC1Month: 3.71, BC3Month: 3.68, BC6Month: 3.71,
@@ -255,7 +256,7 @@ func TestPrintBondHistoryEdgeCases(t *testing.T) {
 	// 7. zero yield values (edge case, should not panic)
 	t.Run("zero yields", func(t *testing.T) {
 		fmt.Println("--- zero yields ---")
-		printBondHistory([]*bond.BondYieldItem{
+		printBondHistory(os.Stdout, []*bond.BondYieldItem{
 			{
 				Date: "2026-05-04", DateTime: date1,
 				BC1Month: 0, BC3Month: 0, BC6Month: 0,

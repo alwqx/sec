@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"os"
 	"testing"
 
 	"github.com/alwqx/sec/provider/sina"
@@ -8,8 +9,8 @@ import (
 
 func TestPrintSecs(t *testing.T) {
 	// 1. empty
-	printSecs(nil)
-	printSecs([]*sina.BasicSecurity{})
+	printSecs(os.Stdout, nil)
+	printSecs(os.Stdout, []*sina.BasicSecurity{})
 
 	// 2. common
 	secs := []*sina.BasicSecurity{
@@ -22,13 +23,13 @@ func TestPrintSecs(t *testing.T) {
 			ExCode: "SZ002475",
 		},
 	}
-	printSecs(secs)
+	printSecs(os.Stdout, secs)
 }
 
 func TestPrintDividends(t *testing.T) {
 	// 1. nil or empty
-	printDividends(nil)
-	printDividends([]sina.Dividend{})
+	printDividends(os.Stdout, nil)
+	printDividends(os.Stdout, []sina.Dividend{})
 
 	dids := []sina.Dividend{
 		{
@@ -48,7 +49,7 @@ func TestPrintDividends(t *testing.T) {
 			Bonus:          0.3,
 		},
 	}
-	printDividends(dids)
+	printDividends(os.Stdout, dids)
 }
 
 func TestVersionHandler(t *testing.T) {

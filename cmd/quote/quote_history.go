@@ -2,8 +2,8 @@ package quote
 
 import (
 	"fmt"
+	"io"
 	"log/slog"
-	"os"
 	"sort"
 	"strconv"
 
@@ -110,13 +110,13 @@ func QuoteHistoryHandler(cmd *cobra.Command, args []string) error {
 		})
 	}
 
-	printQuoteHistory(quotes)
+	printQuoteHistory(cmd.OutOrStdout(), quotes)
 
 	return nil
 }
 
 // printQuote 打印 quote 信息
-func printQuoteHistory(quotes []*eastmoney.Quote) {
+func printQuoteHistory(out io.Writer, quotes []*eastmoney.Quote) {
 	if len(quotes) == 0 {
 		return
 	}
@@ -160,7 +160,7 @@ func printQuoteHistory(quotes []*eastmoney.Quote) {
 		columnsStyles = append(columnsStyles, styles)
 	}
 
-	table := tablewriter.NewWriter(os.Stdout)
+	table := tablewriter.NewWriter(out)
 	table.SetHeader(headers)
 
 	for i, row := range data {

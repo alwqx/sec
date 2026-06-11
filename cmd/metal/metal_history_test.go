@@ -1,6 +1,7 @@
 package metal
 
 import (
+	"os"
 	"testing"
 
 	"github.com/alwqx/sec/provider/metal"
@@ -8,10 +9,10 @@ import (
 
 func TestPrintAu999History(t *testing.T) {
 	// 1. nil data
-	printAu999History(nil)
+	printAu999History(os.Stdout, nil)
 
 	// 2. empty data
-	printAu999History([]*metal.DailyHQItem{})
+	printAu999History(os.Stdout, []*metal.DailyHQItem{})
 
 	// 3. common data with 1 item
 	data := []*metal.DailyHQItem{
@@ -44,5 +45,5 @@ func TestPrintAu999History(t *testing.T) {
 			ChangeRate: -0.016145,
 		},
 	}
-	printAu999History(data)
+	printAu999History(os.Stdout, data)
 }
