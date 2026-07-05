@@ -1,5 +1,12 @@
 ## sec change log
 
+### v0.3.9
+
+1. 新增 `sec ipo` 命令族：`ipo list`（新股上市列表）、`ipo calendar`（新股排期视图）、`ipo prospectus`（IPO 招股说明书 PDF 链接）
+2. 数据来源：东方财富 push2（新股列表）+ 巨潮资讯 cninfo（IPO 公告 / 招股书）
+3. `cninfo.QueryIPOs`、`cninfo.QueryIPOByDateRange` 新增：对 IPO 公告自动填充日期和 PDF 直链
+4. 东方财富 push2 对 Go 的 keep-alive 连接返回 EOF：新增 `newHTTPClient` 禁用 keep-alive 和 IPv6，`fetchIPOListBatch` 内置 5 次指数退避重试
+
 ### v0.3.8
 
 1. 初始化 `sec insider` 命令

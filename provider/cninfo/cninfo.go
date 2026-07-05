@@ -23,13 +23,16 @@ import (
 const (
 	stockListURL = "https://www.cninfo.com.cn/new/data/szse_stock.json"
 	queryURL     = "https://www.cninfo.com.cn/new/hisAnnouncement/query"
+	detailURL    = "https://www.cninfo.com.cn/new/disclosure/detail"
 	pdfBaseURL   = "http://static.cninfo.com.cn"
 
 	// Announcement category codes
-	CategoryAnnual   = "category_ndbg_szsh"  // 年报
-	CategoryHalfYear = "category_bndbg_szsh" // 半年报
-	CategoryQ1       = "category_yjdbg_szsh" // 一季报
-	CategoryQ3       = "category_sjdbg_szsh" // 三季报
+	CategoryAnnual   = "category_ndbg_szsh"   // 年报
+	CategoryHalfYear = "category_bndbg_szsh"  // 半年报
+	CategoryQ1       = "category_yjdbg_szsh"  // 一季报
+	CategoryQ3       = "category_sjdbg_szsh"  // 三季报
+	CategoryIPO      = "category_sf_szsh"     // 首次公开发行及上市（招股书）
+	CategoryProspect = "category_scgkfx_szsh" // 招股说明书公开发行
 )
 
 // StockInfo holds a stock entry from the CNINFO stock list.
@@ -54,6 +57,9 @@ type Announcement struct {
 	TypeName         string `json:"announcementTypeName"`
 	ExistFlag        int    `json:"existFlag"`
 	InvalidationFlag int    `json:"invalidationFlag"`
+	// Derived fields, 非 JSON 字段，由本包内部计算填充
+	Date   string // YYYYMMDD，由 Time(毫秒) 字段派生
+	PDFURL string // 完整 PDF 下载直链，由 AdjunctURL 派生
 }
 
 // QueryRequest holds parameters for querying announcements.
@@ -76,6 +82,57 @@ type QueryResponse struct {
 }
 
 // columnForCode determines the exchange column parameter from a stock code.
+// QueryIPOByDateRange 按公告日期范围查询 IPO / 发行相关公告。
+// CNINFO 按 seDate 参数做过滤：seDate = "{start} ~ {end}"，其中日期格式为 YYYY-MM-DD。
+// 返回范围为 (start, end) 区间内所有 category_sf_szsh 公告（亦含少量 scgkfx）。
+func QueryIPOByDateRange(ctx context.Context, startDate, endDate string, max int) ([]*Announcement, error) {
+	const pageSize = 30 // cninfo pageSize 固定 30（见 QueryAnnouncements 内部约束）
+	items := make([]*Announcement, 0)
+	pageNum := 1
+
+	for {
+		req := &QueryRequest{
+			Category:  CategoryIPO,
+			PageNum:   pageNum,
+			PageSize:  pageSize,
+			StartDate: startDate,
+			EndDate:   endDate,
+		}
+
+		resp, err := QueryAnnouncements(ctx, req)
+		if err != nil {
+			return items, fmt.Errorf("QueryIPOByDateRange: %w", err)
+		}
+		if resp == nil || len(resp.Data) == 0 {
+			break
+		}
+
+		for _, a := range resp.Data {
+			if a == nil {
+				continue
+			}
+			if a.Time > 0 {
+				a.Date = time.Unix(a.Time/1000, 0).Format("20060102")
+			}
+			// if a.AdjunctURL != "" && !strings.HasPrefix(a.AdjunctURL, "http") {
+			// 	a.PDFURL = "http://static.cninfo.com.cn/" + strings.TrimLeft(a.AdjunctURL, "/")
+			// } else {
+			// 	a.PDFURL = a.AdjunctURL
+			// }
+			a.PDFURL = resolvePDFURL(a)
+			items = append(items, a)
+			if max > 0 && len(items) >= max {
+				return items, nil
+			}
+		}
+		if !resp.HasMore {
+			break
+		}
+		pageNum++
+	}
+	return items, nil
+}
+
 func columnForCode(code string) string {
 	if len(code) < 2 {
 		return "szse"
@@ -199,6 +256,52 @@ func LookupOrgID(ctx context.Context, code string) (string, string, error) {
 	return "", "", fmt.Errorf("stock code %s not found in CNINFO stock list", code)
 }
 
+// QueryIPOs 查询指定股票的 IPO 相关公告（招股书、发行公告等）。
+// 覆盖 category_sf_szsh（首次公开发行及上市），并在返回时解析 PDF 直链。
+func QueryIPOs(ctx context.Context, stockCode string, size int) ([]*Announcement, error) {
+	if size <= 0 || size > 5000 {
+		size = 30
+	}
+	req := &QueryRequest{
+		StockCode: stockCode,
+		Category:  CategoryIPO,
+		PageSize:  size,
+	}
+
+	resp, err := QueryAnnouncements(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	// 对每个公告解析 PDF 直链 & 日期（由 Time(ms) 派生）
+	out := make([]*Announcement, 0)
+	for _, a := range resp.Data {
+		if a == nil {
+			continue
+		}
+		// 从毫秒时间戳派生日期（YYYYMMDD）
+		if a.Time > 0 {
+			a.Date = time.Unix(a.Time/1000, 0).Format("20060102")
+		}
+
+		// 解析 PDF 直链：优先用 AdjunctURL 直接拼接，
+		// 否则构造 detail 链接
+		// if a.AdjunctURL != "" && !strings.HasPrefix(a.AdjunctURL, "http") {
+		// 	a.PDFURL = "http://static.cninfo.com.cn/" + strings.TrimLeft(a.AdjunctURL, "/")
+		// } else {
+		// 	a.PDFURL = a.AdjunctURL
+		// }
+		a.PDFURL = resolvePDFURL(a)
+
+		if a.PDFURL == "" {
+			a.PDFURL = fmt.Sprintf("https://www.cninfo.com.cn/new/disclosure/detail?stockCode=%s&announcementId=%s&orgId=%s",
+				a.SecCode, a.ID, a.OrgID)
+		}
+		out = append(out, a)
+	}
+	return out, nil
+}
+
 // QueryAnnouncements queries CNINFO for announcements matching the request.
 func QueryAnnouncements(ctx context.Context, req *QueryRequest) (*QueryResponse, error) {
 	if req == nil {
@@ -279,6 +382,17 @@ func QueryAnnouncements(ctx context.Context, req *QueryRequest) (*QueryResponse,
 	}
 
 	return &qr, nil
+}
+
+// resolvePDFURL
+func resolvePDFURL(a *Announcement) string {
+	if a.AdjunctURL != "" && !strings.HasPrefix(a.AdjunctURL, "http") {
+		return pdfBaseURL + "/" + strings.TrimLeft(a.AdjunctURL, "/")
+	}
+	if a.AdjunctURL != "" {
+		return a.AdjunctURL
+	}
+	return fmt.Sprintf("%s?stockCode=%s&announcementId=%s&orgId=%s", detailURL, a.SecCode, a.ID, a.OrgID)
 }
 
 // PDFDownloadResult holds the result of downloading a PDF.
