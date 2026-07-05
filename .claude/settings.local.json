@@ -20,7 +20,21 @@
       "Bash(python3 *)",
       "Bash(go list *)",
       "Bash(staticcheck *)",
-      "Bash(go clean *)"
+      "Bash(go clean *)",
+      "WebFetch(domain:akshare.akfamily.xyz)",
+      "WebFetch(domain:www1.hkexnews.hk)",
+      "WebFetch(domain:www.hkex.com.hk)",
+      "WebFetch(domain:webapi.cninfo.com.cn)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:data.eastmoney.com)",
+      "WebFetch(domain:www.hkexnews.hk)",
+      "WebFetch(domain:tushare.pro)",
+      "WebFetch(domain:quote.eastmoney.com)",
+      "WebFetch(domain:www.bse.cn)",
+      "WebFetch(domain:push2.eastmoney.com)",
+      "Bash(/tmp/sec ipo *)",
+      "Bash(gofmt -w provider/eastmoney/ipo_test.go)",
+      "Bash(gofmt -l provider/eastmoney/)"
     ]
   }
 }
