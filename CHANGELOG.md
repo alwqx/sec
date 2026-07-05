@@ -1,5 +1,9 @@
 ## sec change log
 
+### v0.3.10
+
+1. 修复依赖报错 https://github.com/alwqx/sec/security/dependabot/3
+
 ### v0.3.9
 
 1. 新增 `sec ipo` 命令族：`ipo list`（新股上市列表）、`ipo calendar`（新股排期视图）、`ipo prospectus`（IPO 招股说明书 PDF 链接）
