@@ -6,6 +6,7 @@
 package ipo
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
@@ -44,6 +45,7 @@ func NewIPOCLI() *cobra.Command {
 		newListCmd(),
 		newCalendarCmd(),
 		newProspectusCmd(),
+		newDownloadCmd(),
 	)
 
 	return root
@@ -271,6 +273,44 @@ func newProspectusCmd() *cobra.Command {
 	return cmd
 }
 
+// resolveStock 将用户输入（代码或名称）解析为标准 A 股代码 + cninfo orgId + 证券简称。
+func resolveStock(ctx context.Context, input string) (code, orgID, name string, err error) {
+	secs := sina.Search(ctx, input)
+	sec := firstAShare(secs)
+	if sec != nil {
+		code = sec.Code
+		name = sec.Name
+		var resolvedName string
+		var lookupErr error
+		orgID, resolvedName, lookupErr = cninfo.LookupOrgID(ctx, code)
+		if lookupErr != nil {
+			err = fmt.Errorf("查找 %s 的公司身份失败: %w", code, lookupErr)
+			return
+		}
+		if orgID == "" {
+			err = fmt.Errorf("查找 %s 的公司身份为空", code)
+			return
+		}
+		if resolvedName != "" {
+			name = resolvedName
+		}
+		return
+	}
+
+	// sina 没搜到 A 股，尝试把用户输入当作 A 股代码
+	code = sanitizeCode(input)
+	if !isACode(code) {
+		err = fmt.Errorf("未找到 %s 对应的 A 股代码，请确认代码无误", input)
+		return
+	}
+	orgID, name, err = cninfo.LookupOrgID(ctx, code)
+	if err != nil || orgID == "" {
+		err = fmt.Errorf("查找 %s 的公司身份失败: %w", code, err)
+		return
+	}
+	return
+}
+
 func runProspectus(cmd *cobra.Command, args []string) error {
 	code := args[0]
 	size, _ := cmd.Flags().GetInt("size")
@@ -285,34 +325,9 @@ func runProspectus(cmd *cobra.Command, args []string) error {
 
 	ctx := cmd.Context()
 
-	// 1. 用户输入可能是简写（名称或代码），先用 sina 搜索做代码 + 市场匹配。
-	// sina 返回结果可能含港股/A 股同名项，cninfo 仅收录 A 股，因此优先选 A 股。
-	var stockCode, orgID, secName string
-	secs := sina.Search(ctx, code)
-	sec := firstAShare(secs)
-	if sec != nil {
-		stockCode = sec.Code
-		secName = sec.Name
-		resolvedOrgID, resolvedName, err := cninfo.LookupOrgID(ctx, stockCode)
-		if err != nil {
-			return fmt.Errorf("查找 %s 的公司身份失败: %w", stockCode, err)
-		}
-		orgID = resolvedOrgID
-		if resolvedName != "" {
-			secName = resolvedName
-		}
-	} else {
-		// sina 没搜到 A 股，尝试把用户输入当作 A 股代码
-		stockCode = sanitizeCode(code)
-		if !isACode(stockCode) {
-			return fmt.Errorf("未找到 %s 对应的 A 股代码，请确认代码无误", code)
-		}
-		resolvedOrgID, resolvedName, err := cninfo.LookupOrgID(ctx, stockCode)
-		if err != nil || resolvedOrgID == "" {
-			return fmt.Errorf("查找 %s 的公司身份失败: %w", stockCode, err)
-		}
-		orgID = resolvedOrgID
-		secName = resolvedName
+	stockCode, orgID, secName, err := resolveStock(ctx, code)
+	if err != nil {
+		return err
 	}
 
 	stockParam := fmt.Sprintf("%s,%s", stockCode, orgID)

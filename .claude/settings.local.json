@@ -34,7 +34,9 @@
       "WebFetch(domain:push2.eastmoney.com)",
       "Bash(/tmp/sec ipo *)",
       "Bash(gofmt -w provider/eastmoney/ipo_test.go)",
-      "Bash(gofmt -l provider/eastmoney/)"
+      "Bash(gofmt -l provider/eastmoney/)",
+      "Bash(go version *)",
+      "Bash(go env *)"
     ]
   }
 }
