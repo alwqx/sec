@@ -1,5 +1,12 @@
 ## sec change log
 
+### v0.3.11
+
+1. 新增 `sec ipo download` 命令：支持交互选择、批量下载、指定编号下载招股说明书 PDF
+2. 数据来源：巨潮资讯 cninfo（复用 `cninfo.QueryIPOs` + `cninfo.DownloadPDF`）
+3. 提取 `resolveStock` 公共函数，供 `prospectus` 和 `download` 命令共用
+4. 支持 `--all`（全部下载）、`--index`（指定编号）、`--force`（覆盖已有）、`--dry-run`（预览）、`-o`（输出目录）等参数
+
 ### v0.3.10
 
 1. 修复依赖报错 https://github.com/alwqx/sec/security/dependabot/3
