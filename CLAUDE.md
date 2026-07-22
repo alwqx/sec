@@ -61,6 +61,15 @@ Layered design, one package per concern:
 - **No Makefile / linter config committed** — formatting is standard `gofmt`; `staticcheck` is recommended but not enforced in CI.
 - **Data bugs** most often live in per-market string parsing (A vs HK vs US formats differ in `provider/sina/quote.go`).
 
+## Git Workflow
+
+提交代码到远端仓库时，必须通过「创建分支 → commit → 创建 PR」的流程，**禁止直接 push 到 main**。流程：
+
+1. 从 `main` 创建功能分支（如 `feat/xxx`、`fix/xxx`）
+2. 在分支上 commit 代码
+3. Push 分支到远端，通过 `gh pr create` 创建 PR
+4. 等待 review 后合入 main
+
 ## CHANGELOG
 
 每次创建 PR 时，必须将本次改动汇总到 `CHANGELOG.md` 中。格式遵循现有约定：以 `### vX.Y.Z` 版本标题开头，下接编号列表，用中文逐条描述变更（新功能、修复、重构等），与现有条目风格保持一致。
