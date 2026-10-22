@@ -8,6 +8,8 @@
 	<string>sec · 证券行情</string>
 	<key>CFBundleExecutable</key>
 	<string>sec-desktop</string>
+	<key>CFBundleIconFile</key>
+	<string>sec.icns</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.alwqx.sec.desktop</string>
 	<key>CFBundleVersion</key>

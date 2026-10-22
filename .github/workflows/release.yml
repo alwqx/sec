@@ -94,19 +94,24 @@ jobs:
           APP_BUNDLE="sec.app"
           DMG_NAME="sec-desktop-darwin-${ARCH}"
 
-          # 组装 .app bundle（可执行文件名须与 Info.plist 的 CFBundleExecutable 一致）。
-          mkdir -p "${APP_BUNDLE}/Contents/MacOS"
-          cp sec-desktop "${APP_BUNDLE}/Contents/MacOS/sec-desktop"
-
-          # 写入版本号到 Info.plist。
+          # 组装带应用图标的 .app bundle，并写入版本号。
           VERSION="$(git describe --tags --always | sed 's/^v//')"
-          sed "s|__VERSION__|${VERSION}|g" desktop/Info.plist > "${APP_BUNDLE}/Contents/Info.plist"
+          bash desktop/package-macos.sh sec-desktop "${APP_BUNDLE}" "${VERSION}"
 
           # 打包成 .dmg：内含 sec.app 与指向 /Applications 的软链。
           STAGING="$(mktemp -d)"
           cp -R "${APP_BUNDLE}" "${STAGING}/"
           ln -s /Applications "${STAGING}/Applications"
           hdiutil create -volname "sec" -srcfolder "${STAGING}" -ov -format UDZO "${DMG_NAME}.dmg"
+
+          # 校验实际发布的镜像及其中应用的签名，避免只校验打包前的目录。
+          hdiutil verify "${DMG_NAME}.dmg"
+          MOUNT_DIR="$(mktemp -d)"
+          trap 'hdiutil detach "$MOUNT_DIR" || true' EXIT
+          hdiutil attach "${DMG_NAME}.dmg" -mountpoint "$MOUNT_DIR" -readonly -nobrowse
+          codesign --verify --deep --strict --verbose=2 "${MOUNT_DIR}/sec.app"
+          hdiutil detach "$MOUNT_DIR"
+          trap - EXIT
 
           echo "DMG_NAME=${DMG_NAME}" >> "$GITHUB_ENV"
 
