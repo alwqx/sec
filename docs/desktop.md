@@ -97,11 +97,28 @@ cd desktop/ui && npm run build                     # 生产（生成 dist/）
 # 桌面端
 go run ./desktop -dev                        # 联调：WebView 加载 http://localhost:5173，server 固定 3001
 go build -o sec-desktop ./desktop            # 正式构建（需先 npm run build 生成 dist）
+
+# macOS：封装带图标的应用（在仓库根目录执行）
+bash desktop/package-macos.sh sec-desktop /tmp/sec.app 0.3.14
+open /tmp/sec.app
 ```
+
+应用图标源图为 `desktop/assets/sec-logo.png`，macOS 多尺寸图标为 `desktop/assets/sec.icns`（16–1024 像素，含 Retina）。打包脚本将其放入 `Contents/Resources/`，由 `Info.plist` 的 `CFBundleIconFile` 引用，供 Finder、Dock 和应用切换器显示。直接运行 `go run ./desktop` 或裸二进制不会使用 bundle 图标；本地查看图标请启动打包后的 `.app`。
 
 ### 发布（macOS）
 
-`.github/workflows/release.yml` 的 `build-macos-desktop` job 在 `macos-latest`（Apple Silicon，arm64）上：构建前端 → `go build ./desktop` → 组装 `sec.app`（元数据见 `desktop/Info.plist`）→ `hdiutil` 打包成 `sec-desktop-darwin-arm64.dmg` 并上传到 Release。安装包未签名/未公证，首次打开需右键「打开」绕过 Gatekeeper。
+`.github/workflows/release.yml` 的 `build-macos-desktop` job 在 `macos-latest`（Apple Silicon，arm64）上：构建前端 → `go build ./desktop` → 组装 `sec.app`（元数据见 `desktop/Info.plist`）→ 对完整应用执行 ad-hoc 签名与严格校验 → `hdiutil` 打包成 `sec-desktop-darwin-arm64.dmg` → 校验并挂载镜像验证内部应用签名 → 上传到 Release。所有资源和元数据必须在签名前写入，避免裸二进制的链接器签名与应用包不匹配。
+
+ad-hoc 签名只保证签名完整性，不提供开发者身份，也不等同于 Apple 公证。当前安装包没有 Developer ID 签名与公证，下载后仍可能被 Gatekeeper 拦截；确认来源可信后，可按系统提示在「系统设置 → 隐私与安全性」中选择「仍要打开」。不能保证所有 macOS 版本均允许手动放行。面向普通用户免拦截分发需要 Developer ID Application 证书签名并完成 Apple 公证。
+
+若旧版提示「已损坏」，可先诊断签名：
+
+```bash
+codesign --verify --deep --strict --verbose=2 /Applications/sec.app
+spctl --assess --type execute --verbose=4 /Applications/sec.app
+```
+
+第一条失败说明签名完整性有问题，应更换重新构建的安装包；第一条通过而第二条拒绝，则需要继续检查 Gatekeeper 的信任与公证信息。
 
 ## 已知问题与风险
 
@@ -110,7 +127,7 @@ go build -o sec-desktop ./desktop            # 正式构建（需先 npm run bui
 - **webview_go 上游**：维护不活跃；当前用 upstream module，若 macOS 新版本出现兼容问题，改 vendor Ollama 的 fork。
 - **编辑快捷键失效**：上游 webview 的 Cocoa 后端只设置了 app 激活策略，没有创建 `NSMenu`/`setMainMenu:`，导致 `Cmd+A`（全选）、`Cmd+C/V/X`（复制/粘贴/剪切）等编辑快捷键在 WKWebView 里不生效。当前对搜索框的 `Cmd/Ctrl+A` 在 `SearchBar` 里用 `onKeyDown` + `select()` 做了前端兜底；复制粘贴等其余快捷键留待 vendor Ollama fork（其已内置 Edit 菜单）时一并修复。
 - **前端未构建**：`go build ./desktop` 前若未执行 `npm run build`，只会内嵌占位 `placeholder.txt`，运行时提示先构建前端。Vite 每次构建前清空 `dist/`，避免旧的 hash 产物残留；占位文件在配置加载时读取，再随构建重新输出，保持入库文件不变。
-- **macOS 安装包未签名/未公证**：release 打出的 `.dmg` 未做 Developer ID 签名与 notarization，用户首次打开会被 Gatekeeper 拦截，需右键「打开」；正式分发需补签名 + 公证。
+- **macOS 安装包未做 Developer ID 签名/公证**：当前仅对完整 `.app` 做 ad-hoc 签名与完整性校验，不保证通过 Gatekeeper；正式分发需补 Developer ID 签名与 Apple 公证。
 - **仅 Apple Silicon（arm64）**：release 当前只在 `macos-latest`（arm64）构建，未出 Intel（x86_64）与通用二进制包。`macos-13` 已退役，Intel 需 `macos-15-intel` 等 large runner，或交叉编译 + `lipo` 合通用包。
 
 ## 分阶段计划

@@ -1,5 +1,14 @@
 ## sec change log
 
+### v0.3.14
+
+1. 新增 sec Desktop 应用 logo 与 macOS 多尺寸 `.icns` 图标，配置应用 bundle 图标资源
+2. 新增 `desktop/package-macos.sh`，统一本地与 Release 的 `.app` 打包流程，将图标集成到 macOS 安装包
+3. 更新桌面版构建文档，补充本地打包、启动和应用图标说明
+4. 修复 macOS 桌面版组装 `.app` 后未重新签署应用包的问题，打包完成后执行 ad-hoc 签名与严格完整性校验
+5. Release 新增 DMG 完整性校验，并挂载最终镜像验证内部应用签名，校验失败时阻止上传
+6. 修正 macOS 安装说明，区分签名完整性与 Developer ID 签名、公证及 Gatekeeper 信任
+
 ### v0.3.13
 
 1. 新增桌面版（Desktop）MVP：参考 Ollama Desktop 架构，Go + 系统 WebView（webview_go）+ React 前端，本地 HTTP JSON API 复用 `provider/` 数据层
