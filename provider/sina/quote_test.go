@@ -153,3 +153,31 @@ var hq_str_gb_amd="AMD,144.5500,4.44,2025-07-10 22:55:35,6.1400,143.0000,145.820
 	require.EqualValues(t, "$AMD", res4[2].ExCode)
 	require.EqualValues(t, "AMD", res4[2].Name)
 }
+
+// TestQuerySecQuoteUSCode 美股 ExCode 为 $AMD，行情 key 应归一化为 gb_amd，
+// 否则新浪返回空行情，parseSecQuoteOfMstock 会越界 panic。
+func TestQuerySecQuoteUSCode(t *testing.T) {
+	defer gock.Off()
+	ctx := context.TODO()
+
+	body := `var hq_str_gb_amd="AMD,144.5500,4.44,2025-07-10 22:55:35,6.1400,143.0000,145.8200,141.8500,187.1100,76.4800,32285637,47105949,234373976387,1.37,105.510000,0.00,0.00,0.00,0.00,1621404195,73,0.0000,0.00,0.00,,Jul 10 10:55AM EDT,138.4100,0,1,2025,4641781226.0000,0.0000,0.0000,0.0000,0.0000,138.4100";`
+	gock.New("https://hq.sinajs.cn").Get("/list=gb_amd").
+		Reply(200).BodyString(body).
+		Header.Add("content-type", "application/javascript; charset=gbk")
+
+	q, err := QuerySecQuote(ctx, "$AMD")
+	require.Nil(t, err)
+	require.NotNil(t, q)
+	require.Equal(t, "$AMD", q.ExCode)
+	require.Equal(t, "AMD", q.Name)
+	require.True(t, gock.IsDone())
+}
+
+// TestParseSecQuoteInvalidLine 空/畸形行情行应返回错误而非越界 panic。
+func TestParseSecQuoteInvalidLine(t *testing.T) {
+	for _, exCode := range []string{"SH600036", "HK00700", "$AMD"} {
+		q, err := parseSecQuote(exCode, `""`)
+		require.NotNil(t, err, exCode)
+		require.Nil(t, q, exCode)
+	}
+}
