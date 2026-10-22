@@ -36,7 +36,12 @@
       "Bash(gofmt -w provider/eastmoney/ipo_test.go)",
       "Bash(gofmt -l provider/eastmoney/)",
       "Bash(go version *)",
-      "Bash(go env *)"
+      "Bash(go env *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(git checkout *)",
+      "Bash(gh pr *)"
     ]
   }
 }

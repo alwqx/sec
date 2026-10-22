@@ -1,5 +1,9 @@
 ## sec change log
 
+### v0.3.12
+
+1. 新增 AGENT.md
+
 ### v0.3.11
 
 1. 新增 `sec ipo download` 命令：支持交互选择、批量下载、指定编号下载招股说明书 PDF
