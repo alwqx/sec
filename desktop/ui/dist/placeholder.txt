@@ -1,0 +1,3 @@
+此目录存放前端构建产物（index.html、assets/），由 npm run build 生成。
+
+placeholder.txt 作为占位文件入库，保证 go:embed ui/dist 在尚未构建前端时也能编译通过。

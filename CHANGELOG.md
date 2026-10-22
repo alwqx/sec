@@ -1,5 +1,15 @@
 ## sec change log
 
+### v0.3.13
+
+1. 新增桌面版（Desktop）MVP：参考 Ollama Desktop 架构，Go + 系统 WebView（webview_go）+ React 前端，本地 HTTP JSON API 复用 `provider/` 数据层
+2. 支持证券搜索（`/api/v1/search`）与实时行情（`/api/v1/quote`），前端每 5 秒轮询刷新
+3. 新增 `docs/desktop.md` 设计文档：记录架构、目录结构、API、构建与分阶段计划
+4. `provider/sina` 的 `BasicSecurity`、`SecurityQuote` 补充 JSON tag，供桌面 API 序列化
+5. 修复 `QuerySecQuote` 美股行情 key 归一化（`$`→`gb_`），并给 A/H/美股行情解析加长度守卫，避免选中美股搜索结果（如「美团」ADR）时越界 panic
+6. GitHub Release workflow 新增 macOS 桌面端安装包：构建前端 + 桌面二进制，封装为 `.app` 并打包成 `.dmg` 上传到 Release（新增 `desktop/Info.plist`）
+7. 修正 Release workflow 中 CLI 构建的 Go 版本 1.22 → 1.25，与 `go.mod` 对齐
+
 ### v0.3.12
 
 1. 新增 AGENT.md

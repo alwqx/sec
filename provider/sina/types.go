@@ -4,11 +4,11 @@ import "github.com/alwqx/sec/types"
 
 // BasicSecurity 基本证券信息
 type BasicSecurity struct {
-	Name         string             // 证券名称
-	SecurityType types.SecurityType // 证券类型：股票 stock，基金 fund
-	Code         string             // 证券代码
-	ExCode       string             // 证券带交易所编码 SH600036
-	ExChange     string             // 交易所
+	Name         string             `json:"name"`          // 证券名称
+	SecurityType types.SecurityType `json:"security_type"` // 证券类型：股票 stock，基金 fund
+	Code         string             `json:"code"`          // 证券代码
+	ExCode       string             `json:"ex_code"`       // 证券带交易所编码 SH600036
+	ExChange     string             `json:"exchange"`      // 交易所
 }
 
 // BasicCorp 公司基本信息
@@ -48,18 +48,18 @@ type CorpProfile struct {
 
 // SecurityQuote 证券行情
 type SecurityQuote struct {
-	TradeDate string // 交易日期 "2023-06-02"
-	Code      string
-	ExCode    string
-	Name      string
-	Current   float64 // 当前价格
-	Open      float64
-	YClose    float64 // 上个交易日收盘价
-	High      float64
-	Low       float64
-	Volume    float64 // 成交金额 单位：元
-	TurnOver  int64   // 成交数量 单位：股
-	Time      string  // 交易日期 "2023-06-02"
+	TradeDate string  `json:"trade_date"` // 交易日期 "2023-06-02"
+	Code      string  `json:"code"`
+	ExCode    string  `json:"ex_code"`
+	Name      string  `json:"name"`
+	Current   float64 `json:"current"`  // 当前价格
+	Open      float64 `json:"open"`     // 开盘价
+	YClose    float64 `json:"yclose"`   // 上个交易日收盘价
+	High      float64 `json:"high"`     // 最高价
+	Low       float64 `json:"low"`      // 最低价
+	Volume    float64 `json:"volume"`   // 成交金额 单位：元
+	TurnOver  int64   `json:"turnover"` // 成交数量 单位：股
+	Time      string  `json:"time"`     // 交易日期 "2023-06-02"
 }
 
 // 分红送转信息

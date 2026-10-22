@@ -103,10 +103,13 @@ func formatQuoteKeys(keys []string) []string {
 }
 
 // QuerySecQuote 查询证券行情
-// exCode SH600036 HK00700
+// exCode SH600036 HK00700 $AMD
 func QuerySecQuote(ctx context.Context, exCode string) (*SecurityQuote, error) {
-	lowerKey := strings.ToLower(exCode)
-	reqUrl := fmt.Sprintf("https://hq.sinajs.cn/list=%s", lowerKey)
+	// 复用 formatQuoteKeys 做行情 key 归一化：
+	// 美股 $AMD -> gb_amd，港股 HK00700 -> hk00700，A 股 SH600036 -> sh600036。
+	// 直接 strings.ToLower 会把 $ 前缀漏掉，导致新浪返回空行情。
+	key := formatQuoteKeys([]string{exCode})[0]
+	reqUrl := fmt.Sprintf("https://hq.sinajs.cn/list=%s", key)
 	resp, err := utils.MakeRequest(ctx, http.MethodGet, reqUrl, defaultHTTPHeaders(), nil, 0)
 	if err != nil {
 		return nil, err
@@ -164,6 +167,9 @@ func parseSecQuoteOfAstock(quoteLine string) (*SecurityQuote, error) {
 	newQuote := strings.TrimPrefix(quoteLine, "\"")
 	newQuote = strings.TrimSuffix(newQuote, "\"")
 	items := strings.Split(newQuote, ",")
+	if len(items) < 32 {
+		return nil, fmt.Errorf("invalid A stock quote line: %q", quoteLine)
+	}
 	res := new(SecurityQuote)
 	res.Name = strings.TrimSpace(items[0])
 	slog.Debug("parseSecQuoteOfAstock", "quote line", quoteLine, "items", items)
@@ -218,6 +224,9 @@ func parseSecQuoteOfHstock(quoteLine string) (*SecurityQuote, error) {
 	newQuote := strings.TrimPrefix(quoteLine, "\"")
 	newQuote = strings.TrimSuffix(newQuote, "\"")
 	items := strings.Split(newQuote, ",")
+	if len(items) < 19 {
+		return nil, fmt.Errorf("invalid HK stock quote line: %q", quoteLine)
+	}
 	res := new(SecurityQuote)
 	res.Name = strings.TrimSpace(items[1])
 	slog.Debug("parseSecQuote quote string", "quoteLine", quoteLine, "items", newQuote)
@@ -272,6 +281,9 @@ func parseSecQuoteOfMstock(quoteLine string) (*SecurityQuote, error) {
 	newQuote := strings.TrimPrefix(quoteLine, "\"")
 	newQuote = strings.TrimSuffix(newQuote, "\"")
 	items := strings.Split(newQuote, ",")
+	if len(items) < 36 {
+		return nil, fmt.Errorf("invalid US stock quote line: %q", quoteLine)
+	}
 	res := new(SecurityQuote)
 	res.Name = strings.TrimSpace(items[0])
 	slog.Debug("parseSecQuoteOfMstock quote string", "quoteLine", quoteLine, "items", newQuote)
@@ -314,6 +326,9 @@ func parseSecQuoteOfMstock(quoteLine string) (*SecurityQuote, error) {
 	}
 
 	tks := strings.Split(strings.TrimSpace(items[3]), " ")
+	if len(tks) < 2 {
+		return nil, fmt.Errorf("invalid US stock quote date: %q", quoteLine)
+	}
 	res.TradeDate = tks[0]
 	res.Time = tks[1]
 

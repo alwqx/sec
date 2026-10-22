@@ -35,9 +35,82 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }} # 一个默认的变量，用来实现往 Release 中添加文件
           goos: ${{ matrix.goos }}
           goarch: ${{ matrix.goarch }}
-          goversion: 1.22 # 可以指定编译使用的 Golang 版本
+          goversion: 1.25 # 可以指定编译使用的 Golang 版本
           binary_name: "sec" # 可以指定二进制文件的名称
           extra_files: README.md # 需要包含的额外文件
           project_path: "./"
           build_flags: -v
           ldflags: -X "github.com/alwqx/sec/version.Version=${{ env.SEC_VERSION }}" -X "github.com/alwqx/sec/version.BuildTime=${{ env.SEC_BUILD_TIME }}" -X github.com/alwqx/sec/version.GitCommit=${{ env.SEC_SHORT_SHA }}
+
+  # macOS 桌面版：构建前端 → 编译桌面二进制 → 封装 .app → 打包 .dmg 上传。
+  # 当前只在 macos-latest（Apple Silicon，arm64）上构建；Intel/通用二进制留待后续。
+  build-macos-desktop:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: desktop/ui/package-lock.json
+
+      - name: Build frontend
+        working-directory: desktop/ui
+        run: npm ci && npm run build
+
+      - name: Set build metadata
+        run: |
+          {
+            echo "SEC_VERSION=$(git describe --tags --always)"
+            echo "SEC_SHORT_SHA=$(git rev-parse --short HEAD)"
+            echo "SEC_BUILD_TIME=$(git log -1 --format=%cd --date=format:%Y%m%d)"
+          } >> "$GITHUB_ENV"
+
+      - name: Build desktop binary
+        run: |
+          CGO_ENABLED=1 go build -o sec-desktop \
+            -ldflags '-X "github.com/alwqx/sec/version.Version=${{ env.SEC_VERSION }}" -X "github.com/alwqx/sec/version.BuildTime=${{ env.SEC_BUILD_TIME }}" -X "github.com/alwqx/sec/version.GitCommit=${{ env.SEC_SHORT_SHA }}"' \
+            ./desktop
+
+      - name: Package macOS app (.app → .dmg)
+        run: |
+          set -euo pipefail
+
+          # 架构归一化：macos-latest 为 arm64，未来若支持 Intel 则映射为 amd64。
+          ARCH="$(uname -m)"
+          case "$ARCH" in
+            x86_64) ARCH="amd64" ;;
+            arm64)  ARCH="arm64" ;;
+          esac
+
+          APP_BUNDLE="sec.app"
+          DMG_NAME="sec-desktop-darwin-${ARCH}"
+
+          # 组装 .app bundle（可执行文件名须与 Info.plist 的 CFBundleExecutable 一致）。
+          mkdir -p "${APP_BUNDLE}/Contents/MacOS"
+          cp sec-desktop "${APP_BUNDLE}/Contents/MacOS/sec-desktop"
+
+          # 写入版本号到 Info.plist。
+          VERSION="$(git describe --tags --always | sed 's/^v//')"
+          sed "s|__VERSION__|${VERSION}|g" desktop/Info.plist > "${APP_BUNDLE}/Contents/Info.plist"
+
+          # 打包成 .dmg：内含 sec.app 与指向 /Applications 的软链。
+          STAGING="$(mktemp -d)"
+          cp -R "${APP_BUNDLE}" "${STAGING}/"
+          ln -s /Applications "${STAGING}/Applications"
+          hdiutil create -volname "sec" -srcfolder "${STAGING}" -ov -format UDZO "${DMG_NAME}.dmg"
+
+          echo "DMG_NAME=${DMG_NAME}" >> "$GITHUB_ENV"
+
+      - name: Upload release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" "${DMG_NAME}.dmg" --clobber
