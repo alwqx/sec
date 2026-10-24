@@ -10,6 +10,7 @@
 6. 修复新浪未声明 GBK 编码的响应被清空，兼容 UTF-8 页面
 7. README 新增 Desktop WebView 编译警告待办，记录新版 Clang 警告原因、临时隐藏命令与依赖修复方向
 8. 将本地页面布局参考与工作产物目录 `/work/` 加入 Git 忽略规则
+9. macOS Desktop Release 安装包文件名复用构建版本 `SEC_VERSION`，例如 `sec-v0.3.14-desktop-darwin-arm64.dmg`，打包、校验与上传统一使用带版本的文件名
 
 ### v0.3.14
 

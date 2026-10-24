@@ -92,10 +92,10 @@ jobs:
           esac
 
           APP_BUNDLE="sec.app"
-          DMG_NAME="sec-desktop-darwin-${ARCH}"
+          DMG_NAME="sec-${SEC_VERSION}-desktop-darwin-${ARCH}"
 
           # 组装带应用图标的 .app bundle，并写入版本号。
-          VERSION="$(git describe --tags --always | sed 's/^v//')"
+          VERSION="${SEC_VERSION#v}"
           bash desktop/package-macos.sh sec-desktop "${APP_BUNDLE}" "${VERSION}"
 
           # 打包成 .dmg：内含 sec.app 与指向 /Applications 的软链。

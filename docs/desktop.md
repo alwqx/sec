@@ -139,7 +139,7 @@ open /tmp/sec.app
 
 ### 发布（macOS）
 
-`.github/workflows/release.yml` 的 `build-macos-desktop` job 在 `macos-latest`（Apple Silicon，arm64）上：构建前端 → `go build ./desktop` → 组装 `sec.app`（元数据见 `desktop/Info.plist`）→ 对完整应用执行 ad-hoc 签名与严格校验 → `hdiutil` 打包成 `sec-desktop-darwin-arm64.dmg` → 校验并挂载镜像验证内部应用签名 → 上传到 Release。所有资源和元数据必须在签名前写入，避免裸二进制的链接器签名与应用包不匹配。
+`.github/workflows/release.yml` 的 `build-macos-desktop` job 在 `macos-latest`（Apple Silicon，arm64）上：构建前端 → `go build ./desktop` → 组装 `sec.app`（元数据见 `desktop/Info.plist`）→ 对完整应用执行 ad-hoc 签名与严格校验 → `hdiutil` 打包成 `sec-<SEC_VERSION>-desktop-darwin-arm64.dmg`（例如 `sec-v0.3.14-desktop-darwin-arm64.dmg`）→ 校验并挂载镜像验证内部应用签名 → 上传到 Release。文件名中的版本复用构建元数据 `SEC_VERSION`（由 `git describe --tags --always` 生成），与二进制版本保持一致，打包、校验与上传使用同一文件名。所有资源和元数据必须在签名前写入，避免裸二进制的链接器签名与应用包不匹配。
 
 ad-hoc 签名只保证签名完整性，不提供开发者身份，也不等同于 Apple 公证。当前安装包没有 Developer ID 签名与公证，下载后仍可能被 Gatekeeper 拦截；确认来源可信后，可按系统提示在「系统设置 → 隐私与安全性」中选择「仍要打开」。不能保证所有 macOS 版本均允许手动放行。面向普通用户免拦截分发需要 Developer ID Application 证书签名并完成 Apple 公证。
 
