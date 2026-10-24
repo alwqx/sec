@@ -1,4 +1,4 @@
-import type { BasicSecurity, SecurityQuote, Company, Dividend, WorkspaceState, PageResult, IPOListing, Announcement, FinancialReport, MetalData } from './types'
+import type { BasicSecurity, SecurityQuote, Company, Dividend, WorkspaceState, PageResult, IPOListing, Announcement, FinancialReport, MetalData, HistoryQuote } from './types'
 
 async function request<T>(path: string, signal?: AbortSignal, options?: RequestInit): Promise<T> {
   const resp = await fetch(path, { ...options, signal })
@@ -55,8 +55,8 @@ export function financials(code: string, report: string, period: string, signal?
   return request(`/api/v1/financials?${new URLSearchParams({ code, report, period })}`, signal)
 }
 
-export async function history(code: string, signal?: AbortSignal): Promise<{ date: string; close: number }[]> {
-  const data = await request<{ results: { date: string; close: number }[] }>(`/api/v1/history?code=${encodeURIComponent(code)}`, signal)
+export async function history(code: string, signal?: AbortSignal): Promise<HistoryQuote[]> {
+  const data = await request<{ results: HistoryQuote[] }>(`/api/v1/history?code=${encodeURIComponent(code)}`, signal)
   return data.results
 }
 

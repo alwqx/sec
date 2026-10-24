@@ -97,3 +97,13 @@ export interface MetalData {
   latest: MetalQuote | null
   results: MetalQuote[]
 }
+
+export interface HistoryQuote {
+  date: string
+  open: number
+  close: number
+  high: number
+  low: number
+  volume?: number // 股/份；沪深成交量已由 provider 从手转换
+  turnover?: number // 成交额，币种与价格一致
+}

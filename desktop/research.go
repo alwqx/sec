@@ -199,7 +199,11 @@ func (s *desktopServer) handleHistory(w http.ResponseWriter, r *http.Request) {
 	results := make([]map[string]any, 0, len(items))
 	for _, item := range items {
 		if item != nil {
-			results = append(results, map[string]any{"date": item.Date.Format("2006-01-02"), "close": item.Close})
+			results = append(results, map[string]any{
+				"date": item.Date.Format("2006-01-02"), "open": item.Open, "close": item.Close,
+				"high": item.High, "low": item.Low,
+				"volume": item.Volume, "turnover": item.TurnOver,
+			})
 		}
 	}
 	writeJSON(w, map[string]any{"results": results})
