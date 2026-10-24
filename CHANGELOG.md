@@ -7,6 +7,8 @@
 3. 新增黄金行情 API 与日期校验，保留区间外昨收基准，未知涨跌显示缺失值；黄金 K 线支持开高低收查看、键盘选择和长区间横向滚动
 4. 修复黄金 K 线长区间滚动后价格刻度不可见的问题，将价格轴固定在滚动区域外，并同步调整鼠标与键盘选择坐标
 5. 「自选与行情」中的证券历史改用日 K 线蜡烛图，历史接口补充开高低收、成交量与成交额，增加成交量副图和逐日量额信息，复用黄金的固定价格轴与交互，保留沪深/港股与不复权口径
+6. Add Desktop Treasury yields with the latest 11-tenor curve, selectable historical trends, date filters, daily basis-point changes, and paginated records
+7. Preserve missing Treasury yields as null values, retain cross-year comparison baselines, and reject incomplete annual responses instead of displaying partial history
 
 ### v0.3.15
 

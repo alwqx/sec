@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -21,8 +22,9 @@ var (
 
 // BondYieldItem 单日国债收益率数据
 type BondYieldItem struct {
-	Date     string
-	DateTime time.Time
+	Date          string
+	DateTime      time.Time
+	MissingTenors map[string]bool // 缺失的期限键，区分真实 0% 与上游空值
 
 	BC1Month float64 // 1个月
 	BC3Month float64 // 3个月
@@ -58,23 +60,37 @@ type atomContent struct {
 
 // treasuryProperties 内层 m:properties 结构，包含全部期限收益率
 type treasuryProperties struct {
-	XMLName         xml.Name `xml:"properties"`
-	NewDate         string   `xml:"NEW_DATE"`
-	BC1Month        float64  `xml:"BC_1MONTH"`
-	BC1_5Month      float64  `xml:"BC_1_5MONTH"`
-	BC2Month        float64  `xml:"BC_2MONTH"`
-	BC3Month        float64  `xml:"BC_3MONTH"`
-	BC4Month        float64  `xml:"BC_4MONTH"`
-	BC6Month        float64  `xml:"BC_6MONTH"`
-	BC1Year         float64  `xml:"BC_1YEAR"`
-	BC2Year         float64  `xml:"BC_2YEAR"`
-	BC3Year         float64  `xml:"BC_3YEAR"`
-	BC5Year         float64  `xml:"BC_5YEAR"`
-	BC7Year         float64  `xml:"BC_7YEAR"`
-	BC10Year        float64  `xml:"BC_10YEAR"`
-	BC20Year        float64  `xml:"BC_20YEAR"`
-	BC30Year        float64  `xml:"BC_30YEAR"`
-	BC30YearDisplay float64  `xml:"BC_30YEARDISPLAY"`
+	XMLName         xml.Name      `xml:"properties"`
+	NewDate         string        `xml:"NEW_DATE"`
+	BC1Month        nullableYield `xml:"BC_1MONTH"`
+	BC1_5Month      float64       `xml:"BC_1_5MONTH"`
+	BC2Month        float64       `xml:"BC_2MONTH"`
+	BC3Month        nullableYield `xml:"BC_3MONTH"`
+	BC4Month        float64       `xml:"BC_4MONTH"`
+	BC6Month        nullableYield `xml:"BC_6MONTH"`
+	BC1Year         nullableYield `xml:"BC_1YEAR"`
+	BC2Year         nullableYield `xml:"BC_2YEAR"`
+	BC3Year         nullableYield `xml:"BC_3YEAR"`
+	BC5Year         nullableYield `xml:"BC_5YEAR"`
+	BC7Year         nullableYield `xml:"BC_7YEAR"`
+	BC10Year        nullableYield `xml:"BC_10YEAR"`
+	BC20Year        nullableYield `xml:"BC_20YEAR"`
+	BC30Year        nullableYield `xml:"BC_30YEAR"`
+	BC30YearDisplay float64       `xml:"BC_30YEARDISPLAY"`
+}
+
+// nullableYield 保留空值状态，避免把未公布的期限收益率误报为 0%。
+type nullableYield struct {
+	Null string `xml:"null,attr"`
+	Text string `xml:",chardata"`
+}
+
+func (v nullableYield) number() (float64, bool) {
+	if v.Null == "true" || strings.TrimSpace(v.Text) == "" {
+		return 0, false
+	}
+	value, err := strconv.ParseFloat(strings.TrimSpace(v.Text), 64)
+	return value, err == nil
 }
 
 // QueryBondReq 请求结构体
@@ -206,22 +222,63 @@ func parseAtomFeed(data []byte) ([]*BondYieldItem, error) {
 			continue
 		}
 
-		items = append(items, &BondYieldItem{
-			Date:     dateStr,
-			DateTime: dateTime,
-
-			BC1Month: props.BC1Month,
-			BC3Month: props.BC3Month,
-			BC6Month: props.BC6Month,
-			BC1Year:  props.BC1Year,
-			BC2Year:  props.BC2Year,
-			BC3Year:  props.BC3Year,
-			BC5Year:  props.BC5Year,
-			BC7Year:  props.BC7Year,
-			BC10Year: props.BC10Year,
-			BC20Year: props.BC20Year,
-			BC30Year: props.BC30Year,
-		})
+		item := &BondYieldItem{Date: dateStr, DateTime: dateTime, MissingTenors: map[string]bool{}}
+		if value, ok := props.BC1Month.number(); ok {
+			item.BC1Month = value
+		} else {
+			item.MissingTenors["1m"] = true
+		}
+		if value, ok := props.BC3Month.number(); ok {
+			item.BC3Month = value
+		} else {
+			item.MissingTenors["3m"] = true
+		}
+		if value, ok := props.BC6Month.number(); ok {
+			item.BC6Month = value
+		} else {
+			item.MissingTenors["6m"] = true
+		}
+		if value, ok := props.BC1Year.number(); ok {
+			item.BC1Year = value
+		} else {
+			item.MissingTenors["1y"] = true
+		}
+		if value, ok := props.BC2Year.number(); ok {
+			item.BC2Year = value
+		} else {
+			item.MissingTenors["2y"] = true
+		}
+		if value, ok := props.BC3Year.number(); ok {
+			item.BC3Year = value
+		} else {
+			item.MissingTenors["3y"] = true
+		}
+		if value, ok := props.BC5Year.number(); ok {
+			item.BC5Year = value
+		} else {
+			item.MissingTenors["5y"] = true
+		}
+		if value, ok := props.BC7Year.number(); ok {
+			item.BC7Year = value
+		} else {
+			item.MissingTenors["7y"] = true
+		}
+		if value, ok := props.BC10Year.number(); ok {
+			item.BC10Year = value
+		} else {
+			item.MissingTenors["10y"] = true
+		}
+		if value, ok := props.BC20Year.number(); ok {
+			item.BC20Year = value
+		} else {
+			item.MissingTenors["20y"] = true
+		}
+		if value, ok := props.BC30Year.number(); ok {
+			item.BC30Year = value
+		} else {
+			item.MissingTenors["30y"] = true
+		}
+		items = append(items, item)
 	}
 
 	// 去重（按日期）

@@ -107,3 +107,18 @@ export interface HistoryQuote {
   volume?: number // 股/份；沪深成交量已由 provider 从手转换
   turnover?: number // 成交额，币种与价格一致
 }
+
+export interface BondDay {
+  date: string
+  yields: Record<string, number | null>
+  previous_10y: number | null
+  change_bp: number | null
+}
+
+export interface BondData {
+  begin: string
+  end: string
+  latest: BondDay | null
+  results: BondDay[]
+  tenors: { key: string; label: string; months: number }[]
+}
