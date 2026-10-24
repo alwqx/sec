@@ -24,7 +24,7 @@ Ollama 桌面版**不是 Electron**，而是「纯 Go 外壳 + 系统 WebView + 
 - **外壳**：Go + 系统 WebView。本实现直接依赖上游 `github.com/webview/webview_go` module（自包含、MIT、与 Ollama vendored 的 fork 同源、API 一致），不 vendor 源码。若后续 macOS 兼容性出问题，可改 vendor Ollama 维护的 fork。
 - **后端**：本地 HTTP JSON API，直接复用 `provider/` 层（其函数已返回类型化 struct，天然可 JSON 序列化，无需复用 `cmd/` 里面向终端的 table 渲染）。
 - **前端**：React + TypeScript + Vite；MVP 用手写 CSS，不引入 Tailwind，降低构建复杂度。
-- **持久化**：MVP 不引入；Phase 2 用 SQLite 存自选股/设置。
+- **持久化**：工作台首版采用 JSON 原子替换，将自选股/设置保存到 `~/.sec/desktop/workspace.json`；后续需要多组合与历史查询时再迁移 SQLite。
 - **平台**：macOS 优先；Windows 打包放 Phase 3。
 
 ## 架构
@@ -81,11 +81,43 @@ CLI 的根 `main.go` 保持不变；桌面版是独立二进制：`go build ./de
 - `/api/*` 校验 cookie 与 token 一致，否则返回 403，防止本机其他程序（如网页）跨站调用。
 - dev 模式跳过鉴权并打开 CORS，便于前端连 Vite dev server。
 
+## 研究工作台
+
+### 页面与导航
+
+- 顶部全局证券搜索，支持名称、代码与拼音；搜索保留当前研究证券，查询结果显示在中间列表。
+- 左侧全局导航：自选与行情、IPO 日历、公告中心、设置。
+- 自选与行情：中间切换「我的自选 / 搜索结果」，右侧围绕选中证券展示「概览 / 公司 / 财报 / 分红 / 公告」。切换全局页面保留当前证券与个股栏目。
+- 概览：实时行情、近 60 个交易日不复权收盘价走势。仅概览页按偏好轮询行情，其他页面不轮询；历史走势按进入概览时加载。切换证券与页面取消旧请求。
+- 公司、财报、分红、个股公告：暂仅支持沪深北 A 股；财报支持资产负债表、利润表、现金流量表与报告期筛选，金额单位亿元，每股收益元/股。历史走势图支持沪深证券与港股，其余市场保留实时行情。
+- IPO 日历：东方财富新股列表，按当前页上市日期分组或表格展示，支持分页和进入个股研究。上游列表没有申购日期，界面不推算或填充申购排期。
+- 公告中心：巨潮资讯最新披露 / 当前 A 股证券，可按关键字查询并分页。仅展示有效公告；标题按纯文本呈现，原文链接只允许巨潮资讯域名。桌面通过 Go 绑定在系统浏览器打开原文；开发浏览器直接打开新标签，并提供复制链接。
+- 设置：行情刷新间隔 5/15/30/60 秒，深色、浅色和跟随系统外观。窄窗口将导航横排、证券列表与详情上下排列；个股栏目支持方向键、Home、End 切换。
+
+### 自选与设置持久化
+
+自选通过「加入自选 / 已加入自选」按钮增删，最多保存 500 只。设置点击保存后生效。Go 服务将完整状态写入 `~/.sec/desktop/workspace.json`，使用同目录临时文件、同步写入与原子替换；数据损坏时返回错误并阻止界面覆盖，提供重新加载入口。
+
+文件不依赖 WebView 的随机端口，因此重启后能恢复自选和偏好。与 CLI 的 `~/.sec/watchlist.json` 独立，不自动导入或覆盖 CLI 自选。首版采用 JSON，以便直接复用现有工程依赖；SQLite、多组合与跨进程同步留待后续扩展。当前研究证券、筛选条件与菜单仅在本次运行中保留。
+
+### 新增 API
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/v1/workspace` | 本地自选与设置；无文件时返回默认值 |
+| PUT | `/api/v1/workspace` | 保存完整状态，要求 JSON、有效参数及生产同源请求 |
+| GET | `/api/v1/company?code=SH600036` | 公司资料 |
+| GET | `/api/v1/dividends?code=SH600036` | 分红记录，按每 10 股展示税前派息/送转 |
+| GET | `/api/v1/financials?code=SH600036&report=balance&period=annual` | 财报；report 为 balance/income/cashflow，period 可省略或 annual/halfyear/q1/q3 |
+| GET | `/api/v1/history?code=SH600036` | 最近 60 个交易日历史收盘价，沪深/港股 |
+| GET | `/api/v1/ipo?page=1` | 每页 30 条新股，返回 total 与 has_more |
+| GET | `/api/v1/announcements?page=1&code=SH600036&key=年度报告` | code 可省略以查询最新披露，支持分页与标题关键字 |
+
+新增接口统一沿用 token cookie 鉴权。上游失败返回 502；公司资料为空返回 404；参数无效返回 400；列表为空返回 `{"results":[]}`（附带各接口其他元数据）。写入设置额外限制请求体大小、内容类型、同源与有效证券/偏好字段。
+
 ## 前端
 
-- 技术：React 18 + TypeScript + Vite 5，手写 CSS（暗色主题，红涨绿跌）。
-- 交互：搜索框 → 结果列表 → 点击某只证券 → 行情卡片（每 5 秒轮询刷新，实现「实时行情」观感）。
-- 通过 Vite `server.proxy` 把 `/api` 代理到 dev 模式的 Go server（`127.0.0.1:3001`）。
+React 18 + TypeScript + Vite 5，手写 CSS。`desktop/ui/src/components/` 按研究栏目与全局页面拆分，`hooks/useResource.ts` 统一处理数据加载、错误重试与取消。Vite `server.proxy` 将 `/api` 代理到开发模式 Go server（`127.0.0.1:3001`），不依赖浏览器跨域直连。
 
 ## 构建与开发
 
@@ -132,6 +164,6 @@ spctl --assess --type execute --verbose=4 /Applications/sec.app
 
 ## 分阶段计划
 
-- **Phase 1（当前）**：MVP —— 搜索 + 实时行情，跑通「WebView + 本地 API + 内嵌前端」全链路。
-- **Phase 2**：公司信息/分红、财报、IPO 日历、公告、自选股（SQLite 持久化）。
+- **Phase 1（已完成）**：MVP —— 搜索 + 实时行情，跑通「WebView + 本地 API + 内嵌前端」全链路。
+- **Phase 2（进行中）**：研究工作台、公司信息/分红、财报、IPO 上市排期、公告、自选股与偏好持久化已接入；后续补充申购排期、多组合与 SQLite 迁移等。
 - **Phase 3**：系统托盘、自动更新、Windows 支持、`.exe` 打包、Intel/通用二进制。macOS `.app`/`.dmg` 打包与 release CI 已完成。

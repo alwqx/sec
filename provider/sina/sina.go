@@ -438,7 +438,8 @@ func adjustRespBodyByEncode(resp *http.Response) error {
 	}
 
 	encodHeader := strings.ToLower(resp.Header.Get("Content-Type"))
-	var newBodyBytes []byte
+	// 未声明 GBK 编码时保留原始内容，避免 UTF-8 响应被清空。
+	newBodyBytes := resBytes
 	if strings.Contains(encodHeader, "charset=gbk") {
 		newBodyBytes, err = simplifiedchinese.GBK.NewDecoder().Bytes(resBytes)
 	} else if strings.Contains(encodHeader, "charset=gb18030") {

@@ -205,6 +205,18 @@ $ sec quote-history lxjm --begin 20250601 --end 20250630
 - [x] 行情信息实时更新
 - [x] 行情信息蜡烛图
 
+### TODO：Desktop 构建警告
+
+- [ ] 升级或修补 `github.com/webview/webview_go` 依赖，消除新版 Clang 的 `-Wdeprecated-literal-operator` 警告：将 `operator"" _cls`、`operator"" _sel`、`operator"" _str` 改为后缀紧邻引号的写法（如 `operator""_cls`）。通过依赖升级或仓库内维护补丁处理，不直接修改 Go 模块缓存。
+
+当前这三条警告来自 WebView 的 C++ 代码，不代表构建失败；未将警告视为错误时，可正常生成二进制。临时隐藏该类警告，可在 `desktop` 目录执行：
+
+```shell
+CGO_CXXFLAGS="-O2 -g -Wno-deprecated-literal-operator" go build -o sec-desktop
+```
+
+该参数仅隐藏警告，不替代依赖修复。详见 [Clang 诊断说明](https://clang.llvm.org/docs/DiagnosticsReference.html#wdeprecated-literal-operator)。
+
 ## 致谢
 
 - [efinance](https://efinance.readthedocs.io/)

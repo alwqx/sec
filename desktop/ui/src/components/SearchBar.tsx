@@ -26,10 +26,11 @@ export default function SearchBar({ onSearch, loading }: Props) {
   return (
     <form className="search-bar" onSubmit={submit}>
       <input
+        aria-label="搜索证券"
         value={key}
         onChange={(e) => setKey(e.target.value)}
         onKeyDown={selectAll}
-        placeholder="搜索证券：代码 / 名称 / 拼音，如 招商银行、600036、zgpa"
+        placeholder="搜索证券名称 / 代码 / 拼音"
         autoFocus
       />
       <button type="submit" disabled={loading}>
