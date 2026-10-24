@@ -77,3 +77,23 @@ export interface FinancialReport {
   columns: { key: string; label: string }[]
   results: { date: string; fields: Record<string, unknown> }[]
 }
+
+export interface MetalQuote {
+  date: string
+  open: number
+  close: number
+  high: number
+  low: number
+  yclose: number | null
+  change: number | null
+  change_rate: number | null // 百分比
+}
+
+export interface MetalData {
+  name: string
+  unit: string
+  begin: string
+  end: string
+  latest: MetalQuote | null
+  results: MetalQuote[]
+}
