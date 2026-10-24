@@ -225,3 +225,40 @@ h1, h2, h3 { font-weight: 600; }
 .chart-grid { stroke: var(--border); stroke-width: 1; }
 .price-line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; }
 .price-point { fill: var(--accent); }
+.metal-page { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.metal-range-form label { flex-wrap: wrap; }
+.metal-range-form input { color: var(--text); }
+.metal-range-form > button:last-child { margin-left: auto; }
+.metal-quick-ranges { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+.metal-quick-ranges button { padding: 5px 10px; font-size: 12px; }
+.metal-quote-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.metal-quote-heading h2 { margin: 5px 0 0; }
+.metal-quote-heading h2 span { margin-left: 12px; color: var(--muted); font-size: 12px; font-weight: 400; }
+.metal-price-row { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(0, 2fr); align-items: center; gap: 24px; margin-top: 22px; }
+.metal-price-row .quote-change { margin-bottom: 0; }
+.metal-quote-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 0; }
+.metal-history h2 { margin: 0; }
+.metal-history .section-caption { align-items: center; }
+.metal-table-heading { border-top: 1px solid var(--border); margin-top: 20px; padding-top: 18px; }
+.metal-table td, .metal-table th { text-align: right; }
+.metal-table th:first-child { text-align: left; }
+@media (max-width: 1100px) { .metal-quote-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 680px) {
+  .metal-range-form { align-items: stretch; }
+  .metal-range-form label { flex: 1 1 100%; justify-content: space-between; }
+  .metal-range-form input { min-width: 0; flex: 1; }
+  .metal-price-row { grid-template-columns: 1fr; gap: 20px; }
+  .metal-quote-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .metal-quote-heading { gap: 8px; }
+}
+
+.candle-plot { display: grid; grid-template-columns: 60px minmax(0, 1fr); align-items: start; }
+.candle-axis { display: block; }
+.candle-scroll { min-width: 0; max-width: 100%; overflow-x: auto; padding-bottom: 4px; }
+.candle-scroll svg { display: block; overflow: hidden; }
+.candle-scroll svg:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.candle-detail { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 12px 0; font-size: 12px; font-variant-numeric: tabular-nums; }
+.candle-detail time { color: var(--muted); }
+.candle-wick { stroke: currentColor; stroke-width: 1; }
+.candle-body { fill: currentColor; }
+.candle-doji { stroke: currentColor; stroke-width: 1.5; }

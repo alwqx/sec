@@ -9,13 +9,15 @@ import Financials from './components/Financials'
 import IPOCalendar from './components/IPOCalendar'
 import Announcements from './components/Announcements'
 import Settings from './components/Settings'
+import Metal from './components/Metal'
 
-type Page = 'stocks' | 'ipo' | 'announcements' | 'settings'
+type Page = 'stocks' | 'ipo' | 'announcements' | 'metal' | 'settings'
 type Tab = 'overview' | 'company' | 'financials' | 'dividends' | 'announcements'
 const pages: { id: Page; title: string; icon: string; description: string }[] = [
   { id: 'stocks', title: '自选与行情', icon: '↗', description: '从市场行情到公司研究，在同一个工作区完成' },
   { id: 'ipo', title: 'IPO 日历', icon: '▦', description: '追踪新股上市排期与最新上市证券' },
   { id: 'announcements', title: '公告中心', icon: '▤', description: '查询巨潮资讯最新披露与证券公告' },
+  { id: 'metal', title: '黄金行情', icon: '◇', description: '上海黄金交易所 Au99.99 最新日行情与历史价格' },
   { id: 'settings', title: '设置', icon: '⚙', description: '管理工作台外观与行情刷新偏好' },
 ]
 const tabs: { id: Tab; title: string }[] = [
@@ -166,6 +168,7 @@ export default function App() {
             </> : <div className="welcome-state"><div className="welcome-symbol" aria-hidden="true">↗</div><h2>从一只证券开始研究</h2><p>搜索证券，或从自选列表中选择。<br />行情、公司资料、财报与公告都在这里。</p><div className="welcome-examples">试试 <button onClick={() => void onSearch('招商银行')}>招商银行</button><button onClick={() => void onSearch('腾讯控股')}>腾讯控股</button><button onClick={() => void onSearch('AAPL')}>AAPL</button></div></div>}
           </section>
         </div>}
+        {page === 'metal' && <Metal />}
         {page === 'ipo' && <IPOCalendar onSelect={openIPO} />}
         {page === 'announcements' && <div className="global-announcements"><div className="scope-bar"><span>公告范围</span><button aria-pressed={announcementScope === 'latest' || !aShare} onClick={() => setAnnouncementScope('latest')}>最新披露</button><button disabled={!aShare} aria-pressed={announcementScope === 'selected' && !!aShare} onClick={() => setAnnouncementScope('selected')}>{selected ? selected.name : '当前证券'}</button></div><Announcements key={announcementScope === 'selected' && aShare ? selected!.ex_code : 'latest'} code={announcementScope === 'selected' && aShare ? selected!.ex_code : ''} /></div>}
         {page === 'settings' && (ready ? <Settings settings={workspace.settings} saving={saving} onSave={saveSettings} /> : <div className="page-panel empty-state">读取本地数据后可修改设置</div>)}
