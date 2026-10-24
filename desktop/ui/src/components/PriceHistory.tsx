@@ -1,15 +1,21 @@
-import { useCallback } from 'react'
+import { useCallback, useMemo } from 'react'
 import { history } from '../api'
 import { useResource } from '../hooks/useResource'
 import ResourceState from './ResourceState'
-import PriceChart from './PriceChart'
+import CandlestickChart from './CandlestickChart'
 
 function LoadedHistory({ code }: { code: string }) {
   const load = useCallback((signal: AbortSignal) => history(code, signal), [code])
   const resource = useResource(load)
-  const values = resource.data?.filter(item => Number.isFinite(item.close)) ?? []
+  // 保持历史数据引用稳定，避免实时行情刷新时触发 K 线自动滚回最新交易日。
+  const values = useMemo(() => resource.data?.filter(item =>
+    [item.open, item.close, item.high, item.low].every(Number.isFinite),
+  ) ?? [], [resource.data])
   return <div className="history-section"><ResourceState {...resource} retry={resource.reload} />
-    {resource.data && (values.length ? <PriceChart data={values} title="近 60 个交易日 · 收盘价 · 不复权" unit={code.startsWith('HK') ? '港元' : '元'} label={`${code} 收盘价走势`} /> : <p className="data-note">暂无历史行情</p>)}
+    {resource.data && (values.length ? <>
+      <p className="data-note">近 60 个交易日 · 不复权</p>
+      <CandlestickChart data={values} name={code} showVolume unit={code.startsWith('HK') ? '港元' : '元'} />
+    </> : <p className="data-note">暂无历史行情</p>)}
   </div>
 }
 

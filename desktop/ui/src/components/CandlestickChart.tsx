@@ -1,14 +1,19 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
+import type { HistoryQuote } from '../types'
 
-interface Candle {
-  date: string
-  open: number
-  close: number
-  high: number
-  low: number
+function compactNumber(value: number | undefined) {
+  if (value === undefined || !Number.isFinite(value)) return '—'
+  if (Math.abs(value) >= 1e8) return `${(value / 1e8).toFixed(2)} 亿`
+  if (Math.abs(value) >= 1e4) return `${(value / 1e4).toFixed(2)} 万`
+  return value.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
 }
 
-export default function CandlestickChart({ data, name, unit }: { data: Candle[]; name: string; unit: string }) {
+export default function CandlestickChart({ data, name, unit, showVolume = false }: {
+  data: HistoryQuote[]
+  name: string
+  unit: string
+  showVolume?: boolean
+}) {
   const container = useRef<HTMLDivElement>(null)
   const scroll = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(480)
@@ -22,7 +27,10 @@ export default function CandlestickChart({ data, name, unit }: { data: Candle[];
 
   // 每根蜡烛至少预留 8px，长区间通过横向滚动查看，避免压缩成无法分辨的细线。
   // 价格轴固定在滚动区域之外；蜡烛图坐标只包含右侧绘图区。
-  const axisWidth = 60, left = 8, right = 16, top = 20, bottom = 234, height = 270
+  const axisWidth = 60, left = 8, right = 16, top = 20, bottom = 234
+  const volumeTop = 270, volumeBottom = 338
+  const dateY = showVolume ? 362 : 258
+  const height = showVolume ? 374 : 270
   const chartWidth = Math.max(width - axisWidth, left + right + data.length * 8)
   useEffect(() => {
     if (scroll.current) scroll.current.scrollLeft = scroll.current.scrollWidth
@@ -39,6 +47,9 @@ export default function CandlestickChart({ data, name, unit }: { data: Candle[];
   const y = (price: number) => bottom - (price - low) / (high - low) * (bottom - top)
   const current = Math.max(0, Math.min(selected ?? data.length - 1, data.length - 1))
   const item = data[current]
+  const volume = (candle: HistoryQuote) => candle.volume !== undefined && Number.isFinite(candle.volume) ? Math.max(0, candle.volume) : 0
+  const maximumVolume = Math.max(0, ...data.map(volume))
+  const volumeY = (value: number) => volumeBottom - value / Math.max(1, maximumVolume) * (volumeBottom - volumeTop)
   const selectPointer = (event: PointerEvent<SVGSVGElement>) => {
     const bounds = event.currentTarget.getBoundingClientRect()
     const position = (event.clientX - bounds.left) * chartWidth / bounds.width
@@ -60,13 +71,20 @@ export default function CandlestickChart({ data, name, unit }: { data: Candle[];
 
   return <div className="history-chart candle-chart" ref={container}>
     <div className="section-caption"><span>{name} · 日 K 线 · {unit}</span><span>红：收盘高于开盘 · 绿：收盘低于开盘</span></div>
-    <div className="candle-detail"><time>{item.date}</time><span>开 {item.open.toFixed(2)}</span><span>高 {item.high.toFixed(2)}</span><span>低 {item.low.toFixed(2)}</span><span>收 {item.close.toFixed(2)}</span></div>
+    <div className="candle-detail"><time>{item.date}</time><span>开 {item.open.toFixed(2)}</span><span>高 {item.high.toFixed(2)}</span><span>低 {item.low.toFixed(2)}</span><span>收 {item.close.toFixed(2)}</span>
+      {showVolume && <><span>成交量 {compactNumber(item.volume)} 股/份</span><span>成交额 {compactNumber(item.turnover)} {unit}</span></>}
+    </div>
     <div className="candle-plot">
       <svg className="candle-axis" width={axisWidth} height={height} viewBox={`0 0 ${axisWidth} ${height}`} aria-hidden="true">
         {[0, .5, 1].map(value => {
           const price = low + (high - low) * value
           return <text key={value} x={axisWidth - 8} y={y(price) + 4} textAnchor="end">{price.toFixed(2)}</text>
         })}
+        {showVolume && <>
+          <text x={axisWidth - 8} y={volumeTop - 10} textAnchor="end">成交量</text>
+          <text x={axisWidth - 8} y={volumeTop + 8} textAnchor="end">{compactNumber(maximumVolume)}</text>
+          <text x={axisWidth - 8} y={volumeBottom} textAnchor="end">0</text>
+        </>}
       </svg>
       <div className="candle-scroll" ref={scroll}>
         <svg width={chartWidth} height={height} viewBox={`0 0 ${chartWidth} ${height}`} role="img" tabIndex={0}
@@ -85,10 +103,12 @@ export default function CandlestickChart({ data, name, unit }: { data: Candle[];
               <line className="candle-wick" x1={x(index)} x2={x(index)} y1={y(candle.high)} y2={y(candle.low)} />
               {bodyHeight < 1 ? <line className="candle-doji" x1={x(index) - bodyWidth / 2} x2={x(index) + bodyWidth / 2} y1={bodyTop} y2={bodyTop} />
                 : <rect className="candle-body" x={x(index) - bodyWidth / 2} y={bodyTop} width={bodyWidth} height={bodyHeight} />}
+              {showVolume && <rect className="candle-volume" x={x(index) - bodyWidth / 2} y={volumeY(volume(candle))} width={bodyWidth} height={volumeBottom - volumeY(volume(candle))} />}
             </g>
           })}
-          {selected !== null && <line className="chart-grid" x1={x(current)} x2={x(current)} y1={top} y2={bottom} strokeDasharray="3 4" />}
-          {ticks.map((index, i) => <text key={index} x={i === 0 ? left : i === ticks.length - 1 ? chartWidth - right : x(index)} y={258} textAnchor={i === 0 ? 'start' : i === ticks.length - 1 ? 'end' : 'middle'}>{data[index].date}</text>)}
+          {showVolume && <line className="chart-grid" x1={left} x2={chartWidth - right} y1={volumeBottom} y2={volumeBottom} />}
+          {selected !== null && <line className="chart-grid" x1={x(current)} x2={x(current)} y1={top} y2={showVolume ? volumeBottom : bottom} strokeDasharray="3 4" />}
+          {ticks.map((index, i) => <text key={index} x={i === 0 ? left : i === ticks.length - 1 ? chartWidth - right : x(index)} y={dateY} textAnchor={i === 0 ? 'start' : i === ticks.length - 1 ? 'end' : 'middle'}>{data[index].date}</text>)}
         </svg>
       </div>
     </div>

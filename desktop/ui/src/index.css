@@ -223,8 +223,6 @@ h1, h2, h3 { font-weight: 600; }
 .history-chart svg { display: block; overflow: visible; }
 .history-chart svg text { fill: var(--muted); font-size: 11px; }
 .chart-grid { stroke: var(--border); stroke-width: 1; }
-.price-line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; }
-.price-point { fill: var(--accent); }
 .metal-page { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
 .metal-range-form label { flex-wrap: wrap; }
 .metal-range-form input { color: var(--text); }
@@ -262,3 +260,5 @@ h1, h2, h3 { font-weight: 600; }
 .candle-wick { stroke: currentColor; stroke-width: 1; }
 .candle-body { fill: currentColor; }
 .candle-doji { stroke: currentColor; stroke-width: 1.5; }
+
+.candle-volume { fill: currentColor; opacity: .65; }
