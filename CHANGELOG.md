@@ -9,6 +9,7 @@
 5. 「自选与行情」中的证券历史改用日 K 线蜡烛图，历史接口补充开高低收、成交量与成交额，增加成交量副图和逐日量额信息，复用黄金的固定价格轴与交互，保留沪深/港股与不复权口径
 6. Add Desktop Treasury yields with the latest 11-tenor curve, selectable historical trends, date filters, daily basis-point changes, and paginated records
 7. Preserve missing Treasury yields as null values, retain cross-year comparison baselines, and reject incomplete annual responses instead of displaying partial history
+8. Add industry, PE (TTM), PB, total market capitalization, and float market capitalization to Desktop overview and company pages using shared CLI info calculations; load metrics independently, show unavailable values explicitly, and normalize quoted profile fields
 
 ### v0.3.15
 

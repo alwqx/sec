@@ -122,3 +122,15 @@ export interface BondData {
   results: BondDay[]
   tenors: { key: string; label: string; months: number }[]
 }
+
+export interface CompanyMetrics {
+  code: string
+  industry: string
+  pe_ttm: number | null
+  pb: number | null
+  market_cap: number | null
+  float_market_cap: number | null
+  currency: 'CNY'
+  trade_date: string
+  time: string
+}

@@ -127,6 +127,7 @@ func Profile(ctx context.Context, opts *types.InfoOptions) (*CorpProfile, error)
 		return nil, err2
 	}
 
+	metrics := calculateCoreMetrics(opts.ExCode, quote, partProfile)
 	profile := &CorpProfile{
 		ExCode:          corp.ExCode,
 		Name:            corp.Name,
@@ -138,27 +139,16 @@ func Profile(ctx context.Context, opts *types.InfoOptions) (*CorpProfile, error)
 		BusinessAddress: corp.BusinessAddress,
 		MainBusiness:    corp.MainBusiness,
 		Current:         quote.Current,
-		Category:        partProfile.Category,
-		MarketCap:       quote.Current * float64(partProfile.Cap) * 10000.0,
-		TradedMarketCap: quote.Current * float64(partProfile.TradeCap) * 10000.0,
-	}
-
-	// 港股的市值需要重新算
-	if strings.HasPrefix(opts.ExCode, "HK") {
-		profile.MarketCap = quote.Current * float64(partProfile.Cap)
-		profile.TradedMarketCap = quote.Current * float64(partProfile.TradeCap)
+		Category:        metrics.Category,
+		MarketCap:       metrics.MarketCap,
+		TradedMarketCap: metrics.TradedMarketCap,
+		PB:              metrics.PB,
+		PeTTM:           metrics.PeTTM,
 	}
 
 	if profile.HistoryName == "" {
 		profile.HistoryName = quote.Name
 	}
-	if partProfile.VPS != 0 {
-		profile.PB = quote.Current / partProfile.VPS
-	}
-	if partProfile.Profit > 0 {
-		profile.PeTTM = quote.Current * float64(partProfile.Cap) / partProfile.Profit / 10000.0
-	}
-
 	return profile, nil
 }
 
@@ -365,7 +355,7 @@ func parseInfoPartProfile(exCode, line string) (*sinaPartProfile, error) {
 // "A,lxzk,-1.5600,-1.7502,-0.3800,6.9603,66.4645,40100,27964.4729,27964.4729,0,CNY,-6.2535,-7.0182,60.0600,1,-5.2800,1.2496,-1.5128,168.88,83.5,0.2,龙芯中科,K|D|0|40100|4100,149.74|99.82,20250331|-151280445.14,718.7600|91.7230,|,,1/1,EQA,,0.00,132.280|129.790|120.400,半导体,龙芯中科,1,509214702.8";
 // 0  1    2       3       4       5      6       7     8          9          10 11 12      13      14      15  16    17     18      19     20   21  22      23               24                                  25              26 27 28 29 30 31  32                     33    34     35 36
 func parseInfoPartProfileOfAstock(line string) (*sinaPartProfile, error) {
-	items := strings.Split(line, ",")
+	items := strings.Split(strings.Trim(line, "\""), ",")
 	if len(items) < 35 {
 		return nil, fmt.Errorf("invalid items %s, num should >= 35 but get %d", line, len(items))
 	}
@@ -397,7 +387,7 @@ func parseInfoPartProfileOfAstock(line string) (*sinaPartProfile, error) {
 // "EQTY,MAIN,542.266,345.980,2.9127,0,0,9189794319,0,9189794319,0,195076015710.40,51819945047.20,5.69,1,腾讯控股,3.700,0.5,100,腾讯控股,50028.230,209573020603.860,216730058624.020,1216841671768.900,,,0.8788,122.528696,,413.391|473.070|518.000,4.756824,2.589747,51,HKD"
 // 0     1    2       3       4      5 6 7总股本     8 9流通股本   10 11              12             13  14 15     16    17   18  19    20         21               22               23               24 25 26  27
 func parseInfoPartProfileOfHstock(line string) (*sinaPartProfile, error) {
-	items := strings.Split(line, ",")
+	items := strings.Split(strings.Trim(line, "\""), ",")
 	if len(items) < 33 {
 		return nil, fmt.Errorf("invalid items %s, num should >= 33 but get %d", line, len(items))
 	}

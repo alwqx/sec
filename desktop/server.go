@@ -29,6 +29,7 @@ func (s *desktopServer) Handler() http.Handler {
 	mux.Handle("GET /api/v1/search", s.withAuth(s.withCORS(http.HandlerFunc(s.handleSearch))))
 	mux.Handle("GET /api/v1/quote", s.withAuth(s.withCORS(http.HandlerFunc(s.handleQuote))))
 
+	mux.Handle("GET /api/v1/metrics", s.withAuth(s.withCORS(http.HandlerFunc(s.handleMetrics))))
 	mux.Handle("GET /api/v1/company", s.withAuth(s.withCORS(http.HandlerFunc(s.handleCompany))))
 	mux.Handle("GET /api/v1/dividends", s.withAuth(s.withCORS(http.HandlerFunc(s.handleDividends))))
 
