@@ -3,27 +3,17 @@ import type { BasicSecurity } from '../types'
 interface Props {
   items: BasicSecurity[]
   selected: BasicSecurity | null
-  onSelect: (s: BasicSecurity) => void
+  onSelect: (security: BasicSecurity) => void
+  emptyText?: string
 }
 
-export default function SecurityList({ items, selected, onSelect }: Props) {
-  if (items.length === 0) {
-    return <div className="list empty">输入关键字搜索证券</div>
-  }
-
-  return (
-    <ul className="list">
-      {items.map((s) => (
-        <li
-          key={s.ex_code}
-          className={selected?.ex_code === s.ex_code ? 'item selected' : 'item'}
-          onClick={() => onSelect(s)}
-        >
-          <span className="name">{s.name}</span>
-          <span className="code">{s.code}</span>
-          <span className="exchange">{s.exchange}</span>
-        </li>
-      ))}
-    </ul>
-  )
+export default function SecurityList({ items, selected, onSelect, emptyText = '输入关键字搜索证券' }: Props) {
+  if (items.length === 0) return <div className="list empty">{emptyText}</div>
+  return <ul className="list">{items.map(security => <li key={security.ex_code}>
+    <button className={selected?.ex_code === security.ex_code ? 'security-item selected' : 'security-item'}
+      aria-pressed={selected?.ex_code === security.ex_code} onClick={() => onSelect(security)}>
+      <span className="security-item-top"><span className="name">{security.name}</span><span className="exchange">{security.exchange}</span></span>
+      <span className="code">{security.ex_code}</span>
+    </button>
+  </li>)}</ul>
 }

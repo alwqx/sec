@@ -20,3 +20,60 @@ export interface SecurityQuote {
   turnover: number // 成交数量（股）
   time: string
 }
+
+export interface Company {
+  name: string
+  en_name: string
+  history_name: string
+  listing_date: string
+  listing_price: number
+  website: string
+  register_address: string
+  business_address: string
+  main_business: string
+}
+
+export interface Dividend {
+  public_date: string
+  record_date: string
+  dividend_date: string
+  shares: number
+  add_shares: number
+  bonus: number
+}
+
+export interface WorkspaceSettings {
+  refresh_seconds: number
+  theme: 'dark' | 'light' | 'system'
+}
+
+export interface WorkspaceState {
+  watchlist: BasicSecurity[]
+  settings: WorkspaceSettings
+}
+
+export interface PageResult<T> {
+  results: T[]
+  total: number
+  has_more: boolean
+}
+
+export interface IPOListing {
+  code: string
+  name: string
+  listing_date: string
+}
+
+export interface Announcement {
+  id: string
+  title: string
+  date: string
+  code: string
+  name: string
+  url: string
+}
+
+export interface FinancialReport {
+  columns: { key: string; label: string }[]
+  results: { date: string; fields: Record<string, unknown> }[]
+}

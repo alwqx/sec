@@ -32,3 +32,6 @@ sec.code-workspace
 
 *.pdf
 main.py
+
+# 本地布局参考与工作产物
+/work/

@@ -58,8 +58,11 @@ func main() {
 	// webview 必须在主线程创建与运行（webview_go 的 init 会 LockOSThread）。
 	w := webview.New(*debug)
 	defer w.Destroy()
-	w.SetTitle("sec · 证券行情")
-	w.SetSize(960, 680, webview.HintNone)
+	w.SetTitle("sec · 研究工作台")
+	w.SetSize(1180, 780, webview.HintNone)
+	if err := w.Bind("secOpenDisclosure", openDisclosure); err != nil {
+		slog.Error("绑定原文浏览器入口失败", "error", err)
+	}
 	w.Navigate(url)
 
 	// 信号处理：优雅关闭 HTTP server 并退出 WebView 主循环。
