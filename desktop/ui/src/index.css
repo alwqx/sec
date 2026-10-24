@@ -262,3 +262,24 @@ h1, h2, h3 { font-weight: 600; }
 .candle-doji { stroke: currentColor; stroke-width: 1.5; }
 
 .candle-volume { fill: currentColor; opacity: .65; }
+.bond-page { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.bond-page h2 { margin: 0; }
+.bond-page .section-toolbar { justify-content: space-between; }
+.bond-range-form label { flex-wrap: wrap; }
+.bond-range-form > button:last-child { margin-left: auto; }
+.bond-quick-ranges { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+.bond-quick-ranges button { padding: 5px 10px; font-size: 12px; }
+.bond-benchmark { display: flex; align-items: center; gap: 36px; margin-top: 18px; flex-wrap: wrap; }
+.bond-yields { grid-template-columns: repeat(auto-fit, minmax(105px, 1fr)); }
+.bond-chart { margin: 22px 0; }
+.bond-chart svg:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.bond-line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; }
+.bond-point { fill: var(--accent); }
+.bond-table th, .bond-table td { text-align: right; }
+.bond-table th:first-child { text-align: left; position: sticky; left: 0; background: var(--panel); }
+@media (max-width: 680px) {
+  .bond-range-form { align-items: stretch; }
+  .bond-range-form label { flex: 1 1 100%; justify-content: space-between; }
+  .bond-range-form input { min-width: 0; flex: 1; }
+  .bond-benchmark { gap: 12px; }
+}

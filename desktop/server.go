@@ -34,6 +34,7 @@ func (s *desktopServer) Handler() http.Handler {
 
 	mux.Handle("GET /api/v1/workspace", s.withAuth(http.HandlerFunc(s.handleWorkspace)))
 	mux.Handle("PUT /api/v1/workspace", s.withAuth(http.HandlerFunc(s.handleWorkspace)))
+	mux.Handle("GET /api/v1/bond", s.withAuth(s.withCORS(http.HandlerFunc(s.handleBond))))
 	mux.Handle("GET /api/v1/metal", s.withAuth(s.withCORS(http.HandlerFunc(s.handleMetal))))
 	mux.Handle("GET /api/v1/history", s.withAuth(http.HandlerFunc(s.handleHistory)))
 	mux.Handle("GET /api/v1/ipo", s.withAuth(http.HandlerFunc(s.handleIPO)))
