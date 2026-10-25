@@ -300,3 +300,8 @@ h1, h2, h3 { font-weight: 600; }
 .prospectus-search input { max-width: 100%; }
 
 .watchlist-refresh { margin: 0 10px 10px; font-size: 12px; }
+.version-details { display: grid; gap: 10px; margin: 16px 0; font-size: 13px; }
+.version-details > div { display: grid; grid-template-columns: 80px minmax(0, 1fr); gap: 12px; }
+.version-details dt { color: var(--muted); }
+.version-details dd { margin: 0; overflow-wrap: anywhere; }
+.version-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; margin: 12px 0; }

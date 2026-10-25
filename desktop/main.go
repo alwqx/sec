@@ -67,6 +67,9 @@ func main() {
 	if err := w.Bind("secOpenDownloadFolder", backend.openDownloadFolder); err != nil {
 		slog.Error("绑定下载目录入口失败", "error", err)
 	}
+	if err := w.Bind("secOpenRelease", openRelease); err != nil {
+		slog.Error("绑定 Release 入口失败", "error", err)
+	}
 	w.Navigate(url)
 
 	// 信号处理：优雅关闭 HTTP server 并退出 WebView 主循环。

@@ -30,6 +30,8 @@
 
 19. Add inclusive, optional listing-date bounds and reset controls to Desktop New Listings; share date validation and filtering with CLI IPO lists, filter before pagination, and exclude unknown dates only when filtering
 
+20. Add Desktop version, build time, commit, and platform details with manual update checks and official Release/download links; share GitHub release queries with CLI and match Desktop DMGs by version and architecture
+
 ### v0.3.15
 
 1. Desktop 升级为研究工作台：顶部全局搜索、左侧工作空间导航、中间证券列表、右侧个股研究，切换功能时保留当前证券
