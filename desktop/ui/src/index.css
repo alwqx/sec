@@ -53,7 +53,6 @@ h1, h2, h3 { font-weight: 600; }
 .brand { display: flex; align-items: center; gap: 10px; min-height: 64px; padding: 10px 16px; flex-shrink: 0; border-bottom: 1px solid var(--border); }
 .brand-mark { display: block; width: 36px; height: 36px; object-fit: contain; flex-shrink: 0; }
 .brand strong { font-size: 18px; letter-spacing: 1px; line-height: 1; }
-.brand div > span { color: var(--muted); display: block; font-size: 11px; margin-top: 3px; }
 
 .search-bar { display: flex; gap: 8px; width: min(540px, 100%); min-width: 0; }
 .search-bar input { flex: 1; width: 100%; padding-left: 14px; }
@@ -205,7 +204,7 @@ h1, h2, h3 { font-weight: 600; }
   .sidebar { width: 100%; flex-shrink: 0; border-right: 0; border-bottom: 1px solid var(--border); }
   .brand { min-height: 52px; padding: 6px 12px; border-bottom: 0; }
   .brand-mark { width: 32px; height: 32px; }
-  .brand div > span, .nav-group-label, .sidebar-footer { display: none; }
+  .nav-group-label, .sidebar-footer { display: none; }
   .side-nav { flex: none; flex-direction: row; overflow-x: auto; padding: 0 8px 8px; }
   .side-nav button { flex-shrink: 0; justify-content: center; padding: 8px 10px; font-size: 12px; gap: 6px; }
   .side-nav .settings-nav { margin-top: 0; }

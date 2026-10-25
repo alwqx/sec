@@ -162,7 +162,7 @@ export default function App() {
   return <div className="app">
     <div className="app-shell">
       <aside className="sidebar">
-        <div className="brand"><img className="brand-mark" src={secLogo} alt="" width={36} height={36} /><div><strong>SEC</strong><span>研究工作台</span></div></div>
+        <div className="brand"><img className="brand-mark" src={secLogo} alt="" width={36} height={36} /><strong>SEC</strong></div>
         <span className="nav-group-label">工作空间</span>
         <nav className="side-nav" aria-label="主导航">{pages.map(item => <button key={item.id}
           className={item.id === 'settings' ? 'settings-nav' : ''}

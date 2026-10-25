@@ -34,6 +34,8 @@
 
 21. Refresh Desktop layout with a full-height branded sidebar, compact page headers and shared page actions, neutral light/dark themes, denser research summaries, grouped settings, sticky table headers, and responsive stacked layouts inspired by CC Switch
 
+22. Simplify the Desktop sidebar brand to the logo and SEC label, removing the subtitle and unused styles
+
 ### v0.3.15
 
 1. Desktop 升级为研究工作台：顶部全局搜索、左侧工作空间导航、中间证券列表、右侧个股研究，切换功能时保留当前证券
