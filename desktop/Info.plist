@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleName</key>
-	<string>sec</string>
+	<string>SEC</string>
 	<key>CFBundleDisplayName</key>
-	<string>sec · 证券行情</string>
+	<string>SEC · 证券行情</string>
 	<key>CFBundleExecutable</key>
 	<string>sec-desktop</string>
 	<key>CFBundleIconFile</key>
