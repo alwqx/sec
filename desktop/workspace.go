@@ -25,8 +25,9 @@ type workspaceStore struct {
 }
 
 type workspaceSettings struct {
-	RefreshSeconds int    `json:"refresh_seconds"`
-	Theme          string `json:"theme"`
+	DownloadDirectory string `json:"download_directory"`
+	RefreshSeconds    int    `json:"refresh_seconds"`
+	Theme             string `json:"theme"`
 }
 
 type workspaceState struct {
@@ -52,6 +53,12 @@ func (s *workspaceStore) filePath() (string, error) {
 var workspaceCode = regexp.MustCompile(`^[A-Za-z0-9$._-]{1,40}$`)
 
 func validateWorkspace(state workspaceState) bool {
+	if len(state.Settings.DownloadDirectory) > 4096 {
+		return false
+	}
+	if _, err := downloadDirectory(state.Settings.DownloadDirectory); err != nil {
+		return false
+	}
 	if len(state.Watchlist) > 500 {
 		return false
 	}

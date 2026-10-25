@@ -15,9 +15,10 @@ import (
 
 // desktopServer 提供本地 HTTP 服务：/api/* JSON 接口 + 前端静态资源。
 type desktopServer struct {
-	token     string
-	dev       bool
-	workspace workspaceStore
+	token        string
+	dev          bool
+	workspace    workspaceStore
+	downloadRoot string
 }
 
 // Handler 返回装配好的路由。
@@ -40,6 +41,9 @@ func (s *desktopServer) Handler() http.Handler {
 	mux.Handle("GET /api/v1/history", s.withAuth(http.HandlerFunc(s.handleHistory)))
 	mux.Handle("GET /api/v1/ipo", s.withAuth(http.HandlerFunc(s.handleIPO)))
 	mux.Handle("GET /api/v1/announcements", s.withAuth(http.HandlerFunc(s.handleAnnouncements)))
+	mux.Handle("POST /api/v1/financials/export", s.withAuth(http.HandlerFunc(s.handleFinancialExport)))
+	mux.Handle("GET /api/v1/annual-reports", s.withAuth(http.HandlerFunc(s.handleAnnualReports)))
+	mux.Handle("POST /api/v1/annual-reports/download", s.withAuth(http.HandlerFunc(s.handleAnnualDownload)))
 	mux.Handle("GET /api/v1/financials", s.withAuth(http.HandlerFunc(s.handleFinancials)))
 
 	// 前端 SPA：先尝试真实文件，否则回退 index.html（支持前端路由）。

@@ -5,6 +5,7 @@ package main
 import (
 	"errors"
 	"net/url"
+	"os"
 	"os/exec"
 	"runtime"
 )
@@ -30,6 +31,28 @@ func openDisclosure(raw string) error {
 	}
 	if err := command.Start(); err != nil {
 		return errors.New("打开原文失败，请复制链接到浏览器")
+	}
+	go func() { _ = command.Wait() }()
+	return nil
+}
+
+// openDownloadFolder 打开工作台设置中的下载目录，不接收前端传入的路径。
+func (s *desktopServer) openDownloadFolder() error {
+	directory, err := s.downloadDirectory()
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(directory, 0700); err != nil {
+		return err
+	}
+	var command *exec.Cmd
+	if runtime.GOOS == "darwin" {
+		command = exec.Command("open", directory)
+	} else {
+		command = exec.Command("explorer", directory)
+	}
+	if err := command.Start(); err != nil {
+		return err
 	}
 	go func() { _ = command.Wait() }()
 	return nil

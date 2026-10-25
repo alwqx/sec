@@ -27,6 +27,12 @@ Ollama 桌面版**不是 Electron**，而是「纯 Go 外壳 + 系统 WebView + 
 - **持久化**：工作台首版采用 JSON 原子替换，将自选股/设置保存到 `~/.sec/desktop/workspace.json`；后续需要多组合与历史查询时再迁移 SQLite。
 - **平台**：macOS 优先；Windows 打包放 Phase 3。
 
+## 财报导出与年度报告
+
+个股「财报」页分为「财务报表」与「年度报告」。财务报表可按当前报表类型和报告期重新查询，导出 CSV 或 JSON，最多 50 期，保留全部原始字段和数值单位（不按页面的亿元缩放）。CSV 使用 UTF-8 BOM，JSON 包含证券信息、报告日期及原始字段。
+
+年度报告按报告年度查询，例如 2025 年度报告通常在 2026 年披露；支持 1990 年至上一年度、分页查询及 PDF 原文下载，排除摘要、英文、更正与修订版本。文件保存至设置中配置的下载目录（默认 `~/Downloads`，支持绝对路径或 `~/` 开头），成功后显示完整路径，可打开下载目录。同名文件自动追加编号，下载失败或取消清理临时文件。PDF 仅允许巨潮资讯 HTTPS 原文地址，最大 128 MB。
+
 ## 架构
 
 ```
@@ -135,6 +141,9 @@ provider 在保持原有数值字段的同时，通过 `MissingTenors` 记录上
 | GET | `/api/v1/metrics?code=SH600036` | 沪深北 A 股行业、PE（TTM）、PB、总市值、流通市值与快照时间；未知数值为 null |
 | GET | `/api/v1/company?code=SH600036` | 公司资料 |
 | GET | `/api/v1/dividends?code=SH600036` | 分红记录，按每 10 股展示税前派息/送转 |
+| POST | `/api/v1/financials/export` | JSON 参数 code/report/period/format，format 为 csv/json；返回本地文件路径及大小 |
+| GET | `/api/v1/annual-reports?code=SH600036&year=2025&page=1` | 按报告年度查询年度报告正文 |
+| POST | `/api/v1/annual-reports/download` | JSON 参数 code/year（字符串）/url；下载 PDF 并返回本地文件路径及大小 |
 | GET | `/api/v1/financials?code=SH600036&report=balance&period=annual` | 财报；report 为 balance/income/cashflow，period 可省略或 annual/halfyear/q1/q3 |
 | GET | `/api/v1/bond?begin=2026-01-01&end=2026-01-31` | 美国国债最新各期限收益率与区间历史；起止日期 YYYY-MM-DD，默认美东今日向前 30 天，单次最多 5 年 |
 | GET | `/api/v1/metal?begin=2026-01-01&end=2026-01-31` | Au99.99 最新日行情与区间历史；日期格式 YYYY-MM-DD，省略 end 时默认上海时区今日，省略 begin 时默认 end 向前 30 天 |

@@ -43,7 +43,8 @@ func main() {
 	}
 	port := ln.Addr().(*net.TCPAddr).Port
 
-	srv := &http.Server{Handler: (&desktopServer{token: newToken(), dev: *dev}).Handler()}
+	backend := &desktopServer{token: newToken(), dev: *dev}
+	srv := &http.Server{Handler: backend.Handler()}
 	go func() {
 		if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			slog.Error("http server", "error", err)
@@ -62,6 +63,9 @@ func main() {
 	w.SetSize(1180, 780, webview.HintNone)
 	if err := w.Bind("secOpenDisclosure", openDisclosure); err != nil {
 		slog.Error("绑定原文浏览器入口失败", "error", err)
+	}
+	if err := w.Bind("secOpenDownloadFolder", backend.openDownloadFolder); err != nil {
+		slog.Error("绑定下载目录入口失败", "error", err)
 	}
 	w.Navigate(url)
 
