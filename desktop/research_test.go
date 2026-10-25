@@ -3,11 +3,13 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
 	"testing"
+	"time"
 
 	"github.com/alwqx/sec/provider/cninfo"
 	"github.com/stretchr/testify/require"
@@ -94,4 +96,55 @@ func TestDisclosureURLValidation(t *testing.T) {
 	}
 	require.NoError(t, validateDisclosureURL("https://static.cninfo.com.cn/finalpage/2026-01-01/test.PDF"))
 	require.NoError(t, validateDisclosureURL("https://www.cninfo.com.cn/new/disclosure/detail?announcementId=1"))
+}
+
+func TestHistoryFilters(t *testing.T) {
+	for _, code := range []string{"SH600036", "SZ000001", "HK00700"} {
+		for index, fq := range []string{"bfq", "qfq", "hfq"} {
+			t.Run(code+fq, func(t *testing.T) {
+				defer gock.Off()
+				gock.New("https://push2his.eastmoney.com").Get("/api/qt/stock/kline/get").
+					MatchParam("beg", "20240101").MatchParam("end", "20241231").MatchParam("fqt", fmt.Sprint(index)).
+					Reply(200).BodyString(`{"data":{"code":"600036","market":1,"klines":[]}}`)
+				response := httptest.NewRecorder()
+				(&desktopServer{dev: true}).Handler().ServeHTTP(response, httptest.NewRequest("GET", "/api/v1/history?code="+code+"&begin=2024-01-01&end=2024-12-31&fq="+fq, nil))
+				require.Equal(t, 200, response.Code, response.Body.String())
+				require.JSONEq(t, `{"results":[]}`, response.Body.String())
+				require.True(t, gock.IsDone())
+			})
+		}
+	}
+}
+
+func TestHistoryRejectsInvalidFilters(t *testing.T) {
+	for _, query := range []string{
+		"begin=2024-02-30", "end=20240101", "begin=2024-02-01&end=2024-01-01",
+		"begin=1989-12-31&end=1990-01-01", "end=2999-01-01",
+		"begin=2010-01-01&end=2015-01-02", "fq=unknown",
+	} {
+		response := httptest.NewRecorder()
+		(&desktopServer{dev: true}).Handler().ServeHTTP(response, httptest.NewRequest("GET", "/api/v1/history?code=SH600036&"+query, nil))
+		require.Equal(t, 400, response.Code, query)
+	}
+}
+
+func TestHistoryDoesNotTruncateRange(t *testing.T) {
+	defer gock.Off()
+	lines := make([]string, 0, 70)
+	for day := 0; day < 70; day++ {
+		date := time.Date(2024, 1, 1+day, 0, 0, 0, 0, time.UTC).Format("2006-01-02")
+		lines = append(lines, date+",40,41,42,39,100,410000,5,2,1,1")
+	}
+	gock.New("https://push2his.eastmoney.com").Get("/api/qt/stock/kline/get").Reply(200).
+		JSON(map[string]any{"data": map[string]any{"code": "600036", "market": 1, "klines": lines}})
+	response := httptest.NewRecorder()
+	(&desktopServer{dev: true}).Handler().ServeHTTP(response, httptest.NewRequest("GET", "/api/v1/history?code=SH600036&begin=2024-01-01&end=2024-03-31", nil))
+	require.Equal(t, 200, response.Code)
+	var data struct {
+		Results []map[string]any `json:"results"`
+	}
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &data))
+	require.Len(t, data.Results, 70)
+	require.Equal(t, "2024-01-01", data.Results[0]["date"])
+	require.Equal(t, 10000.0, data.Results[0]["volume"])
 }

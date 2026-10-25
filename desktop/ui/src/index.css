@@ -297,3 +297,9 @@ h1, h2, h3 { font-weight: 600; }
 .saved-download span { max-width: 100%; }
 .saved-download button { margin-top: 4px; }
 .download-status { display: flex; align-items: center; gap: 12px; margin: 12px 0; color: var(--muted); font-size: 12px; }
+
+.history-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; margin: 16px 0 10px; }
+.history-filters label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--muted); }
+.history-filters input, .history-filters select { max-width: 100%; }
+.history-shortcuts { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.history-shortcuts button { font-size: 12px; }
