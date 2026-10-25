@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { ChartCandlestick, FilePlusCorner, Newspaper, Coins, Landmark, Settings as SettingsIcon, type LucideIcon } from 'lucide-react'
 import { loadWorkspace, saveWorkspace, search } from './api'
 import type { BasicSecurity, WorkspaceSettings, WorkspaceState } from './types'
 import SearchBar from './components/SearchBar'
@@ -14,13 +15,13 @@ import Bond from './components/Bond'
 
 type Page = 'stocks' | 'ipo' | 'announcements' | 'metal' | 'bond' | 'settings'
 type Tab = 'overview' | 'company' | 'financials' | 'dividends' | 'announcements'
-const pages: { id: Page; title: string; icon: string; description: string }[] = [
-  { id: 'stocks', title: '自选与行情', icon: '↗', description: '从市场行情到公司研究，在同一个工作区完成' },
-  { id: 'ipo', title: 'IPO', icon: '▦', description: '查看新股上市信息与招股说明书' },
-  { id: 'announcements', title: '公告中心', icon: '▤', description: '查询巨潮资讯最新披露与证券公告' },
-  { id: 'metal', title: '黄金行情', icon: '◇', description: '上海黄金交易所 Au99.99 最新日行情与历史价格' },
-  { id: 'bond', title: '美债收益率', icon: '∿', description: '美国财政部每日收益率曲线与各期限历史数据' },
-  { id: 'settings', title: '设置', icon: '⚙', description: '管理工作台外观与行情刷新偏好' },
+const pages: { id: Page; title: string; icon: LucideIcon; description: string }[] = [
+  { id: 'stocks', title: '自选与行情', icon: ChartCandlestick, description: '从市场行情到公司研究，在同一个工作区完成' },
+  { id: 'ipo', title: 'IPO', icon: FilePlusCorner, description: '查看新股上市信息与招股说明书' },
+  { id: 'announcements', title: '公告中心', icon: Newspaper, description: '查询巨潮资讯最新披露与证券公告' },
+  { id: 'metal', title: '黄金行情', icon: Coins, description: '上海黄金交易所 Au99.99 最新日行情与历史价格' },
+  { id: 'bond', title: '美债收益率', icon: Landmark, description: '美国财政部每日收益率曲线与各期限历史数据' },
+  { id: 'settings', title: '设置', icon: SettingsIcon, description: '管理工作台外观与行情刷新偏好' },
 ]
 const tabs: { id: Tab; title: string }[] = [
   { id: 'overview', title: '概览' }, { id: 'company', title: '公司' }, { id: 'financials', title: '财报' },
@@ -137,7 +138,7 @@ export default function App() {
         <nav className="side-nav" aria-label="主导航">{pages.map(item => <button key={item.id}
           className={item.id === 'settings' ? 'settings-nav' : ''}
           aria-current={page === item.id ? 'page' : undefined} onClick={() => setPage(item.id)}>
-          <span className="nav-icon" aria-hidden="true">{item.icon}</span>{item.title}
+          <item.icon className="nav-icon" size={20} strokeWidth={1.75} aria-hidden="true" focusable="false" />{item.title}
         </button>)}</nav>
         <div className="sidebar-footer"><span className="status-dot" />本地工作台<span>自选 · 行情 · 研究</span></div>
       </aside>
