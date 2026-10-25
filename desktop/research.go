@@ -35,9 +35,21 @@ func (s *desktopServer) handleIPO(w http.ResponseWriter, r *http.Request) {
 	if page == 0 {
 		return
 	}
+	since, until := r.URL.Query().Get("since"), r.URL.Query().Get("until")
+	if err := eastmoney.ValidateIPODates(since, until); err != nil {
+		writeError(w, 400, err.Error())
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
 	defer cancel()
-	items, total, err := eastmoney.ListIPO(ctx, &eastmoney.IPOListReq{PageNum: page, PageSize: 30})
+	var items []*eastmoney.IListing
+	var total int
+	var err error
+	if since == "" && until == "" {
+		items, total, err = eastmoney.ListIPO(ctx, &eastmoney.IPOListReq{PageNum: page, PageSize: 30})
+	} else {
+		items, total, err = eastmoney.ListIPOFiltered(ctx, since, until, page, 30)
+	}
 	if err != nil {
 		slog.ErrorContext(ctx, "查询 IPO 失败", "error", err)
 		writeError(w, http.StatusBadGateway, "新股列表获取失败，请稍后重试")

@@ -41,8 +41,8 @@ export function saveWorkspace(state: WorkspaceState): Promise<WorkspaceState> {
   })
 }
 
-export function ipo(page: number, signal?: AbortSignal): Promise<PageResult<IPOListing>> {
-  return request(`/api/v1/ipo?page=${page}`, signal)
+export function ipo(page: number, since: string, until: string, signal?: AbortSignal): Promise<PageResult<IPOListing>> {
+  return request(`/api/v1/ipo?${new URLSearchParams({ page: String(page), since, until })}`, signal)
 }
 
 export function announcements(page: number, code: string, key: string, type: string, signal?: AbortSignal): Promise<PageResult<Announcement>> {
