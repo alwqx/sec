@@ -3,10 +3,11 @@ import { useState, type FormEvent, type KeyboardEvent } from 'react'
 interface Props {
   onSearch: (key: string) => void
   loading: boolean
+  initialKey?: string
 }
 
-export default function SearchBar({ onSearch, loading }: Props) {
-  const [key, setKey] = useState('')
+export default function SearchBar({ onSearch, loading, initialKey = '' }: Props) {
+  const [key, setKey] = useState(initialKey)
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
@@ -30,7 +31,7 @@ export default function SearchBar({ onSearch, loading }: Props) {
         value={key}
         onChange={(e) => setKey(e.target.value)}
         onKeyDown={selectAll}
-        placeholder="搜索证券名称 / 代码 / 拼音"
+        placeholder="名称 / 代码 / 拼音"
         autoFocus
       />
       <button type="submit" disabled={loading}>
