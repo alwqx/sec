@@ -129,7 +129,6 @@ export default function App() {
   return <div className="app">
     <header className="topbar">
       <div className="brand"><span className="brand-mark">s</span><div><strong>sec</strong><span>研究工作台</span></div></div>
-      <SearchBar onSearch={onSearch} loading={searching} />
       <span className="topbar-caption">A 股 · 港股 · 美股</span>
     </header>
     <div className="app-shell">
@@ -150,8 +149,9 @@ export default function App() {
         {!ready && !storeError && <div className="data-note" role="status">正在读取本地自选与设置…</div>}
         {page === 'stocks' && <div className="workspace-grid">
           <section className="security-browser" aria-label="证券列表">
+            <div className="browser-search"><SearchBar onSearch={onSearch} loading={searching} initialKey={searchedKey} /></div>
             <div className="browser-tabs segmented"><button aria-pressed={listMode === 'watchlist'} onClick={() => setListMode('watchlist')}>我的自选 <span>{workspace.watchlist.length}</span></button><button aria-pressed={listMode === 'search'} onClick={() => setListMode('search')}>搜索结果</button></div>
-            <div className="results-caption">{listMode === 'watchlist' ? '关注的证券，随时继续研究' : searchedKey ? `“${searchedKey}” · ${results.length} 个结果` : '在顶部输入名称或代码'}</div>
+            <div className="results-caption">{listMode === 'watchlist' ? '关注的证券，随时继续研究' : searchedKey ? `“${searchedKey}” · ${results.length} 个结果` : '在上方输入名称或代码'}</div>
             {listMode === 'search' && searchError && <div className="error" role="alert">{searchError}</div>}
             {listMode === 'search' && searching ? <div className="empty-state" role="status">正在搜索证券…</div>
               : <SecurityList items={items} selected={selected} onSelect={onSelect} emptyText={listMode === 'watchlist' ? '暂无自选证券。搜索并选中证券后，点击“加入自选”。' : searchedKey ? '未找到证券，请尝试其他名称或代码' : '输入关键字搜索证券'} />}

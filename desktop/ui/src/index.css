@@ -75,6 +75,9 @@ h1, h2, h3 { font-weight: 600; }
 .context-security { background: transparent; color: var(--muted); font-size: 12px; }
 .workspace-grid { display: grid; grid-template-columns: 234px minmax(0, 1fr); gap: 20px; flex: 1; min-height: 360px; }
 .security-browser { display: flex; flex-direction: column; min-height: 0; border: 1px solid var(--border); border-radius: 9px; background: var(--panel); overflow: hidden; }
+.browser-search { padding: 12px 10px 0; flex-shrink: 0; }
+.browser-search .search-bar { width: 100%; flex-direction: column; }
+.browser-search input { padding-left: 10px; }
 .browser-tabs { padding: 10px; flex-shrink: 0; }
 .segmented { display: flex; gap: 4px; }
 .segmented button { border: 0; font-size: 12px; background: transparent; }
@@ -181,7 +184,6 @@ h1, h2, h3 { font-weight: 600; }
 }
 @media (max-width: 850px) {
   .topbar-caption { display: none; }
-  .topbar .search-bar { flex: 1; }
   .sidebar { width: 144px; padding-left: 8px; padding-right: 8px; }
   .workspace-grid { grid-template-columns: 175px minmax(0, 1fr); }
   .main-body { padding: 18px 14px; }
@@ -207,7 +209,7 @@ h1, h2, h3 { font-weight: 600; }
   .main-body { gap: 16px; }
   .app-header h1 { font-size: 20px; }
   .workspace-grid { display: flex; flex-direction: column; flex: none; }
-  .security-browser { min-height: 140px; max-height: 240px; }
+  .security-browser { min-height: 140px; max-height: 320px; }
   .research-workspace { min-height: 400px; }
   .research-panel { overflow: visible; }
   .welcome-state { min-height: 360px; padding: 26px 16px; }
