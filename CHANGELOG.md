@@ -14,6 +14,8 @@
 10. Move Desktop security search into the Stocks and Watchlist page above the security list, keeping search results and the selected security when switching pages
 11. Add Desktop security history date filters, 1/3/6-month and 1-year shortcuts, and unadjusted/forward/backward adjustment choices; retain the full requested range with a five-year limit and default to the last three months
 
+12. Add Desktop IPO prospectus lookup by security code and disclosure dates, paginated original PDF links, and single or selected downloads with progress, cancellation, per-file failures, and the configured download directory; consolidate the IPO module into New Listings and Prospectuses, removing the duplicate listing timeline
+
 ### v0.3.15
 
 1. Desktop 升级为研究工作台：顶部全局搜索、左侧工作空间导航、中间证券列表、右侧个股研究，切换功能时保留当前证券

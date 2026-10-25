@@ -145,11 +145,6 @@ h1, h2, h3 { font-weight: 600; }
 .financial-table th:first-child { text-align: left; min-width: 138px; position: sticky; left: 0; background: var(--panel); }
 .pagination { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding-top: 20px; color: var(--muted); font-size: 12px; }
 .pagination button { font-size: 12px; margin-left: 8px; }
-.ipo-timeline { margin-top: 28px; }
-.ipo-day { display: grid; grid-template-columns: 118px minmax(0, 1fr); gap: 20px; padding: 0 0 24px; }
-.ipo-day h2 { font-size: 13px; margin: 10px 0 0; font-weight: 500; color: var(--muted); }
-.ipo-day > div { border-left: 2px solid var(--border); padding-left: 18px; }
-.ipo-security { width: 100%; display: flex; gap: 16px; align-items: center; text-align: left; margin-bottom: 8px; padding: 12px; background: var(--surface); border: 0; }
 .text-link { color: var(--accent); margin-left: auto; font-size: 12px; }
 .announcement-search input { flex: 1; min-width: 140px; }
 .announcement-search > button:last-child { margin-left: 0; }
@@ -214,9 +209,6 @@ h1, h2, h3 { font-weight: 600; }
   .research-panel { overflow: visible; }
   .welcome-state { min-height: 360px; padding: 26px 16px; }
   .page-panel { padding: 16px; }
-  .ipo-day { grid-template-columns: 1fr; gap: 6px; }
-  .ipo-day > div { padding-left: 12px; }
-  .ipo-security { flex-wrap: wrap; gap: 6px 12px; }
   .setting-row { gap: 14px; flex-wrap: wrap; }
   .setting-row select, .setting-row input { width: 100%; }
   .company-fields > div { grid-template-columns: 70px minmax(0,1fr); gap: 12px; }
@@ -303,3 +295,6 @@ h1, h2, h3 { font-weight: 600; }
 .history-filters input, .history-filters select { max-width: 100%; }
 .history-shortcuts { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
 .history-shortcuts button { font-size: 12px; }
+.prospectus-search { align-items: end; }
+.prospectus-search label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--muted); }
+.prospectus-search input { max-width: 100%; }
