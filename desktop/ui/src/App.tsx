@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { ChartCandlestick, FilePlusCorner, Newspaper, Coins, Landmark, Settings as SettingsIcon, type LucideIcon } from 'lucide-react'
-import { loadWorkspace, saveWorkspace, search } from './api'
+import { loadWorkspace, saveWorkspace, search, loadWatchlist, changeWatchlist } from './api'
 import type { BasicSecurity, WorkspaceSettings, WorkspaceState } from './types'
 import SearchBar from './components/SearchBar'
 import SecurityList from './components/SecurityList'
@@ -47,6 +47,8 @@ export default function App() {
   const [storeRetry, setStoreRetry] = useState(0)
   const searchController = useRef<AbortController | null>(null)
   const savingRef = useRef(false)
+  const watchRevision = useRef(0)
+  const [watchRefresh, setWatchRefresh] = useState(0)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -72,9 +74,29 @@ export default function App() {
 
   useEffect(() => () => searchController.current?.abort(), [])
 
+  useEffect(() => {
+    if (!ready || page !== 'stocks') return
+    const controller = new AbortController()
+    let requestSequence = 0
+    const refresh = () => {
+      if (savingRef.current) return
+      const revision = watchRevision.current
+      const sequence = ++requestSequence
+      void loadWatchlist(controller.signal).then(watchlist => {
+        if (!controller.signal.aborted && !savingRef.current && revision === watchRevision.current && sequence === requestSequence) setWorkspace(current => ({ ...current, watchlist }))
+      }).catch((e: unknown) => {
+        if (!controller.signal.aborted) setStoreError(e instanceof Error ? e.message : String(e))
+      })
+    }
+    refresh()
+    window.addEventListener('focus', refresh)
+    return () => { controller.abort(); window.removeEventListener('focus', refresh) }
+  }, [ready, page, listMode, watchRefresh])
+
   const persist = async (state: WorkspaceState) => {
     if (!ready || savingRef.current) return false
     savingRef.current = true
+    watchRevision.current++
     setSaving(true)
     setStoreError('')
     try { setWorkspace(await saveWorkspace(state)); return true }
@@ -108,11 +130,18 @@ export default function App() {
     setTab('overview')
     setPage('stocks')
   }
-  const watched = selected !== null && workspace.watchlist.some(item => item.ex_code === selected.ex_code)
-  const toggleWatch = () => {
-    if (!selected) return
-    if (!watched && workspace.watchlist.length >= 500) { setStoreError('最多保存 500 只自选证券'); return }
-    void persist({ ...workspace, watchlist: watched ? workspace.watchlist.filter(item => item.ex_code !== selected.ex_code) : [...workspace.watchlist, selected] })
+  const watched = selected !== null && workspace.watchlist.some(item => item.ex_code.toUpperCase() === selected.ex_code.toUpperCase())
+  const toggleWatch = async () => {
+    if (!selected || !ready || savingRef.current) return
+    savingRef.current = true
+    watchRevision.current++
+    setSaving(true)
+    setStoreError('')
+    try {
+      const watchlist = await changeWatchlist(watched ? 'remove' : 'add', selected)
+      setWorkspace(current => ({ ...current, watchlist }))
+    } catch (e) { setStoreError(e instanceof Error ? e.message : String(e)) }
+    finally { savingRef.current = false; setSaving(false) }
   }
   const saveSettings = (settings: WorkspaceSettings) => persist({ ...workspace, settings })
   const currentPage = pages.find(item => item.id === page)!
@@ -153,6 +182,7 @@ export default function App() {
           <section className="security-browser" aria-label="证券列表">
             <div className="browser-search"><SearchBar onSearch={onSearch} loading={searching} initialKey={searchedKey} /></div>
             <div className="browser-tabs segmented"><button aria-pressed={listMode === 'watchlist'} onClick={() => setListMode('watchlist')}>我的自选 <span>{workspace.watchlist.length}</span></button><button aria-pressed={listMode === 'search'} onClick={() => setListMode('search')}>搜索结果</button></div>
+            {listMode === 'watchlist' && <button className="watchlist-refresh" disabled={!ready || saving} onClick={() => setWatchRefresh(n => n + 1)}>刷新自选</button>}
             <div className="results-caption">{listMode === 'watchlist' ? '关注的证券，随时继续研究' : searchedKey ? `“${searchedKey}” · ${results.length} 个结果` : '在上方输入名称或代码'}</div>
             {listMode === 'search' && searchError && <div className="error" role="alert">{searchError}</div>}
             {listMode === 'search' && searching ? <div className="empty-state" role="status">正在搜索证券…</div>

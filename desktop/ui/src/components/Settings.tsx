@@ -11,7 +11,7 @@ export default function Settings({ settings, saving, onSave }: {
   const changed = draft.download_directory !== settings.download_directory || draft.theme !== settings.theme || draft.refresh_seconds !== settings.refresh_seconds
   return <section className="page-panel settings-panel">
     <h2>工作台偏好</h2>
-    <p className="data-note">自选证券保存在本机；偏好修改后点击保存，重新打开应用后继续使用。</p>
+    <p className="data-note">自选证券与 CLI 共用本机列表；偏好修改后点击保存，重新打开应用后继续使用。</p>
     <form onSubmit={async e => { e.preventDefault(); setSaved(await onSave(draft)) }}>
       <div className="setting-row"><div><label htmlFor="refresh-interval">行情刷新间隔</label><p className="data-note">仅在查看个股概览时刷新行情</p></div><select id="refresh-interval" value={draft.refresh_seconds} onChange={e => { setDraft({ ...draft, refresh_seconds: Number(e.target.value) }); setSaved(false) }}>{[5, 15, 30, 60].map(n => <option value={n} key={n}>{n} 秒</option>)}</select></div>
       <div className="setting-row"><div><label htmlFor="theme">外观</label><p className="data-note">选择深色、浅色或跟随系统</p></div><select id="theme" value={draft.theme} onChange={e => { setDraft({ ...draft, theme: e.target.value as WorkspaceSettings['theme'] }); setSaved(false) }}><option value="dark">深色</option><option value="light">浅色</option><option value="system">跟随系统</option></select></div>

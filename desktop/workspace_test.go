@@ -24,6 +24,7 @@ func TestWorkspacePersistsAcrossServers(t *testing.T) {
 	state.Watchlist = []sina.BasicSecurity{{Name: "招商银行", Code: "600036", ExCode: "SH600036", ExChange: "sse", SecurityType: types.SecurityTypeStock}}
 	data, err := json.Marshal(state)
 	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(path, data, 0600))
 	srv := &desktopServer{token: "secret", workspace: workspaceStore{path: path}}
 	req := httptest.NewRequest(http.MethodPut, "/api/v1/workspace", strings.NewReader(string(data)))
 	req.Header.Set("Content-Type", "application/json")
