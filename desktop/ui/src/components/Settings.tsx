@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import VersionInfo from './VersionInfo'
 import type { WorkspaceSettings } from '../types'
 
 export default function Settings({ settings, saving, onSave }: {
@@ -18,6 +19,6 @@ export default function Settings({ settings, saving, onSave }: {
       <div className="setting-row"><div><label htmlFor="download-directory">下载目录</label><p className="data-note">财报导出和年报 PDF 共用此目录。留空使用 ~/Downloads；支持绝对路径或 ~/ 开头，下载时自动创建目录。</p></div><input id="download-directory" type="text" placeholder="~/Downloads" value={draft.download_directory ?? ''} onChange={e => { setDraft({ ...draft, download_directory: e.target.value }); setSaved(false) }} /></div>
       <div className="settings-actions"><button className="primary-button" type="submit" disabled={saving || !changed}>{saving ? '保存中…' : '保存设置'}</button><span role="status">{saved && !changed ? '设置已保存' : ''}</span></div>
     </form>
-    <div className="settings-about"><h3>关于 SEC Desktop</h3><p className="data-note">证券研究工作台 · 支持 A 股、港股和美股行情。公司资料、财报、分红与公告目前接入 A 股数据。</p></div>
+    <div className="settings-about"><h3>关于 SEC Desktop</h3><p className="data-note">证券研究工作台 · 支持 A 股、港股和美股行情。公司资料、财报、分红与公告目前接入 A 股数据。</p><VersionInfo /></div>
   </section>
 }

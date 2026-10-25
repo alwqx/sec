@@ -5,7 +5,6 @@ import (
 	"archive/zip"
 	"compress/gzip"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -18,27 +17,18 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alwqx/sec/release"
 	"github.com/alwqx/sec/utils"
 	"github.com/alwqx/sec/version"
 	"github.com/spf13/cobra"
 )
 
 const (
-	githubLatestAPI = "https://api.github.com/repos/alwqx/sec/releases/latest"
-	maxBinarySize   = 500 * 1024 * 1024 // 500 MB
+	maxBinarySize = 500 * 1024 * 1024 // 500 MB
 )
 
-type releaseInfo struct {
-	TagName string  `json:"tag_name"`
-	Name    string  `json:"name"`
-	Assets  []asset `json:"assets"`
-}
-
-type asset struct {
-	Name               string `json:"name"`
-	BrowserDownloadURL string `json:"browser_download_url"`
-	Size               int64  `json:"size"`
-}
+type releaseInfo = release.Info
+type asset = release.Asset
 
 func NewUpgradeCLI() *cobra.Command {
 	rootCmd := &cobra.Command{
@@ -100,31 +90,7 @@ func UpgradeHandler(cmd *cobra.Command, args []string) error {
 }
 
 // fetchLatestRelease 获取最新的 release 信息
-func fetchLatestRelease(ctx context.Context) (*releaseInfo, error) {
-	headers := http.Header{}
-	headers.Set("Accept", "application/vnd.github+json")
-
-	resp, err := utils.MakeRequest(ctx, http.MethodGet, githubLatestAPI, headers, nil, 30*time.Second)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("github API returned status %d", resp.StatusCode)
-	}
-
-	var release releaseInfo
-	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
-		return nil, err
-	}
-
-	if release.TagName == "" {
-		return nil, errors.New("no release found")
-	}
-
-	return &release, nil
-}
+func fetchLatestRelease(ctx context.Context) (*releaseInfo, error) { return release.FetchLatest(ctx) }
 
 // findAsset 查找匹配当前 OS/Arch 的 release asset
 func findAsset(release *releaseInfo) (*asset, error) {

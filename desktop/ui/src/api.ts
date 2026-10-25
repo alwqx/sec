@@ -109,3 +109,10 @@ export async function changeWatchlist(action: 'add' | 'remove', security: BasicS
   })
   return data.results
 }
+
+export function versionDetails(signal?: AbortSignal): Promise<import('./types').VersionDetails> {
+  return request('/api/v1/version', signal)
+}
+export function checkUpdates(signal?: AbortSignal): Promise<import('./types').UpdateDetails> {
+  return request('/api/v1/updates', signal)
+}

@@ -25,6 +25,8 @@ type desktopServer struct {
 func (s *desktopServer) Handler() http.Handler {
 	mux := http.NewServeMux()
 
+	mux.Handle("GET /api/v1/version", s.withAuth(http.HandlerFunc(s.handleVersion)))
+	mux.Handle("GET /api/v1/updates", s.withAuth(http.HandlerFunc(s.handleUpdates)))
 	// API 路由：显式方法 + 路径，避免与 SPA 的 GET / 冲突。
 	// dev 模式跳过鉴权并打开 CORS。
 	mux.Handle("GET /api/v1/search", s.withAuth(s.withCORS(http.HandlerFunc(s.handleSearch))))

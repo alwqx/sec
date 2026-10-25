@@ -135,10 +135,18 @@ provider 在保持原有数值字段的同时，通过 `MissingTenors` 记录上
 
 设置仍保存到 `~/.sec/desktop/workspace.json`，仅持久化 settings。保存设置即使携带过期 watchlist 快照也不会改写共享自选；增删使用独立接口，只提交对应证券。首次保存设置前先完成旧列表迁移，设置文件与迁移使用同一工作台文件锁。Desktop 返回「自选与行情」、重新获得窗口焦点或点击「刷新自选」时同步列表，后台响应不会覆盖本窗口正在进行的增删。当前研究证券、筛选条件与菜单仅在本次运行中保留。
 
+### 版本与更新
+
+设置页「关于 SEC Desktop」展示链接器注入的版本、构建时间、提交号及当前平台；未注入版本时显示开发构建，其他缺失字段显示未知。仅点击「检查更新」时查询 GitHub 最新正式 Release，CLI 与 Desktop 共用 `release.FetchLatest`。版本按语义版本比较，区分可更新、已是最新、当前版本更高及无法比较；查询失败时保留直接访问 Release 的入口。
+
+macOS 按当前进程架构匹配 `sec-<tag>-desktop-darwin-<arch>.dmg`，不将 CLI 压缩包作为安装包。无匹配文件时提示用户前往 Release 查看。原生应用通过绑定在系统浏览器打开官方发布页面或安装包链接，开发浏览器使用新标签；下载和安装由用户完成，不替换运行中的应用。链接仅允许 `https://github.com/alwqx/sec/releases/` 下的发布与下载路径。
+
 ### 新增 API
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
+| GET | `/api/v1/version` | 当前版本、构建时间、提交号、平台与官方 Release 地址，无外部网络请求 |
+| GET | `/api/v1/updates` | 手动查询最新正式版本、比较状态及匹配当前平台的 Desktop 安装包；GitHub 错误返回 502 |
 | GET | `/api/v1/watchlist` | 读取 CLI／Desktop 共享自选，返回 results |
 | POST | `/api/v1/watchlist` | JSON action=add 与 security，或 action=remove 与 code；按最新列表执行单项增删，要求鉴权与同源 |
 | GET | `/api/v1/workspace` | 本地自选与设置；无文件时返回默认值 |

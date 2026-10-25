@@ -171,3 +171,18 @@ export interface ProspectusPage {
   page: number
   has_more: boolean
 }
+
+export interface VersionDetails {
+  version: string
+  build_time: string
+  git_commit: string
+  os: string
+  arch: string
+  release_url: string
+}
+export interface UpdateDetails {
+  latest_version: string
+  status: 'available' | 'current' | 'ahead' | 'unknown'
+  release_url: string
+  asset: { name: string; browser_download_url: string; size: number } | null
+}
