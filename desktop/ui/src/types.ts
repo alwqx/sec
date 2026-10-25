@@ -155,3 +155,18 @@ export interface AnnualReportsPage {
   page: number
   has_more: boolean
 }
+
+export interface ProspectusDocument {
+  id: string
+  title: string
+  date: string
+  url: string
+}
+
+export interface ProspectusPage {
+  code: string
+  name: string
+  results: ProspectusDocument[]
+  page: number
+  has_more: boolean
+}

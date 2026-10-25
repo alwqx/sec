@@ -16,7 +16,7 @@ type Page = 'stocks' | 'ipo' | 'announcements' | 'metal' | 'bond' | 'settings'
 type Tab = 'overview' | 'company' | 'financials' | 'dividends' | 'announcements'
 const pages: { id: Page; title: string; icon: string; description: string }[] = [
   { id: 'stocks', title: '自选与行情', icon: '↗', description: '从市场行情到公司研究，在同一个工作区完成' },
-  { id: 'ipo', title: 'IPO 日历', icon: '▦', description: '追踪新股上市排期与最新上市证券' },
+  { id: 'ipo', title: 'IPO', icon: '▦', description: '查看新股上市信息与招股说明书' },
   { id: 'announcements', title: '公告中心', icon: '▤', description: '查询巨潮资讯最新披露与证券公告' },
   { id: 'metal', title: '黄金行情', icon: '◇', description: '上海黄金交易所 Au99.99 最新日行情与历史价格' },
   { id: 'bond', title: '美债收益率', icon: '∿', description: '美国财政部每日收益率曲线与各期限历史数据' },
