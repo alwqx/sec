@@ -1,3 +1,4 @@
+import PageActions from './PageActions'
 import { useCallback, useState, type FormEvent } from 'react'
 import { bond } from '../api'
 import { useResource } from '../hooks/useResource'
@@ -20,6 +21,18 @@ function yieldText(value: number | null | undefined) { return value == null ? '�
 function bpText(value: number | null) { return value === null ? '—' : `${value > 0 ? '+' : ''}${value.toFixed(1)} bp` }
 function changeClass(value: number | null) { return value === null || value === 0 ? 'flat' : value > 0 ? 'up' : 'down' }
 
+function BondLatest({ data }: { data: BondData }) {
+  const latest = data.latest
+  return <section className="page-panel bond-latest" aria-label="最新美债收益率">
+      <div className="section-caption"><h2>美国国债收益率</h2><span>{latest ? `最新交易日 ${latest.date}` : '近期暂无数据'}</span></div>
+      {latest ? <>
+        <div className="bond-benchmark"><div><span className="data-note">10 年期收益率</span><div className="quote-price">{yieldText(latest.yields['10y'])}</div><div className={`quote-change ${changeClass(latest.change_bp)}`}>较前一交易日 {bpText(latest.change_bp)}</div></div><div className="data-note">前值 {yieldText(latest.previous_10y)}<br />1 bp = 0.01 个百分点</div></div>
+        <dl className="quote-grid bond-yields">{data.tenors.map(item => <div key={item.key}><dt>{item.label}</dt><dd>{yieldText(latest.yields[item.key])}</dd></div>)}</dl>
+      </> : <div className="empty-state">暂无最近可用的美债日收益率</div>}
+      <p className="data-note">来源：美国财政部 · 每日公布，非盘中实时报价；红绿表示收益率上升或下降，不表示债券价格涨跌。缺失值显示“—”。</p>
+    </section>
+}
+
 function BondResults({ data, tenor, setTenor }: { data: BondData; tenor: string; setTenor: (tenor: string) => void }) {
   const [page, setPage] = useState(1)
   const [curveDate, setCurveDate] = useState('latest')
@@ -28,14 +41,6 @@ function BondResults({ data, tenor, setTenor }: { data: BondData; tenor: string;
   const label = data.tenors.find(item => item.key === tenor)?.label ?? '10年'
   const pageSize = 30, rows = [...data.results].reverse().slice((page - 1) * pageSize, page * pageSize)
   return <>
-    <section className="page-panel bond-latest" aria-label="最新美债收益率">
-      <div className="section-caption"><h2>美国国债收益率</h2><span>{latest ? `最新交易日 ${latest.date}` : '近期暂无数据'}</span></div>
-      {latest ? <>
-        <div className="bond-benchmark"><div><span className="data-note">10 年期收益率</span><div className="quote-price">{yieldText(latest.yields['10y'])}</div><div className={`quote-change ${changeClass(latest.change_bp)}`}>较前一交易日 {bpText(latest.change_bp)}</div></div><div className="data-note">前值 {yieldText(latest.previous_10y)}<br />1 bp = 0.01 个百分点</div></div>
-        <dl className="quote-grid bond-yields">{data.tenors.map(item => <div key={item.key}><dt>{item.label}</dt><dd>{yieldText(latest.yields[item.key])}</dd></div>)}</dl>
-      </> : <div className="empty-state">暂无最近可用的美债日收益率</div>}
-      <p className="data-note">来源：美国财政部 · 每日公布，非盘中实时报价；红绿表示收益率上升或下降，不表示债券价格涨跌。缺失值显示“—”。</p>
-    </section>
     <section className="page-panel" aria-label="美债收益率曲线">
       <div className="section-toolbar"><h2>收益率曲线</h2><label>对比日期<select aria-label="收益率曲线日期" value={curveDate} onChange={e => setCurveDate(e.target.value)}><option value="latest">最新交易日</option>{[...data.results].reverse().map(item => <option key={item.date} value={item.date}>{item.date}</option>)}</select></label></div>
       {selectedDay ? <BondChart key={selectedDay.date} title={`${selectedDay.date} · 各期限收益率`} curve points={data.tenors.map(item => ({ label: item.label, value: selectedDay.yields[item.key] ?? null }))} /> : <div className="empty-state">暂无收益率曲线</div>}
@@ -72,10 +77,11 @@ export default function Bond() {
   }
   const quickRange = (days: number) => { const next = dateRange(days); setDraft(next); apply(next) }
   return <div className="bond-page">
+    {resource.data && <BondLatest data={resource.data} />}
     <section className="page-panel" aria-label="美债收益率查询"><form className="section-toolbar bond-range-form" onSubmit={submit}>
       <label htmlFor="bond-begin">开始日期<input id="bond-begin" type="date" required min="1990-01-01" max={draft.end} value={draft.begin} onChange={e => setDraft({ ...draft, begin: e.target.value })} /></label>
       <label htmlFor="bond-end">结束日期<input id="bond-end" type="date" required min={draft.begin} max={todayNewYork()} value={draft.end} onChange={e => setDraft({ ...draft, end: e.target.value })} /></label>
-      <button className="primary-button" type="submit">查询</button><button type="button" disabled={resource.loading} onClick={resource.reload}>刷新</button>
+      <button className="primary-button" type="submit">查询</button><PageActions><button type="button" disabled={resource.loading} onClick={resource.reload}>刷新行情</button></PageActions>
     </form><div className="bond-quick-ranges"><span className="data-note">快捷区间</span>{[[30, '近1个月'], [90, '近3个月'], [365, '近1年']].map(([days, label]) => <button key={days} onClick={() => quickRange(Number(days))}>{label}</button>)}</div>
       <p className="data-note">日期按美东时区计算，支持 1990 年至今，单次历史区间最多 5 年。修改历史区间不会改变最新行情的日期。</p>
       {validation && <div className="error" role="alert">{validation}</div>}

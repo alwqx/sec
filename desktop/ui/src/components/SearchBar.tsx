@@ -1,3 +1,4 @@
+import { Search, LoaderCircle } from 'lucide-react'
 import { useState, type FormEvent, type KeyboardEvent } from 'react'
 
 interface Props {
@@ -34,8 +35,8 @@ export default function SearchBar({ onSearch, loading, initialKey = '' }: Props)
         placeholder="名称 / 代码 / 拼音"
         autoFocus
       />
-      <button type="submit" disabled={loading}>
-        {loading ? '搜索中…' : '搜索'}
+      <button type="submit" aria-label={loading ? '搜索中' : '搜索证券'} title="搜索证券" disabled={loading}>
+        {loading ? <LoaderCircle size={17} className="spin" aria-hidden="true" /> : <Search size={17} aria-hidden="true" />}
       </button>
     </form>
   )
