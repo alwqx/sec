@@ -10,10 +10,9 @@
 6. Add Desktop Treasury yields with the latest 11-tenor curve, selectable historical trends, date filters, daily basis-point changes, and paginated records
 7. Preserve missing Treasury yields as null values, retain cross-year comparison baselines, and reject incomplete annual responses instead of displaying partial history
 8. Add industry, PE (TTM), PB, total market capitalization, and float market capitalization to Desktop overview and company pages using shared CLI info calculations; load metrics independently, show unavailable values explicitly, and normalize quoted profile fields
-
 9. Add Desktop financial statement CSV/JSON exports with original fields and units, plus annual report lookup by fiscal year and PDF downloads; save files to a configurable download directory (default ~/Downloads) without overwriting existing downloads
-
 10. Move Desktop security search into the Stocks and Watchlist page above the security list, keeping search results and the selected security when switching pages
+11. Add Desktop security history date filters, 1/3/6-month and 1-year shortcuts, and unadjusted/forward/backward adjustment choices; retain the full requested range with a five-year limit and default to the last three months
 
 ### v0.3.15
 

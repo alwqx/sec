@@ -163,7 +163,7 @@ func (s *desktopServer) handleFinancials(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, map[string]any{"columns": columns, "results": results})
 }
 
-// handleHistory 返回最近 60 个交易日的不复权行情，供概览走势图使用。
+// handleHistory 按日期范围和复权方式返回日行情，默认最近三个月、不复权。
 func (s *desktopServer) handleHistory(w http.ResponseWriter, r *http.Request) {
 	code := strings.ToUpper(strings.TrimSpace(r.URL.Query().Get("code")))
 	market := -1
@@ -182,19 +182,51 @@ func (s *desktopServer) handleHistory(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "走势图暂支持沪深证券与港股")
 		return
 	}
+	now := time.Now().In(time.FixedZone("CST", 8*3600))
+	query := r.URL.Query()
+	end := query.Get("end")
+	if end == "" {
+		end = now.Format("2006-01-02")
+	}
+	endTime, err := time.Parse("2006-01-02", end)
+	if err != nil {
+		writeError(w, 400, "结束日期格式无效，请使用 YYYY-MM-DD")
+		return
+	}
+	begin := query.Get("begin")
+	if begin == "" {
+		begin = endTime.AddDate(0, -3, 0).Format("2006-01-02")
+	}
+	beginTime, err := time.Parse("2006-01-02", begin)
+	if err != nil {
+		writeError(w, 400, "开始日期格式无效，请使用 YYYY-MM-DD")
+		return
+	}
+	if beginTime.After(endTime) || beginTime.Year() < 1990 || end > now.Format("2006-01-02") || endTime.After(beginTime.AddDate(5, 0, 0)) {
+		writeError(w, 400, "日期范围须在 1990 年至今日之间，开始不晚于结束，单次最多 5 年")
+		return
+	}
+	fq := query.Get("fq")
+	fqt := eastmoney.QuoteFQTDefault
+	switch fq {
+	case "", "bfq":
+	case "qfq":
+		fqt = eastmoney.QuoteFQTFront
+	case "hfq":
+		fqt = eastmoney.QuoteFQTPost
+	default:
+		writeError(w, 400, "复权方式必须为 bfq、qfq 或 hfq")
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
-	now := time.Now()
 	items, err := eastmoney.GetQuoteHistory(ctx, &eastmoney.GetQuoteHistoryReq{
-		Code: symbol, MarketCode: market, Begin: now.AddDate(0, -6, 0).Format("20060102"), End: now.Format("20060102"), FQT: eastmoney.QuoteFQTDefault,
+		Code: symbol, MarketCode: market, Begin: beginTime.Format("20060102"), End: endTime.Format("20060102"), FQT: fqt,
 	})
 	if err != nil {
 		slog.ErrorContext(ctx, "查询历史行情失败", "error", err)
 		writeError(w, http.StatusBadGateway, "历史行情获取失败，请稍后重试")
 		return
-	}
-	if len(items) > 60 {
-		items = items[len(items)-60:]
 	}
 	results := make([]map[string]any, 0, len(items))
 	for _, item := range items {

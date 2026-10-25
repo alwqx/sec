@@ -55,8 +55,8 @@ export function financials(code: string, report: string, period: string, signal?
   return request(`/api/v1/financials?${new URLSearchParams({ code, report, period })}`, signal)
 }
 
-export async function history(code: string, signal?: AbortSignal): Promise<HistoryQuote[]> {
-  const data = await request<{ results: HistoryQuote[] }>(`/api/v1/history?code=${encodeURIComponent(code)}`, signal)
+export async function history(code: string, filters: { begin: string; end: string; fq: string }, signal?: AbortSignal): Promise<HistoryQuote[]> {
+  const data = await request<{ results: HistoryQuote[] }>(`/api/v1/history?${new URLSearchParams({ code, ...filters })}`, signal)
   return data.results
 }
 
