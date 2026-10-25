@@ -29,9 +29,9 @@ Ollama 桌面版**不是 Electron**，而是「纯 Go 外壳 + 系统 WebView + 
 
 ## 财报导出与年度报告
 
-个股「财报」页分为「财务报表」与「年度报告」。财务报表可按当前报表类型和报告期重新查询，导出 CSV 或 JSON，最多 50 期，保留全部原始字段和数值单位（不按页面的亿元缩放）。CSV 使用 UTF-8 BOM，JSON 包含证券信息、报告日期及原始字段。
+个股「财报」页分为「财务报表」与「定期报告」。财务报表可按当前报表类型和报告期重新查询，导出 CSV 或 JSON，最多 50 期，保留全部原始字段和数值单位（不按页面的亿元缩放）。CSV 使用 UTF-8 BOM，JSON 包含证券信息、报告日期及原始字段。
 
-年度报告按报告年度查询，例如 2025 年度报告通常在 2026 年披露；支持 1990 年至上一年度的起止年份筛选、分页查询及 PDF 原文下载；起止相同可查单年度。支持单份下载、本页全选与多选顺序下载，展示当前文件、总份数、成功／失败数量与失败原因。翻页清空选择，下载期间禁止翻页和刷新；重新查询或离开栏目取消未完成任务，已保存文件保留，排除摘要、英文、更正与修订版本。文件保存至设置中配置的下载目录（默认 `~/Downloads`，支持绝对路径或 `~/` 开头），成功后显示完整路径，可打开下载目录。同名文件自动追加编号，下载失败或取消清理临时文件。PDF 仅允许巨潮资讯 HTTPS 原文地址，最大 128 MB。
+定期报告支持年报、半年报、一季报和三季报，按报告年度查询，例如 2025 年度报告通常在 2026 年披露；年报支持 1990 年至上一年度、其余类型支持至本年度的起止年份筛选、分页查询及 PDF 原文下载；起止相同可查单年度。支持单份下载、本页全选与多选顺序下载，展示当前文件、总份数、成功／失败数量与失败原因。翻页清空选择，下载期间禁止翻页和刷新；重新查询或离开栏目取消未完成任务，已保存文件保留，排除摘要、英文、更正与修订版本。文件保存至设置中配置的下载目录（默认 `~/Downloads`，支持绝对路径或 `~/` 开头），成功后显示完整路径，可打开下载目录。同名文件自动追加编号，下载失败或取消清理临时文件。PDF 仅允许巨潮资讯 HTTPS 原文地址，最大 128 MB。
 
 ## 架构
 
@@ -142,8 +142,8 @@ provider 在保持原有数值字段的同时，通过 `MissingTenors` 记录上
 | GET | `/api/v1/company?code=SH600036` | 公司资料 |
 | GET | `/api/v1/dividends?code=SH600036` | 分红记录，按每 10 股展示税前派息/送转 |
 | POST | `/api/v1/financials/export` | JSON 参数 code/report/period/format，format 为 csv/json；返回本地文件路径及大小 |
-| GET | `/api/v1/annual-reports?code=SH600036&start_year=2022&end_year=2025&page=1` | 按报告年度范围查询正文，兼容 year 单年度参数；范围参数必须成对提供 |
-| POST | `/api/v1/annual-reports/download` | JSON 参数 code/year（字符串）/url；下载 PDF 并返回本地文件路径及大小 |
+| GET | `/api/v1/annual-reports?code=SH600036&start_year=2022&end_year=2025&page=1` | 按报告年度范围查询正文，兼容 year 单年度参数；范围参数必须成对提供，type 为 annual（默认）/halfyear/q1/q3 |
+| POST | `/api/v1/annual-reports/download` | JSON 参数 code/year（字符串）/url/type（默认 annual）；下载定期报告 PDF 并返回本地文件路径及大小 |
 | GET | `/api/v1/financials?code=SH600036&report=balance&period=annual` | 财报；report 为 balance/income/cashflow，period 可省略或 annual/halfyear/q1/q3 |
 | GET | `/api/v1/bond?begin=2026-01-01&end=2026-01-31` | 美国国债最新各期限收益率与区间历史；起止日期 YYYY-MM-DD，默认美东今日向前 30 天，单次最多 5 年 |
 | GET | `/api/v1/metal?begin=2026-01-01&end=2026-01-31` | Au99.99 最新日行情与区间历史；日期格式 YYYY-MM-DD，省略 end 时默认上海时区今日，省略 begin 时默认 end 向前 30 天 |

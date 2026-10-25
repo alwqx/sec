@@ -143,6 +143,7 @@ export interface SavedDownload {
 }
 
 export interface AnnualReport {
+  type: string
   id: string
   title: string
   date: string

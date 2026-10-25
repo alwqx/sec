@@ -78,13 +78,13 @@ export function exportFinancials(code: string, report: string, period: string, f
   })
 }
 
-export function annualReports(code: string, startYear: number, endYear: number, page: number, signal?: AbortSignal): Promise<AnnualReportsPage> {
-  return request(`/api/v1/annual-reports?${new URLSearchParams({ code, start_year: String(startYear), end_year: String(endYear), page: String(page) })}`, signal)
+export function annualReports(code: string, startYear: number, endYear: number, page: number, type: string, signal?: AbortSignal): Promise<AnnualReportsPage> {
+  return request(`/api/v1/annual-reports?${new URLSearchParams({ code, start_year: String(startYear), end_year: String(endYear), page: String(page), type })}`, signal)
 }
 
-export function downloadAnnualReport(code: string, year: number, url: string, signal?: AbortSignal): Promise<SavedDownload> {
+export function downloadAnnualReport(code: string, year: number, url: string, type: string, signal?: AbortSignal): Promise<SavedDownload> {
   return request('/api/v1/annual-reports/download', signal, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, year: String(year), url }),
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, year: String(year), url, type }),
   })
 }
 
