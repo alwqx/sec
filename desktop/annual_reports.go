@@ -64,10 +64,18 @@ func annualPDFURL(raw string) string {
 
 // queryAnnualReports 按报告年度过滤正文，披露日期从次年开始，避免将报告年度误作公告年度。
 func queryAnnualReports(ctx context.Context, stock string, year, page int) ([]annualReport, bool, error) {
+	return queryAnnualReportRange(ctx, stock, year, year, page)
+}
+
+func queryAnnualReportRange(ctx context.Context, stock string, startYear, endYear, page int) ([]annualReport, bool, error) {
+	search := ""
+	if startYear == endYear {
+		search = strconv.Itoa(startYear)
+	}
 	today := time.Now().In(time.FixedZone("CST", 8*3600)).Format("2006-01-02")
 	response, err := cninfo.QueryAnnouncements(ctx, &cninfo.QueryRequest{
-		StockCode: stock, Category: cninfo.CategoryAnnual, SearchKey: strconv.Itoa(year),
-		StartDate: fmt.Sprintf("%d-01-01", year+1), EndDate: today, PageNum: page, PageSize: 30,
+		StockCode: stock, Category: cninfo.CategoryAnnual, SearchKey: search,
+		StartDate: fmt.Sprintf("%d-01-01", startYear+1), EndDate: today, PageNum: page, PageSize: 30,
 	})
 	if err != nil {
 		return nil, false, err
@@ -90,7 +98,11 @@ func queryAnnualReports(ctx context.Context, stock string, year, page int) ([]an
 		}
 		compact := strings.Join(strings.Fields(title), "")
 		match := annualTitle.FindStringSubmatch(compact)
-		if skip || len(match) < 2 || match[1] != strconv.Itoa(year) {
+		if skip || len(match) < 2 {
+			continue
+		}
+		year, _ := strconv.Atoi(match[1])
+		if year < startYear || year > endYear {
 			continue
 		}
 		pdfURL := annualPDFURL(item.AdjunctURL)
@@ -111,9 +123,23 @@ func (s *desktopServer) handleAnnualReports(w http.ResponseWriter, r *http.Reque
 	if code == "" {
 		return
 	}
-	year, err := reportYear(r.URL.Query().Get("year"))
+	startValue, endValue := r.URL.Query().Get("start_year"), r.URL.Query().Get("end_year")
+	if startValue == "" && endValue == "" {
+		startValue = r.URL.Query().Get("year")
+		endValue = startValue
+	}
+	startYear, err := reportYear(startValue)
 	if err != nil {
 		writeError(w, 400, err.Error())
+		return
+	}
+	endYear, err := reportYear(endValue)
+	if err != nil {
+		writeError(w, 400, err.Error())
+		return
+	}
+	if startYear > endYear {
+		writeError(w, 400, "开始年度不能晚于结束年度")
 		return
 	}
 	page := requestPage(w, r)
@@ -128,7 +154,7 @@ func (s *desktopServer) handleAnnualReports(w http.ResponseWriter, r *http.Reque
 		writeError(w, 502, "证券公告信息获取失败，请稍后重试")
 		return
 	}
-	results, more, err := queryAnnualReports(ctx, code+","+org, year, page)
+	results, more, err := queryAnnualReportRange(ctx, code+","+org, startYear, endYear, page)
 	if err != nil {
 		slog.ErrorContext(ctx, "查询年度报告失败", "error", err)
 		writeError(w, 502, "年度报告获取失败，请稍后重试")
