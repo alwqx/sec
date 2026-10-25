@@ -73,7 +73,13 @@ func (s *desktopServer) handleAnnouncements(w http.ResponseWriter, r *http.Reque
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
 	defer cancel()
-	req := &cninfo.QueryRequest{PageNum: page, PageSize: 30}
+	categories := map[string]string{"": "", "annual": cninfo.CategoryAnnual, "halfyear": cninfo.CategoryHalfYear, "q1": cninfo.CategoryQ1, "q3": cninfo.CategoryQ3}
+	category, ok := categories[r.URL.Query().Get("type")]
+	if !ok {
+		writeError(w, http.StatusBadRequest, "公告类别必须为 annual、halfyear、q1 或 q3，留空查询全部")
+		return
+	}
+	req := &cninfo.QueryRequest{PageNum: page, PageSize: 30, Category: category}
 	if strings.TrimSpace(r.URL.Query().Get("code")) != "" {
 		code := companyCode(w, r)
 		if code == "" {
@@ -113,7 +119,7 @@ func (s *desktopServer) handleAnnouncements(w http.ResponseWriter, r *http.Reque
 		}
 		results = append(results, map[string]any{
 			"id": a.ID, "title": html.UnescapeString(titleTags.ReplaceAllString(a.Title, "")),
-			"date": date, "code": a.SecCode, "name": a.SecName, "url": announcementURL(a),
+			"date": date, "code": a.SecCode, "name": html.UnescapeString(titleTags.ReplaceAllString(a.SecName, "")), "url": announcementURL(a),
 		})
 	}
 	writeJSON(w, map[string]any{"results": results, "total": response.Total, "has_more": response.HasMore || page < response.TotalPages})

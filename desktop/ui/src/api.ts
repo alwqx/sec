@@ -45,8 +45,8 @@ export function ipo(page: number, signal?: AbortSignal): Promise<PageResult<IPOL
   return request(`/api/v1/ipo?page=${page}`, signal)
 }
 
-export function announcements(page: number, code: string, key: string, signal?: AbortSignal): Promise<PageResult<Announcement>> {
-  const params = new URLSearchParams({ page: String(page), key })
+export function announcements(page: number, code: string, key: string, type: string, signal?: AbortSignal): Promise<PageResult<Announcement>> {
+  const params = new URLSearchParams({ page: String(page), key, type })
   if (code) params.set('code', code)
   return request(`/api/v1/announcements?${params}`, signal)
 }
