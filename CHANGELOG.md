@@ -1,6 +1,6 @@
 ## sec change log
 
-### v0.3.16
+### v0.4.0
 
 1. Desktop 新增「黄金行情」，复用 CLI metal / metal-history 的上海黄金交易所 Au99.99 数据，展示最新日行情、涨跌及元/克单位
 2. 支持自定义日期范围、近 1 个月 / 3 个月 / 1 年快捷查询、历史日 K 线蜡烛图与分页明细，提供手动刷新、重试和空数据提示
@@ -13,28 +13,18 @@
 9. Add Desktop financial statement CSV/JSON exports with original fields and units, plus annual report lookup by fiscal year and PDF downloads; save files to a configurable download directory (default ~/Downloads) without overwriting existing downloads
 10. Move Desktop security search into the Stocks and Watchlist page above the security list, keeping search results and the selected security when switching pages
 11. Add Desktop security history date filters, 1/3/6-month and 1-year shortcuts, and unadjusted/forward/backward adjustment choices; retain the full requested range with a five-year limit and default to the last three months
-
 12. Add Desktop IPO prospectus lookup by security code and disclosure dates, paginated original PDF links, and single or selected downloads with progress, cancellation, per-file failures, and the configured download directory; consolidate the IPO module into New Listings and Prospectuses, removing the duplicate listing timeline
-
 13. Add annual, half-year, first-quarter, and third-quarter announcement filters to the Desktop announcement center and security research, combining category selection with title search and resetting pagination when categories change; strip upstream search highlight tags from security names
-
 14. Add Desktop annual report year-range queries and current-page multi-select downloads with sequential task progress, success/failure counts, per-file errors, and cancellation that preserves completed files
-
 15. Expand Desktop Annual Reports into Periodic Reports with annual, half-year, first-quarter, and third-quarter PDF queries and batch downloads; support current-year interim reports and distinguish report types in downloaded filenames
-
 16. Replace Desktop sidebar text symbols with statically imported Lucide SVG icons, using consistent sizing and strokes that follow theme and active navigation colors
-
 17. Replace the Desktop header lettermark with the existing sec PNG logo, keeping it visible and proportionally sized on narrow screens; use uppercase SEC branding in the header, window title, About section, and macOS display name
-
 18. Unify CLI and Desktop watchlists through a shared store with cross-process locks, atomic mutations, legacy-list merging and backups; separate Desktop settings writes from watchlist changes, refresh shared selections on return/focus, document shared strategy/valuation extraction TODOs, and isolate the JSON utility test temporary directory to prevent deleting other build artifacts
-
 19. Add inclusive, optional listing-date bounds and reset controls to Desktop New Listings; share date validation and filtering with CLI IPO lists, filter before pagination, and exclude unknown dates only when filtering
-
 20. Add Desktop version, build time, commit, and platform details with manual update checks and official Release/download links; share GitHub release queries with CLI and match Desktop DMGs by version and architecture
-
 21. Refresh Desktop layout with a full-height branded sidebar, compact page headers and shared page actions, neutral light/dark themes, denser research summaries, grouped settings, sticky table headers, and responsive stacked layouts inspired by CC Switch
-
 22. Simplify the Desktop sidebar brand to the logo and SEC label, removing the subtitle and unused styles
+23. Update README with the current CLI and Desktop feature matrix, installation and build instructions, shared watchlist usage, and five Desktop screenshots using hosted images
 
 ### v0.3.15
 
