@@ -64,7 +64,7 @@ export default function Financials({ security }: { security: BasicSecurity }) {
   return <div className="financials-page">
     <div className="segmented financial-views" aria-label="财报内容">
       <button aria-pressed={view === 'statements'} onClick={() => setView('statements')}>财务报表</button>
-      <button aria-pressed={view === 'annual'} onClick={() => setView('annual')}>年度报告</button>
+      <button aria-pressed={view === 'annual'} onClick={() => setView('annual')}>定期报告</button>
     </div>
     {view === 'statements' ? <FinancialStatements security={security} /> : <AnnualReports security={security} />}
   </div>

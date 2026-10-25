@@ -5,7 +5,10 @@ import type { BasicSecurity, AnnualReport, SavedDownload as SavedFile } from '..
 import ResourceState from './ResourceState'
 import SavedDownload from './SavedDownload'
 
-function Results({ code, startYear, endYear }: { code: string; startYear: number; endYear: number }) {
+const reportTypes = { annual: '年报', halfyear: '半年报', q1: '一季报', q3: '三季报' }
+type ReportType = keyof typeof reportTypes
+
+function Results({ code, startYear, endYear, type }: { code: string; startYear: number; endYear: number; type: ReportType }) {
   const [page, setPage] = useState(1)
   const [selected, setSelected] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
@@ -13,7 +16,7 @@ function Results({ code, startYear, endYear }: { code: string; startYear: number
   const [error, setError] = useState('')
   const [files, setFiles] = useState<SavedFile[]>([])
   const controller = useRef<AbortController | null>(null)
-  const load = useCallback((signal: AbortSignal) => annualReports(code, startYear, endYear, page, signal), [code, startYear, endYear, page])
+  const load = useCallback((signal: AbortSignal) => annualReports(code, startYear, endYear, page, type, signal), [code, startYear, endYear, page, type])
   const resource = useResource(load)
   useEffect(() => () => controller.current?.abort(), [])
   const rows = resource.data?.results ?? []
@@ -32,7 +35,7 @@ function Results({ code, startYear, endYear }: { code: string; startYear: number
       if (request.signal.aborted) break
       setProgress(`正在下载 ${i + 1}/${documents.length}：${documents[i].title}`)
       try {
-        const file = await downloadAnnualReport(code, documents[i].year, documents[i].url, request.signal)
+        const file = await downloadAnnualReport(code, documents[i].year, documents[i].url, documents[i].type, request.signal)
         if (!request.signal.aborted) { complete++; setFiles(current => [...current, file]) }
       } catch (e) {
         if (!request.signal.aborted) { failed++; setError(current => [current, `${documents[i].title}：${e instanceof Error ? e.message : String(e)}`].filter(Boolean).join('；')) }
@@ -48,7 +51,7 @@ function Results({ code, startYear, endYear }: { code: string; startYear: number
   const changePage = (next: number) => { setSelected([]); setPage(next) }
   const reload = () => { setSelected([]); resource.reload() }
   return <div>
-    <p className="data-note">{startYear} 至 {endYear} 报告年度 · 按报告年度筛选正文，例如 2025 年报通常于 2026 年披露；排除摘要、英文、更正与修订版。选择范围限当前页，翻页后重新选择。文件保存到设置中的下载目录（默认 ~/Downloads），同名自动编号。</p>
+    <p className="data-note">{startYear} 至 {endYear} 报告年度 · {reportTypes[type]} · 按报告年度筛选正文，例如 2025 年报通常于 2026 年披露；排除摘要、英文、更正与修订版。选择范围限当前页，翻页后重新选择。文件保存到设置中的下载目录（默认 ~/Downloads），同名自动编号。</p>
     <div className="section-toolbar">
       <label><input type="checkbox" checked={rows.length > 0 && chosen.length === rows.length} disabled={busy || resource.loading || !rows.length} onChange={e => setSelected(e.target.checked ? rows.map(item => item.url) : [])} /> 全选本页</label>
       <button disabled={busy || !chosen.length || resource.loading} onClick={() => void download(chosen)}>下载所选（{chosen.length}）</button>
@@ -67,20 +70,21 @@ function Results({ code, startYear, endYear }: { code: string; startYear: number
         event.preventDefault()
         void window.secOpenDisclosure(item.url).catch(() => setError('原文打开失败，请尝试下载 PDF。'))
       }}>查看原文 ↗</a></div>
-    </li>)}</ul> : <div className="empty-state">本页暂无符合条件的年度报告正文。{resource.data.has_more ? '可继续查看下一页。' : '可尝试调整报告年度。'}</div>)}
+    </li>)}</ul> : <div className="empty-state">本页暂无符合条件的定期报告正文。{resource.data.has_more ? '可继续查看下一页。' : '可尝试调整报告年度。'}</div>)}
     {resource.data && <div className="pagination"><span>第 {page} 页 · 本页 {rows.length} 份 PDF</span><div><button disabled={busy || resource.loading || page === 1} onClick={() => changePage(page - 1)}>上一页</button><button disabled={busy || resource.loading || !resource.data.has_more} onClick={() => changePage(page + 1)}>下一页</button></div></div>}
   </div>
 }
 
 export default function AnnualReports({ security }: { security: BasicSecurity }) {
-  const latestYear = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Shanghai', year: 'numeric' }).format(new Date())) - 1
-  const [draft, setDraft] = useState({ startYear: latestYear, endYear: latestYear })
+  const latestYear = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Shanghai', year: 'numeric' }).format(new Date()))
+  const [draft, setDraft] = useState({ startYear: latestYear - 1, endYear: latestYear - 1, type: 'annual' as ReportType })
   const [range, setRange] = useState(draft)
   const [revision, setRevision] = useState(0)
   const [error, setError] = useState('')
   const years = Array.from({ length: latestYear - 1990 + 1 }, (_, i) => latestYear - i)
   const submit = (event: FormEvent) => {
     event.preventDefault()
+    if (draft.type === 'annual' && draft.endYear >= latestYear) { setError('年报请选择上一年度或更早的报告年度'); return }
     if (draft.startYear > draft.endYear) { setError('开始年度不能晚于结束年度'); return }
     setError('')
     setRange(draft)
@@ -88,8 +92,9 @@ export default function AnnualReports({ security }: { security: BasicSecurity })
   }
   return <section>
     <form className="section-toolbar" onSubmit={submit}>
-      <label>开始年度<select aria-label="年报开始年度" value={draft.startYear} onChange={e => setDraft({ ...draft, startYear: Number(e.target.value) })}>{years.map(year => <option key={year} value={year}>{year} 年</option>)}</select></label>
-      <label>结束年度<select aria-label="年报结束年度" value={draft.endYear} onChange={e => setDraft({ ...draft, endYear: Number(e.target.value) })}>{years.map(year => <option key={year} value={year}>{year} 年</option>)}</select></label>
+      <label>报告类型<select aria-label="定期报告类型" value={draft.type} onChange={e => setDraft({ ...draft, type: e.target.value as ReportType })}>{Object.entries(reportTypes).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+      <label>开始年度<select aria-label="报告开始年度" value={draft.startYear} onChange={e => setDraft({ ...draft, startYear: Number(e.target.value) })}>{years.map(year => <option key={year} value={year}>{year} 年</option>)}</select></label>
+      <label>结束年度<select aria-label="报告结束年度" value={draft.endYear} onChange={e => setDraft({ ...draft, endYear: Number(e.target.value) })}>{years.map(year => <option key={year} value={year}>{year} 年</option>)}</select></label>
       <button type="submit">查询</button>
     </form>
     <p className="data-note">选择相同起止年份可查询单年度。重新查询、切换栏目或离开页面会取消未完成下载，已保存文件保留。</p>
