@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
-import { ChartCandlestick, FilePlusCorner, Newspaper, Coins, Landmark, Settings as SettingsIcon, type LucideIcon } from 'lucide-react'
+import { ChartCandlestick, FilePlusCorner, Newspaper, Coins, Landmark, Settings as SettingsIcon, RefreshCw, Star, type LucideIcon } from 'lucide-react'
 import { loadWorkspace, saveWorkspace, search, loadWatchlist, changeWatchlist } from './api'
 import type { BasicSecurity, WorkspaceSettings, WorkspaceState } from './types'
 import SearchBar from './components/SearchBar'
@@ -16,13 +16,13 @@ import secLogo from '../../assets/sec-logo.png'
 
 type Page = 'stocks' | 'ipo' | 'announcements' | 'metal' | 'bond' | 'settings'
 type Tab = 'overview' | 'company' | 'financials' | 'dividends' | 'announcements'
-const pages: { id: Page; title: string; icon: LucideIcon; description: string }[] = [
-  { id: 'stocks', title: '自选与行情', icon: ChartCandlestick, description: '从市场行情到公司研究，在同一个工作区完成' },
-  { id: 'ipo', title: 'IPO', icon: FilePlusCorner, description: '查看新股上市信息与招股说明书' },
-  { id: 'announcements', title: '公告中心', icon: Newspaper, description: '查询巨潮资讯最新披露与证券公告' },
-  { id: 'metal', title: '黄金行情', icon: Coins, description: '上海黄金交易所 Au99.99 最新日行情与历史价格' },
-  { id: 'bond', title: '美债收益率', icon: Landmark, description: '美国财政部每日收益率曲线与各期限历史数据' },
-  { id: 'settings', title: '设置', icon: SettingsIcon, description: '管理工作台外观与行情刷新偏好' },
+const pages: { id: Page; title: string; icon: LucideIcon }[] = [
+  { id: 'stocks', title: '自选与行情', icon: ChartCandlestick },
+  { id: 'ipo', title: 'IPO', icon: FilePlusCorner },
+  { id: 'announcements', title: '公告中心', icon: Newspaper },
+  { id: 'metal', title: '黄金行情', icon: Coins },
+  { id: 'bond', title: '美债收益率', icon: Landmark },
+  { id: 'settings', title: '设置', icon: SettingsIcon },
 ]
 const tabs: { id: Tab; title: string }[] = [
   { id: 'overview', title: '概览' }, { id: 'company', title: '公司' }, { id: 'financials', title: '财报' },
@@ -46,6 +46,7 @@ export default function App() {
   const [saving, setSaving] = useState(false)
   const [storeRetry, setStoreRetry] = useState(0)
   const searchController = useRef<AbortController | null>(null)
+  const pageContentRef = useRef<HTMLDivElement | null>(null)
   const savingRef = useRef(false)
   const watchRevision = useRef(0)
   const [watchRefresh, setWatchRefresh] = useState(0)
@@ -73,6 +74,7 @@ export default function App() {
   }, [workspace.settings.theme])
 
   useEffect(() => () => searchController.current?.abort(), [])
+  useEffect(() => { pageContentRef.current?.scrollTo(0, 0) }, [page])
 
   useEffect(() => {
     if (!ready || page !== 'stocks') return
@@ -158,12 +160,9 @@ export default function App() {
   }
 
   return <div className="app">
-    <header className="topbar">
-      <div className="brand"><img className="brand-mark" src={secLogo} alt="" width={44} height={44} /><div><strong>SEC</strong><span>研究工作台</span></div></div>
-      <span className="topbar-caption">A 股 · 港股 · 美股</span>
-    </header>
     <div className="app-shell">
       <aside className="sidebar">
+        <div className="brand"><img className="brand-mark" src={secLogo} alt="" width={36} height={36} /><div><strong>SEC</strong><span>研究工作台</span></div></div>
         <span className="nav-group-label">工作空间</span>
         <nav className="side-nav" aria-label="主导航">{pages.map(item => <button key={item.id}
           className={item.id === 'settings' ? 'settings-nav' : ''}
@@ -173,16 +172,19 @@ export default function App() {
         <div className="sidebar-footer"><span className="status-dot" />本地工作台<span>自选 · 行情 · 研究</span></div>
       </aside>
       <main className="main-body" id="main-content">
-        <header className="app-header"><div><h1>{currentPage.title}</h1><p>{currentPage.description}</p></div>
+        <header className="app-header"><div className="page-heading"><currentPage.icon size={22} strokeWidth={1.75} aria-hidden="true" /><h1>{currentPage.title}</h1></div><div className="page-actions" id="page-actions">
           {selected && page !== 'stocks' && <button className="context-security" onClick={() => setPage('stocks')}>{selected.name} · 返回研究 →</button>}
+          </div>
         </header>
+        <div ref={pageContentRef} className={page === 'stocks' ? 'page-content page-content--workspace' : 'page-content'}>
         {storeError && <div className="error" role="alert">{storeError}{!ready && <button onClick={() => setStoreRetry(n => n + 1)}>重新加载</button>}</div>}
         {!ready && !storeError && <div className="data-note" role="status">正在读取本地自选与设置…</div>}
         {page === 'stocks' && <div className="workspace-grid">
           <section className="security-browser" aria-label="证券列表">
             <div className="browser-search"><SearchBar onSearch={onSearch} loading={searching} initialKey={searchedKey} /></div>
-            <div className="browser-tabs segmented"><button aria-pressed={listMode === 'watchlist'} onClick={() => setListMode('watchlist')}>我的自选 <span>{workspace.watchlist.length}</span></button><button aria-pressed={listMode === 'search'} onClick={() => setListMode('search')}>搜索结果</button></div>
-            {listMode === 'watchlist' && <button className="watchlist-refresh" disabled={!ready || saving} onClick={() => setWatchRefresh(n => n + 1)}>刷新自选</button>}
+            <div className="browser-toolbar"><div className="browser-tabs segmented"><button aria-pressed={listMode === 'watchlist'} onClick={() => setListMode('watchlist')}>我的自选 <span>{workspace.watchlist.length}</span></button><button aria-pressed={listMode === 'search'} onClick={() => setListMode('search')}>搜索结果</button></div>
+            {listMode === 'watchlist' && <button className="watchlist-refresh icon-button" aria-label="刷新自选" title="刷新自选" disabled={!ready || saving} onClick={() => setWatchRefresh(n => n + 1)}><RefreshCw size={15} aria-hidden="true" /></button>}
+            </div>
             <div className="results-caption">{listMode === 'watchlist' ? '关注的证券，随时继续研究' : searchedKey ? `“${searchedKey}” · ${results.length} 个结果` : '在上方输入名称或代码'}</div>
             {listMode === 'search' && searchError && <div className="error" role="alert">{searchError}</div>}
             {listMode === 'search' && searching ? <div className="empty-state" role="status">正在搜索证券…</div>
@@ -190,7 +192,7 @@ export default function App() {
           </section>
           <section className="research-workspace" aria-label="个股研究">
             {selected ? <>
-              <header className="security-header"><div><div className="eyebrow">证券研究</div><h2>{selected.name}<span>{selected.ex_code}</span></h2></div><button className={watched ? 'watch-button is-watched' : 'watch-button'} aria-pressed={watched} aria-label={watched ? `将${selected.name}移出自选` : `将${selected.name}加入自选`} title={watched ? '点击移出自选' : '点击加入自选'} disabled={!ready || saving} onClick={toggleWatch}>{saving ? '保存中…' : watched ? '★ 已加入自选' : '☆ 加入自选'}</button></header>
+              <header className="security-header"><div><h2>{selected.name}<span>{selected.ex_code}</span></h2></div><button className={watched ? 'watch-button is-watched' : 'watch-button'} aria-pressed={watched} aria-label={watched ? `将${selected.name}移出自选` : `将${selected.name}加入自选`} title={watched ? '点击移出自选' : '点击加入自选'} disabled={!ready || saving} onClick={toggleWatch}><Star size={15} fill={watched ? 'currentColor' : 'none'} aria-hidden="true" />{saving ? '保存中…' : watched ? '已加入自选' : '加入自选'}</button></header>
               <div className="research-tabs" role="tablist" aria-label="个股研究栏目">{tabs.map((item, index) => <button key={item.id} id={`tab-${item.id}`} role="tab" aria-controls="research-panel" aria-selected={tab === item.id} tabIndex={tab === item.id ? 0 : -1} onKeyDown={e => tabKey(e, index)} onClick={() => setTab(item.id)}>{item.title}</button>)}</div>
               <div className="research-panel" role="tabpanel" id="research-panel" aria-labelledby={`tab-${tab}`} key={`${selected.ex_code}-${tab}`}>
                 {tab === 'overview' ? <Overview security={selected} interval={workspace.settings.refresh_seconds} />
@@ -205,8 +207,9 @@ export default function App() {
         {page === 'bond' && <Bond />}
         {page === 'metal' && <Metal />}
         {page === 'ipo' && <IPOCalendar onSelect={openIPO} />}
-        {page === 'announcements' && <div className="global-announcements"><div className="scope-bar"><span>公告范围</span><button aria-pressed={announcementScope === 'latest' || !aShare} onClick={() => setAnnouncementScope('latest')}>最新披露</button><button disabled={!aShare} aria-pressed={announcementScope === 'selected' && !!aShare} onClick={() => setAnnouncementScope('selected')}>{selected ? selected.name : '当前证券'}</button></div><Announcements key={announcementScope === 'selected' && aShare ? selected!.ex_code : 'latest'} code={announcementScope === 'selected' && aShare ? selected!.ex_code : ''} /></div>}
+        {page === 'announcements' && <div className="global-announcements page-panel"><div className="scope-bar"><span>公告范围</span><button aria-pressed={announcementScope === 'latest' || !aShare} onClick={() => setAnnouncementScope('latest')}>最新披露</button><button disabled={!aShare} aria-pressed={announcementScope === 'selected' && !!aShare} onClick={() => setAnnouncementScope('selected')}>{selected ? selected.name : '当前证券'}</button></div><Announcements compact key={announcementScope === 'selected' && aShare ? selected!.ex_code : 'latest'} code={announcementScope === 'selected' && aShare ? selected!.ex_code : ''} /></div>}
         {page === 'settings' && (ready ? <Settings settings={workspace.settings} saving={saving} onSave={saveSettings} /> : <div className="page-panel empty-state">读取本地数据后可修改设置</div>)}
+        </div>
       </main>
     </div>
   </div>

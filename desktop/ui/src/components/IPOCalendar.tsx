@@ -1,3 +1,4 @@
+import PageActions from './PageActions'
 import { useCallback, useState, type FormEvent } from 'react'
 import { ipo } from '../api'
 import { useResource } from '../hooks/useResource'
@@ -37,7 +38,7 @@ export default function IPOCalendar({ onSelect }: { onSelect: (security: BasicSe
   }
   const select = (item: IPOListing) => { const security = asSecurity(item); if (security) onSelect(security) }
   return <section className="page-panel">
-    <div className="section-toolbar"><div className="segmented" aria-label="IPO 栏目"><button aria-pressed={view === 'list'} onClick={() => setView('list')}>新股上市</button><button aria-pressed={view === 'prospectus'} onClick={() => setView('prospectus')}>招股说明书</button></div>{view !== 'prospectus' && <button onClick={resource.reload} disabled={resource.loading}>刷新</button>}</div>
+    <div className="section-toolbar"><div className="segmented" aria-label="IPO 栏目"><button aria-pressed={view === 'list'} onClick={() => setView('list')}>新股上市</button><button aria-pressed={view === 'prospectus'} onClick={() => setView('prospectus')}>招股说明书</button></div>{view !== 'prospectus' && <PageActions><button onClick={resource.reload} disabled={resource.loading}>刷新列表</button></PageActions>}</div>
     {view === 'prospectus' ? <Prospectuses key={prospectusCode} initialCode={prospectusCode} /> : <>
     <form className="section-toolbar prospectus-search" onSubmit={submit}>
       <label>上市开始日期<input type="date" aria-label="上市开始日期" value={draft.since} onChange={e => setDraft({ ...draft, since: e.target.value })} /></label>

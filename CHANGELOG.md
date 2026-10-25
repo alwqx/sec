@@ -32,6 +32,8 @@
 
 20. Add Desktop version, build time, commit, and platform details with manual update checks and official Release/download links; share GitHub release queries with CLI and match Desktop DMGs by version and architecture
 
+21. Refresh Desktop layout with a full-height branded sidebar, compact page headers and shared page actions, neutral light/dark themes, denser research summaries, grouped settings, sticky table headers, and responsive stacked layouts inspired by CC Switch
+
 ### v0.3.15
 
 1. Desktop 升级为研究工作台：顶部全局搜索、左侧工作空间导航、中间证券列表、右侧个股研究，切换功能时保留当前证券

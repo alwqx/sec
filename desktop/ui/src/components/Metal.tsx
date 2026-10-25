@@ -1,3 +1,4 @@
+import PageActions from './PageActions'
 import { useCallback, useState, type FormEvent } from 'react'
 import { metal } from '../api'
 import { useResource } from '../hooks/useResource'
@@ -64,19 +65,19 @@ export default function Metal() {
   const rows = data ? [...data.results].reverse().slice((currentPage - 1) * pageSize, currentPage * pageSize) : []
 
   return <div className="metal-page">
+    {data && <div className="page-panel">{data.latest ? <Latest quote={data.latest} name={data.name} unit={data.unit} /> : <div className="empty-state">暂无黄金日行情</div>}</div>}
     <section className="page-panel metal-controls" aria-label="黄金历史查询">
       <form className="section-toolbar metal-range-form" onSubmit={submit}>
         <label htmlFor="metal-begin">开始日期<input id="metal-begin" type="date" required value={draft.begin} onChange={e => setDraft({ ...draft, begin: e.target.value })} /></label>
         <label htmlFor="metal-end">结束日期<input id="metal-end" type="date" required value={draft.end} onChange={e => setDraft({ ...draft, end: e.target.value })} /></label>
         <button className="primary-button" type="submit">查询</button>
-        <button type="button" onClick={resource.reload} disabled={resource.loading}>刷新</button>
+        <PageActions><button type="button" onClick={resource.reload} disabled={resource.loading}>刷新行情</button></PageActions>
       </form>
       <div className="metal-quick-ranges"><span className="data-note">快捷区间</span>{[[30, '近 1 个月'], [90, '近 3 个月'], [365, '近 1 年']].map(([days, label]) => <button type="button" key={days} onClick={() => quickRange(Number(days))}>{label}</button>)}</div>
       {validation && <p className="error" role="alert">{validation}</p>}
     </section>
     <ResourceState {...resource} retry={resource.reload} />
     {data && <>
-      <div className="page-panel">{data.latest ? <Latest quote={data.latest} name={data.name} unit={data.unit} /> : <div className="empty-state">暂无黄金日行情</div>}</div>
       <section className="page-panel metal-history" aria-label="黄金历史行情">
         <div className="section-caption"><h2>历史行情</h2><span>{data.begin} 至 {data.end} · {data.results.length} 个交易日</span></div>
         {data.results.length === 0 ? <div className="empty-state">所选区间暂无交易记录，请调整日期范围。</div> : <>
