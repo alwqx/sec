@@ -51,14 +51,17 @@ func TestFinancialsMapping(t *testing.T) {
 	require.True(t, gock.IsDone())
 }
 
-func TestAnnouncementsSanitizeTitlesAndLinks(t *testing.T) {
+func TestAnnouncementsSanitizeTitlesNamesAndLinks(t *testing.T) {
 	defer gock.Off()
 	gock.New("https://www.cninfo.com.cn").Post("/new/hisAnnouncement/query").Reply(200).
-		BodyString(`{"totalAnnouncement":3,"totalpages":2,"announcements":[{"announcementId":"a1","announcementTitle":"<em>年度</em>报告 &amp; 摘要","announcementTime":1767225600000,"adjunctUrl":"finalpage/2026-01-01/a1.PDF","secCode":"600036","secName":"招商银行"},{"announcementId":"a2","announcementTitle":"已失效","invalidationFlag":1}]}`)
+		BodyString(`{"totalAnnouncement":3,"totalpages":2,"announcements":[{"announcementId":"a1","announcementTitle":"<em>年度</em>报告 &amp; 摘要","announcementTime":1767225600000,"adjunctUrl":"finalpage/2026-01-01/a1.PDF","secCode":"600036","secName":"<em>招商银行</em>"},{"announcementId":"a2","announcementTitle":"已失效","invalidationFlag":1}]}`)
 	rr := httptest.NewRecorder()
-	(&desktopServer{dev: true}).Handler().ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/api/v1/announcements", nil))
+	(&desktopServer{dev: true}).Handler().ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/api/v1/announcements?key=%E6%8B%9B%E5%95%86%E9%93%B6%E8%A1%8C", nil))
 	require.Equal(t, http.StatusOK, rr.Code)
 	require.Contains(t, rr.Body.String(), `年度报告`)
+	require.Contains(t, rr.Body.String(), `"name":"招商银行"`)
+	require.NotContains(t, rr.Body.String(), `\u003cem\u003e`)
+	require.NotContains(t, rr.Body.String(), `<em>`)
 	require.NotContains(t, rr.Body.String(), `已失效`)
 	require.Contains(t, rr.Body.String(), `https://static.cninfo.com.cn/finalpage/2026-01-01/a1.PDF`)
 	require.Contains(t, rr.Body.String(), `"has_more":true`)
@@ -114,6 +117,29 @@ func TestHistoryFilters(t *testing.T) {
 			})
 		}
 	}
+}
+
+func TestAnnouncementCategoryFilters(t *testing.T) {
+	for name, category := range map[string]string{
+		"annual": cninfo.CategoryAnnual, "halfyear": cninfo.CategoryHalfYear,
+		"q1": cninfo.CategoryQ1, "q3": cninfo.CategoryQ3,
+	} {
+		t.Run(name, func(t *testing.T) {
+			defer gock.Off()
+			gock.New("https://www.cninfo.com.cn").Post("/new/hisAnnouncement/query").
+				MatchParam("category", category).MatchParam("searchkey", "报告").MatchParam("pageNum", "2").
+				Reply(200).BodyString(`{"totalAnnouncement":45,"hasMore":true,"announcements":[]}`)
+			response := httptest.NewRecorder()
+			(&desktopServer{dev: true}).Handler().ServeHTTP(response, httptest.NewRequest("GET", "/api/v1/announcements?page=2&key=报告&type="+name, nil))
+			require.Equal(t, 200, response.Code, response.Body.String())
+			require.JSONEq(t, `{"results":[],"total":45,"has_more":true}`, response.Body.String())
+			require.True(t, gock.IsDone())
+		})
+	}
+	// 类别应先于证券身份查询校验，不允许未知分类落回全部公告。
+	response := httptest.NewRecorder()
+	(&desktopServer{dev: true}).Handler().ServeHTTP(response, httptest.NewRequest("GET", "/api/v1/announcements?code=SH600036&type=unknown", nil))
+	require.Equal(t, 400, response.Code)
 }
 
 func TestHistoryRejectsInvalidFilters(t *testing.T) {
