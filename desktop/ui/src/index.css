@@ -283,3 +283,8 @@ h1, h2, h3 { font-weight: 600; }
   .bond-range-form input { min-width: 0; flex: 1; }
   .bond-benchmark { gap: 12px; }
 }
+.company-metrics { margin: 20px 0; border-top: 1px solid var(--border); padding-top: 18px; }
+.company-metrics .section-caption { align-items: center; }
+.company-metrics h3 { margin: 0; font-size: 14px; color: var(--text); }
+.company-metrics .section-caption button { font-size: 12px; padding: 5px 10px; }
+.metrics-grid { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); margin: 14px 0 8px; }

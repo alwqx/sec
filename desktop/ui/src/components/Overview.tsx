@@ -3,6 +3,7 @@ import { quote } from '../api'
 import type { BasicSecurity, SecurityQuote } from '../types'
 import QuoteCard from './QuoteCard'
 import PriceHistory from './PriceHistory'
+import CompanyMetrics from './CompanyMetrics'
 
 export default function Overview({ security, interval }: { security: BasicSecurity; interval: number }) {
   const [data, setData] = useState<SecurityQuote | null>(null)
@@ -30,6 +31,7 @@ export default function Overview({ security, interval }: { security: BasicSecuri
     <div className="section-caption"><span>实时行情</span><span>每 {interval} 秒刷新 · 红涨绿跌</span></div>
     {error && <div className="error" role="alert">{error}<button onClick={() => setRetry(n => n + 1)}>重试</button></div>}
     {data ? <QuoteCard quote={data} /> : !error && <div className="empty-state" role="status">正在获取行情…</div>}
+    <CompanyMetrics security={security} refreshSeconds={60} />
     <PriceHistory code={security.ex_code} />
     <p className="data-note">行情以数据源返回时间为准，港美股可能存在延迟。</p>
   </div>
