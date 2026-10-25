@@ -34,10 +34,7 @@ func TestMakeRequest(t *testing.T) {
 }
 
 func TestWriteJson(t *testing.T) {
-	tmpDir := os.TempDir()
-	t.Cleanup(func() {
-		os.RemoveAll(tmpDir)
-	})
+	tmpDir := t.TempDir()
 	// 1. nil
 	err := WriteJson(nil, tmpDir)
 	require.Nil(t, err)

@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -12,13 +13,14 @@ import (
 	"path/filepath"
 	"regexp"
 	"sync"
+	"time"
 
 	"github.com/alwqx/sec/provider/sina"
 	"github.com/alwqx/sec/utils"
+	"github.com/alwqx/sec/watchlist"
 )
 
-// workspaceStore 将桌面自选与偏好存入固定路径，避免随机服务端口影响持久化。
-// 与 CLI 的 watchlist.json 分开，保留证券类型与交易所等桌面所需元数据。
+// workspaceStore 仅保存桌面偏好；旧 watchlist 字段由共享自选存储迁移。
 type workspaceStore struct {
 	mu   sync.Mutex
 	path string
@@ -90,6 +92,13 @@ func (s *workspaceStore) load() (workspaceState, error) {
 	if err != nil {
 		return state, err
 	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	unlock, err := watchlist.FileLock(ctx, path)
+	if err != nil {
+		return state, err
+	}
+	defer unlock()
 	data, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return state, nil
@@ -116,33 +125,25 @@ func (s *workspaceStore) save(state workspaceState) error {
 	if err != nil {
 		return err
 	}
-	data, err := json.MarshalIndent(state, "", "  ")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	unlock, err := watchlist.FileLock(ctx, path)
 	if err != nil {
 		return err
 	}
-	// 先写同目录临时文件，再替换，避免写入中断损坏现有数据。
-	f, err := os.CreateTemp(filepath.Dir(path), ".workspace-*")
+	defer unlock()
+	data, err := json.MarshalIndent(struct {
+		Settings workspaceSettings `json:"settings"`
+	}{state.Settings}, "", "  ")
 	if err != nil {
 		return err
 	}
-	defer os.Remove(f.Name())
-	if _, err = f.Write(data); err != nil {
-		f.Close()
-		return err
-	}
-	if err = f.Sync(); err != nil {
-		f.Close()
-		return err
-	}
-	if err = f.Close(); err != nil {
-		return err
-	}
-	return os.Rename(f.Name(), path)
+	return watchlist.AtomicWrite(path, data)
 }
 
 func (s *desktopServer) handleWorkspace(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
-		state, err := s.workspace.load()
+		state, err := s.loadSharedWorkspace(r.Context())
 		if err != nil {
 			slog.ErrorContext(r.Context(), "读取工作台失败", "error", err)
 			writeError(w, http.StatusInternalServerError, "读取本地自选与设置失败，请检查数据文件")
@@ -174,9 +175,23 @@ func (s *desktopServer) handleWorkspace(w http.ResponseWriter, r *http.Request) 
 	if state.Watchlist == nil {
 		state.Watchlist = []sina.BasicSecurity{}
 	}
+	store, err := s.sharedWatchlist()
+	if err != nil {
+		writeError(w, 500, "自选存储初始化失败")
+		return
+	}
+	if _, err = store.List(r.Context()); err != nil {
+		writeError(w, 500, "自选迁移失败，请检查数据文件")
+		return
+	}
 	if err := s.workspace.save(state); err != nil {
 		slog.ErrorContext(r.Context(), "保存工作台失败", "error", err)
 		writeError(w, http.StatusInternalServerError, "保存自选与设置失败，请稍后重试")
+		return
+	}
+	state, err = s.loadSharedWorkspace(r.Context())
+	if err != nil {
+		writeError(w, 500, "重新读取工作台失败")
 		return
 	}
 	writeJSON(w, state)

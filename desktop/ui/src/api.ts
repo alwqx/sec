@@ -37,7 +37,7 @@ export function loadWorkspace(signal?: AbortSignal): Promise<WorkspaceState> {
 
 export function saveWorkspace(state: WorkspaceState): Promise<WorkspaceState> {
   return request('/api/v1/workspace', undefined, {
-    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(state),
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ settings: state.settings }),
   })
 }
 
@@ -96,4 +96,16 @@ export function downloadProspectus(code: string, url: string, signal?: AbortSign
   return request('/api/v1/ipo/prospectuses/download', signal, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, url }),
   })
+}
+
+export async function loadWatchlist(signal?: AbortSignal): Promise<BasicSecurity[]> {
+  const data = await request<{ results: BasicSecurity[] }>('/api/v1/watchlist', signal)
+  return data.results
+}
+export async function changeWatchlist(action: 'add' | 'remove', security: BasicSecurity): Promise<BasicSecurity[]> {
+  const data = await request<{ results: BasicSecurity[] }>('/api/v1/watchlist', undefined, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(action === 'add' ? { action, security } : { action, code: security.ex_code }),
+  })
+  return data.results
 }

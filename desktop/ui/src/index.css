@@ -298,3 +298,5 @@ h1, h2, h3 { font-weight: 600; }
 .prospectus-search { align-items: end; }
 .prospectus-search label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--muted); }
 .prospectus-search input { max-width: 100%; }
+
+.watchlist-refresh { margin: 0 10px 10px; font-size: 12px; }

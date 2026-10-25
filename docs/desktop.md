@@ -24,7 +24,7 @@ Ollama 桌面版**不是 Electron**，而是「纯 Go 外壳 + 系统 WebView + 
 - **外壳**：Go + 系统 WebView。本实现直接依赖上游 `github.com/webview/webview_go` module（自包含、MIT、与 Ollama vendored 的 fork 同源、API 一致），不 vendor 源码。若后续 macOS 兼容性出问题，可改 vendor Ollama 维护的 fork。
 - **后端**：本地 HTTP JSON API，直接复用 `provider/` 层（其函数已返回类型化 struct，天然可 JSON 序列化，无需复用 `cmd/` 里面向终端的 table 渲染）。
 - **前端**：React + TypeScript + Vite；MVP 用手写 CSS，不引入 Tailwind，降低构建复杂度。
-- **持久化**：工作台首版采用 JSON 原子替换，将自选股/设置保存到 `~/.sec/desktop/workspace.json`；后续需要多组合与历史查询时再迁移 SQLite。
+- **持久化**：工作台首版采用 JSON 原子替换，两端自选共用 `~/.sec/watchlist.json`，桌面偏好保存在 `~/.sec/desktop/workspace.json`；后续需要多组合与历史查询时再迁移 SQLite。
 - **平台**：macOS 优先；Windows 打包放 Phase 3。
 
 ## 财报导出与年度报告
@@ -129,16 +129,20 @@ provider 在保持原有数值字段的同时，通过 `MissingTenors` 记录上
 
 ### 自选与设置持久化
 
-自选通过「加入自选 / 已加入自选」按钮增删，最多保存 500 只。设置点击保存后生效。Go 服务将完整状态写入 `~/.sec/desktop/workspace.json`，使用同目录临时文件、同步写入与原子替换；数据损坏时返回错误并阻止界面覆盖，提供重新加载入口。
+自选通过「加入自选 / 已加入自选」按钮增删，CLI 与 Desktop 共享 `watchlist` 包和 `~/.sec/watchlist.json`。共享记录包含代码、带市场前缀标识、名称、证券类型、交易所及添加时间；按标准标识去重，最多新增到 500 只。旧数据超过上限时不截断，仍允许删除。跨进程操作使用 `gofrs/flock` 文件锁，读改写在同一锁内完成，以同目录临时文件、同步写入和原子替换发布。锁文件保留，进程退出由操作系统释放锁。
 
-文件不依赖 WebView 的随机端口，因此重启后能恢复自选和偏好。与 CLI 的 `~/.sec/watchlist.json` 独立，不自动导入或覆盖 CLI 自选。首版采用 JSON，以便直接复用现有工程依赖；SQLite、多组合与跨进程同步留待后续扩展。当前研究证券、筛选条件与菜单仅在本次运行中保留。
+首次访问共享存储时合并旧 CLI 数组与 Desktop 自选，原文件生成同目录 `*.pre-shared-*.bak` 备份；版本化共享文档作为一次性迁移标记，随后删除 workspace 的旧 watchlist 字段。中断重试不会把已删除证券重新导入。迁移不依赖网络；旧 CLI 缺少类型时按代码补齐常见基金类型，其余默认股票，重复记录优先保留 Desktop 的完整证券信息及 CLI 原有添加时间。损坏文件返回错误并保留原文。旧版 CLI 不能读取新格式，两端应同步使用新版。
+
+设置仍保存到 `~/.sec/desktop/workspace.json`，仅持久化 settings。保存设置即使携带过期 watchlist 快照也不会改写共享自选；增删使用独立接口，只提交对应证券。首次保存设置前先完成旧列表迁移，设置文件与迁移使用同一工作台文件锁。Desktop 返回「自选与行情」、重新获得窗口焦点或点击「刷新自选」时同步列表，后台响应不会覆盖本窗口正在进行的增删。当前研究证券、筛选条件与菜单仅在本次运行中保留。
 
 ### 新增 API
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
+| GET | `/api/v1/watchlist` | 读取 CLI／Desktop 共享自选，返回 results |
+| POST | `/api/v1/watchlist` | JSON action=add 与 security，或 action=remove 与 code；按最新列表执行单项增删，要求鉴权与同源 |
 | GET | `/api/v1/workspace` | 本地自选与设置；无文件时返回默认值 |
-| PUT | `/api/v1/workspace` | 保存完整状态，要求 JSON、有效参数及生产同源请求 |
+| PUT | `/api/v1/workspace` | 仅保存 settings 并返回最新共享自选与设置，不应用请求中的 watchlist 快照；要求 JSON、有效参数及生产同源请求 |
 | GET | `/api/v1/metrics?code=SH600036` | 沪深北 A 股行业、PE（TTM）、PB、总市值、流通市值与快照时间；未知数值为 null |
 | GET | `/api/v1/company?code=SH600036` | 公司资料 |
 | GET | `/api/v1/dividends?code=SH600036` | 分红记录，按每 10 股展示税前派息/送转 |

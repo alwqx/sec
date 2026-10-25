@@ -8,69 +8,20 @@
 package watch
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
-	"os"
-	"path/filepath"
-	"sort"
 	"strings"
-	"time"
 
 	"github.com/alwqx/sec/provider/sina"
-	"github.com/alwqx/sec/utils"
+	"github.com/alwqx/sec/watchlist"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 )
 
-// WatchItem represents a single watched stock.
-type WatchItem struct {
-	Code    string `json:"code"`
-	ExCode  string `json:"excode"`
-	Name    string `json:"name"`
-	AddedAt string `json:"added_at"`
-}
+type WatchItem = watchlist.Item
 
-// watchlistPath returns the path to the watchlist JSON file.
-func watchlistPath() (string, error) {
-	dir, err := utils.SecDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(dir, "watchlist.json"), nil
-}
-
-func loadWatchlist() ([]WatchItem, error) {
-	path, err := watchlistPath()
-	if err != nil {
-		return nil, err
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	var items []WatchItem
-	if err := json.Unmarshal(data, &items); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-func saveWatchlist(items []WatchItem) error {
-	path, err := watchlistPath()
-	if err != nil {
-		return err
-	}
-	data, err := json.MarshalIndent(items, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(path, data, 0644)
-}
+var newWatchStore = watchlist.Default
 
 // NewWatchCLI returns the watch command with subcommands.
 func NewWatchCLI() *cobra.Command {
@@ -116,7 +67,11 @@ type quoteRow struct {
 }
 
 func runWatchShow(cmd *cobra.Command, args []string) error {
-	items, err := loadWatchlist()
+	store, err := newWatchStore()
+	if err != nil {
+		return err
+	}
+	items, err := store.List(cmd.Context())
 	if err != nil {
 		return fmt.Errorf("读取自选列表失败: %w", err)
 	}
@@ -214,50 +169,31 @@ func printWatchQuotes(out io.Writer, rows []quoteRow) {
 }
 
 func runWatchAdd(cmd *cobra.Command, args []string) error {
-	items, err := loadWatchlist()
+	store, err := newWatchStore()
 	if err != nil {
-		return fmt.Errorf("读取自选列表失败: %w", err)
+		return err
 	}
-
-	existing := make(map[string]bool)
-	for _, item := range items {
-		existing[item.Code] = true
-		existing[item.ExCode] = true
+	items, err := store.List(cmd.Context())
+	if err != nil {
+		return err
 	}
-
 	added := 0
-	for _, code := range args {
-		code = strings.TrimSpace(code)
-		if existing[code] {
-			fmt.Fprintf(cmd.OutOrStdout(), "  %s 已在自选中\n", code)
-			continue
-		}
-
-		secs := sina.Search(cmd.Context(), code)
+	for _, key := range args {
+		secs := sina.Search(cmd.Context(), strings.TrimSpace(key))
 		if len(secs) == 0 {
-			fmt.Fprintf(cmd.OutOrStdout(), "  %s 未找到\n", code)
+			fmt.Fprintf(cmd.OutOrStdout(), "  %s 未找到\n", key)
 			continue
 		}
-		sec := secs[0]
-
-		items = append(items, WatchItem{
-			Code:    sec.Code,
-			ExCode:  sec.ExCode,
-			Name:    sec.Name,
-			AddedAt: time.Now().Format("2006-01-02"),
-		})
-		existing[sec.Code] = true
-		existing[sec.ExCode] = true
-		added++
-		fmt.Fprintf(cmd.OutOrStdout(), "  ✓ %s %s\n", sec.ExCode, sec.Name)
-	}
-
-	// Sort by code
-	sort.Slice(items, func(i, j int) bool { return items[i].Code < items[j].Code })
-
-	if added > 0 {
-		if err := saveWatchlist(items); err != nil {
-			return fmt.Errorf("保存失败: %w", err)
+		var changed bool
+		items, changed, err = store.Add(cmd.Context(), *secs[0])
+		if err != nil {
+			return err
+		}
+		if changed {
+			added++
+			fmt.Fprintf(cmd.OutOrStdout(), "  ✓ %s %s\n", secs[0].ExCode, secs[0].Name)
+		} else {
+			fmt.Fprintf(cmd.OutOrStdout(), "  %s 已在自选中\n", secs[0].ExCode)
 		}
 	}
 	fmt.Fprintf(cmd.OutOrStdout(), "\n已添加 %d 只，共 %d 只\n", added, len(items))
@@ -265,32 +201,17 @@ func runWatchAdd(cmd *cobra.Command, args []string) error {
 }
 
 func runWatchRemove(cmd *cobra.Command, args []string) error {
-	items, err := loadWatchlist()
+	store, err := newWatchStore()
 	if err != nil {
-		return fmt.Errorf("读取自选列表失败: %w", err)
+		return err
 	}
-
-	removeSet := make(map[string]bool)
-	for _, code := range args {
-		removeSet[strings.TrimSpace(code)] = true
+	items, removed, err := store.Remove(cmd.Context(), args...)
+	if err != nil {
+		return err
 	}
-
-	removed := 0
-	filtered := make([]WatchItem, 0, len(items))
-	for _, item := range items {
-		if removeSet[item.Code] || removeSet[item.ExCode] {
-			fmt.Fprintf(cmd.OutOrStdout(), "  ✗ %s %s\n", item.ExCode, item.Name)
-			removed++
-		} else {
-			filtered = append(filtered, item)
-		}
+	for _, item := range removed {
+		fmt.Fprintf(cmd.OutOrStdout(), "  ✗ %s %s\n", item.ExCode, item.Name)
 	}
-
-	if removed > 0 {
-		if err := saveWatchlist(filtered); err != nil {
-			return fmt.Errorf("保存失败: %w", err)
-		}
-	}
-	fmt.Fprintf(cmd.OutOrStdout(), "\n已移除 %d 只，剩余 %d 只\n", removed, len(filtered))
+	fmt.Fprintf(cmd.OutOrStdout(), "\n已移除 %d 只，剩余 %d 只\n", len(removed), len(items))
 	return nil
 }
