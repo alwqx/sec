@@ -95,23 +95,21 @@ func runList(cmd *cobra.Command, args []string) error {
 		PageSize: size,
 		MaxTotal: size,
 	}
-	items, _, err := eastmoney.ListIPO(ctx, req)
+	if err := eastmoney.ValidateIPODates(since, until); err != nil {
+		return err
+	}
+	var items []*eastmoney.IListing
+	if since != "" || until != "" {
+		items, _, err = eastmoney.ListIPOFiltered(ctx, since, until, 1, size)
+	} else {
+		items, _, err = eastmoney.ListIPO(ctx, req)
+	}
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to ListIPO", "since", since, "until", until, "error", err)
 		return fmt.Errorf("获取新股列表失败: %w", err)
 	}
 
-	filtered := make([]*eastmoney.IListing, 0, len(items))
-	for _, it := range items {
-		// 日期区间过滤
-		if since != "" && it.ListingDate != "-" && it.ListingDate < strings.ReplaceAll(since, "-", "") {
-			continue
-		}
-		if until != "" && it.ListingDate != "-" && it.ListingDate > strings.ReplaceAll(until, "-", "") {
-			continue
-		}
-		filtered = append(filtered, it)
-	}
+	filtered := items
 	if len(filtered) == 0 {
 		fmt.Fprintln(cmd.OutOrStdout(), "未找到 IPO 记录（尝试放宽年份或 --size）")
 		return nil
