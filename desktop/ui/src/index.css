@@ -49,7 +49,7 @@ h1, h2, h3 { font-weight: 600; }
 .app { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
 .topbar { display: flex; align-items: center; min-height: 76px; padding: 14px 28px 14px 22px; gap: 26px; background: var(--panel); border-bottom: 1px solid var(--border); }
 .brand { width: 144px; flex-shrink: 0; display: flex; align-items: center; gap: 11px; }
-.brand-mark { width: 36px; height: 36px; display: grid; place-items: center; color: #fff; background: var(--accent-fill); font-size: 28px; font-weight: 700; border-radius: 11px; }
+.brand-mark { display: block; width: 44px; height: 44px; object-fit: contain; flex-shrink: 0; }
 .brand strong { font-size: 20px; letter-spacing: 1px; line-height: 1; }
 .brand div > span { color: var(--muted); display: block; font-size: 11px; margin-top: 3px; }
 .topbar-caption { margin-left: auto; font-size: 12px; color: var(--muted); white-space: nowrap; }
@@ -191,7 +191,7 @@ h1, h2, h3 { font-weight: 600; }
 @media (max-width: 680px) {
   .topbar { gap: 14px; padding: 12px; min-height: 64px; }
   .brand { width: auto; }
-  .brand-mark { display: none; }
+  .brand-mark { width: 36px; height: 36px; }
   .brand div > span { display: none; }
   .search-bar button { padding-left: 9px; padding-right: 9px; }
   .app-shell { flex-direction: column; }
