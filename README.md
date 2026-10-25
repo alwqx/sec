@@ -1,46 +1,128 @@
-# sec
+# SEC
 
-Security Information CLI
+SEC（Security Information Client）提供 CLI 与 Desktop 两种界面，用于查询证券行情、公司资料、财务报表、公告、IPO、黄金与美债收益率。两端复用数据源与公共业务能力，并共享同一份自选证券列表。
 
-![sec kline chart screenshot](https://github.com/alwqx/picx-images-hosting/raw/master/blog/2026/sec-kline.8vnjmsfq85.webp)
+[下载安装](https://github.com/alwqx/sec/releases) · [Desktop 截图](#desktop-截图) · [CLI 命令](#cli-命令) · [开发计划](#开发计划)
+
+## 功能概览
+
+| 功能           | Desktop                                                                   | CLI                                           |
+| -------------- | ------------------------------------------------------------------------- | --------------------------------------------- |
+| 证券搜索与自选 | 名称／代码／拼音搜索，自选增删，与 CLI 共享存储                           | `search`、`watch`                             |
+| 实时与历史行情 | 行情自动刷新，日 K 线、成交量与成交额，日期范围、快捷区间和复权选择       | `quote`、`quote-history`、`kline`             |
+| 公司研究       | 公司资料、行业、PE、PB、总市值、流通市值与分红记录                        | `info`                                        |
+| 财务报表       | 资产负债表、利润表、现金流量表，报告期筛选，CSV／JSON 导出                | `balance-sheet`                               |
+| 报告原文       | 年报、半年报、一季报、三季报，年份范围查询、单份／多选 PDF 下载及任务进度 | `balance-sheet-download`（年报）              |
+| 公告           | 标题搜索、报告类别筛选、分页与原文查看                                    | `announcements`、`insider`（增减持公告）      |
+| IPO            | 新股上市日期筛选，招股说明书查询、原文查看及单份／多选下载                | `ipo list / calendar / prospectus / download` |
+| 黄金           | Au99.99 最新日行情、历史蜡烛图与日期筛选                                  | `metal`、`metal-history`                      |
+| 美债           | 11 个期限收益率、收益率曲线、历史趋势与明细                               | `bond`、`bond-history`                        |
+| 技术分析与估值 | 待接入，见开发计划                                                        | `strategy`、`valuation`                       |
+| 版本与更新     | 设置页版本、构建时间、提交号，手动检查更新和 Release 下载入口             | `--version`、`upgrade`                        |
+
+市场覆盖按功能区分：Desktop 搜索与实时行情支持 A 股、港股和美股；证券历史 K 线支持沪深和港股；公司资料、核心指标、财报、分红及个股公告面向沪深北 A 股。黄金为上海黄金交易所 Au99.99 日行情。
 
 ## 安装
 
-进入 [releases](https://github.com/alwqx/sec/releases) 页面，下载指定操作系统的二进制文件。
+### Desktop（macOS Apple Silicon）
 
-Mac/Linux 要把二进制文件放在 `PATH` 路径下。
+1. 打开 [Releases](https://github.com/alwqx/sec/releases)，下载 `sec-<版本>-desktop-darwin-arm64.dmg`，例如 `sec-v0.3.16-desktop-darwin-arm64.dmg`（以实际发布资源为准）。
+2. 打开 DMG，将应用拖入 `Applications`，启动 SEC。
+3. 在「自选与行情」中搜索证券并加入自选；在「设置」中调整外观、行情刷新间隔和下载目录。
 
-Windows 要把二进制文件放在 `系统环境变量` 下。
+当前 Release 仅提供 Apple Silicon 的 Desktop 安装包，Intel Mac 与 Windows Desktop 安装包尚未提供。macOS 安装包采用 ad-hoc 签名，尚未完成 Developer ID 签名与 Apple 公证；系统拦截时的说明见 [Desktop 构建与发布文档](docs/desktop.md#发布macos)。
 
-## 命令
+Desktop 支持浅色、深色及跟随系统外观。导出文件与 PDF 默认保存到 `~/Downloads`，可在设置中修改；同名文件自动追加编号，避免覆盖。检查更新后通过官方 Release 下载并手动安装新版。
 
-### 帮助信息
+### CLI
+
+从 [Releases](https://github.com/alwqx/sec/releases) 下载对应平台的 CLI 压缩包并解压：Linux／macOS 支持 amd64、arm64，Windows 支持 amd64。将 `sec`（Windows 为 `sec.exe`）所在目录加入 `PATH`。
 
 ```shell
-Usage:
-  sec [flags]
-  sec [command]
-
-Available Commands:
-  bond          Print US Treasury yield curve (1M/3M/6M/5Y/10Y)
-  bond-history  Print US Treasury yield curve history
-  help          Help about any command
-  info          Print basic information of a security/stock
-  kline         Print candlestick chart of specific security
-  metal         Print quote of precious metal(default au999)
-  metal-history Print quote history of precious metal(default au999)
-  quote         Security quote root Command
-  quote-history Print quote history of specific security
-  search        Search code and name of a security/stock
-  upgrade       Upgrade sec to the latest version from GitHub releases
-
-Flags:
-  -D, --debug     Enable debug mode
-  -h, --help      help for sec
-  -v, --version   Show version information
-
-Use "sec [command] --help" for more information about a command.
+sec --version
+sec --help
+sec search 招商银行
+sec quote SH600036
 ```
+
+CLI 命令名和可执行文件名保持小写 `sec`。
+
+## Desktop 截图
+
+以下为当前 Desktop 前端界面，使用演示数据生成；证券列表、行情和报表数值不代表实时数据。
+
+### 自选与行情
+
+侧栏切换工作空间，证券列表与研究区并列展示；个股研究包含概览、公司、财报、分红与公告。K 线支持日期范围、复权选择、成交量副图和逐日量额查看。
+
+![SEC Desktop 浅色主题：自选证券、核心指标与历史 K 线](https://raw.githubusercontent.com/alwqx/picx-images-hosting/refs/heads/master/blog/2026/sec-quote.3rc18xtfai.webp)
+
+### 财报研究
+
+切换三类财务报表与报告期，导出 CSV／JSON；「定期报告」提供四类报告原文查询与 PDF 下载。
+
+![SEC Desktop 财报页：报告期筛选、财务数据与导出入口](https://raw.githubusercontent.com/alwqx/picx-images-hosting/refs/heads/master/blog/2026/sec-desktop-financials.4g5asyp8t7.webp)
+
+### IPO
+
+「新股上市」按上市日期筛选，并可进入证券研究或查询招股说明书；「招股说明书」支持披露日期筛选、原文查看与多选下载。
+
+![SEC Desktop IPO 页：新股上市日期筛选与招股书入口](https://raw.githubusercontent.com/alwqx/picx-images-hosting/refs/heads/master/blog/2026/sec-desktop-ipo.9rk7doetna.webp)
+
+### 黄金行情与美债收益率
+
+![SEC Desktop 黄金行情：最新日行情、日期筛选与蜡烛图](https://raw.githubusercontent.com/alwqx/picx-images-hosting/refs/heads/master/blog/2026/sec-desktop-metal.39lzkd3udz.webp)
+
+![SEC Desktop 美债收益率：各期限收益率与收益率曲线](https://raw.githubusercontent.com/alwqx/picx-images-hosting/refs/heads/master/blog/2026/sec-desktop-bond.1vzggbssd1.webp)
+
+## CLI 与 Desktop 共享自选
+
+CLI `sec watch` 与 Desktop「我的自选」统一使用 `~/.sec/watchlist.json`。两端通过公共 `watchlist` 包执行查询、添加、删除，按证券标识（含市场前缀、不区分大小写）去重，新增最多 500 只。Desktop 偏好仍保存在 `~/.sec/desktop/workspace.json`，保存偏好不会替换自选列表。
+
+首次使用新版 CLI 或 Desktop 时，自动合并原 CLI 列表与 Desktop 自选，保留证券类型、交易所和已有添加时间；有旧数据的源文件先生成同目录 `*.pre-shared-*.bak` 备份，再写入带版本的共享文档并移除 Desktop 旧自选字段。迁移失败时返回错误，不用空列表覆盖损坏数据。两端应使用支持共享格式的新版程序；旧版 CLI 不支持新的版本化文档。
+
+跨进程文件锁与同目录临时文件原子替换保护增删操作。Desktop 返回「自选与行情」、窗口重新获得焦点或点击「刷新自选」时读取最新共享列表。迁移时不截断超过 500 只的历史列表，此时可删除但不能继续新增。
+
+## CLI 命令
+
+| 命令                                          | 用途                                     |
+| --------------------------------------------- | ---------------------------------------- |
+| `search`                                      | 按代码、名称或拼音搜索证券               |
+| `quote`、`quote-history`                      | 单只／多只证券实时行情、历史行情         |
+| `kline`                                       | 终端蜡烛图，支持 MA、布林带叠加          |
+| `info`                                        | 公司资料、核心指标与分红                 |
+| `watch`、`watch add`、`watch remove`          | 自选行情总览及增删                       |
+| `balance-sheet`                               | 三类财务报表查询及 CSV／JSON 导出        |
+| `balance-sheet-download`                      | 按单年或年份范围下载年报 PDF             |
+| `announcements`、`insider`                    | 公司公告、增减持公告                     |
+| `ipo list / calendar / prospectus / download` | 新股列表、IPO 公告日历、招股书查询与下载 |
+| `metal`、`metal-history`                      | 黄金日行情与历史                         |
+| `bond`、`bond-history`                        | 美债收益率与历史                         |
+| `strategy ma / macd / rsi / boll`             | 技术指标与信号                           |
+| `valuation`                                   | 估值指标与 DCF 分析                      |
+| `upgrade`、`--version`                        | CLI 升级与版本信息                       |
+
+使用 `sec <命令> --help` 查看参数，IPO 等子命令使用 `sec ipo <子命令> --help`。
+
+```shell
+# 自选与 Desktop 共享
+sec watch add SH600036 SZ002475
+sec watch
+
+# 财报查询与导出
+sec balance-sheet SH600036 --type balance --period annual --output balance.csv
+sec balance-sheet-download SH600036 --start-year 2023 --end-year 2025 --output-dir ./reports
+
+# 新股上市日期范围、招股书查询
+sec ipo list --since 2026-01-01 --until 2026-06-30
+sec ipo prospectus 300750
+
+# 技术分析与估值
+sec strategy macd SH600036
+sec valuation SH600036
+```
+
+以下命令输出为历史示例。
 
 ### 搜索证券
 
@@ -198,20 +280,27 @@ $ sec quote-history lxjm --begin 20250601 --end 20250630
 2025-06-30 | 立讯精密 | 34.69 0.82 2.4%    | 33.95 | 34.78 | 33.95 | 43.77 亿 | 126.69 万 | 2.45 | 1.75   | SZ002475
 ```
 
+## 本地开发
+
+CLI 使用 Go 1.25 或更新版本：
+
+```shell
+go build -o sec .
+go test -v ./...
+```
+
+macOS Desktop 还需要 Node.js（Release 使用 Node 20）、npm 与 Xcode Command Line Tools，先构建前端，再编译桌面端：
+
+```shell
+npm ci --prefix desktop/ui
+npm run build --prefix desktop/ui
+go build -o sec-desktop ./desktop
+./sec-desktop
+```
+
+开发联调、应用打包与架构说明见 [Desktop 文档](docs/desktop.md)。
+
 ## 开发计划
-
-- [ ] 基本信息支持打印股东结构
-- [x] 行情信息打印对齐
-- [x] 行情信息实时更新
-- [x] 行情信息蜡烛图
-
-### CLI 与 Desktop 共享自选
-
-CLI `sec watch` 与 Desktop「我的自选」统一使用 `~/.sec/watchlist.json`。两端通过公共 `watchlist` 包执行查询、添加、删除，按证券标识（含市场前缀、不区分大小写）去重，新增最多 500 只。Desktop 偏好仍保存在 `~/.sec/desktop/workspace.json`，保存偏好不会替换自选列表。
-
-首次使用新版 CLI 或 Desktop 时，自动合并原 CLI 列表与 Desktop 自选，保留证券类型、交易所和已有添加时间；有旧数据的源文件先生成同目录 `*.pre-shared-*.bak` 备份，再写入带版本的共享文档并移除 Desktop 旧自选字段。迁移失败时返回错误，不用空列表覆盖损坏数据。两端应使用支持共享格式的新版程序；旧版 CLI 不支持新的版本化文档。
-
-跨进程文件锁与同目录临时文件原子替换保护增删操作。Desktop 返回「自选与行情」、窗口重新获得焦点或点击「刷新自选」时读取最新共享列表。迁移时不截断超过 500 只的历史列表，此时可删除但不能继续新增。
 
 ### TODO：共享业务能力
 
@@ -222,15 +311,15 @@ CLI `sec watch` 与 Desktop「我的自选」统一使用 `~/.sec/watchlist.json
 
 已覆盖证券搜索、公司核心指标与分红、基础行情与蜡烛图（含日期范围、快捷区间和复权选择）、三类财报及 CSV/JSON 导出、定期报告（年报／半年报／一季报／三季报）年度范围查询与单份／多选 PDF 下载（含任务进度）、公告查询（含年报／中报／一季报／三季报类别筛选）、IPO 新股上市日期范围筛选、招股说明书及相关 PDF 查询与单份／多选下载、黄金行情、美债收益率及设置页版本详情与更新入口。以下按 CLI 与 Desktop 当前差异整理，优先补齐现有页面中的常用能力。
 
-| 优先级 | CLI 功能 | Desktop 当前差距 | 待办 |
-|---|---|---|---|
-| 高 | `watch` 自选行情总览 | 自选列表仅展示名称与代码 | 增加最新价、涨跌幅及多证券行情表 |
-| 高 | `kline --ma / --boll` | 蜡烛图没有指标叠加 | 增加 MA 均线、布林带开关及参数设置 |
-| 中 | `insider` | 没有增减持专题入口 | 个股公告增加增持／减持快捷分类 |
-| 中 | `strategy ma / macd / rsi / boll` | 没有技术分析与信号明细 | 个股研究增加技术分析，展示指标、副图、信号日期和原因 |
-| 中 | `valuation` | 已有 PE、PB，缺少完整估值分析 | 增加 PS、PEG、ROE、Graham 等指标，再增加可调整参数的 DCF |
-| 中 | `ipo calendar` | 当前仅按上市日期分组 | 增加独立的 IPO 发行公告日期视图 |
-| 中 | `quote` 多证券行情 | 当前仅展示选中证券行情 | 支持从自选中选择多只证券，并排比较行情 |
+| 优先级 | CLI 功能                          | Desktop 当前差距                           | 待办                                                     |
+| ------ | --------------------------------- | ------------------------------------------ | -------------------------------------------------------- |
+| 高     | `watch` 自选行情总览              | 自选列表仅展示名称与代码                   | 增加最新价、涨跌幅及多证券行情表                         |
+| 高     | `kline --ma / --boll`             | 蜡烛图没有指标叠加                         | 增加 MA 均线、布林带开关及参数设置                       |
+| 中     | `insider`                         | 没有增减持专题入口                         | 个股公告增加增持／减持快捷分类                           |
+| 中     | `strategy ma / macd / rsi / boll` | 没有技术分析与信号明细                     | 个股研究增加技术分析，展示指标、副图、信号日期和原因     |
+| 中     | `valuation`                       | 已有 PE、PB，缺少完整估值分析              | 增加 PS、PEG、ROE、Graham 等指标，再增加可调整参数的 DCF |
+| 中     | `ipo calendar`                    | 当前提供新股上市列表，缺少发行公告日期视图 | 增加独立的 IPO 发行公告日期视图                          |
+| 中     | `quote` 多证券行情                | 当前仅展示选中证券行情                     | 支持从自选中选择多只证券，并排比较行情                   |
 
 建议实施顺序：自选行情总览 → MA／布林带，其余功能按上述优先级推进。
 
