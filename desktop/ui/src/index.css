@@ -163,6 +163,7 @@ h1, h2, h3 { font-weight: 600; }
 .setting-row { display: flex; justify-content: space-between; align-items: center; gap: 24px; padding: 22px 0; border-bottom: 1px solid var(--border); }
 .setting-row p { margin: 5px 0 0; }
 .setting-row select { min-width: 136px; }
+.setting-row input { width: 320px; max-width: 100%; }
 .settings-actions { display: flex; gap: 14px; align-items: center; margin-top: 24px; }
 .settings-actions span { color: var(--muted); font-size: 12px; }
 .settings-about { margin-top: 40px; border-top: 1px solid var(--border); padding-top: 16px; }
@@ -215,7 +216,7 @@ h1, h2, h3 { font-weight: 600; }
   .ipo-day > div { padding-left: 12px; }
   .ipo-security { flex-wrap: wrap; gap: 6px 12px; }
   .setting-row { gap: 14px; flex-wrap: wrap; }
-  .setting-row select { width: 100%; }
+  .setting-row select, .setting-row input { width: 100%; }
   .company-fields > div { grid-template-columns: 70px minmax(0,1fr); gap: 12px; }
 }
 .history-section { border-top: 1px solid var(--border); padding-top: 18px; }
@@ -288,3 +289,9 @@ h1, h2, h3 { font-weight: 600; }
 .company-metrics h3 { margin: 0; font-size: 14px; color: var(--text); }
 .company-metrics .section-caption button { font-size: 12px; padding: 5px 10px; }
 .metrics-grid { grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); margin: 14px 0 8px; }
+.financial-views { margin-bottom: 20px; }
+.financial-export-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+.saved-download { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 12px; border-radius: 7px; background: var(--accent-soft); color: var(--text); margin: 14px 0; font-size: 12px; overflow-wrap: anywhere; }
+.saved-download span { max-width: 100%; }
+.saved-download button { margin-top: 4px; }
+.download-status { display: flex; align-items: center; gap: 12px; margin: 12px 0; color: var(--muted); font-size: 12px; }

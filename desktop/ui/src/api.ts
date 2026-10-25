@@ -1,4 +1,4 @@
-import type { BasicSecurity, SecurityQuote, Company, Dividend, WorkspaceState, PageResult, IPOListing, Announcement, FinancialReport, MetalData, HistoryQuote, BondData, CompanyMetrics } from './types'
+import type { BasicSecurity, SecurityQuote, Company, Dividend, WorkspaceState, PageResult, IPOListing, Announcement, FinancialReport, MetalData, HistoryQuote, BondData, CompanyMetrics, SavedDownload, AnnualReportsPage } from './types'
 
 async function request<T>(path: string, signal?: AbortSignal, options?: RequestInit): Promise<T> {
   const resp = await fetch(path, { ...options, signal })
@@ -70,4 +70,20 @@ export function bond(begin: string, end: string, signal?: AbortSignal): Promise<
 
 export function companyMetrics(code: string, signal?: AbortSignal): Promise<CompanyMetrics> {
   return request(`/api/v1/metrics?${new URLSearchParams({ code })}`, signal)
+}
+
+export function exportFinancials(code: string, report: string, period: string, format: 'csv' | 'json', signal?: AbortSignal): Promise<SavedDownload> {
+  return request('/api/v1/financials/export', signal, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, report, period, format }),
+  })
+}
+
+export function annualReports(code: string, year: number, page: number, signal?: AbortSignal): Promise<AnnualReportsPage> {
+  return request(`/api/v1/annual-reports?${new URLSearchParams({ code, year: String(year), page: String(page) })}`, signal)
+}
+
+export function downloadAnnualReport(code: string, year: number, url: string, signal?: AbortSignal): Promise<SavedDownload> {
+  return request('/api/v1/annual-reports/download', signal, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, year: String(year), url }),
+  })
 }

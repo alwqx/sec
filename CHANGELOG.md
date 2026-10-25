@@ -11,6 +11,8 @@
 7. Preserve missing Treasury yields as null values, retain cross-year comparison baselines, and reject incomplete annual responses instead of displaying partial history
 8. Add industry, PE (TTM), PB, total market capitalization, and float market capitalization to Desktop overview and company pages using shared CLI info calculations; load metrics independently, show unavailable values explicitly, and normalize quoted profile fields
 
+9. Add Desktop financial statement CSV/JSON exports with original fields and units, plus annual report lookup by fiscal year and PDF downloads; save files to a configurable download directory (default ~/Downloads) without overwriting existing downloads
+
 ### v0.3.15
 
 1. Desktop 升级为研究工作台：顶部全局搜索、左侧工作空间导航、中间证券列表、右侧个股研究，切换功能时保留当前证券

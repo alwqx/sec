@@ -43,6 +43,7 @@ export interface Dividend {
 }
 
 export interface WorkspaceSettings {
+  download_directory: string
   refresh_seconds: number
   theme: 'dark' | 'light' | 'system'
 }
@@ -133,4 +134,24 @@ export interface CompanyMetrics {
   currency: 'CNY'
   trade_date: string
   time: string
+}
+
+export interface SavedDownload {
+  filename: string
+  path: string
+  size: number
+}
+
+export interface AnnualReport {
+  id: string
+  title: string
+  date: string
+  year: number
+  url: string
+}
+
+export interface AnnualReportsPage {
+  results: AnnualReport[]
+  page: number
+  has_more: boolean
 }

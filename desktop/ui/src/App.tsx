@@ -26,7 +26,7 @@ const tabs: { id: Tab; title: string }[] = [
   { id: 'overview', title: '概览' }, { id: 'company', title: '公司' }, { id: 'financials', title: '财报' },
   { id: 'dividends', title: '分红' }, { id: 'announcements', title: '公告' },
 ]
-const initialWorkspace: WorkspaceState = { watchlist: [], settings: { refresh_seconds: 5, theme: 'dark' } }
+const initialWorkspace: WorkspaceState = { watchlist: [], settings: { refresh_seconds: 5, theme: 'dark', download_directory: '' } }
 
 export default function App() {
   const [page, setPage] = useState<Page>('stocks')
