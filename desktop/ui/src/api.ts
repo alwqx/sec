@@ -78,8 +78,8 @@ export function exportFinancials(code: string, report: string, period: string, f
   })
 }
 
-export function annualReports(code: string, year: number, page: number, signal?: AbortSignal): Promise<AnnualReportsPage> {
-  return request(`/api/v1/annual-reports?${new URLSearchParams({ code, year: String(year), page: String(page) })}`, signal)
+export function annualReports(code: string, startYear: number, endYear: number, page: number, signal?: AbortSignal): Promise<AnnualReportsPage> {
+  return request(`/api/v1/annual-reports?${new URLSearchParams({ code, start_year: String(startYear), end_year: String(endYear), page: String(page) })}`, signal)
 }
 
 export function downloadAnnualReport(code: string, year: number, url: string, signal?: AbortSignal): Promise<SavedDownload> {
