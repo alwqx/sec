@@ -14,26 +14,30 @@ import (
 )
 
 func pmiSamples(t *testing.T) ([]valueRow, []series) {
+	return surveySamples(t, "pmi", manufacturingSurvey)
+}
+
+func surveySamples(t *testing.T, prefix string, survey pmiSurvey) ([]valueRow, []series) {
 	t.Helper()
 	var response struct {
 		Data []valueRow `json:"data"`
 	}
-	require.NoError(t, json.Unmarshal(fixture(t, "pmi-values"), &response))
+	require.NoError(t, json.Unmarshal(fixture(t, prefix+"-values"), &response))
 	var metadata struct {
 		Data struct {
 			List []series `json:"list"`
 		} `json:"data"`
 	}
-	require.NoError(t, json.Unmarshal(fixture(t, "pmi-series"), &metadata))
+	require.NoError(t, json.Unmarshal(fixture(t, prefix+"-series"), &metadata))
 	var selected []series
-	for _, component := range pmiComponents {
+	for _, component := range survey.components {
 		for _, s := range metadata.Data.List {
 			if compact(s.Name) == component.name {
 				selected = append(selected, s)
 			}
 		}
 	}
-	require.Len(t, selected, 5)
+	require.Len(t, selected, len(survey.components))
 	return response.Data, selected
 }
 
@@ -91,6 +95,7 @@ func TestManufacturingPMI(t *testing.T) {
 	require.Len(t, items, 15)
 	require.Equal(t, "202607", items[0].Period)
 	require.Equal(t, "manufacturing-pmi", items[0].Indicator)
+	require.Equal(t, "manufacturing", items[0].Survey)
 	require.Equal(t, 49.2, *items[0].Index, "PMI 不应减 100")
 	require.Equal(t, 50.1, *items[10].Index)
 	require.Equal(t, 48.4, *items[14].Index)

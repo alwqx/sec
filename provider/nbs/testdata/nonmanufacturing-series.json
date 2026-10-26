@@ -1,0 +1,58 @@
+{
+  "data": {
+    "total": 12,
+    "list": [
+      {
+        "_id": "88a150208f6e4a1db8babe41ae700f66",
+        "i_showname": "非制造业商务活动指数 (%) "
+      },
+      {
+        "_id": "e64aa8133ca647da8f75893583a5bb24",
+        "i_showname": "新订单指数 (%) "
+      },
+      {
+        "_id": "55ef7f3b8fc44bd791de8c0dd1c0ec56",
+        "i_showname": "新出口订单指数 (%) "
+      },
+      {
+        "_id": "b5957bb8bb284cfaaeaf06abb84a562c",
+        "i_showname": "在手订单指数 (%) "
+      },
+      {
+        "_id": "77e232b90a314d53a63741ca923c90fb",
+        "i_showname": "存货指数 (%) "
+      },
+      {
+        "_id": "61d7f87361374c7e9f9b811a69e5e5c9",
+        "i_showname": "投入品价格指数 (%) "
+      },
+      {
+        "_id": "60c688be2e284933986a6f42fd65b366",
+        "i_showname": "销售价格指数 (%) "
+      },
+      {
+        "_id": "bbe0067c5fbb49eda66f8fd8d60811cf",
+        "i_showname": "从业人员指数 (%) "
+      },
+      {
+        "_id": "fa78c1b7b0424f0598e04fff9fd0e6ef",
+        "i_showname": "供应商配送时间指数 (%) "
+      },
+      {
+        "_id": "7f8ebe0d686142cbaccf5b2ee450c50c",
+        "i_showname": "业务活动预期指数 (%) "
+      },
+      {
+        "_id": "97a152f401d64409892a7fdbe22b0225",
+        "i_showname": "建筑业商务活动指数 (%) "
+      },
+      {
+        "_id": "6f77d579993b454d9e61776b7113a672",
+        "i_showname": "服务业商务活动指数 (%) "
+      }
+    ]
+  },
+  "success": true,
+  "state": 20000,
+  "message": "成功"
+}
