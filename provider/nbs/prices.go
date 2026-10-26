@@ -80,7 +80,11 @@ func (r PriceRequest) Validate() error {
 	if r.Indicator != "cpi" && r.Indicator != "core-cpi" && r.Indicator != "ppi" {
 		return fmt.Errorf("不支持的价格指标: %s", r.Indicator)
 	}
-	for _, month := range []string{r.Begin, r.End} {
+	return validateMonths(r.Begin, r.End)
+}
+
+func validateMonths(begin, end string) error {
+	for _, month := range []string{begin, end} {
 		if len(month) != 6 {
 			return fmt.Errorf("月份必须使用 YYYYMM 格式: %s", month)
 		}
@@ -88,7 +92,7 @@ func (r PriceRequest) Validate() error {
 			return fmt.Errorf("无效月份: %s", month)
 		}
 	}
-	if r.Begin > r.End {
+	if begin > end {
 		return fmt.Errorf("开始月份不能晚于结束月份")
 	}
 	return nil

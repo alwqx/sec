@@ -27,6 +27,7 @@
 23. Update README with the current CLI and Desktop feature matrix, installation and build instructions, shared watchlist usage, and five Desktop screenshots using hosted images
 24. Add official NBS monthly CPI, core CPI, and PPI collection with dynamic catalog discovery, historical partition handling, original comparison indexes, derived year-over-year/month-over-month changes, and explicit missing values
 25. Add `macro cn` price queries with month filters, JSON output, six-hour raw-response caching, refresh controls, NBS source and methodology documentation, and separate CN/US macro collection TODOs
+26. Add `macro cn pmi` to collect official manufacturing PMI, production, new orders, new export orders, and employment indexes with monthly tables, JSON export, shared cache controls, explicit missing values, and seasonally adjusted diffusion-index metadata
 
 ### v0.3.15
 

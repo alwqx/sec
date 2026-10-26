@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// NewMacroCLI 创建宏观数据命令，目前支持中国 CPI、核心 CPI 和 PPI。
+// NewMacroCLI 创建宏观数据命令，支持中国价格指数和制造业 PMI。
 func NewMacroCLI() *cobra.Command {
 	root := &cobra.Command{Use: "macro", Short: "查询宏观经济数据"}
 	cn := &cobra.Command{Use: "cn", Short: "中国宏观经济数据"}
@@ -24,46 +24,27 @@ func NewMacroCLI() *cobra.Command {
 			Args: cobra.NoArgs,
 			RunE: func(cmd *cobra.Command, args []string) error { return prices(cmd, name) },
 		}
-		command.Flags().StringP("begin", "b", "", "开始月份 YYYYMM，默认截至月份前 11 个月")
-		command.Flags().StringP("end", "e", "", "截至月份 YYYYMM，默认上个月")
-		command.Flags().Bool("json", false, "输出含原始指数和来源的 JSON")
-		command.Flags().Bool("refresh", false, "重新采集并更新缓存")
-		command.Flags().Bool("no-cache", false, "不读写磁盘缓存")
-		command.Flags().BoolP("debug", "D", false, "显示调试日志")
+		addQueryFlags(command)
 		cn.AddCommand(command)
 	}
+	cn.AddCommand(newPMICLI())
 	root.AddCommand(cn)
 	return root
 }
 
 func prices(cmd *cobra.Command, indicator string) error {
-	begin, _ := cmd.Flags().GetString("begin")
-	end, _ := cmd.Flags().GetString("end")
-	if end == "" {
-		end = time.Now().AddDate(0, 0, -time.Now().Day()).Format("200601")
-	}
-	if begin == "" {
-		date, err := time.Parse("200601", end)
-		if err != nil {
-			return fmt.Errorf("无效截至月份: %s", end)
-		}
-		begin = date.AddDate(0, -11, 0).Format("200601")
+	begin, end, err := queryMonths(cmd)
+	if err != nil {
+		return err
 	}
 	req := nbs.PriceRequest{Indicator: indicator, Begin: begin, End: end}
 	if err := req.Validate(); err != nil {
 		return err
 	}
-	noCache, _ := cmd.Flags().GetBool("no-cache")
-	cacheDir := ""
-	if !noCache {
-		var err error
-		cacheDir, err = utils.SecDir("cache", "nbs")
-		if err != nil {
-			return err
-		}
+	client, err := queryClient(cmd)
+	if err != nil {
+		return err
 	}
-	client := nbs.NewClient(cacheDir)
-	client.Refresh, _ = cmd.Flags().GetBool("refresh")
 	items, err := client.Prices(cmd.Context(), req)
 	if err != nil {
 		return err
@@ -98,4 +79,44 @@ func prices(cmd *cobra.Command, indicator string) error {
 	table.Render()
 	_, err = fmt.Fprintln(cmd.OutOrStdout(), "来源：国家统计局；涨跌幅 = 原始指数 − 100；未季调。空值显示为 —，缺少的月份不补值。")
 	return err
+}
+
+func addQueryFlags(command *cobra.Command) {
+	command.Flags().StringP("begin", "b", "", "开始月份 YYYYMM，默认截至月份前 11 个月")
+	command.Flags().StringP("end", "e", "", "截至月份 YYYYMM，默认上个月")
+	command.Flags().Bool("json", false, "输出含原始指数和来源的 JSON")
+	command.Flags().Bool("refresh", false, "重新采集并更新缓存")
+	command.Flags().Bool("no-cache", false, "不读写磁盘缓存")
+	command.Flags().BoolP("debug", "D", false, "显示调试日志")
+}
+
+func queryMonths(cmd *cobra.Command) (string, string, error) {
+	begin, _ := cmd.Flags().GetString("begin")
+	end, _ := cmd.Flags().GetString("end")
+	if end == "" {
+		end = time.Now().AddDate(0, 0, -time.Now().Day()).Format("200601")
+	}
+	if begin == "" {
+		date, err := time.Parse("200601", end)
+		if err != nil {
+			return "", "", fmt.Errorf("无效截至月份: %s", end)
+		}
+		begin = date.AddDate(0, -11, 0).Format("200601")
+	}
+	return begin, end, nil
+}
+
+func queryClient(cmd *cobra.Command) (*nbs.Client, error) {
+	noCache, _ := cmd.Flags().GetBool("no-cache")
+	cacheDir := ""
+	if !noCache {
+		var err error
+		cacheDir, err = utils.SecDir("cache", "nbs")
+		if err != nil {
+			return nil, err
+		}
+	}
+	client := nbs.NewClient(cacheDir)
+	client.Refresh, _ = cmd.Flags().GetBool("refresh")
+	return client, nil
 }

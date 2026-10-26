@@ -1,0 +1,22 @@
+{
+  "data": [
+    {
+      "_id": "93ffbb1aa85740d3aa2618371508b606",
+      "_name": "制造业采购经理指数",
+      "isLeaf": true
+    },
+    {
+      "_id": "7a64a6e25aec4a8e9dde044ecd9e2cce",
+      "_name": "非制造业采购经理指数",
+      "isLeaf": true
+    },
+    {
+      "_id": "455378e1c3264a32875768a35ba5de76",
+      "_name": "综合PMI产出指数",
+      "isLeaf": true
+    }
+  ],
+  "success": true,
+  "state": 20000,
+  "message": "成功"
+}
