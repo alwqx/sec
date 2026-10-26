@@ -32,6 +32,7 @@
 28. Add `macro cn industrial` (`ip`) for real monthly and year-to-date industrial value-added growth, supplement seasonally adjusted monthly growth from official release revision tables, preserve January–February reporting gaps, and document source timestamps, caching, and historical coverage limits
 29. Add `macro cn retail` for national monthly and year-to-date retail sales amounts and nominal growth, preserving CNY 100 million units, January–February reporting gaps, source identifiers, JSON exports, and shared cache controls without mixing in above-designated-size retail series
 30. Add `macro cn unemployment` with optional age groups, explicit student-coverage definitions, separate comparable series keys across the December 2023 methodology change, preserved publication gaps, JSON export, and shared cache controls
+31. Add `macro cn financing` (`afre`) using official PBC annual stock and flow tables, with financing components, normalized CNY 100 million amounts, explicitly derived year-to-date flows, source notes, JSON exports, and six-hour caching
 
 ### v0.3.15
 
