@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// NewMacroCLI 创建宏观数据命令，支持中国价格指数与制造业、非制造业采购经理调查。
+// NewMacroCLI 创建宏观数据命令，支持中国价格指数、采购经理调查与工业增加值。
 func NewMacroCLI() *cobra.Command {
 	root := &cobra.Command{Use: "macro", Short: "查询宏观经济数据"}
 	cn := &cobra.Command{Use: "cn", Short: "中国宏观经济数据"}
@@ -29,6 +29,7 @@ func NewMacroCLI() *cobra.Command {
 	}
 	cn.AddCommand(newPMICLI())
 	cn.AddCommand(newNonManufacturingCLI())
+	cn.AddCommand(newIndustrialCLI())
 	root.AddCommand(cn)
 	return root
 }
@@ -85,7 +86,7 @@ func prices(cmd *cobra.Command, indicator string) error {
 func addQueryFlags(command *cobra.Command) {
 	command.Flags().StringP("begin", "b", "", "开始月份 YYYYMM，默认截至月份前 11 个月")
 	command.Flags().StringP("end", "e", "", "截至月份 YYYYMM，默认上个月")
-	command.Flags().Bool("json", false, "输出含原始指数和来源的 JSON")
+	command.Flags().Bool("json", false, "输出含指标数值和来源的 JSON")
 	command.Flags().Bool("refresh", false, "重新采集并更新缓存")
 	command.Flags().Bool("no-cache", false, "不读写磁盘缓存")
 	command.Flags().BoolP("debug", "D", false, "显示调试日志")

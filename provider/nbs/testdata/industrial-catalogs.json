@@ -1,0 +1,107 @@
+{
+  "data": [
+    {
+      "_id": "3f2e14f0542348ed9fe02476eca3450b",
+      "_name": "规上工业增加值增长速度",
+      "isLeaf": true
+    },
+    {
+      "_id": "b1d8cee1b413494bab668fbae92d80ac",
+      "_name": "按经济类型分工业增加值增长速度",
+      "isLeaf": true
+    },
+    {
+      "_id": "2b06ed9af69a441684ef906a27d0faf8",
+      "_name": "按三大门类分工业增加值增长速度",
+      "isLeaf": true
+    },
+    {
+      "_id": "240338c22ce6470d80754833eae62a73",
+      "_name": "工业分大类行业增加值增长速度 (2003-2011) ",
+      "isLeaf": true
+    },
+    {
+      "_id": "41f883ee51194da893cb6b8d4186f32b",
+      "_name": "工业分大类行业增加值增长速度 (2012-2017) ",
+      "isLeaf": true
+    },
+    {
+      "_id": "f581720fd0f04d81a77bccebb429b913",
+      "_name": "工业分大类行业增加值增长速度 (2018-至今) ",
+      "isLeaf": true
+    },
+    {
+      "_id": "381a2bfe1b164ad79c9f7961d2a7ba5a",
+      "_name": "工业分大类行业出口交货值 (2003-2011) ",
+      "isLeaf": false
+    },
+    {
+      "_id": "067e4a50b8ff4d82b25302895aeafe97",
+      "_name": "工业分大类行业出口交货值 (2012-2017) ",
+      "isLeaf": false
+    },
+    {
+      "_id": "28642c69d6c54fe78eadd12caafc4184",
+      "_name": "工业分大类行业出口交货值 (2018-至今) ",
+      "isLeaf": false
+    },
+    {
+      "_id": "1001ca9380c74a65b5f297d11fda85fe",
+      "_name": "产品销售率 (按现价计算) ",
+      "isLeaf": true
+    },
+    {
+      "_id": "4000345c59c34e68856ee651c6690f05",
+      "_name": "工业主要产品产量",
+      "isLeaf": false
+    },
+    {
+      "_id": "d760d189206642ce8afad57640408e09",
+      "_name": "工业企业主要经济指标",
+      "isLeaf": true
+    },
+    {
+      "_id": "1a2fe800929b46508686d5ce3bbc26d5",
+      "_name": "按登记注册类型分工业企业主要经济指标（-2023）",
+      "isLeaf": false
+    },
+    {
+      "_id": "60d079366cb04de5a6e14065678c1090",
+      "_name": "按登记注册类型分工业企业主要经济指标（2024-）",
+      "isLeaf": false
+    },
+    {
+      "_id": "46c9c88c350244339172675e5e2828ef",
+      "_name": "大中型工业企业主要经济指标",
+      "isLeaf": true
+    },
+    {
+      "_id": "cf62b058b52342e4b25d2d69fd15365b",
+      "_name": "大中型国有控股工业企业主要经济指标",
+      "isLeaf": true
+    },
+    {
+      "_id": "399c369c7b02482eaf06bd26cde3bfd4",
+      "_name": "按行业分工业企业主要经济指标 (2001-2002) ",
+      "isLeaf": false
+    },
+    {
+      "_id": "b0c4b413cb394a98a2bef12f19d6d7dc",
+      "_name": "按行业分工业企业主要经济指标 (2003-2011) ",
+      "isLeaf": false
+    },
+    {
+      "_id": "2f1dfd86443744f7850f41d6a2776dfd",
+      "_name": "按行业分工业企业主要经济指标 (2012-2017) ",
+      "isLeaf": false
+    },
+    {
+      "_id": "1e49af0eeed74047a9ff4271dffba01d",
+      "_name": "按行业分工业企业主要经济指标 (2018-至今) ",
+      "isLeaf": false
+    }
+  ],
+  "success": true,
+  "state": 20000,
+  "message": "成功"
+}
