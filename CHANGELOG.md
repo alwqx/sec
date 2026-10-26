@@ -30,6 +30,7 @@
 26. Add `macro cn pmi` to collect official manufacturing PMI, production, new orders, new export orders, and employment indexes with monthly tables, JSON export, shared cache controls, explicit missing values, and seasonally adjusted diffusion-index metadata
 27. Add `macro cn nonmanufacturing-pmi` (`npmi`) with national, services, and construction business activity indexes plus nine detailed components; share PMI collection and cache controls, distinguish survey types in JSON, and preserve documented historical gaps
 28. Add `macro cn industrial` (`ip`) for real monthly and year-to-date industrial value-added growth, supplement seasonally adjusted monthly growth from official release revision tables, preserve January–February reporting gaps, and document source timestamps, caching, and historical coverage limits
+29. Add `macro cn retail` for national monthly and year-to-date retail sales amounts and nominal growth, preserving CNY 100 million units, January–February reporting gaps, source identifiers, JSON exports, and shared cache controls without mixing in above-designated-size retail series
 
 ### v0.3.15
 

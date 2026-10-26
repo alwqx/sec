@@ -1,0 +1,52 @@
+{
+  "data": [
+    {
+      "_id": "d0cb882c7f27443ab6b3ef9421901961",
+      "_name": "社会消费品零售总额",
+      "isLeaf": true
+    },
+    {
+      "_id": "d5c7d1062a5742c69a02c39650c7c327",
+      "_name": "按经营地分社会消费品零售总额",
+      "isLeaf": true
+    },
+    {
+      "_id": "d9821f4ad1ec42ebbbd0554efb3e3772",
+      "_name": "按消费类型分社会消费品零售总额",
+      "isLeaf": true
+    },
+    {
+      "_id": "7c05740ff94c4ac3ba77a8d0abeecc21",
+      "_name": "限上单位商品零售类值",
+      "isLeaf": false
+    },
+    {
+      "_id": "22838c7f1ba44eb480f80cf1b8a0f347",
+      "_name": "限额以上住宿和餐饮业经营情况 (-2009) ",
+      "isLeaf": true
+    },
+    {
+      "_id": "fb09cbc680fe4d348c9d05f535ebf77c",
+      "_name": "网上零售额",
+      "isLeaf": true
+    },
+    {
+      "_id": "ce144b3caaf9498aabcc713e671c1f33",
+      "_name": "网上商品和服务零售额",
+      "isLeaf": true
+    },
+    {
+      "_id": "e31b36786de142f784aa05581914dffc",
+      "_name": "按零售业态分限额以上消费品零售额",
+      "isLeaf": true
+    },
+    {
+      "_id": "28fc474f03e746008ff9fbc2bbb4bf3b",
+      "_name": "服务零售额",
+      "isLeaf": true
+    }
+  ],
+  "success": true,
+  "state": 20000,
+  "message": "成功"
+}
