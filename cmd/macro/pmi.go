@@ -1,6 +1,7 @@
 package macro
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,7 +13,13 @@ import (
 )
 
 func newPMICLI() *cobra.Command {
-	command := &cobra.Command{Use: "pmi", Short: "制造业采购经理指数及生产、订单、出口订单、就业分项", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, args []string) error {
+	return newPMIQueryCLI("pmi", "制造业采购经理指数及生产、订单、出口订单、就业分项", (*nbs.Client).ManufacturingPMI, func(cmd *cobra.Command, items []nbs.PMIObservation) error {
+		return printPMI(cmd.OutOrStdout(), items)
+	})
+}
+
+func newPMIQueryCLI(use, short string, query func(*nbs.Client, context.Context, nbs.PMIRequest) ([]nbs.PMIObservation, error), render func(*cobra.Command, []nbs.PMIObservation) error) *cobra.Command {
+	command := &cobra.Command{Use: use, Short: short, Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, args []string) error {
 		begin, end, err := queryMonths(cmd)
 		if err != nil {
 			return err
@@ -25,7 +32,7 @@ func newPMICLI() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		items, err := client.ManufacturingPMI(cmd.Context(), req)
+		items, err := query(client, cmd.Context(), req)
 		if err != nil {
 			return err
 		}
@@ -38,7 +45,7 @@ func newPMICLI() *cobra.Command {
 			encoder.SetIndent("", "  ")
 			return encoder.Encode(items)
 		}
-		return printPMI(cmd.OutOrStdout(), items)
+		return render(cmd, items)
 	}}
 	addQueryFlags(command)
 	return command
@@ -50,6 +57,12 @@ func printPMI(out io.Writer, items []nbs.PMIObservation) error {
 		return err
 	}
 	keys := []string{"manufacturing-pmi", "production", "new-orders", "new-export-orders", "employment"}
+	printPMITable(out, items, keys, []string{"月份", "制造业 PMI", "生产", "新订单", "新出口订单", "从业人员"})
+	_, err := fmt.Fprintln(out, "来源：国家统计局；季调扩散指数，单位 %，50 为临界点；指数水平不是产出增速，不减 100。空值显示为 —，缺少的月份不补值。")
+	return err
+}
+
+func printPMITable(out io.Writer, items []nbs.PMIObservation, keys, headers []string) {
 	rows := map[string]map[string]*float64{}
 	var months []string
 	for _, item := range items {
@@ -61,7 +74,7 @@ func printPMI(out io.Writer, items []nbs.PMIObservation) error {
 	}
 	table := tablewriter.NewWriter(out)
 	table.SetBorder(false)
-	table.SetHeader([]string{"月份", "制造业 PMI", "生产", "新订单", "新出口订单", "从业人员"})
+	table.SetHeader(headers)
 	for _, month := range months {
 		row := []string{month}
 		for _, key := range keys {
@@ -74,6 +87,4 @@ func printPMI(out io.Writer, items []nbs.PMIObservation) error {
 		table.Append(row)
 	}
 	table.Render()
-	_, err := fmt.Fprintln(out, "来源：国家统计局；季调扩散指数，单位 %，50 为临界点；指数水平不是产出增速，不减 100。空值显示为 —，缺少的月份不补值。")
-	return err
 }
