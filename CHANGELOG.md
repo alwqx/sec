@@ -25,6 +25,8 @@
 21. Refresh Desktop layout with a full-height branded sidebar, compact page headers and shared page actions, neutral light/dark themes, denser research summaries, grouped settings, sticky table headers, and responsive stacked layouts inspired by CC Switch
 22. Simplify the Desktop sidebar brand to the logo and SEC label, removing the subtitle and unused styles
 23. Update README with the current CLI and Desktop feature matrix, installation and build instructions, shared watchlist usage, and five Desktop screenshots using hosted images
+24. Add official NBS monthly CPI, core CPI, and PPI collection with dynamic catalog discovery, historical partition handling, original comparison indexes, derived year-over-year/month-over-month changes, and explicit missing values
+25. Add `macro cn` price queries with month filters, JSON output, six-hour raw-response caching, refresh controls, NBS source and methodology documentation, and separate CN/US macro collection TODOs
 
 ### v0.3.15
 

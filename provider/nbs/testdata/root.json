@@ -1,0 +1,22 @@
+{
+  "data": [
+    {
+      "explain": null,
+      "sdate": null,
+      "_name": "月度数据",
+      "treeinfo_pid": "69c574ab128a44e595cc0b24502b771b",
+      "treeinfo_level": 2,
+      "type": "catalog",
+      "edate": null,
+      "isLeaf": false,
+      "treeinfo_globalid": "69c574ab128a44e595cc0b24502b771b.fc982599aa684be7969d7b90b1bd0e84",
+      "name": "月度数据",
+      "_id": "fc982599aa684be7969d7b90b1bd0e84",
+      "publicrelease_web_catalog_id": "fc982599aa684be7969d7b90b1bd0e84",
+      "treeinfo_icon": null
+    }
+  ],
+  "success": true,
+  "state": 20000,
+  "message": "成功"
+}
