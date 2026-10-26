@@ -11,7 +11,7 @@
 
 ## 当前范围与用法
 
-目前支持全国月度 CPI、核心 CPI（不包括食品和能源）、PPI（工业生产者出厂价格指数），分别查询同比与环比口径；另支持制造业 PMI、非制造业商务活动指数及相关分项、规模以上工业增加值增速，以及社会消费品零售总额，口径见下文。暂不涉及 US、汇率、股票与黄金的联合分析，也未接入 Desktop。
+目前支持全国月度 CPI、核心 CPI（不包括食品和能源）、PPI（工业生产者出厂价格指数），分别查询同比与环比口径；另支持制造业 PMI、非制造业商务活动指数及相关分项、规模以上工业增加值增速、社会消费品零售总额和城镇调查失业率，口径见下文。暂不涉及 US、汇率、股票与黄金的联合分析，也未接入 Desktop。
 
 ```bash
 sec macro cn cpi
@@ -101,6 +101,8 @@ provider/nbs/industrial_releases.go 官方发布稿发现、季调环比修订�
 cmd/macro/industrial.go     工业增加值命令、表格及 JSON 导出
 provider/nbs/retail.go      全国社零四项指标采集与口径保留
 cmd/macro/retail.go         社零命令、表格及 JSON 导出
+provider/nbs/unemployment.go 失业率采集、年龄分组与口径版本
+cmd/macro/unemployment.go   失业率命令、表格及 JSON 导出
 ```
 
 provider 接收 `context.Context`，支持取消与请求超时；CLI 通过 `cmd.OutOrStdout()` 输出。`nbs.NewClient("")` 可在其他调用方禁用磁盘缓存。
@@ -255,3 +257,49 @@ JSON 显式保存 `amount_unit: "亿元"`、`growth_unit: "%"`、`price_basis: "
 缓存、默认月份范围及刷新参数与其他发布库指标相同。JSON 同时保留地区、目录及四个系列 ID、来源、抓取时间。未取得逐条公布时间，不用月份或抓取时间代替；本功能不新增历史修订档案或季调环比采集。
 
 `retail-catalogs.json`、`retail-series.json`、`retail-values.json` 为 2026-10-26 获取并精简的官方样本，观测覆盖 2026 年 1—9 月；保留同目录限额以上系列用于验证不会误选。测试覆盖四项映射、1—2 月口径、零值、负增速、缺失值、元数据异常、重复/非法记录、缓存命中/刷新、取消请求，以及中文表格和月份参数。
+
+## 城镇调查失业率
+
+```bash
+sec macro cn unemployment
+sec macro cn unemployment --begin 202001 --end 202609 --json
+sec macro cn unemployment --begin 202306 --end 202401 --age-groups
+sec macro cn unemployment --age-groups --json
+sec macro cn unemployment --refresh
+sec macro cn unemployment --no-cache
+```
+
+默认仅查询全国城镇调查失业率；`--age-groups` 同时查询 16—24 岁、25—29 岁、30—59 岁及旧 25—59 岁四个年龄组。月份参数、六小时缓存、JSON 和刷新方式与其他宏观查询一致。
+
+动态选择“月度数据 → 城镇调查失业率 → 城镇调查失业率”，精确匹配所选指标，一次获取全国值及可选年龄分组。不混入同目录的 31 个大城市、户籍分组失业率或企业周工作时间，也不以其他分组填补全国值缺口。
+
+| `indicator` | 指标 |
+| --- | --- |
+| `urban-surveyed` | 全国城镇调查失业率 |
+| `age-16-24` | 全国城镇 16—24 岁劳动力失业率 |
+| `age-25-29` | 全国城镇 25—29 岁劳动力失业率（不含在校生的新分组） |
+| `age-30-59` | 全国城镇 30—59 岁劳动力失业率（不含在校生的新分组） |
+| `age-25-59` | 全国城镇 25—59 岁劳动力失业率（旧分组） |
+
+数值为失业率水平，单位 `%`，不是同比增速、PMI 或登记失业率。失业人口需符合工作搜寻、可以开始工作等条件，未就业的所有人不等于失业人口。全国总体包含符合劳动力定义的在校生，不能直接套用新年龄分组“不含在校生”的口径。[计算方法](https://www.stats.gov.cn/zs/tjws/zytjzbqs/tcsyl/202411/t20241115_1957491.html)、[全国与分年龄口径说明](https://www.stats.gov.cn/hd/lyzx/zxgk/202406/t20240619_1955075.html)。
+
+### 年龄分组断点
+
+当前官方元数据中，16—24 岁同一个系列 ID 同时包含新旧口径，指标名称未直接注明“不含在校生”，但官方注释明确“2023年12月起，失业率年龄分组进行了调整，往月数据包含在校生”。因此程序根据所属期标记口径，不仅依赖名称或 ID：
+
+| 所属期/指标 | `definition_version` | `student_scope` |
+| --- | --- | --- |
+| 全国值，各月 | `national-surveyed` | `included-if-in-labour-force` |
+| 16—24 岁，至 2023 年 6 月 | `legacy-including-students` | `included-if-in-labour-force` |
+| 16—24 岁，2023 年 7—11 月 | `publication-paused-202307-202311` | `not-applicable` |
+| 16—24 岁，自 2023 年 12 月起 | `excluding-students-since-202312` | `excluded` |
+| 新 25—29 岁、30—59 岁 | `excluding-students-since-202312` | `excluded` |
+| 旧 25—59 岁 | `legacy-including-students` | `included-if-in-labour-force` |
+
+新分组从 2023 年 12 月所属期起有值，在 2024 年 1 月恢复发布时公布，**不能把公布月份误当成数据所属月份**。[国家统计局调整说明](https://www.stats.gov.cn/xxgk/sjfb/zxfb2020/202401/t20240117_1946644.html)。新分组较早月份以及旧分组停止发布后的缺口保持为空；程序不插值、不替换、不将旧 25—59 岁拆成新组或与新组拼接，也不将 2023 年 6 月的 21.3% 与 12 月的 14.9% 直接解释为同口径改善。
+
+JSON 的 `series_key` 为 `indicator:definition_version`，用于区分已知口径版本。年龄分组历史分析必须结合该字段，不能仅按官方 `series_id` 或 `indicator` 连线、计算跨断点变化。`series_key` 只标记已核验的这次口径变化，不承诺捕获未来所有统计方法调整。
+
+每条 JSON 保留地区、所属期、失业率、单位、未季调标识、口径版本、在校生范围、官方目录/系列 ID、名称、来源、抓取时间和缺口说明。真实零值保留；缺失字段为 `null` / 表格 `—`；未返回的整个月不补虚构记录。重复观测、异常数值（非有限数或超出 0—100）、缺少所选元数据或指标列表被截断时返回错误。官方未提供逐条公布时间，不用抓取时间代替；历史修订档案限制同上。
+
+`unemployment-*.json` 样本于 2026-10-26 获取，精简后保留 2023 年 6 月、7 月、11 月、12 月及 2024 年 1 月、9 月的口径边界数据和官方系列注释。测试覆盖全国/年龄选项、口径版本及可比序列隔离、暂停期、旧年龄组、零值/缺失/异常值、元数据异常、缓存命中/刷新、取消请求和表格展示。

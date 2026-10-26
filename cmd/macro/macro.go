@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// NewMacroCLI 创建宏观数据命令，支持中国价格指数、采购经理调查、工业增加值与社零。
+// NewMacroCLI 创建宏观数据命令，支持中国价格、景气、生产、消费与就业数据。
 func NewMacroCLI() *cobra.Command {
 	root := &cobra.Command{Use: "macro", Short: "查询宏观经济数据"}
 	cn := &cobra.Command{Use: "cn", Short: "中国宏观经济数据"}
@@ -31,6 +31,7 @@ func NewMacroCLI() *cobra.Command {
 	cn.AddCommand(newNonManufacturingCLI())
 	cn.AddCommand(newIndustrialCLI())
 	cn.AddCommand(newRetailCLI())
+	cn.AddCommand(newUnemploymentCLI())
 	root.AddCommand(cn)
 	return root
 }

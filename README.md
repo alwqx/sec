@@ -103,6 +103,7 @@ CLI `sec watch` 与 Desktop「我的自选」统一使用 `~/.sec/watchlist.json
 | `macro cn nonmanufacturing-pmi` / `macro cn npmi` | 非制造业、服务业、建筑业商务活动指数；`--details` 展示九个全国分项 |
 | `macro cn industrial` / `macro cn ip`          | 规模以上工业增加值单月同比、累计同比及可检索的季调环比 |
 | `macro cn retail`                             | 社会消费品零售总额当月金额、同比、累计金额及累计同比 |
+| `macro cn unemployment`                       | 全国城镇调查失业率；`--age-groups` 展示年龄分组并标记口径变化 |
 | `strategy ma / macd / rsi / boll`             | 技术指标与信号                           |
 | `valuation`                                   | 估值指标与 DCF 分析                      |
 | `upgrade`、`--version`                        | CLI 升级与版本信息                       |
