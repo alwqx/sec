@@ -1,0 +1,22 @@
+{
+  "data": {
+    "total": 3,
+    "list": [
+      {
+        "_id": "e64079bae9064aebad1c4c5fe0c8a6ef",
+        "i_showname": "工业生产者出厂价格指数 (上月=100) "
+      },
+      {
+        "_id": "2d64292eff8d434492cfc9c155fd158c",
+        "i_showname": "生产资料工业生产者出厂价格指数 (上月=100) "
+      },
+      {
+        "_id": "2ed0062abfd349f088a6b33213773930",
+        "i_showname": "生活资料工业生产者出厂价格指数 (上月=100) "
+      }
+    ]
+  },
+  "success": true,
+  "state": 20000,
+  "message": "成功"
+}

@@ -1,0 +1,65 @@
+{
+  "data": [
+    {
+      "code": "202609MM",
+      "name": "2026年9月",
+      "values": [
+        {
+          "i_showname": "居民消费价格指数 (上年同月=100) ",
+          "num_accuracy_text": "1",
+          "_name": "居民消费价格指数",
+          "is_economy_chart_show_text": "是",
+          "daterange_sdate": 1767196800000,
+          "ek": "6021702000021|b50457fdeade41b0ac011456f7ab5e44",
+          "dp": "1",
+          "type": "indicator",
+          "is_economy_chart_show_value": "1",
+          "ds_order": 1,
+          "du": "414774dee2bc47f392cf13abfa9de882",
+          "catalogid": "5c7452825c7c4dcba391db5ca7f335c5",
+          "chart_style_text": "折线图",
+          "_id": "53180dfb9c14411ba4b762307c85920c",
+          "num_accuracy_value": "1",
+          "chart_style_value": "2",
+          "du_name": "%",
+          "order": 1,
+          "value": "100.9",
+          "da": "000000000000",
+          "da_name": "全国"
+        }
+      ]
+    },
+    {
+      "code": "202608MM",
+      "name": "2026年8月",
+      "values": [
+        {
+          "i_showname": "居民消费价格指数 (上年同月=100) ",
+          "num_accuracy_text": "1",
+          "_name": "居民消费价格指数",
+          "is_economy_chart_show_text": "是",
+          "daterange_sdate": 1767196800000,
+          "ek": "6021702000021|b50457fdeade41b0ac011456f7ab5e44",
+          "dp": "1",
+          "type": "indicator",
+          "is_economy_chart_show_value": "1",
+          "ds_order": 1,
+          "du": "414774dee2bc47f392cf13abfa9de882",
+          "catalogid": "5c7452825c7c4dcba391db5ca7f335c5",
+          "chart_style_text": "折线图",
+          "_id": "53180dfb9c14411ba4b762307c85920c",
+          "num_accuracy_value": "1",
+          "chart_style_value": "2",
+          "du_name": "%",
+          "order": 1,
+          "value": "100.8",
+          "da": "000000000000",
+          "da_name": "全国"
+        }
+      ]
+    }
+  ],
+  "success": true,
+  "state": 20000,
+  "message": "成功"
+}

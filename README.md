@@ -98,6 +98,7 @@ CLI `sec watch` 与 Desktop「我的自选」统一使用 `~/.sec/watchlist.json
 | `ipo list / calendar / prospectus / download` | 新股列表、IPO 公告日历、招股书查询与下载 |
 | `metal`、`metal-history`                      | 黄金日行情与历史                         |
 | `bond`、`bond-history`                        | 美债收益率与历史                         |
+| `macro cn cpi`、`macro cn core-cpi`、`macro cn ppi` | 国家统计局月度价格指数，见 [NBS 文档](docs/nbs.md) |
 | `strategy ma / macd / rsi / boll`             | 技术指标与信号                           |
 | `valuation`                                   | 估值指标与 DCF 分析                      |
 | `upgrade`、`--version`                        | CLI 升级与版本信息                       |
