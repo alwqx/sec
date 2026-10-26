@@ -1,0 +1,18 @@
+{
+  "data": {
+    "total": 2,
+    "list": [
+      {
+        "_id": "ef1b1765960d45a29b4d7c4ca91be916",
+        "i_showname": "规上工业增加值同比增长 (%) "
+      },
+      {
+        "_id": "21e7072e9f384209aedb56e69a18216e",
+        "i_showname": "规上工业增加值累计增长 (%) "
+      }
+    ]
+  },
+  "success": true,
+  "state": 20000,
+  "message": "成功"
+}

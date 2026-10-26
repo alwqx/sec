@@ -101,6 +101,7 @@ CLI `sec watch` 与 Desktop「我的自选」统一使用 `~/.sec/watchlist.json
 | `macro cn cpi`、`macro cn core-cpi`、`macro cn ppi` | 国家统计局月度价格指数，见 [NBS 文档](docs/nbs.md) |
 | `macro cn pmi`                                | 国家统计局制造业 PMI 及生产、订单、出口订单、就业分项 |
 | `macro cn nonmanufacturing-pmi` / `macro cn npmi` | 非制造业、服务业、建筑业商务活动指数；`--details` 展示九个全国分项 |
+| `macro cn industrial` / `macro cn ip`          | 规模以上工业增加值单月同比、累计同比及可检索的季调环比 |
 | `strategy ma / macd / rsi / boll`             | 技术指标与信号                           |
 | `valuation`                                   | 估值指标与 DCF 分析                      |
 | `upgrade`、`--version`                        | CLI 升级与版本信息                       |

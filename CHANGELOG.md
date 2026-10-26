@@ -29,6 +29,7 @@
 25. Add `macro cn` price queries with month filters, JSON output, six-hour raw-response caching, refresh controls, NBS source and methodology documentation, and separate CN/US macro collection TODOs
 26. Add `macro cn pmi` to collect official manufacturing PMI, production, new orders, new export orders, and employment indexes with monthly tables, JSON export, shared cache controls, explicit missing values, and seasonally adjusted diffusion-index metadata
 27. Add `macro cn nonmanufacturing-pmi` (`npmi`) with national, services, and construction business activity indexes plus nine detailed components; share PMI collection and cache controls, distinguish survey types in JSON, and preserve documented historical gaps
+28. Add `macro cn industrial` (`ip`) for real monthly and year-to-date industrial value-added growth, supplement seasonally adjusted monthly growth from official release revision tables, preserve January–February reporting gaps, and document source timestamps, caching, and historical coverage limits
 
 ### v0.3.15
 
