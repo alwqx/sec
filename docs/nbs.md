@@ -11,7 +11,7 @@
 
 ## 当前范围与用法
 
-本次实现全国月度 CPI、核心 CPI（不包括食品和能源）、PPI（工业生产者出厂价格指数），分别查询同比与环比口径。暂不涉及 US、汇率、股票与黄金的联合分析，也未接入 Desktop。
+目前支持全国月度 CPI、核心 CPI（不包括食品和能源）、PPI（工业生产者出厂价格指数），分别查询同比与环比口径；另支持制造业 PMI 及四个分项，口径见下文。暂不涉及 US、汇率、股票与黄金的联合分析，也未接入 Desktop。
 
 ```bash
 sec macro cn cpi
@@ -90,9 +90,11 @@ https://data.stats.gov.cn/dg/website/publicrelease/web/external
 ```text
 provider/nbs/nbs.go          请求、错误处理、原始响应缓存
 provider/nbs/prices.go       目录发现、历史分段、价格指标解析
+provider/nbs/pmi.go          制造业 PMI 目录发现与五项指数采集
 provider/nbs/prices_test.go  官方响应样本与本地 HTTP 模拟测试
 provider/nbs/testdata/       核验时获取的官方响应样本（部分精简）
 cmd/macro/macro.go          命令参数、JSON 与中文表格
+cmd/macro/pmi.go            PMI 命令与月度五项指数表格
 ```
 
 provider 接收 `context.Context`，支持取消与请求超时；CLI 通过 `cmd.OutOrStdout()` 输出。`nbs.NewClient("")` 可在其他调用方禁用磁盘缓存。
@@ -103,3 +105,33 @@ go test ./...
 ```
 
 离线测试覆盖三类指标、同比/环比、原始指数、真实零涨幅、缺失值、历史分段筛选、缓存命中/刷新、上游错误、取消请求和月份校验。真实网络验证应手动运行上述命令，不加入 CI。
+
+## 制造业 PMI
+
+`PMI` 是 Purchasing Managers' Index（采购经理指数）的缩写。当前采集全国制造业总指数和四个指定分项；不包含非制造业商务活动指数或综合 PMI，它们在官方目录中属于不同系列。
+
+```bash
+sec macro cn pmi
+sec macro cn pmi --begin 202001 --end 202609
+sec macro cn pmi --begin 202607 --end 202609 --json
+sec macro cn pmi --refresh
+sec macro cn pmi --no-cache
+```
+
+月份默认范围、缓存目录、六小时有效期和刷新方式与价格查询一致。终端每个月展示一行，含总指数、生产、新订单、新出口订单、从业人员五列；JSON 每个月输出五条观测记录。
+
+| JSON `indicator` | 官方指标 | 含义 |
+| --- | --- | --- |
+| `manufacturing-pmi` | 制造业采购经理指数 | 制造业总体景气 |
+| `production` | 生产指数 | 生产活动 |
+| `new-orders` | 新订单指数 | 新增需求 |
+| `new-export-orders` | 新出口订单指数 | 出口订单需求 |
+| `employment` | 从业人员指数 | 企业用工变化 |
+
+采集流程为“月度数据 → 采购经理指数 → 制造业采购经理指数 → 指标元数据 → 五项全国观测值”。动态查找目录和指标 ID，并在同一数据请求中提交五个 ID。不会误选非制造业或综合 PMI，也不自动扩展到其余分项。
+
+PMI 是扩散指数，以百分数形式发布，取值范围为 0—100。官方数据已经季节调整，JSON 显式返回 `unit: "%"` 和 `seasonally_adjusted: true`。50 是临界点，大于/小于 50 表示相应调查活动相对上月扩张/收缩，**不表示产出同比或环比增长了该百分比**。它不适用价格指数的“减 100”转换；本次也不计算月差或经济状态评分。方法和季调说明见[国家统计局 PMI 发布说明](https://www.stats.gov.cn/sj/zxfb/202609/t20260930_1965449.html)。
+
+JSON 保留全国地区、指标键、所属月份、原始指数、官方目录/序列标识、名称、来源和抓取时间。缺失分项输出 `null`，表格显示 `—`；整个月未返回时不生成虚构数据。重复月份/观测值、非法或超出 0—100 的数值、元数据缺少必需指标、指标列表被截断时返回错误。公布时间和历史修订归档限制与上文一致。
+
+`pmi-catalogs.json`、`pmi-series.json`、`pmi-values.json` 是 2026-10-26 从官方接口取得并精简的测试样本，数据样本覆盖 2026 年 7—9 月。测试覆盖五项正确映射、月份排序/过滤、零值与缺失值、无效/重复响应、缓存命中与刷新、CLI 月份校验和中文表格展示。

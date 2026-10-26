@@ -1,0 +1,66 @@
+{
+  "data": {
+    "total": 14,
+    "list": [
+      {
+        "_id": "a09aa989bdcf4cffa2021795722eb916",
+        "i_showname": "制造业采购经理指数 (%) "
+      },
+      {
+        "_id": "6729aa00f9ed46d8b30c5d2312214b89",
+        "i_showname": "生产指数 (%) "
+      },
+      {
+        "_id": "4151df33b53f4d02ae9f51fe402f1a50",
+        "i_showname": "新订单指数 (%) "
+      },
+      {
+        "_id": "fb245388740743d0974af1b00cfd27bb",
+        "i_showname": "新出口订单指数 (%) "
+      },
+      {
+        "_id": "d14ffd61d762435b8360896a13787659",
+        "i_showname": "在手订单指数 (%) "
+      },
+      {
+        "_id": "48ec2904ba8848cf9488fa99d3731525",
+        "i_showname": "产成品库存指数 (%) "
+      },
+      {
+        "_id": "c83954218ae645cf975ed4f66b4a57f2",
+        "i_showname": "采购量指数 (%) "
+      },
+      {
+        "_id": "0cfb958d221a488da4fe4514b96b5cb0",
+        "i_showname": "进口指数 (%) "
+      },
+      {
+        "_id": "105a73cd48cc47d4a914ebccdedf24ec",
+        "i_showname": "出厂价格指数 (%) "
+      },
+      {
+        "_id": "f8d4068c475844bb9485f9363935119e",
+        "i_showname": "主要原材料购进价格指数 (%) "
+      },
+      {
+        "_id": "c149709d0c48422d83a59d4b94d03bbb",
+        "i_showname": "原材料库存指数 (%) "
+      },
+      {
+        "_id": "24454731f2fd46f1850da13fe6f39263",
+        "i_showname": "从业人员指数 (%) "
+      },
+      {
+        "_id": "23a80d4340314e45ab0cc0ce69f3eeec",
+        "i_showname": "供应商配送时间指数 (%) "
+      },
+      {
+        "_id": "b0bf6dec50d3459086e79e0336c92246",
+        "i_showname": "生产经营活动预期指数 (%) "
+      }
+    ]
+  },
+  "success": true,
+  "state": 20000,
+  "message": "成功"
+}
