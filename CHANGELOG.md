@@ -39,6 +39,8 @@
 35. Add `macro cn lpr` for official monthly one-year and five-year-plus LPR quotes since August 2019, with actual quote dates, publication metadata, independent adjacent-month basis-point changes, explicit missing values, and JSON exports
 36. Add `macro cn rrr` for RMB reserve requirement adjustments announced since 2020, preserving institution scopes, exemptions, targeted ranges, additional cuts, phased effective dates, and official sources
 37. Embed verified RRR history and persist incremental announcements with same-day checks, deduplication, and atomic checkpoints; serve covered historical queries offline and check only recent news pages for updates
+38. Add `macro cn treasury` for official ChinaBond government bond yield-to-maturity curves at one, two, five, and ten years since March 2006, with annual batch queries, six-hour raw-response caching, Beijing dates, explicit missing tenors, source metadata, and JSON exports
+39. Use pointer requests and results for ChinaBond Treasury collection, reject nil requests, and return nil results on errors
 
 ### v0.3.15
 
