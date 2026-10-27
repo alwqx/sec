@@ -87,7 +87,7 @@ func printTreasury(out io.Writer, result *chinabond.TreasuryResult) error {
 		for _, key := range []string{"1y", "2y", "5y", "10y"} {
 			value := "—"
 			if n := item.Yields[key]; n != nil {
-				value = strconv.FormatFloat(*n, 'f', 4, 64)
+				value = strconv.FormatFloat(*n, 'f', 2, 64)
 			}
 			row = append(row, value)
 		}

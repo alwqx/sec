@@ -5,22 +5,18 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"log/slog"
-	"net/http"
-	"net/url"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
-
-	"github.com/alwqx/sec/utils"
 )
 
 const (
 	CoverageStart = "20060301"
-	curveID       = "2c9081e50a2f9606010a3068cae70001"
+	curveID       = "1"
 	curveName     = "中债国债收益率曲线"
 )
 
@@ -61,6 +57,7 @@ func (r TreasuryRequest) Validate() error {
 
 // TreasuryObservation 仅含上游实际返回的日期；缺失收益率为 nil，真实零值保留。
 type TreasuryObservation struct {
+	Original      *ChinaBondItem      `json:"original"`
 	Date          string              `json:"date"`
 	Yields        map[string]*float64 `json:"yields"`
 	MissingTenors []string            `json:"missing_tenors"`
@@ -99,7 +96,7 @@ func (c *Client) Treasury(ctx context.Context, req *TreasuryRequest) (*TreasuryR
 		CurveID: curveID, CurveName: curveName, CurveType: "yield-to-maturity",
 		Unit: "%", Frequency: "daily", Begin: req.Begin, End: req.End, CoverageStart: CoverageStart,
 		Observations: []TreasuryObservation{},
-		Note:         "中债国债到期收益率曲线，单位为百分数（1.5表示1.5%）；日期为北京时间所属日。缺失期限为null，不补值；整天未返回不区分休市、尚未发布或上游缺口。接口未提供逐日公布时间和历史修订版本，published_at为null；数据为抓取时可见版本。",
+		Note:         "中债国债到期收益率曲线，单位为百分数（1.5表示1.5%）；日期为北京时间所属日。缺失期限为null，不补值；整天未返回不区分休市、尚未发布或上游缺口。historyQuery源值保留两位小数；original保留其他期限源字段（源null统一为空字符串）。接口未提供逐日公布时间和历史修订版本，published_at为null；数据为抓取时可见版本。",
 	}
 	begin, _ := time.Parse("20060102", req.Begin)
 	end, _ := time.Parse("20060102", req.End)
@@ -127,80 +124,44 @@ func (c *Client) Treasury(ctx context.Context, req *TreasuryRequest) (*TreasuryR
 	return result, nil
 }
 
-type rawSeries struct {
-	ID   string              `json:"ycDefId"`
-	Name string              `json:"ycDefName"`
-	Data [][]json.RawMessage `json:"seriesData"`
-}
-
-// parseTreasury 按曲线身份和期限匹配，不依赖上游数组顺序。
+// parseTreasury 按PR #66的日期行结构解析，不再拼接期限序列或转换时间戳。
 func parseTreasury(raw []byte, from, to, source string, fetchedAt time.Time) ([]TreasuryObservation, error) {
-	var series []rawSeries
-	if err := json.Unmarshal(raw, &series); err != nil {
-		return nil, fmt.Errorf("中债响应不是有效曲线数组: %w", err)
+	response, err := decodeChinaBond(raw)
+	if err != nil {
+		return nil, err
 	}
-	if series == nil {
-		return nil, fmt.Errorf("中债响应为空或结构异常")
-	}
-	rows := map[string]*TreasuryObservation{}
+	result := make([]TreasuryObservation, 0, len(response.HeList))
 	seen := map[string]bool{}
-	for _, s := range series {
-		tenor := ""
-		for _, key := range tenors {
-			years := key[:len(key)-1]
-			if s.ID == curveID+years+".0" && s.Name == curveName+"(到期)("+key+")" {
-				tenor = key
-				break
-			}
+	for _, item := range response.HeList {
+		if item == nil {
+			return nil, fmt.Errorf("中债返回空数据行")
 		}
-		if tenor == "" || seen[tenor] {
-			return nil, fmt.Errorf("中债返回未知或重复曲线: %s (%s)", s.Name, s.ID)
+		date, err := time.Parse("2006-01-02", item.Date)
+		if err != nil {
+			return nil, fmt.Errorf("中债所属日期无效: %s", item.Date)
 		}
-		seen[tenor] = true
-		if s.Data == nil {
-			return nil, fmt.Errorf("中债%s期限缺少数据数组", tenor)
+		day := date.Format("20060102")
+		if day < from || day > to || seen[day] {
+			return nil, fmt.Errorf("中债所属日期越界或重复: %s", item.Date)
 		}
-		dates := map[string]bool{}
-		for _, point := range s.Data {
-			if len(point) != 2 {
-				return nil, fmt.Errorf("中债%s期限数据点格式异常", tenor)
-			}
-			var millis int64
-			if err := json.Unmarshal(point[0], &millis); err != nil || string(point[0]) == "null" {
-				return nil, fmt.Errorf("中债时间戳无效")
-			}
-			timestamp := time.UnixMilli(millis).In(beijing)
-			date := timestamp.Format("20060102")
-			if date < from || date > to || timestamp.Format("15:04:05.000") != "00:00:00.000" {
-				return nil, fmt.Errorf("中债所属日期超出查询范围或时间戳异常: %s", timestamp)
-			}
-			if dates[date] {
-				return nil, fmt.Errorf("中债%s期限日期重复: %s", tenor, date)
-			}
-			dates[date] = true
-			var value *float64
-			if err := json.Unmarshal(point[1], &value); err != nil {
-				return nil, fmt.Errorf("中债%s期限收益率无效: %w", tenor, err)
-			}
-			row := rows[date]
-			if row == nil {
-				row = &TreasuryObservation{Date: date, Yields: map[string]*float64{}, MissingTenors: []string{}, Source: source, FetchedAt: fetchedAt}
-				rows[date] = row
-			}
-			row.Yields[tenor] = value
-		}
-	}
-	result := make([]TreasuryObservation, 0, len(rows))
-	for _, row := range rows {
-		row.Status = "complete"
-		for _, key := range tenors {
-			if row.Yields[key] == nil {
-				row.Yields[key] = nil
-				row.MissingTenors = append(row.MissingTenors, key)
+		seen[day] = true
+		row := TreasuryObservation{Original: item, Date: day, Yields: map[string]*float64{}, MissingTenors: []string{}, Status: "complete", Source: source, FetchedAt: fetchedAt}
+		values := map[string]string{"1y": item.OneYear, "2y": item.TwoYear, "5y": item.FiveYear, "10y": item.TenYear}
+		for _, tenor := range tenors {
+			text := strings.TrimSpace(values[tenor])
+			if text == "" {
+				row.Yields[tenor] = nil
+				row.MissingTenors = append(row.MissingTenors, tenor)
 				row.Status = "missing-tenors"
+				continue
 			}
+			value, err := strconv.ParseFloat(text, 64)
+			if err != nil || math.IsNaN(value) || math.IsInf(value, 0) {
+				return nil, fmt.Errorf("中债%s期限收益率无效: %s", tenor, text)
+			}
+			row.Yields[tenor] = &value
 		}
-		result = append(result, *row)
+		result = append(result, row)
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i].Date < result[j].Date })
 	return result, nil
@@ -214,11 +175,7 @@ type cachedResponse struct {
 
 func (c *Client) fetchYear(ctx context.Context, year int, from, to string) ([]TreasuryObservation, error) {
 	formatDate := func(date string) string { d, _ := time.Parse("20060102", date); return d.Format("2006-01-02") }
-	query := url.Values{
-		"bjlx": {"no"}, "dcq": {"1,1y;2,2y;5,5y;10,10y;"}, "startTime": {formatDate(from)}, "endTime": {formatDate(to)},
-		"qxlx": {"0,"}, "yqqxN": {"N"}, "yqqxK": {"K"}, "par": {"day"}, "ycDefIds": {curveID}, "locale": {"CN"},
-	}
-	source := c.origin + "/cbweb-mn/yc/queryYz?" + query.Encode()
+	source := chinaBondURL(c.origin, &GetChinaBondReq{Start: formatDate(from), End: formatDate(to)})
 	path := filepath.Join(c.CacheDir, "treasury-"+strconv.Itoa(year)+".json")
 	if c.CacheDir != "" && !c.Refresh {
 		if raw, err := os.ReadFile(path); err == nil {
@@ -230,21 +187,9 @@ func (c *Client) fetchYear(ctx context.Context, year int, from, to string) ([]Tr
 			}
 		}
 	}
-	slog.DebugContext(ctx, "请求中债国债收益率曲线", "url", source)
-	resp, err := utils.MakeRequest(ctx, http.MethodPost, source, nil, nil, 30*time.Second)
+	raw, err := requestChinaBond(ctx, source)
 	if err != nil {
 		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("中债返回 HTTP %d", resp.StatusCode)
-	}
-	raw, err := io.ReadAll(io.LimitReader(resp.Body, (16<<20)+1))
-	if err != nil {
-		return nil, err
-	}
-	if len(raw) > 16<<20 {
-		return nil, fmt.Errorf("中债响应超过大小限制")
 	}
 	fetchedAt := time.Now().UTC()
 	rows, err := parseTreasury(raw, from, to, source, fetchedAt)

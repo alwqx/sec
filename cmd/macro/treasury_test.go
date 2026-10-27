@@ -16,7 +16,7 @@ func TestTreasuryCLI(t *testing.T) {
 	raw, err := os.ReadFile("../../provider/chinabond/testdata/treasury-20060301-20060307.json")
 	require.NoError(t, err)
 	for _, asJSON := range []bool{false, true} {
-		gock.New("https://yield.chinabond.com.cn").Post("/cbweb-mn/yc/queryYz").MatchParam("startTime", "2006-03-01").MatchParam("endTime", "2006-12-31").Reply(200).BodyString(string(raw))
+		gock.New("https://yield.chinabond.com.cn").Get("/cbweb-czb-web/czb/historyQuery").MatchParam("startDate", "2006-03-01").MatchParam("endDate", "2006-12-31").Reply(200).BodyString(string(raw))
 		cmd := NewMacroCLI()
 		args := []string{"cn", "treasury", "--begin", "20060301", "--end", "20060307", "--no-cache"}
 		if asJSON {
@@ -32,7 +32,7 @@ func TestTreasuryCLI(t *testing.T) {
 			require.Contains(t, out.String(), `"date": "20060301"`)
 		} else {
 			require.Contains(t, out.String(), "2006-03-01")
-			require.Contains(t, out.String(), "2.9000")
+			require.Contains(t, out.String(), "2.90")
 			require.Contains(t, out.String(), "中债国债到期收益率曲线")
 		}
 	}
@@ -43,7 +43,7 @@ func TestTreasuryOutputMissing(t *testing.T) {
 	zero := 0.0
 	var out bytes.Buffer
 	require.NoError(t, printTreasury(&out, &chinabond.TreasuryResult{Observations: []chinabond.TreasuryObservation{{Date: "20250101", Yields: map[string]*float64{"1y": &zero}, MissingTenors: []string{"2y", "5y", "10y"}}}}))
-	require.Contains(t, out.String(), "0.0000")
+	require.Contains(t, out.String(), "0.00")
 	require.Contains(t, out.String(), "—")
 	require.Contains(t, out.String(), "期限缺失")
 	out.Reset()

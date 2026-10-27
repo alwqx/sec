@@ -1,6 +1,8 @@
 # 中债国债收益率曲线
 
-`provider/chinabond` 采集中央国债登记结算有限责任公司（China Central Depository & Clearing Co., Ltd.，CCDC，简称中央结算公司）的中债国债收益率曲线。包名使用官方品牌 ChinaBond，避免与已有美国财政部 `provider/bond` 混淆。
+`provider/chinabond` 采集中央国债登记结算有限责任公司（China Central Depository & Clearing Co., Ltd.，CCDC，简称中央结算公司）的中债国债收益率曲线。
+
+本实现恢复 [PR #66](https://github.com/alwqx/sec/pull/66) 删除的 `GetChinaBond`、`GetChinaBondReq`、`GetChinaBondResp` 和 `ChinaBondItem` 请求/响应结构，以及 `historyQuery` GET采集方式。代码按当前来源分包放在 `provider/chinabond`，已有 `provider/bond` 继续提供美国财政部数据。
 
 ## 查询方式
 
@@ -19,50 +21,52 @@ sec macro cn treasury --no-cache
 
 日期参数为 `YYYYMMDD`，表格显示 `YYYY-MM-DD`。仅指定 `--end` 时，默认开始日为截至日前29天，且不早于20060301；仅指定 `--begin` 时，截至日为北京时间今天。不接受未来截至日。
 
-## 来源与口径
+## 恢复的采集接口
 
-- [中债官方收益率查询页](https://yield.chinabond.com.cn/cbweb-mn/yield_main?locale=CN)。页面的期限历史查询使用 `POST /cbweb-mn/yc/queryYz`，由官方脚本 `statics/js/yc/yzBondYields.js` 发起。
-- 曲线目录 `POST /cbweb-mn/yc/queryTree?locale=CN` 中，“中债国债收益率曲线”的标识为 `2c9081e50a2f9606010a3068cae70001`；`POST /cbweb-mn/yc/bzqx?ycDefIds=...` 提供标准期限。当前固定请求1、2、5、10年期。
-- 参数 `bjlx=no`、`par=day` 请求原始日度序列，`qxlx=0,` 明确选择**到期收益率**。不采集即期或远期收益率，也不混入政策性金融债、地方政府债或信用债曲线。
-- `dcq=1,1y;2,2y;5,5y;10,10y;` 一次请求四个期限，`startTime`、`endTime` 为 `YYYY-MM-DD`。解析同时核对返回的曲线标识及名称，不依赖序列顺序。
-- [中债向人民银行提供的曲线说明](https://yield.chinabond.com.cn/cbweb-pbc-web/pbc/more?locale=cn_zh) 描述了人民币在岸市场到期收益率曲线。该展示表没有2年期，因此本功能使用期限历史查询接口。曲线数值是拟合曲线的期限点，不是某一只债券的成交收益率。
-- 币种为人民币，数值单位为百分数：`1.5` 表示 `1.5%`。不换算成小数，不计算未要求的利差或涨跌幅。
-- 接口时间戳对应北京时间所属日零点（UTC前一天16点），必须转为北京时间后取日期。不能直接按UTC日期截断。
+使用PR #66中的官方接口：
 
-当前支持自2006年3月1日起查询；已用官方接口核验起点周四个期限和2025年全年数据，不承诺历史每个交易日均无缺口。
+```text
+GET https://yield.chinabond.com.cn/cbweb-czb-web/czb/historyQuery
+    ?startDate=2026-10-19&endDate=2026-10-26&gjqx=0&locale=cn_ZH&qxmc=1
+```
 
-## JSON与缺失状态
+`startDate`、`endDate` 是 `YYYY-MM-DD`；`qxmc=1` 选择中债国债收益率曲线，`gjqx=0` 返回全部关键期限。恢复原请求的JSON Accept、Content-Type、中文语言偏好和Origin头，并适配当前公共HTTP函数的超时参数。
 
-顶层保留地区、币种、指标、曲线标识/名称/类型、单位、频率、请求范围及覆盖起点。`observations` 按日期升序，仅包含上游返回过至少一个期限数据点的日期。每条记录包含：
+`GetChinaBond(ctx, *GetChinaBondReq) (*GetChinaBondResp, error)` 可直接采集一个小于一年的区间。响应 `flag="0"` 表示成功，`heList` 按日期行返回；每行包含 `workTime`、`threeMonth`、`sixMonth`、`oneYear`、`twoYear`、`threeYear`、`fiveYear`、`sevenYear`、`tenYear`、`fifteenYear`、`twentyYear`、`thirtyYear`、`qxmc`。收益率为字符串，未提供的字段可能是空字符串或null，解析为Go字符串后统一为空字符串。原始响应字节仍完整保存在缓存中。
+
+接口直接返回所属日期，无需时间戳转换或多期限序列拼接。实测数值保留两位小数，表格按两位小数显示，不补四位精度。人民币收益率单位为百分数，`1.18` 表示 `1.18%`。
+
+2026-10-27实测接口中的 `qxmc` 字段为问号字符串；不擅自改写源字段，也不以该字段作为严格名称校验。顶层曲线名称由请求 `qxmc=1` 确定，`curve_id` 为接口选择值 `"1"`。本功能不再依赖 `queryYz` 接口、长曲线标识或毫秒时间戳。
+
+## 宏观命令输出
+
+保留 `Treasury(ctx, *TreasuryRequest) (*TreasuryResult, error)` 指针接口。请求为空或失败时返回 `nil, err`。顶层含地区、币种、指标、曲线名称/类型、单位、频率、请求范围与覆盖起点；`observations` 按日期升序。
 
 | 字段 | 含义 |
 | --- | --- |
-| `date` | 北京时间所属日期，`YYYYMMDD` |
-| `yields` | `1y`、`2y`、`5y`、`10y` 的百分数值或 `null` |
-| `missing_tenors` | 该日期缺失的期限；完整时为 `[]` |
+| `date` | 所属日期，`YYYYMMDD` |
+| `yields` | 1、2、5、10年期（`1y`、`2y`、`5y`、`10y`）的百分数值或null |
+| `missing_tenors` | 上述四个期限中缺失的期限；完整时为 `[]` |
 | `status` | `complete` 或 `missing-tenors` |
-| `source` | 可重现本批查询参数的官方接口地址，使用POST |
-| `fetched_at` | 本批原始响应抓取时间（UTC），命中缓存保留原时间 |
+| `original` | `ChinaBondItem`全部源字段，保留其他期限及源名称；源null/空字符串统一为空字符串 |
+| `source` | 含查询参数的官方GET接口地址 |
+| `fetched_at` | 原始响应抓取时间（UTC），命中缓存保留原时间 |
 
-上游显式 `null`、某日少一个期限点或整条期限缺失，都保留为缺失；真实零值保持为0。表格缺失显示 `—`。若某日所有返回点均为 `null`，仍保留该日；若整天未返回任何点，不创建该日记录，也不自动断言休市。空数组表示所选区间未返回记录，不等于收益率为零。
+空字符串、null或未提供的关键期限转为缺失值，真实零值保持为0；表格缺失显示 `—`。若整天无记录，不创建该日记录，也不自动判定休市。接口未提供逐日实际公布时间和历史修订版本，因此 `published_at` 为null；历史查询为抓取时可见版本。
 
-官方接口未提供逐日实际公布时间或历史修订版本，因此 `published_at` 为 `null`。不将网页公布惯例或抓取时间冒充实际公布时间；历史查询得到的是抓取时可见版本，不能直接用于要求当时已知信息的回测。
-
-HTTP错误、非JSON、未知曲线、重复期限/日期、非法数值、异常或越界时间戳均报错。跨年任何一年失败则整次查询失败，避免悄悄输出不完整范围。整个缺失日期仍无法从该接口区分为非交易日或上游遗漏。
+HTTP错误、非JSON、失败flag、缺少heList、空数据行、非法关键期限数值、无效/重复/越界日期均报错；跨年任一年失败则整次查询失败。未知整天缺口与非交易日仍无法由该接口区分。
 
 ## 批量采集与缓存
 
-按自然年查询，每年一次请求同时取得四个期限，不逐日抓取。2006年从3月1日起，当前年截至北京时间今天；取回后按用户请求范围过滤。2025年官方实测每条期限返回248个日期。
+宏观命令按自然年分批，每批不超过一年，四个关键期限和其他原始期限一次返回。2006年从3月1日起，当前年截至北京时间今天；取回后按用户请求范围过滤。已实测2006年起点周及2025年全年；2025年返回248个日期。
 
-原始JSON响应、查询地址和抓取时间原子写入 `~/.sec/cache/chinabond/treasury-YYYY.json`，有效期6小时。同年不同日期区间复用缓存；北京时间跨日后当前年查询截止日变化，会重新获取。`--refresh` 忽略已有缓存，`--no-cache` 不读写缓存。无效或过期缓存重新采集，失败不覆盖有效缓存，也不静默回退旧数据。
-
-日内发布或修订后，缓存有效期内可能尚未体现，需用 `--refresh` 立即重查。历史收益率不硬编码；官方批量接口可直接返回全年数据，缓存保留原始值及来源，并允许重新核验历史修订。
+原始JSON、查询地址与抓取时间原子写入 `~/.sec/cache/chinabond/treasury-YYYY.json`，有效期6小时。同年不同日期区间复用缓存；北京时间跨日后当前年截止日变化，会重新获取。接口地址与旧版不同，旧缓存自动失效。`--refresh` 忽略缓存，`--no-cache` 不读写缓存。损坏或过期缓存重新采集，失败不覆盖已有缓存，也不静默回退旧数据。
 
 ## 验证样本
 
-`provider/chinabond/testdata/` 两个文件均为2026-10-27核验时保存的官方原始响应：
+`provider/chinabond/testdata/` 两个JSON文件是2026-10-27保存的 `historyQuery` 官方原始响应，参数均为 `gjqx=0&locale=cn_ZH&qxmc=1`：
 
-- `treasury-20060301-20060307.json`：上述曲线、四期限、起止日2006-03-01至2006-03-07，5个所属日期。
-- `treasury-20261019-20261026.json`：相同参数、起止日2026-10-19至2026-10-26，6个所属日期。
+- `treasury-20060301-20060307.json`：2006-03-01至2006-03-07，5个所属日期。
+- `treasury-20261019-20261026.json`：2026-10-19至2026-10-26，6个所属日期。
 
-测试覆盖时区转换、历史起点、零值与空值、缺失期限、错误曲线/数值/日期、跨年失败、按年复用缓存、刷新/不缓存、损坏/过期恢复、取消请求及CLI表格/JSON输出。
+测试同时恢复PR #66的2023-06-01至2023-06-02请求参数验证，覆盖GET请求头、flag/字段校验、字符串收益率、空值与零值、日期排序及去重、缓存/刷新/取消、跨年失败，以及CLI表格与JSON。
