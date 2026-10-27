@@ -42,6 +42,7 @@
 38. Add `macro cn treasury` for official ChinaBond government bond yield-to-maturity curves at one, two, five, and ten years since March 2006, with annual batch queries, six-hour raw-response caching, Beijing dates, explicit missing tenors, source metadata, and JSON exports
 39. Use pointer requests and results for ChinaBond Treasury collection, reject nil requests, and return nil results on errors
 40. Restore the ChinaBond historyQuery GET collector and request/response structures removed in PR #66; call GetChinaBond directly from macro Treasury queries, output original fields in JSON, display three-month and six-month yields alongside the existing annual tenors, preserve source precision, and remove the unused Treasury wrapper and annual cache controls
+41. Add `macro cn gdp` for official NBS quarterly real GDP levels, quarterly and year-to-date growth indexes, derived year-over-year growth, and seasonally adjusted non-annualized quarter-over-quarter growth; preserve missing values, source annotations, segmented price-base limitations, latest-available revision metadata, and shared cache controls
 
 ### v0.3.15
 

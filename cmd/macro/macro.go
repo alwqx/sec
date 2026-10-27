@@ -39,6 +39,7 @@ func NewMacroCLI() *cobra.Command {
 	cn.AddCommand(newLPRCLI())
 	cn.AddCommand(newRRRCLI())
 	cn.AddCommand(newTreasuryCLI())
+	cn.AddCommand(newGDPCLI())
 	root.AddCommand(cn)
 	return root
 }

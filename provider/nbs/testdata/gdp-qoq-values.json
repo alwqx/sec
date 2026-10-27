@@ -1,0 +1,315 @@
+{
+  "data": [
+    {
+      "code": "202603SS",
+      "name": "2026年第三季度",
+      "values": [
+        {
+          "i_showname": "国内生产总值环比增长速度 (%) ",
+          "num_accuracy_text": "1",
+          "_name": "国内生产总值",
+          "is_economy_chart_show_text": "是",
+          "ek": "db8e5a86c08246e79b1b11251927e740",
+          "dp": "13",
+          "type": "indicator",
+          "is_economy_chart_show_value": "1",
+          "ds_order": 73,
+          "du": "414774dee2bc47f392cf13abfa9de882",
+          "catalogid": "2b0aa179980e41b8b636037ebae01d91",
+          "chart_style_text": "折线图",
+          "_id": "88bcaf76058e49b08a45b14a204b2d3d",
+          "num_accuracy_value": "1",
+          "chart_style_value": "2",
+          "du_name": "%",
+          "order": 73,
+          "value": "1.2",
+          "da": "000000000000",
+          "da_name": "全国"
+        }
+      ]
+    },
+    {
+      "code": "202602SS",
+      "name": "2026年第二季度",
+      "values": [
+        {
+          "i_showname": "国内生产总值环比增长速度 (%) ",
+          "num_accuracy_text": "1",
+          "_name": "国内生产总值",
+          "is_economy_chart_show_text": "是",
+          "ek": "db8e5a86c08246e79b1b11251927e740",
+          "dp": "13",
+          "type": "indicator",
+          "is_economy_chart_show_value": "1",
+          "ds_order": 73,
+          "du": "414774dee2bc47f392cf13abfa9de882",
+          "catalogid": "2b0aa179980e41b8b636037ebae01d91",
+          "chart_style_text": "折线图",
+          "_id": "88bcaf76058e49b08a45b14a204b2d3d",
+          "num_accuracy_value": "1",
+          "chart_style_value": "2",
+          "du_name": "%",
+          "order": 73,
+          "value": "0.9",
+          "da": "000000000000",
+          "da_name": "全国"
+        }
+      ]
+    },
+    {
+      "code": "202601SS",
+      "name": "2026年第一季度",
+      "values": [
+        {
+          "i_showname": "国内生产总值环比增长速度 (%) ",
+          "num_accuracy_text": "1",
+          "_name": "国内生产总值",
+          "is_economy_chart_show_text": "是",
+          "ek": "db8e5a86c08246e79b1b11251927e740",
+          "dp": "13",
+          "type": "indicator",
+          "is_economy_chart_show_value": "1",
+          "ds_order": 73,
+          "du": "414774dee2bc47f392cf13abfa9de882",
+          "catalogid": "2b0aa179980e41b8b636037ebae01d91",
+          "chart_style_text": "折线图",
+          "_id": "88bcaf76058e49b08a45b14a204b2d3d",
+          "num_accuracy_value": "1",
+          "chart_style_value": "2",
+          "du_name": "%",
+          "order": 73,
+          "value": "1.3",
+          "da": "000000000000",
+          "da_name": "全国"
+        }
+      ]
+    },
+    {
+      "code": "202504SS",
+      "name": "2025年第四季度",
+      "values": [
+        {
+          "i_showname": "国内生产总值环比增长速度 (%) ",
+          "num_accuracy_text": "1",
+          "_name": "国内生产总值",
+          "is_economy_chart_show_text": "是",
+          "ek": "db8e5a86c08246e79b1b11251927e740",
+          "dp": "13",
+          "type": "indicator",
+          "is_economy_chart_show_value": "1",
+          "ds_order": 73,
+          "du": "414774dee2bc47f392cf13abfa9de882",
+          "catalogid": "2b0aa179980e41b8b636037ebae01d91",
+          "chart_style_text": "折线图",
+          "_id": "88bcaf76058e49b08a45b14a204b2d3d",
+          "num_accuracy_value": "1",
+          "chart_style_value": "2",
+          "du_name": "%",
+          "order": 73,
+          "value": "1.1",
+          "da": "000000000000",
+          "da_name": "全国"
+        }
+      ]
+    },
+    {
+      "code": "202503SS",
+      "name": "2025年第三季度",
+      "values": [
+        {
+          "i_showname": "国内生产总值环比增长速度 (%) ",
+          "num_accuracy_text": "1",
+          "_name": "国内生产总值",
+          "is_economy_chart_show_text": "是",
+          "ek": "db8e5a86c08246e79b1b11251927e740",
+          "dp": "13",
+          "type": "indicator",
+          "is_economy_chart_show_value": "1",
+          "ds_order": 73,
+          "du": "414774dee2bc47f392cf13abfa9de882",
+          "catalogid": "2b0aa179980e41b8b636037ebae01d91",
+          "chart_style_text": "折线图",
+          "_id": "88bcaf76058e49b08a45b14a204b2d3d",
+          "num_accuracy_value": "1",
+          "chart_style_value": "2",
+          "du_name": "%",
+          "order": 73,
+          "value": "1.1",
+          "da": "000000000000",
+          "da_name": "全国"
+        }
+      ]
+    },
+    {
+      "code": "202502SS",
+      "name": "2025年第二季度",
+      "values": [
+        {
+          "i_showname": "国内生产总值环比增长速度 (%) ",
+          "num_accuracy_text": "1",
+          "_name": "国内生产总值",
+          "is_economy_chart_show_text": "是",
+          "ek": "db8e5a86c08246e79b1b11251927e740",
+          "dp": "13",
+          "type": "indicator",
+          "is_economy_chart_show_value": "1",
+          "ds_order": 73,
+          "du": "414774dee2bc47f392cf13abfa9de882",
+          "catalogid": "2b0aa179980e41b8b636037ebae01d91",
+          "chart_style_text": "折线图",
+          "_id": "88bcaf76058e49b08a45b14a204b2d3d",
+          "num_accuracy_value": "1",
+          "chart_style_value": "2",
+          "du_name": "%",
+          "order": 73,
+          "value": "1.2",
+          "da": "000000000000",
+          "da_name": "全国"
+        }
+      ]
+    },
+    {
+      "code": "202501SS",
+      "name": "2025年第一季度",
+      "values": [
+        {
+          "i_showname": "国内生产总值环比增长速度 (%) ",
+          "num_accuracy_text": "1",
+          "_name": "国内生产总值",
+          "is_economy_chart_show_text": "是",
+          "ek": "db8e5a86c08246e79b1b11251927e740",
+          "dp": "13",
+          "type": "indicator",
+          "is_economy_chart_show_value": "1",
+          "ds_order": 73,
+          "du": "414774dee2bc47f392cf13abfa9de882",
+          "catalogid": "2b0aa179980e41b8b636037ebae01d91",
+          "chart_style_text": "折线图",
+          "_id": "88bcaf76058e49b08a45b14a204b2d3d",
+          "num_accuracy_value": "1",
+          "chart_style_value": "2",
+          "du_name": "%",
+          "order": 73,
+          "value": "1.1",
+          "da": "000000000000",
+          "da_name": "全国"
+        }
+      ]
+    },
+    {
+      "code": "201101SS",
+      "name": "2011年第一季度",
+      "values": [
+        {
+          "i_showname": "国内生产总值环比增长速度 (%) ",
+          "num_accuracy_text": "1",
+          "_name": "国内生产总值",
+          "is_economy_chart_show_text": "是",
+          "ek": "db8e5a86c08246e79b1b11251927e740",
+          "dp": "13",
+          "type": "indicator",
+          "is_economy_chart_show_value": "1",
+          "ds_order": 73,
+          "du": "414774dee2bc47f392cf13abfa9de882",
+          "catalogid": "2b0aa179980e41b8b636037ebae01d91",
+          "chart_style_text": "折线图",
+          "_id": "88bcaf76058e49b08a45b14a204b2d3d",
+          "num_accuracy_value": "1",
+          "chart_style_value": "2",
+          "du_name": "%",
+          "order": 73,
+          "value": "2.3",
+          "da": "000000000000",
+          "da_name": "全国"
+        }
+      ]
+    },
+    {
+      "code": "200701SS",
+      "name": "2007年第一季度",
+      "values": [
+        {
+          "i_showname": "国内生产总值环比增长速度 (%) ",
+          "num_accuracy_text": "1",
+          "_name": "国内生产总值",
+          "is_economy_chart_show_text": "是",
+          "ek": "db8e5a86c08246e79b1b11251927e740",
+          "dp": "13",
+          "type": "indicator",
+          "is_economy_chart_show_value": "1",
+          "ds_order": 73,
+          "du": "414774dee2bc47f392cf13abfa9de882",
+          "catalogid": "2b0aa179980e41b8b636037ebae01d91",
+          "chart_style_text": "折线图",
+          "_id": "88bcaf76058e49b08a45b14a204b2d3d",
+          "num_accuracy_value": "1",
+          "chart_style_value": "2",
+          "du_name": "%",
+          "order": 73,
+          "value": "",
+          "da": "000000000000",
+          "da_name": "全国"
+        }
+      ]
+    },
+    {
+      "code": "199301SS",
+      "name": "1993年第一季度",
+      "values": [
+        {
+          "i_showname": "国内生产总值环比增长速度 (%) ",
+          "num_accuracy_text": "1",
+          "_name": "国内生产总值",
+          "is_economy_chart_show_text": "是",
+          "ek": "db8e5a86c08246e79b1b11251927e740",
+          "dp": "13",
+          "type": "indicator",
+          "is_economy_chart_show_value": "1",
+          "ds_order": 73,
+          "du": "414774dee2bc47f392cf13abfa9de882",
+          "catalogid": "2b0aa179980e41b8b636037ebae01d91",
+          "chart_style_text": "折线图",
+          "_id": "88bcaf76058e49b08a45b14a204b2d3d",
+          "num_accuracy_value": "1",
+          "chart_style_value": "2",
+          "du_name": "%",
+          "order": 73,
+          "value": "",
+          "da": "000000000000",
+          "da_name": "全国"
+        }
+      ]
+    },
+    {
+      "code": "199201SS",
+      "name": "1992年第一季度",
+      "values": [
+        {
+          "i_showname": "国内生产总值环比增长速度 (%) ",
+          "num_accuracy_text": "1",
+          "_name": "国内生产总值",
+          "is_economy_chart_show_text": "是",
+          "ek": "db8e5a86c08246e79b1b11251927e740",
+          "dp": "13",
+          "type": "indicator",
+          "is_economy_chart_show_value": "1",
+          "ds_order": 73,
+          "du": "414774dee2bc47f392cf13abfa9de882",
+          "catalogid": "2b0aa179980e41b8b636037ebae01d91",
+          "chart_style_text": "折线图",
+          "_id": "88bcaf76058e49b08a45b14a204b2d3d",
+          "num_accuracy_value": "1",
+          "chart_style_value": "2",
+          "du_name": "%",
+          "order": 73,
+          "value": "",
+          "da": "000000000000",
+          "da_name": "全国"
+        }
+      ]
+    }
+  ],
+  "success": true,
+  "state": 20000,
+  "message": "成功"
+}

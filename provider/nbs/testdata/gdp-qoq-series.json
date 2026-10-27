@@ -1,0 +1,44 @@
+{
+  "data": {
+    "total": 1,
+    "list": [
+      {
+        "i_showname": "国内生产总值环比增长速度 (%) ",
+        "num_accuracy_text": "1",
+        "_name": "国内生产总值",
+        "ek_dp": "db8e5a86c08246e79b1b11251927e740_13",
+        "kj1_name": null,
+        "dp": "13",
+        "type": "indicator",
+        "is_economy_chart_show_value": "1",
+        "i_annotation": "环比增长速度为经季节调整后与上一季度对比的增长速度。",
+        "ds_order": 73,
+        "du": "414774dee2bc47f392cf13abfa9de882",
+        "kj3_name": null,
+        "chart_style_text": "折线图",
+        "ek_dp_name": "国内生产总值_环比增减%",
+        "num_accuracy_value": "1",
+        "chart_style_value": "2",
+        "ek_name": "国内生产总值",
+        "dp_name": "环比增减%",
+        "daterange_sdate": null,
+        "is_economy_chart_show_text": "是",
+        "kj2_name": null,
+        "ek": "db8e5a86c08246e79b1b11251927e740",
+        "dead_line_value": null,
+        "kj2": null,
+        "kj1": null,
+        "catalogid": "2b0aa179980e41b8b636037ebae01d91",
+        "daterange_edate": null,
+        "kj3": null,
+        "default_indicator_value": null,
+        "i_mark": "国内生产总值环比增长速度为经季节调整后与上一季度对比的增长速度，按不变价格计算。",
+        "_id": "88bcaf76058e49b08a45b14a204b2d3d",
+        "du_name": "%"
+      }
+    ]
+  },
+  "success": true,
+  "state": 20000,
+  "message": "成功"
+}
