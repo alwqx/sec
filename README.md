@@ -107,6 +107,7 @@ CLI `sec watch` 与 Desktop「我的自选」统一使用 `~/.sec/watchlist.json
 | `macro cn financing` / `macro cn afre`         | 人民银行社融存量、同比、月度/累计增量；`--details` 展示融资结构，见 [PBC 文档](docs/pbc.md) |
 | `macro cn loans`                              | 金融机构人民币贷款余额、同比和新增；`--details` 展示住户／企事业单位期限结构，近似计算值带 `≈` |
 | `macro cn money`                              | 人民银行 M1、M2 余额及同比；标注 2025 年 M1 口径修订 |
+| `macro cn reverse-repo`                       | 七天逆回购政策利率调整公告，含公布/生效日期及前后值；覆盖自 2024-07-22 起 |
 | `strategy ma / macd / rsi / boll`             | 技术指标与信号                           |
 | `valuation`                                   | 估值指标与 DCF 分析                      |
 | `upgrade`、`--version`                        | CLI 升级与版本信息                       |

@@ -1,4 +1,4 @@
-// Package pbc 采集中国人民银行（People's Bank of China）的官方统计数据。
+// Package pbc 采集中国人民银行（People's Bank of China）的官方统计数据和政策公告。
 package pbc
 
 import (
@@ -23,7 +23,7 @@ import (
 
 const statisticsPath = "/diaochatongjisi/116219/116319/index.html"
 
-// Client 按官方年度目录发现链接；CacheDir 为空时禁用缓存。
+// Client 按官方目录发现统计表和政策公告链接；CacheDir 为空时禁用缓存。
 type Client struct {
 	CacheDir string
 	Refresh  bool
