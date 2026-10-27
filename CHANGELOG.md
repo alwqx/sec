@@ -37,6 +37,8 @@
 33. Add `macro cn money` for official monthly M1 and M2 balances and year-over-year growth, label the 2025 M1 definition change, and retain missing report months as null observations
 34. Add `macro cn reverse-repo` for official seven-day reverse repo policy-rate changes since July 22, 2024, with separate publication and effective dates, before/after rates, calculated basis-point changes, preceding-event context, and JSON exports
 35. Add `macro cn lpr` for official monthly one-year and five-year-plus LPR quotes since August 2019, with actual quote dates, publication metadata, independent adjacent-month basis-point changes, explicit missing values, and JSON exports
+36. Add `macro cn rrr` for RMB reserve requirement adjustments announced since 2020, preserving institution scopes, exemptions, targeted ranges, additional cuts, phased effective dates, and official sources
+37. Embed verified RRR history and persist incremental announcements with same-day checks, deduplication, and atomic checkpoints; serve covered historical queries offline and check only recent news pages for updates
 
 ### v0.3.15
 
