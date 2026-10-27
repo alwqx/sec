@@ -90,6 +90,10 @@ func TestRMBLoans(t *testing.T) {
 
 func TestLoanReportPeriods(t *testing.T) {
 	september := reportSample(t, "202609")
+	require.Equal(t, 3596300.0, *september.M2Balance)
+	require.Equal(t, 7.2, *september.M2YoY)
+	require.Equal(t, 1167600.0, *september.M1Balance)
+	require.Equal(t, 3.2, *september.M1YoY)
 	require.Equal(t, 2834400.0, *september.Balance)
 	require.Equal(t, 115200.0, *september.YTD["total"], "不能选到社融的11.50万亿元")
 	require.Equal(t, -11400.0, *september.YTD["households-short"])
@@ -151,6 +155,15 @@ func TestLoanBalanceAndUnknownScope(t *testing.T) {
 	require.ErrorContains(t, err, "不能晚于")
 }
 
+func TestMoneySupplyParsing(t *testing.T) {
+	balance, yoy := parseMoneyPair(narrowMoneyPattern, "狭义货币(M1)余额63.23万亿元,同比下降6.6%")
+	require.Equal(t, 632300.0, *balance)
+	require.Equal(t, -6.6, *yoy)
+	balance, yoy = parseMoneyPair(moneySupplyPattern, "广义货币（M2）余额为359.63万亿元，同比增长7.2%")
+	require.Equal(t, 3596300.0, *balance)
+	require.Equal(t, 7.2, *yoy)
+}
+
 func TestLoanReportPagination(t *testing.T) {
 	report := sample(t, "loan-report-202609")
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -172,4 +185,11 @@ func TestLoanReportPagination(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, reports, 1)
 	require.Equal(t, 115200.0, *reports["202609"].YTD["total"])
+	money, err := client.MoneySupply(context.Background(), MoneySupplyRequest{"202608", "202609"})
+	require.NoError(t, err)
+	require.Len(t, money, 2)
+	require.Nil(t, money[0].M1Balance)
+	require.Contains(t, money[0].Note, "目录未检索到")
+	require.Equal(t, "revised-2025", money[1].M1Definition)
+	require.Equal(t, 3596300.0, *money[1].M2Balance)
 }

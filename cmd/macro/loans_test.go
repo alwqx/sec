@@ -34,3 +34,20 @@ func TestLoansArguments(t *testing.T) {
 		require.Error(t, cmd.Execute())
 	}
 }
+
+func TestMoneySupplyOutputAndArguments(t *testing.T) {
+	m1, m1yoy, m2, m2yoy := 1167600.0, 3.2, 3596300.0, 7.2
+	items := []pbc.MoneySupplyObservation{{Period: "202609", M1Balance: &m1, M1YoY: &m1yoy, M1Definition: "revised-2025", M2Balance: &m2, M2YoY: &m2yoy}}
+	var out bytes.Buffer
+	require.NoError(t, printMoneySupply(&out, items))
+	require.Contains(t, out.String(), "revised-2025")
+	require.Contains(t, out.String(), "1167600")
+	require.Contains(t, out.String(), "—")
+	for _, args := range [][]string{{"cn", "money", "--begin", "202613"}, {"cn", "money", "--begin", "202609", "--end", "202601"}, {"cn", "money", "extra"}} {
+		cmd := NewMacroCLI()
+		cmd.SetArgs(args)
+		cmd.SetOut(&bytes.Buffer{})
+		cmd.SetErr(&bytes.Buffer{})
+		require.Error(t, cmd.Execute())
+	}
+}
