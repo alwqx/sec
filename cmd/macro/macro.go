@@ -36,6 +36,7 @@ func NewMacroCLI() *cobra.Command {
 	cn.AddCommand(newLoansCLI())
 	cn.AddCommand(newMoneySupplyCLI())
 	cn.AddCommand(newReverseRepoCLI())
+	cn.AddCommand(newLPRCLI())
 	root.AddCommand(cn)
 	return root
 }
