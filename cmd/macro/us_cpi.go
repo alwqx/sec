@@ -19,7 +19,7 @@ func newUSCPICLI(indicator string) *cobra.Command {
 		short = "美国核心CPI-U（剔除食品和能源）：季调/非季调指数及增速"
 	}
 	command := &cobra.Command{Use: indicator, Short: short, Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, args []string) error {
-		begin, end, err := usCPIMonths(cmd, time.Now())
+		begin, end, err := queryUSMonths(cmd, time.Now(), "191301")
 		if err != nil {
 			return err
 		}
@@ -54,7 +54,7 @@ func newUSCPICLI(indicator string) *cobra.Command {
 	return command
 }
 
-func usCPIMonths(cmd *cobra.Command, now time.Time) (string, string, error) {
+func queryUSMonths(cmd *cobra.Command, now time.Time, earliest string) (string, string, error) {
 	begin, _ := cmd.Flags().GetString("begin")
 	end, _ := cmd.Flags().GetString("end")
 	if end == "" {
@@ -67,8 +67,8 @@ func usCPIMonths(cmd *cobra.Command, now time.Time) (string, string, error) {
 			return "", "", fmt.Errorf("无效截至月份: %s", end)
 		}
 		begin = date.AddDate(0, -11, 0).Format("200601")
-		if begin < "191301" {
-			begin = "191301"
+		if begin < earliest {
+			begin = earliest
 		}
 	}
 	return begin, end, nil

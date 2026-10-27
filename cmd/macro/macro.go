@@ -43,6 +43,7 @@ func NewMacroCLI() *cobra.Command {
 	root.AddCommand(cn)
 	us := &cobra.Command{Use: "us", Short: "美国宏观经济数据"}
 	us.AddCommand(newUSCPICLI("cpi"), newUSCPICLI("core-cpi"))
+	us.AddCommand(newUSPCECLI("pce"), newUSPCECLI("core-pce"))
 	root.AddCommand(us)
 	return root
 }

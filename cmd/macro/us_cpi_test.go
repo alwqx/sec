@@ -56,12 +56,12 @@ func TestUSCPICLI(t *testing.T) {
 
 func TestUSCPIDefaultsAndInvalidArgs(t *testing.T) {
 	cmd := newUSCPICLI("cpi")
-	begin, end, err := usCPIMonths(cmd, time.Date(2026, 1, 1, 0, 30, 0, 0, time.UTC))
+	begin, end, err := queryUSMonths(cmd, time.Date(2026, 1, 1, 0, 30, 0, 0, time.UTC), "191301")
 	require.NoError(t, err)
 	require.Equal(t, "202501", begin)
 	require.Equal(t, "202512", end)
 	require.NoError(t, cmd.Flags().Set("end", "191301"))
-	begin, end, err = usCPIMonths(cmd, time.Now())
+	begin, end, err = queryUSMonths(cmd, time.Now(), "191301")
 	require.NoError(t, err)
 	require.Equal(t, "191301", begin)
 	require.Equal(t, "191301", end)
