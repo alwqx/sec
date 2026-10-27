@@ -43,6 +43,7 @@
 39. Use pointer requests and results for ChinaBond Treasury collection, reject nil requests, and return nil results on errors
 40. Restore the ChinaBond historyQuery GET collector and request/response structures removed in PR #66; call GetChinaBond directly from macro Treasury queries, output original fields in JSON, display three-month and six-month yields alongside the existing annual tenors, preserve source precision, and remove the unused Treasury wrapper and annual cache controls
 41. Add `macro cn gdp` for official NBS quarterly real GDP levels, quarterly and year-to-date growth indexes, derived year-over-year growth, and seasonally adjusted non-annualized quarter-over-quarter growth; preserve missing values, source annotations, segmented price-base limitations, latest-available revision metadata, and shared cache controls
+42. Add `macro us cpi` and `macro us core-cpi` using official BLS CPI-U series, with seasonally adjusted and unadjusted indexes, explicitly derived growth and comparison baselines, preserved gaps and footnotes, ten-year batch queries, shared six-hour caching, and JSON exports
 
 ### v0.3.15
 
