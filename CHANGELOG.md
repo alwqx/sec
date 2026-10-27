@@ -36,6 +36,7 @@
 32. Add `macro cn loans` for PBC financial-institution RMB loan balances, official year-over-year growth, monthly and year-to-date additions, and household/enterprise maturity breakdowns; mark differences of rounded cumulative releases as approximate and preserve report gaps
 33. Add `macro cn money` for official monthly M1 and M2 balances and year-over-year growth, label the 2025 M1 definition change, and retain missing report months as null observations
 34. Add `macro cn reverse-repo` for official seven-day reverse repo policy-rate changes since July 22, 2024, with separate publication and effective dates, before/after rates, calculated basis-point changes, preceding-event context, and JSON exports
+35. Add `macro cn lpr` for official monthly one-year and five-year-plus LPR quotes since August 2019, with actual quote dates, publication metadata, independent adjacent-month basis-point changes, explicit missing values, and JSON exports
 
 ### v0.3.15
 
