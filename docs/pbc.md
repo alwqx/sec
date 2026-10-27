@@ -225,6 +225,8 @@ sec macro cn lpr --no-cache
 
 `quote_date` 来自公告正文，不能固定为每月 20 日。例如 [2025 年 4 月报价](https://www.pbc.gov.cn/zhengcehuobisi/125207/125213/125440/3876551/5677604/index.html)的实际日期是 4 月 21 日。`published_at` 则使用网页公布时间，精确到秒时带北京时间 `+08:00`；缺少时保留 `PubDate` 日期并标记 `published_precision: day`，不补入常规发布时间。[2024 年 7 月公告](https://www.pbc.gov.cn/zhengcehuobisi/125207/125213/125440/3876551/5410019/index.html)同时调整了发布时间，解析器兼容该类扩展标题，不将报价行名单或改革问答误作月度报价。
 
+终端表格将报价日期显示为 `YYYY-MM-DD`、缺失月份显示为 `YYYY-MM`，公布时间转换为北京时间 `YYYY-MM-DD HH:mm:ss`。只有日期精度时仍只显示日期，缺失时间显示 `—`；JSON 保留原有日期与时区格式。
+
 每个期限的基点变化为**计算值**：`(本月报价 − 相邻上月报价) × 100`。采集器按需读取查询起点前一个月，跨年仍使用相邻上月；不把该基准月混入请求结果。真实持平值保存为 `0`，不与空值混淆；缺少本月/上月公告、改革首月等无法确认变化的情况保留 `null`，不跨缺口比较。
 
 JSON 的 `change_status` 为 `changed`（至少一个期限变化）、`unchanged`（两个期限均持平）、`unknown`（没有相邻同口径基准）或 `missing-release`（未检索到当月公告）。`change_method` 在可计算时为 `difference-of-adjacent-monthly-releases`，否则为 `unavailable`。月度表保留持平月份，可直接根据这些字段识别可确认的调整。

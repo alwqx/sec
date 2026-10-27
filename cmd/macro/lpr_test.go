@@ -10,10 +10,18 @@ import (
 
 func TestLPROutput(t *testing.T) {
 	zero, rate, change := 0.0, 3.0, -10.0
-	items := []pbc.LPRObservation{{QuoteDate: "20250520", PublishedAt: "2025-05-20T09:00:00+08:00", OneYearRate: &rate, OneYearChangeBP: &zero, FiveYearPlusChangeBP: &change}}
+	items := []pbc.LPRObservation{
+		{QuoteDate: "20250520", PublishedAt: "2025-05-20T01:00:00Z", OneYearRate: &rate, OneYearChangeBP: &zero, FiveYearPlusChangeBP: &change},
+		{QuoteDate: "20250620", PublishedAt: "2025-06-20"},
+		{Period: "202507"},
+	}
 	var out bytes.Buffer
 	require.NoError(t, printLPR(&out, items))
-	require.Contains(t, out.String(), "20250520")
+	require.Contains(t, out.String(), "2025-05-20 09:00:00")
+	require.Contains(t, out.String(), "2025-06-20")
+	require.Contains(t, out.String(), "2025-07")
+	require.NotContains(t, out.String(), "2025-06-20 00:00:00", "日期精度不能伪造时间")
+	require.NotContains(t, out.String(), "T01:00:00Z")
 	require.Contains(t, out.String(), "-10")
 	require.Contains(t, out.String(), "—")
 	out.Reset()
