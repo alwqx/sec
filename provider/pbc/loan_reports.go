@@ -17,6 +17,8 @@ const financialReportsPath = "/diaochatongjisi/116219/116225/index.html"
 type loanReport struct {
 	Period                string
 	Balance, YoY          *float64
+	M1Balance, M1YoY      *float64
+	M2Balance, M2YoY      *float64
 	Monthly, YTD          map[string]*float64
 	Source, PublishedDate string
 	FetchedAt             time.Time
@@ -142,6 +144,8 @@ func (c *Client) loanReports(ctx context.Context, req LoanRequest) (map[string]l
 }
 
 var bankLoanBalancePattern = regexp.MustCompile(`人民币贷款余额(?:为)?([0-9.,]+)(万亿元|亿元)[，,]同比(增长|下降)([0-9.]+)%`)
+var moneySupplyPattern = regexp.MustCompile(`(?:广义货币(?:供应量)?[（(]M2[）)]|M2)余额(?:为)?([0-9.,]+)(万亿元|亿元)[，,]同比(增长|下降)([0-9.]+)%`)
+var narrowMoneyPattern = regexp.MustCompile(`(?:狭义货币(?:供应量)?[（(]M1[）)]|M1)余额(?:为)?([0-9.,]+)(万亿元|亿元)[，,]同比(增长|下降)([0-9.]+)%`)
 var householdLoanPattern = regexp.MustCompile(`住户(?:部门)?贷款`)
 var enterpriseLoanPattern = regexp.MustCompile(`(?:企[（(]事[）)]业单位|非金融企业及机关团体|非金融企业及其他部门)贷款`)
 var monthlyPrefixPattern = regexp.MustCompile(`^(?:当月|本月|\d{1,2}月份?)[，,]?人民币贷款`)
@@ -174,6 +178,9 @@ func parseLoanReport(doc *goquery.Document, period string) (loanReport, error) {
 	if body.Length() == 0 {
 		body = doc.Find("body")
 	}
+	fullText := compact(body.Text())
+	result.M2Balance, result.M2YoY = parseMoneyPair(moneySupplyPattern, fullText)
+	result.M1Balance, result.M1YoY = parseMoneyPair(narrowMoneyPattern, fullText)
 	flowText := ""
 	inLoanSection := false
 	var parseErr error
@@ -212,7 +219,7 @@ func parseLoanReport(doc *goquery.Document, period string) (loanReport, error) {
 				flowText += text
 			}
 		}
-		if strings.HasPrefix(text, "注") && (strings.Contains(text, "金融统计范围") || strings.Contains(text, "企（事）业单位贷款")) {
+		if strings.HasPrefix(text, "注") && (strings.Contains(text, "金融统计范围") || strings.Contains(text, "企（事）业单位贷款") || strings.Contains(text, "新修订的狭义货币") || strings.Contains(text, "修订后的M1")) {
 			result.Notes = append(result.Notes, text)
 		}
 	})
@@ -285,6 +292,27 @@ func parseLoanReport(doc *goquery.Document, period string) (loanReport, error) {
 		result.Monthly["total"] = value
 	}
 	return result, nil
+}
+
+func parseMoneyPair(pattern *regexp.Regexp, text string) (*float64, *float64) {
+	m := pattern.FindStringSubmatch(text)
+	if m == nil {
+		return nil, nil
+	}
+	balance, err := number(m[1])
+	if err != nil {
+		return nil, nil
+	}
+	yoy, err := number(m[4])
+	if err != nil {
+		return nil, nil
+	}
+	balance = normalise(balance, m[2])
+	if m[3] == "下降" && yoy != nil {
+		v := -*yoy
+		yoy = &v
+	}
+	return balance, yoy
 }
 
 func monthlyLoanFlow(period, key string, current, previous loanReport) (*float64, string, bool) {
