@@ -1,3 +1,4 @@
+// Package chinabond 采集中债官方国债收益率曲线。
 package chinabond
 
 import (
@@ -6,12 +7,17 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"net/http"
 	"net/url"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/alwqx/sec/utils"
 )
+
+const CoverageStart = "20060301"
 
 // ChinaBondItem 恢复PR #66删除的官方日期行结构，空字符串和null字段均表示未提供值。
 type ChinaBondItem struct {
@@ -58,7 +64,31 @@ func GetChinaBond(ctx context.Context, req *GetChinaBondReq) (*GetChinaBondResp,
 	if err != nil {
 		return nil, err
 	}
-	return decodeChinaBond(raw)
+	result, err := decodeChinaBond(raw)
+	if err != nil {
+		return nil, err
+	}
+	seen := map[string]bool{}
+	for _, item := range result.HeList {
+		if item == nil {
+			return nil, fmt.Errorf("中债返回空数据行")
+		}
+		date, err := time.Parse("2006-01-02", item.Date)
+		if err != nil || date.Before(start) || date.After(end) || seen[item.Date] {
+			return nil, fmt.Errorf("中债所属日期无效、越界或重复: %s", item.Date)
+		}
+		seen[item.Date] = true
+		for _, text := range []string{item.ThreeMonth, item.SixMonth, item.OneYear, item.TwoYear, item.FiveYear, item.TenYear} {
+			if strings.TrimSpace(text) == "" {
+				continue
+			}
+			value, err := strconv.ParseFloat(strings.TrimSpace(text), 64)
+			if err != nil || math.IsNaN(value) || math.IsInf(value, 0) {
+				return nil, fmt.Errorf("中债收益率无效: %s", text)
+			}
+		}
+	}
+	return result, nil
 }
 
 func chinaBondURL(origin string, req *GetChinaBondReq) string {
