@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"time"
 
 	"github.com/alwqx/sec/provider/pbc"
 	"github.com/alwqx/sec/utils"
@@ -62,12 +63,26 @@ func printLPR(out io.Writer, items []pbc.LPRObservation) error {
 	table := tablewriter.NewWriter(out)
 	table.SetBorder(false)
 	table.SetHeader([]string{"报价日期/月份", "公布时间（北京时间）", "1年期（%）", "5年期以上（%）", "1年期变化（BP）", "5年期以上变化（BP）", "说明"})
+	beijing := time.FixedZone("CST", 8*60*60)
 	for _, item := range items {
 		date := item.QuoteDate
+		layout, display := "20060102", "2006-01-02"
 		if date == "" {
 			date = item.Period
+			layout, display = "200601", "2006-01"
 		}
-		table.Append([]string{date, item.PublishedAt, format(item.OneYearRate), format(item.FiveYearPlusRate), format(item.OneYearChangeBP), format(item.FiveYearPlusChangeBP), item.Note})
+		if parsed, err := time.Parse(layout, date); err == nil {
+			date = parsed.Format(display)
+		} else if date == "" {
+			date = "—"
+		}
+		published := item.PublishedAt
+		if parsed, err := time.Parse(time.RFC3339, published); err == nil {
+			published = parsed.In(beijing).Format("2006-01-02 15:04:05")
+		} else if published == "" {
+			published = "—"
+		}
+		table.Append([]string{date, published, format(item.OneYearRate), format(item.FiveYearPlusRate), format(item.OneYearChangeBP), format(item.FiveYearPlusChangeBP), item.Note})
 	}
 	table.Render()
 	_, err := fmt.Fprintln(out, "来源：人民银行授权发布的全国银行间同业拆借中心LPR公告；覆盖自201908起。BP变化为相邻月报价差×100的计算值，不跨缺口计算；空值为 —，持平为0。网页公布时间可能受修订影响，JSON保留原文和相邻月来源。")
