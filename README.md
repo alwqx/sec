@@ -111,6 +111,7 @@ CLI `sec watch` 与 Desktop「我的自选」统一使用 `~/.sec/watchlist.json
 | `macro cn lpr`                                | 1 年期、5 年期以上 LPR 月度报价、实际报价日、公布时间及基点变化；覆盖自 2019-08 起 |
 | `macro cn rrr`                                | 人民币存款准备金率调整，内置 2020 年起已核验历史并增量检查新公告；区分全面/定向及分批生效 |
 | `macro cn treasury`                           | 中债国债到期收益率曲线，含 3 个月、6 个月及 1、2、5、10 年期；直接查询指定日期范围，见 [中债文档](docs/chinabond.md) |
+| `macro cn gdp`                                | 国家统计局季度实际 GDP 同比、累计同比、季调环比及分段基期的不变价金额，见 [NBS 文档](docs/nbs.md#实际-gdp) |
 | `strategy ma / macd / rsi / boll`             | 技术指标与信号                           |
 | `valuation`                                   | 估值指标与 DCF 分析                      |
 | `upgrade`、`--version`                        | CLI 升级与版本信息                       |
