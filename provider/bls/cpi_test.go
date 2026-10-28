@@ -134,7 +134,7 @@ func TestCPIOfficialDataAndCache(t *testing.T) {
 }
 
 func TestCPIEarlySeries(t *testing.T) {
-	response, err := decodeCPIBatch(sample(t, "cpi-1913-1914"), cpiSeriesIDs, 1913, 1914)
+	response, err := decodeMonthlyBatch(sample(t, "cpi-1913-1914"), cpiSeriesIDs, 1913, 1914)
 	require.NoError(t, err)
 	require.Len(t, response.Messages, 6)
 	require.Len(t, response.Results.Series[0].Data, 24)
@@ -175,7 +175,7 @@ func TestCPIInvalidData(t *testing.T) {
 			}
 			raw, err := json.Marshal(response)
 			require.NoError(t, err)
-			_, err = decodeCPIBatch(raw, cpiSeriesIDs, 2024, 2026)
+			_, err = decodeMonthlyBatch(raw, cpiSeriesIDs, 2024, 2026)
 			if name == "annual-average" {
 				require.NoError(t, err)
 			} else {
