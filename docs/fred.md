@@ -1,6 +1,6 @@
 # FRED：美国官方经济统计转接
 
-FRED（Federal Reserve Economic Data）由圣路易斯联邦储备银行提供。`provider/fred` 当前采集BEA（Bureau of Economic Analysis，美国经济分析局）的PCE价格指数，以及美国劳工部ETA（Employment and Training Administration，就业与培训管理局）的初请、续请失业金周度数据。FRED是分发来源，JSON另行保留原始编制机构与来源链接。
+FRED（Federal Reserve Economic Data）由圣路易斯联邦储备银行提供。`provider/fred` 当前采集BEA（Bureau of Economic Analysis，美国经济分析局）的PCE价格指数、实际个人消费支出及主要分项，以及美国劳工部ETA（Employment and Training Administration，就业与培训管理局）的初请、续请失业金周度数据。FRED是分发来源，JSON另行保留原始编制机构与来源链接。
 
 ## 使用方式
 
@@ -22,7 +22,7 @@ sec macro us pce --no-cache
 | `pce` | [PCEPI](https://fred.stlouisfed.org/series/PCEPI) | DPCERG | 个人消费支出链式价格指数 |
 | `core-pce` | [PCEPILFE](https://fred.stlouisfed.org/series/PCEPILFE) | DPCCRG | 剔除食品和能源的个人消费支出链式价格指数 |
 
-两条序列的官方定义均为**月度、季调、2017=100的链式价格指数**。原始发布是BEA的Personal Income and Outlays；[BEA价格指数说明](https://www.bea.gov/data/personal-consumption-expenditures-price-index)介绍了该指数衡量的消费价格变化。它们不是以美元计价的PCE消费金额，也不是实际消费量或链式数量指数；后两类继续作为独立TODO。
+两条序列的官方定义均为**月度、季调、2017=100的链式价格指数**。原始发布是BEA的Personal Income and Outlays；[BEA价格指数说明](https://www.bea.gov/data/personal-consumption-expenditures-price-index)介绍了该指数衡量的消费价格变化。它们不是以美元计价的PCE消费金额，也不是实际消费量或链式数量指数；实际个人消费支出使用本页后述的独立系列及 `real-pce` 命令。
 
 当前采集不依赖BEA或FRED API密钥，使用FRED公开CSV下载：
 
@@ -99,3 +99,41 @@ JSON `observations` 每条包含：
 CSV下载与校验后缓存逻辑与PCE共用，申领快照单独原子保存于 `~/.sec/cache/fred/jobless-claims.json`，有效期六小时。两项申领指标及所有日期范围共享该缓存，与PCE文件相互独立；`--refresh`重新下载，`--no-cache`不读写磁盘，失败不覆盖正常缓存，不回退过期值。
 
 `provider/fred/testdata/jobless-claims.csv` 为本次核验保存的完整官方快照，仅用于离线HTTP模拟测试。测试覆盖真实最新周及发布滞后、连续四周均值、历史起点、跨年和区间外基期、空值/零值/整周缺失、日期及格式校验、缓存共享/刷新/失效恢复、不缓存、请求取消、PCE与申领缓存隔离，以及CLI表格、JSON和UTC默认日期。
+
+## 实际个人消费支出
+
+```sh
+sec macro us real-pce
+sec macro us real-pce --component goods
+sec macro us real-pce --component services --begin 202501 --end 202609 --json
+sec macro us real-pce --component durable-goods --refresh
+sec macro us real-pce --component nondurable-goods --no-cache
+```
+
+默认 `--component total`。原始编制机构为BEA，发布于Personal Income and Outlays；[BEA消费支出主页](https://www.bea.gov/data/consumer-spending/main)提供调查范围与发布入口。采集下列五条月度官方序列，各自直接保留来源金额：
+
+| 分项 | FRED系列 | BEA账户代码 |
+| --- | --- | --- |
+| `total` 总量 | [PCEC96](https://fred.stlouisfed.org/series/PCEC96) | DPCERX |
+| `goods` 商品 | [DGDSRX1](https://fred.stlouisfed.org/series/DGDSRX1) | DGDSRX |
+| `durable-goods` 耐用品 | [PCEDGC96](https://fred.stlouisfed.org/series/PCEDGC96) | DDURRX |
+| `nondurable-goods` 非耐用品 | [PCENDC96](https://fred.stlouisfed.org/series/PCENDC96) | DNDGRX |
+| `services` 服务 | [PCESC96](https://fred.stlouisfed.org/series/PCESC96) | DSERRX |
+
+本次核验五条序列均为 **月度、十亿美元（2017年链式美元）、季调折年率（SAAR）**，历史自2007年1月起。链式实际金额衡量剔除价格变化后的消费水平，区别于名义消费金额，也区别于 `pce` / `core-pce` 的2017=100价格指数。这里2017为链式美元参考年，不是将 `level` 当成指数100。
+
+按[BEA折年率说明](https://www.bea.gov/help/faq/121)，折年水平用于方便跨期比较。命令保留原始SAAR水平，不除以12，也不把该水平称为当月实际发生额。同比 =（当月 / 上年同月 − 1）×100，月环比 =（当月 / 上月 − 1）×100，均使用同一季调序列、同一CSV快照，**增速未年化**。不将月环比乘12或复利折成年率。表格水平显示一位小数、增速两位小数；JSON保留计算精度。
+
+根据[BEA链式价格和数量方法](https://www.bea.gov/help/faq/521)及[发布说明中的不可加性注释](https://www.bea.gov/news/2024/personal-income-and-outlays-april-2024)，链式金额分项一般不具有可加性。程序直接取官方商品总量和官方消费总量，不以耐用品加非耐用品替代商品，不以商品加服务构造总量，也不以金额占比推算增长贡献度。缺少某分项时，不从其他系列求和或求差补齐。
+
+日期参数为包含端点的 `YYYYMM`，默认截至UTC上个月、共最近12个月，最早200701。每个月均输出一项，未发布月份或源空单元格/`.` 保留null；真实0有效。同比或环比严格对应基期缺失、基期为0时，该增速为空；不跨缺口寻找替代值。
+
+JSON顶层保存 `component`、系列ID、BEA账户代码、频率、实际消费定义、`unit`、`reference_year=2017`、`seasonally_adjusted=true`、`level_annualized=true`、`growth_annualized=false`、`components_additive=false`。可加性字段表示不能假设分项在所有时期可加。每条观测含 `period`、`level`、`raw_value`、`yoy_percent`、`mom_percent`、严格基期 `yoy_base` / `mom_base` 及中文缺失说明。它不输出价格指数 `index` 字段。
+
+所有分项从同一个公开CSV端点获取完整历史：`https://fred.stlouisfed.org/graph/fredgraph.csv?id=PCEC96,DGDSRX1,PCEDGC96,PCENDC96,PCESC96`。本次快照为2007-01至2026-08共236个月。CSV表头按固定系列ID匹配，支持列重排和 `DATE` / `observation_date`；拒绝未知/重复/缺少列、非法/非月初日期、早于系列起点的日期、重复月份、空历史、负值或非有限数。错误响应不会更新正常缓存。
+
+原始CSV在 `~/.sec/cache/fred/real-pce.json` 原子保存六小时；不同分项及日期范围共用，支持 `--refresh` 和 `--no-cache`，与PCE价格和申领数据缓存分开。价格指数、实际消费及申领数据均复用同一CSV下载/校验后缓存逻辑。
+
+BEA可能修订历史及变更参考年。当前元数据按上述官方系列页面核验；结果为 `data_version="latest-available"`，仅代表抓取时可见版本，CSV不提供逐期实际公布时间、修订编号和完整历史版本档案，`published_at`、`revision_id` 为null。来源链接、编制/分发机构和UTC `fetched_at` 均保留。
+
+`provider/fred/testdata/real-pce.csv` 为本次下载的完整官方快照，仅用于HTTP模拟测试。测试覆盖五个分项的原值、单位/参考年/折年标识、未年化增速、严格基期、起点及未发布月份、缺口/零值、不相加分项、不从其他分项补缺口、CSV校验、缓存共享和隔离、刷新和失败保护、请求取消，以及CLI表格/JSON和分项选择。
