@@ -115,6 +115,7 @@ CLI `sec watch` 与 Desktop「我的自选」统一使用 `~/.sec/watchlist.json
 | `macro us cpi`、`macro us core-cpi`             | BLS美国CPI/核心CPI季调与非季调指数、非季调同比及季调环比；保留缺口与脚注，见 [BLS 文档](docs/bls.md) |
 | `macro us pce`、`macro us core-pce`             | BEA经FRED转接的PCE/核心PCE季调链式价格指数、同比与月环比；区别于消费支出金额和实际消费量，见 [FRED 文档](docs/fred.md) |
 | `macro us payrolls`                             | BLS季调非农工资岗位总数、月度变化及本机观测版本，见 [BLS 文档](docs/bls.md) |
+| `macro us earnings`、`macro us weekly-hours`    | BLS私人非农全部雇员季调平均时薪、平均每周工时、月度变化和同比；保留基期与脚注，见 [BLS 文档](docs/bls.md#平均时薪与每周工时) |
 | `strategy ma / macd / rsi / boll`             | 技术指标与信号                           |
 | `valuation`                                   | 估值指标与 DCF 分析                      |
 | `upgrade`、`--version`                        | CLI 升级与版本信息                       |
