@@ -48,6 +48,7 @@
 44. Add `macro us payrolls` for BLS seasonally adjusted nonfarm payroll job levels and adjacent-month changes, preserving preliminary footnotes, missing values, shared six-hour caching, and locally observed version history; document that official first/second/third estimates and historical vintage archives remain pending
 45. Keep payroll monthly changes within a single response across batch boundaries, persist observation timestamps even when values are unchanged to reject late snapshots, and validate existing archives before writing; preserve legacy history through migration and cover revision, concurrency, missing-baseline, and corrupt-archive cases with regression tests
 46. Add `macro us earnings` and `macro us weekly-hours` for BLS seasonally adjusted average hourly earnings and weekly hours of all private nonfarm employees, with explicit units and coverage, monthly level changes, same-response growth baselines, preliminary footnotes, missing values, shared caching, and JSON exports
+47. Add `macro us unemployment` and `macro us participation` for official BLS CPS seasonally adjusted rates, with percentage-point changes, explicit population and denominator definitions, same-response comparison baselines, missing observations and population-control revision footnotes, validated rate bounds, shared caching, and JSON exports
 
 ### v0.3.15
 

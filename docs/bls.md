@@ -1,6 +1,6 @@
 # BLS：美国劳工统计局
 
-BLS（Bureau of Labor Statistics）是美国劳工统计局，`provider/bls` 使用其官方 Public Data API。当前实现美国CPI-U（所有城市消费者价格指数）的美国城市平均总指数及核心指数，以及CES非农工资岗位总数、私人非农平均时薪与每周工时，独立于CN数据；核心指数剔除食品和能源。
+BLS（Bureau of Labor Statistics）是美国劳工统计局，`provider/bls` 使用其官方 Public Data API。当前实现美国CPI-U（所有城市消费者价格指数）的美国城市平均总指数及核心指数，CES非农工资岗位总数、私人非农平均时薪与每周工时，以及CPS失业率和劳动参与率，独立于CN数据；核心指数剔除食品和能源。
 
 ## 使用方式
 
@@ -22,9 +22,12 @@ sec macro us payrolls --no-cache
 sec macro us earnings
 sec macro us weekly-hours --begin 202501 --end 202609
 sec macro us earnings --begin 202501 --end 202609 --json
+
+sec macro us unemployment
+sec macro us participation --begin 202501 --end 202609 --json
 ```
 
-起止月份为 `YYYYMM`，包含端点；表格显示 `YYYY-MM`。仅指定截至月时默认向前共12个月，最早不超过191301；仅指定开始月时截至UTC上个月。拒绝无效月份、逆序范围及晚于当前UTC月份的截至月。当前月或上个月可能尚未发布，保留缺失而不估算。
+起止月份为 `YYYYMM`，包含端点；表格显示 `YYYY-MM`。仅指定截至月时默认向前共12个月，并按指标历史起点截断；仅指定开始月时截至UTC上个月。CPI最早191301，非农岗位193901，时薪/工时200603，失业率/劳动参与率194801。拒绝无效月份、逆序范围及晚于当前UTC月份的截至月。当前月或上个月可能尚未发布，保留缺失而不估算。
 
 ## 官方接口和系列
 
@@ -117,3 +120,26 @@ sec macro us earnings --begin 202501 --end 202609 --json
 `--refresh`重新采集并更新缓存；`--no-cache`不读写磁盘。本功能不写入非农岗位的本机观测档案。历史结果为当前可见版本，`data_version="latest-available"`；保留P脚注，未标P仍可能修订，实际公布时间为null，官方历史版本档案尚未接入。JSON顶层另含地区、覆盖人群、单位、频率、季调状态与批次元数据；时薪的 `price_basis="current-dollars"`，工时不带价格口径。
 
 `provider/bls/testdata/earnings-hours-2024-2026.json` 与 `earnings-hours-2006-2007.json` 为本次从官方API取得的原始响应，仅供本地模拟测试；生产查询使用API及原始响应缓存，不读取这些样本。测试覆盖实际水平和脚注、系列起点、共享缓存和刷新、缺口与零值、同批修订基期、部分失败、取消及命令输出。
+
+## 失业率与劳动参与率
+
+`sec macro us unemployment` 和 `sec macro us participation` 查询CPS（Current Population Survey，住户调查）美国总体月度季调比率。统计范围为16岁及以上非机构平民人口；与CES岗位统计分别保留调查口径。
+
+| 命令 | BLS系列 | 官方比率的分子/分母 |
+| --- | --- | --- |
+| `unemployment` | `LNS14000000` | 失业人数 / 平民劳动力 ×100 |
+| `participation` | `LNS11300000` | 平民劳动力 / 非机构平民人口 ×100 |
+
+人口及比率定义见[BLS CPS定义](https://www.bls.gov/cps/definitions.htm)。本功能直接保留官方季调比率，不从人数序列重新估算；比率单位为 `%`，表格保留一位小数。两条系列均已核验自1948年1月开始；起止月份为包含端点的 `YYYYMM`，默认截至UTC上个月、最近12个月，最早194801。
+
+变化按百分点计算：`mom_change_pp` = 当月比率 − 上月比率，`yoy_change_pp` = 当月比率 − 上年同月比率。比如4.1%升至4.2%，月度变化为+0.1个百分点。零比率和零基期均有效，不执行除法；缺少当月值或严格基期时，对应变化为null。每个请求月份都输出一项，完全未返回月份与源值 `"-"` 均保留缺失，不跨缺口、不补值。
+
+JSON `observations` 中包含 `rate_percent`、源字符串、脚注、官方latest标记和抓取时间；`mom_base`、`yoy_base`保存严格基期的完整值对象。顶层包括地区、CPS调查名、覆盖人群、分子/分母、季调状态、单位、变化单位、查询范围和批次来源。表格同时显示当月、上月基期、上年同月基期的来源脚注编号，原文见JSON；不将没有脚注解读为“最终值”。
+
+官方样本中的2025年10月为 `"-"`，脚注9说明拨款中断导致数据不可用，因此2025年11月的较上月变化也为空。2026年1月附有脚注12，注明已纳入更新的人口控制。按[BLS 2026年人口控制说明](https://www.bls.gov/web/empsit/cps-pop-control-adjustments.pdf)，该年更新延迟至3月随2月数据发布，并同时修订1月值。程序保留官方当前值与原始脚注，不自行调整历史人口口径；跨期变化可能包含人口控制更新影响。
+
+[CPS季调方法](https://www.bls.gov/cps/seasonal-adjustment-methodology.htm)说明季调历史存在年度修订。结果为 `data_version="latest-available"`，实际公布时间不可得，`published_at=null`；`fetched_at`只是本次响应的抓取时间。官方历次发布快照和完整修订档案尚未接入，历史查询不代表当时已知的数据。
+
+每次请求同时取得上述两条系列，共享六小时原始响应缓存；缓存键与CPI、CES各系列分开，支持 `--refresh` 和 `--no-cache`。同比比较需额外取得前一年，每批最多十个自然年，后批重叠一年作为基期。每行当前值及基期均使用同一响应；不借用别批次缓存补基期，任一批失败整次返回错误。重叠年按前批展示，后批行的基期可能与先前行展示值不同；JSON分别保留抓取时间。比率必须是0—100内的有限值，越界响应在写缓存前拒绝。
+
+`provider/bls/testdata/labor-force-2024-2026.json`、`labor-force-1948-1949.json` 是本次核验的官方API原始样本，仅用于本地HTTP模拟测试。测试覆盖真实缺口和人口控制脚注、系列起点、百分比水平与百分点变化、零值、缓存/刷新、越界拒绝、同批修订基期、三批长历史覆盖、部分失败、取消和CLI输出。

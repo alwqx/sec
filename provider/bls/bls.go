@@ -220,6 +220,10 @@ func mergeMonthly(response *rawResponse, first, last int, fetched time.Time, val
 				if err != nil || math.IsNaN(n) || math.IsInf(n, 0) || n < 0 {
 					return fmt.Errorf("BLS返回无效月度指数: %s %s %q", series.ID, period, point.Value)
 				}
+				// CPS的这两条系列是百分比，需在缓存前拒绝超出100的比率。
+				if n > 100 && (series.ID == unemploymentRateSeriesID || series.ID == participationRateSeriesID) {
+					return fmt.Errorf("BLS返回超出0—100范围的比率: %s %s %q", series.ID, period, point.Value)
+				}
 				item.Number = &n
 			}
 			data[period] = item
