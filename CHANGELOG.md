@@ -50,6 +50,7 @@
 46. Add `macro us earnings` and `macro us weekly-hours` for BLS seasonally adjusted average hourly earnings and weekly hours of all private nonfarm employees, with explicit units and coverage, monthly level changes, same-response growth baselines, preliminary footnotes, missing values, shared caching, and JSON exports
 47. Add `macro us unemployment` and `macro us participation` for official BLS CPS seasonally adjusted rates, with percentage-point changes, explicit population and denominator definitions, same-response comparison baselines, missing observations and population-control revision footnotes, validated rate bounds, shared caching, and JSON exports
 48. Add `macro us initial-claims` and `macro us continued-claims` for seasonally adjusted ETA data distributed by FRED, preserving each series' Saturday observation dates and release lag, strict weekly changes and calculated four-week averages, missing values and comparison windows; share validated CSV caching with PCE while keeping metric caches separate
+49. Add `macro us real-pce` for BEA real consumption totals and official goods, durable goods, nondurable goods, and services components distributed by FRED; preserve chained 2017 dollar SAAR levels, non-annualized growth, strict comparison baselines, missing values, component non-additivity, and shared snapshot caching with JSON exports
 
 ### v0.3.15
 
