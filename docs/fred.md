@@ -1,6 +1,6 @@
 # FRED：美国官方经济统计转接
 
-FRED（Federal Reserve Economic Data）由圣路易斯联邦储备银行提供。`provider/fred` 当前采集BEA（Bureau of Economic Analysis，美国经济分析局）编制、经FRED转接的PCE价格指数。FRED是分发来源，BEA是原始编制机构，JSON分别保留二者。
+FRED（Federal Reserve Economic Data）由圣路易斯联邦储备银行提供。`provider/fred` 当前采集BEA（Bureau of Economic Analysis，美国经济分析局）的PCE价格指数，以及美国劳工部ETA（Employment and Training Administration，就业与培训管理局）的初请、续请失业金周度数据。FRED是分发来源，JSON另行保留原始编制机构与来源链接。
 
 ## 使用方式
 
@@ -55,3 +55,47 @@ BEA可能修订历史值及调整价格指数参考年。结果标记 `data_vers
 原始CSV、来源地址和抓取时间原子写入 `~/.sec/cache/fred/pce-prices.json`，有效期六小时。两个指标和不同月份范围复用同一快照。`--refresh`跳过读取并更新缓存；`--no-cache`不读写磁盘；过期、来源不符或无效CSV缓存会重新采集。失败不覆盖已有有效缓存，不回退过期值。
 
 `provider/fred/testdata/pce-prices.csv` 为2026-10-27下载的官方完整快照。测试使用模拟HTTP，不依赖在线数据；覆盖两个价格系列及BEA代码、真实历史/增速、基期与未发布月份、缺口不跨越、空值/零值、列重排、非法响应、缓存/刷新/不缓存/恢复、取消请求，以及命令表格/JSON。实测命令与官方系列页面的最新月值一致。
+
+## 初请与续请失业金
+
+```sh
+sec macro us initial-claims
+sec macro us continued-claims
+sec macro us initial-claims --begin 20260901 --end 20261024
+sec macro us continued-claims --begin 20260901 --end 20261024 --json
+sec macro us initial-claims --refresh
+sec macro us continued-claims --no-cache
+```
+
+| 命令 | FRED系列 | 口径与单位 |
+| --- | --- | --- |
+| `initial-claims` | [ICSA](https://fred.stlouisfed.org/series/ICSA) | 常规州失业保险初请资格申请数，件，季调 |
+| `continued-claims` | [CCSA](https://fred.stlouisfed.org/series/CCSA) | 续请所反映的参保失业人数， 人，季调 |
+
+两条系列的官方频率为每周、周六结束，原始编制机构为美国劳工部ETA。初请是失业保险资格申请，不等同于全部新增失业人数；续请基于对应失业周的后续申领，覆盖申请常规州失业保险的人群，不等于CPS全部失业人口。[劳工部查询页面](https://oui.doleta.gov/unemploy/claims.asp)提供原始项目说明与周度查询。
+
+两命令共用一份完整历史CSV：`https://fred.stlouisfed.org/graph/fredgraph.csv?id=ICSA,CCSA`，不附带单位变换、频率聚合或增长率转换参数。本次核验含1967-01-07至2026-10-17共3120个周六，CSV约81KB；其中ICSA最新为2026-10-17，CCSA最新为2026-10-10。合并CSV末行的CCSA为空，保留该空值，不将续请前移到初请最新所属周，也不把FRED更新日当成所属周。
+
+此处日期参数是包含端点的 **`YYYYMMDD`**，按区间内的周六所属日期筛选。默认截至UTC今天，开始日期为截至日期之前最近12个周六中的第一个（截至日为周六时包含当天），最早19670107。可使用非周六边界，未包含周六的区间返回空列表。尚未发布的周六仍输出缺失行；初请与续请发布进度不同，默认范围尾部可能有不同数量的空行。只指定开始日期时截至UTC今天，只指定截至日期时仍默认最近12个周六。拒绝无效日期、逆序、早于历史起点及晚于UTC今天的范围。
+
+JSON `observations` 每条包含：
+
+| 字段 | 含义 |
+| --- | --- |
+| `week_ending` | 该周截至日期，`YYYY-MM-DD`，固定周六 |
+| `count` / `raw_value` | 季调数量及FRED源单元格文本 |
+| `weekly_change` | 当周 − 严格前7天的上周数量；缺少任一值即为null |
+| `previous_week` | 上周的所属日期、数量和源文本 |
+| `four_week_average` | 当周及前三个连续日历周的算术平均计算值 |
+| `four_week_window` | 当周、前7/14/21天四个值对象，包含区间外基期与缺失状态 |
+| `note` | 中文缺失或窗口不完整说明 |
+
+四周均值明确标为计算值，不冒充另一个官方均值系列。当前周或任意一个严格窗口周缺失时，均值为null，不取“最近四条有效记录”替代。真实0有效，表格原始数量和周变化显示整数，均值显示两位小数，JSON保留计算精度。跨年按日历每7天取值，不用周编号拼接，不将周度数量简单累计为去重失业人数。CSV空单元格或 `.` 转为null；列重排、`DATE`或`observation_date`日期列均支持。未知/重复列、非周六或非法日期、重复周、空历史、非有限数、负数、非整数数量均在缓存前报错。
+
+元数据包含地区US、系列ID、常规州项目范围、指标定义、单位、周频与周六标记、季调状态、编制/分发机构及来源链接。`latest_available_week` 是整份快照内该系列最后一个非空所属周，可能位于请求的历史区间之外；表格页脚明确标为“快照中本系列最新可用所属周”。原始数量、上周和四周窗口均来自同一CSV快照，使用顶层 `fetched_at`。
+
+申领统计和季调历史可能修订；CSV不提供逐期的预估/修订状态、实际公布时间、修订编号或完整历史版本档案。结果为 `data_version="latest-available"`，`published_at`、`revision_id` 为null，不将抓取时间当成发布日或把历史查询当成当时已知版本。
+
+CSV下载与校验后缓存逻辑与PCE共用，申领快照单独原子保存于 `~/.sec/cache/fred/jobless-claims.json`，有效期六小时。两项申领指标及所有日期范围共享该缓存，与PCE文件相互独立；`--refresh`重新下载，`--no-cache`不读写磁盘，失败不覆盖正常缓存，不回退过期值。
+
+`provider/fred/testdata/jobless-claims.csv` 为本次核验保存的完整官方快照，仅用于离线HTTP模拟测试。测试覆盖真实最新周及发布滞后、连续四周均值、历史起点、跨年和区间外基期、空值/零值/整周缺失、日期及格式校验、缓存共享/刷新/失效恢复、不缓存、请求取消、PCE与申领缓存隔离，以及CLI表格、JSON和UTC默认日期。
