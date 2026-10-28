@@ -51,6 +51,9 @@
 47. Add `macro us unemployment` and `macro us participation` for official BLS CPS seasonally adjusted rates, with percentage-point changes, explicit population and denominator definitions, same-response comparison baselines, missing observations and population-control revision footnotes, validated rate bounds, shared caching, and JSON exports
 48. Add `macro us initial-claims` and `macro us continued-claims` for seasonally adjusted ETA data distributed by FRED, preserving each series' Saturday observation dates and release lag, strict weekly changes and calculated four-week averages, missing values and comparison windows; share validated CSV caching with PCE while keeping metric caches separate
 49. Add `macro us real-pce` for BEA real consumption totals and official goods, durable goods, nondurable goods, and services components distributed by FRED; preserve chained 2017 dollar SAAR levels, non-annualized growth, strict comparison baselines, missing values, component non-additivity, and shared snapshot caching with JSON exports
+50. Add `macro us real-income` for BEA real disposable personal income distributed by FRED, preserving chained 2017 dollar SAAR levels, non-annualized growth, strict comparison baselines, missing values, source metadata, and validated snapshot caching
+51. Add `macro us industrial-production` and `macro us capacity-utilization` for Federal Reserve total industry and NAICS manufacturing data distributed by FRED, with separate history coverage, index growth and utilization percentage-point changes, shared caching, and JSON exports
+52. Add `macro us effr` using the New York Fed Markets API, preserving effective dates, prior-observation basis-point changes, revision flags and raw fields; handle the 2016 methodology boundary, omit unpublished dates, and document unavailable publication timestamps and historical vintages
 
 ### v0.3.15
 

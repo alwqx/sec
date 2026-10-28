@@ -16,15 +16,19 @@ import (
 )
 
 type Client struct {
-	CacheDir        string
-	Refresh         bool
-	endpoint        string
-	claimsEndpoint  string
-	realPCEEndpoint string
+	CacheDir           string
+	Refresh            bool
+	endpoint           string
+	claimsEndpoint     string
+	realPCEEndpoint    string
+	incomeEndpoint     string
+	productionEndpoint string
 }
 
 func NewClient(cacheDir string) *Client {
-	return &Client{CacheDir: cacheDir, endpoint: pceCSVURL, claimsEndpoint: claimsCSVURL, realPCEEndpoint: realPCECSVURL}
+	return &Client{CacheDir: cacheDir, endpoint: pceCSVURL, claimsEndpoint: claimsCSVURL, realPCEEndpoint: realPCECSVURL,
+		incomeEndpoint:     realIncomeCSVURL,
+		productionEndpoint: productionCSVURL}
 }
 
 type csvCache struct {

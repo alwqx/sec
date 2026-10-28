@@ -119,6 +119,9 @@ CLI `sec watch` 与 Desktop「我的自选」统一使用 `~/.sec/watchlist.json
 | `macro us unemployment`、`macro us participation` | BLS CPS季调失业率、劳动参与率及百分点变化；保留缺口和修订脚注，见 [BLS 文档](docs/bls.md#失业率与劳动参与率) |
 | `macro us initial-claims`、`macro us continued-claims` | 劳工部ETA经FRED转接的季调初请/续请数量、周变化及四周计算均值；按各自周六所属周对齐，见 [FRED 文档](docs/fred.md#初请与续请失业金) |
 | `macro us real-pce`                           | BEA经FRED转接的实际消费总量、商品及服务分项；保留季调折年水平与未年化增速，见 [FRED 文档](docs/fred.md#实际个人消费支出) |
+| `macro us real-income`                        | BEA经FRED转接的实际可支配个人收入总量、同比与月环比；保留2017年链式美元季调折年水平，见 [实际收入文档](docs/real-income.md) |
+| `macro us industrial-production`、`macro us capacity-utilization` | 美联储经FRED转接的工业生产指数与产能利用率；`--sector total\|manufacturing` 选择总量或NAICS制造业，见 [工业生产文档](docs/us-production.md) |
+| `macro us effr`                               | 纽约联储有效联邦基金利率、所属日期及前一可用观测值的基点变化，见 [纽约联储文档](docs/nyfed.md) |
 | `strategy ma / macd / rsi / boll`             | 技术指标与信号                           |
 | `valuation`                                   | 估值指标与 DCF 分析                      |
 | `upgrade`、`--version`                        | CLI 升级与版本信息                       |
