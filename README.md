@@ -114,6 +114,7 @@ CLI `sec watch` 与 Desktop「我的自选」统一使用 `~/.sec/watchlist.json
 | `macro cn gdp`                                | 国家统计局季度实际 GDP 同比、累计同比、季调环比及分段基期的不变价金额，见 [NBS 文档](docs/nbs.md#实际-gdp) |
 | `macro us cpi`、`macro us core-cpi`             | BLS美国CPI/核心CPI季调与非季调指数、非季调同比及季调环比；保留缺口与脚注，见 [BLS 文档](docs/bls.md) |
 | `macro us pce`、`macro us core-pce`             | BEA经FRED转接的PCE/核心PCE季调链式价格指数、同比与月环比；区别于消费支出金额和实际消费量，见 [FRED 文档](docs/fred.md) |
+| `macro us payrolls`                             | BLS季调非农工资岗位总数、月度变化及本机观测版本，见 [BLS 文档](docs/bls.md) |
 | `strategy ma / macd / rsi / boll`             | 技术指标与信号                           |
 | `valuation`                                   | 估值指标与 DCF 分析                      |
 | `upgrade`、`--version`                        | CLI 升级与版本信息                       |

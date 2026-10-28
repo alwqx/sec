@@ -3,8 +3,6 @@ package bls
 import (
 	"context"
 	"fmt"
-	"math"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -20,21 +18,7 @@ func (r *CPIRequest) Validate() error {
 	if r.Indicator != "cpi" && r.Indicator != "core-cpi" {
 		return fmt.Errorf("不支持的美国CPI指标: %s", r.Indicator)
 	}
-	for _, month := range []string{r.Begin, r.End} {
-		if _, err := time.Parse("200601", month); err != nil || len(month) != 6 {
-			return fmt.Errorf("无效月份 %q，请使用YYYYMM", month)
-		}
-	}
-	if r.Begin > r.End {
-		return fmt.Errorf("开始月份不能晚于截至月份")
-	}
-	if r.Begin < "191301" {
-		return fmt.Errorf("美国CPI查询支持自191301起，未起始系列保留缺失")
-	}
-	if r.End > time.Now().UTC().Format("200601") {
-		return fmt.Errorf("截至月份不能晚于当前UTC月份")
-	}
-	return nil
+	return validateMonthlyRange(r.Begin, r.End, "191301")
 }
 
 type CPISeries struct {
@@ -99,9 +83,9 @@ func (c *Client) CPI(ctx context.Context, req *CPIRequest) (*CPIResult, error) {
 	if first < 1913 {
 		first = 1913
 	}
-	values := map[string]map[string]*CPIValue{}
+	values := map[string]map[string]*monthlyValue{}
 	for _, id := range cpiSeriesIDs {
-		values[id] = map[string]*CPIValue{}
+		values[id] = map[string]*monthlyValue{}
 	}
 	result := &CPIResult{Region: "US", Indicator: req.Indicator, Population: "CPI-U: U.S. city average, all urban consumers", Frequency: "monthly", IndexBase: "1982-1984=100", Begin: req.Begin, End: req.End, Source: apiURL, DataVersion: "latest-available", Batches: []CPIBatch{}, Observations: []CPIObservation{}, Note: "同比=(当月非季调指数/上年同月非季调指数−1)×100；月环比=(当月季调指数/上月季调指数−1)×100，均为计算值，未年化。不跨缺口寻找基期，不补值。季调序列可能年度修订最近五年；历史查询为当前可见版本。接口未提供逐月实际公布时间或历史版本档案，published_at为null。"}
 	for year := first; year <= end.Year(); year += 10 {
@@ -113,7 +97,7 @@ func (c *Client) CPI(ctx context.Context, req *CPIRequest) (*CPIResult, error) {
 		if err != nil {
 			return nil, err
 		}
-		if err := mergeCPI(response, year, last, fetched, values); err != nil {
+		if err := mergeMonthly(response, year, last, fetched, values); err != nil {
 			return nil, err
 		}
 		result.Batches = append(result.Batches, CPIBatch{year, last, response.Messages, fetched})
@@ -125,7 +109,7 @@ func (c *Client) CPI(ctx context.Context, req *CPIRequest) (*CPIResult, error) {
 	result.Series = []CPISeries{{nsaID, false}, {saID, true}}
 	for month := begin; !month.After(end); month = month.AddDate(0, 1, 0) {
 		period := month.Format("200601")
-		item := CPIObservation{Period: period, NSA: values[nsaID][period], SA: values[saID][period], YoYBase: values[nsaID][month.AddDate(-1, 0, 0).Format("200601")], MoMBase: values[saID][month.AddDate(0, -1, 0).Format("200601")]}
+		item := CPIObservation{Period: period, NSA: cpiValue(values[nsaID][period]), SA: cpiValue(values[saID][period]), YoYBase: cpiValue(values[nsaID][month.AddDate(-1, 0, 0).Format("200601")]), MoMBase: cpiValue(values[saID][month.AddDate(0, -1, 0).Format("200601")])}
 		item.YoY = percentChange(item.NSA, item.YoYBase)
 		item.MoM = percentChange(item.SA, item.MoMBase)
 		notes := []string{}
@@ -155,55 +139,9 @@ func percentChange(current, base *CPIValue) *float64 {
 	return &value
 }
 
-func mergeCPI(response *rawResponse, first, last int, fetched time.Time, values map[string]map[string]*CPIValue) error {
-	seen := map[string]bool{}
-	for _, series := range response.Results.Series {
-		data, ok := values[series.ID]
-		if !ok || seen[series.ID] {
-			return fmt.Errorf("BLS返回未知或重复CPI系列: %s", series.ID)
-		}
-		seen[series.ID] = true
-		if series.Data == nil {
-			return fmt.Errorf("BLS系列缺少数据数组: %s", series.ID)
-		}
-		for _, point := range series.Data {
-			year, err := strconv.Atoi(point.Year)
-			if err != nil || len(point.Year) != 4 || fmt.Sprintf("%04d", year) != point.Year || year < first || year > last {
-				return fmt.Errorf("BLS返回无效或越界年份: %s", point.Year)
-			}
-			if point.Period == "M13" {
-				continue
-			} // 年平均不是月份，不参与月度增速计算。
-			if len(point.Period) != 3 || point.Period[0] != 'M' {
-				return fmt.Errorf("BLS返回非月度CPI所属期: %s", point.Period)
-			}
-			month, err := strconv.Atoi(point.Period[1:])
-			if err != nil || month < 1 || month > 12 || point.Period != fmt.Sprintf("M%02d", month) {
-				return fmt.Errorf("BLS返回无效月份: %s", point.Period)
-			}
-			period := point.Year + point.Period[1:]
-			if _, exists := data[period]; exists {
-				return fmt.Errorf("BLS返回重复CPI月份: %s %s", series.ID, period)
-			}
-			item := &CPIValue{Period: period, SeriesID: series.ID, RawValue: point.Value, Footnotes: []Footnote{}, Latest: point.Latest == "true", FetchedAt: fetched}
-			for _, footnote := range point.Footnotes {
-				if footnote.Code != "" || footnote.Text != "" {
-					item.Footnotes = append(item.Footnotes, footnote)
-				}
-			}
-			text := strings.TrimSpace(point.Value)
-			if text != "" && text != "-" {
-				n, err := strconv.ParseFloat(text, 64)
-				if err != nil || math.IsNaN(n) || math.IsInf(n, 0) || n < 0 {
-					return fmt.Errorf("BLS返回无效CPI指数: %s %s %q", series.ID, period, point.Value)
-				}
-				item.Index = &n
-			}
-			data[period] = item
-		}
+func cpiValue(point *monthlyValue) *CPIValue {
+	if point == nil {
+		return nil
 	}
-	if len(seen) != len(cpiSeriesIDs) {
-		return fmt.Errorf("BLS返回CPI系列不完整，需四条季调/非季调序列")
-	}
-	return nil
+	return &CPIValue{Period: point.Period, SeriesID: point.SeriesID, Index: point.Number, RawValue: point.RawValue, Footnotes: point.Footnotes, Latest: point.Latest, FetchedAt: point.FetchedAt}
 }

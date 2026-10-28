@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -77,16 +78,16 @@ func decodeResponse(raw []byte) (*rawResponse, error) {
 	return &response, nil
 }
 
-func decodeCPIBatch(raw []byte, ids []string, first, last int) (*rawResponse, error) {
+func decodeMonthlyBatch(raw []byte, ids []string, first, last int) (*rawResponse, error) {
 	response, err := decodeResponse(raw)
 	if err != nil {
 		return nil, err
 	}
-	values := map[string]map[string]*CPIValue{}
+	values := map[string]map[string]*monthlyValue{}
 	for _, id := range ids {
-		values[id] = map[string]*CPIValue{}
+		values[id] = map[string]*monthlyValue{}
 	}
-	if err := mergeCPI(response, first, last, time.Time{}, values); err != nil {
+	if err := mergeMonthly(response, first, last, time.Time{}, values); err != nil {
 		return nil, err
 	}
 	return response, nil
@@ -110,7 +111,7 @@ func (c *Client) query(ctx context.Context, ids []string, first, last int) (*raw
 		if raw, err := os.ReadFile(path); err == nil {
 			var cache cachedResponse
 			if json.Unmarshal(raw, &cache) == nil && time.Since(cache.FetchedAt) >= 0 && time.Since(cache.FetchedAt) < 6*time.Hour {
-				if response, err := decodeCPIBatch(cache.Body, ids, first, last); err == nil {
+				if response, err := decodeMonthlyBatch(cache.Body, ids, first, last); err == nil {
 					return response, cache.FetchedAt, nil
 				}
 			}
@@ -133,7 +134,7 @@ func (c *Client) query(ctx context.Context, ids []string, first, last int) (*raw
 	if len(raw) > 16<<20 {
 		return nil, time.Time{}, fmt.Errorf("BLS响应超过大小限制")
 	}
-	response, err := decodeCPIBatch(raw, ids, first, last)
+	response, err := decodeMonthlyBatch(raw, ids, first, last)
 	if err != nil {
 		return nil, time.Time{}, err
 	}
@@ -164,4 +165,86 @@ func (c *Client) query(ctx context.Context, ids []string, first, last int) (*raw
 		}
 	}
 	return response, fetched, nil
+}
+
+// monthlyValue 是BLS月度水平观测；具体单位由CPI、岗位等各指标定义。
+type monthlyValue struct {
+	Period    string
+	SeriesID  string
+	Number    *float64
+	RawValue  string
+	Footnotes []Footnote
+	Latest    bool
+	FetchedAt time.Time
+}
+
+func mergeMonthly(response *rawResponse, first, last int, fetched time.Time, values map[string]map[string]*monthlyValue) error {
+	seen := map[string]bool{}
+	for _, series := range response.Results.Series {
+		data, ok := values[series.ID]
+		if !ok || seen[series.ID] {
+			return fmt.Errorf("BLS返回未知或重复月度系列: %s", series.ID)
+		}
+		seen[series.ID] = true
+		if series.Data == nil {
+			return fmt.Errorf("BLS系列缺少数据数组: %s", series.ID)
+		}
+		for _, point := range series.Data {
+			year, err := strconv.Atoi(point.Year)
+			if err != nil || len(point.Year) != 4 || fmt.Sprintf("%04d", year) != point.Year || year < first || year > last {
+				return fmt.Errorf("BLS返回无效或越界年份: %s", point.Year)
+			}
+			if point.Period == "M13" {
+				continue
+			} // 年平均不是月份，不参与月度增速计算。
+			if len(point.Period) != 3 || point.Period[0] != 'M' {
+				return fmt.Errorf("BLS返回非月度所属期: %s", point.Period)
+			}
+			month, err := strconv.Atoi(point.Period[1:])
+			if err != nil || month < 1 || month > 12 || point.Period != fmt.Sprintf("M%02d", month) {
+				return fmt.Errorf("BLS返回无效月份: %s", point.Period)
+			}
+			period := point.Year + point.Period[1:]
+			if _, exists := data[period]; exists {
+				return fmt.Errorf("BLS返回重复月度月份: %s %s", series.ID, period)
+			}
+			item := &monthlyValue{Period: period, SeriesID: series.ID, RawValue: point.Value, Footnotes: []Footnote{}, Latest: point.Latest == "true", FetchedAt: fetched}
+			for _, footnote := range point.Footnotes {
+				if footnote.Code != "" || footnote.Text != "" {
+					item.Footnotes = append(item.Footnotes, footnote)
+				}
+			}
+			text := strings.TrimSpace(point.Value)
+			if text != "" && text != "-" {
+				n, err := strconv.ParseFloat(text, 64)
+				if err != nil || math.IsNaN(n) || math.IsInf(n, 0) || n < 0 {
+					return fmt.Errorf("BLS返回无效月度指数: %s %s %q", series.ID, period, point.Value)
+				}
+				item.Number = &n
+			}
+			data[period] = item
+		}
+	}
+	if len(seen) != len(values) {
+		return fmt.Errorf("BLS返回月度系列不完整")
+	}
+	return nil
+}
+
+func validateMonthlyRange(begin, end, earliest string) error {
+	for _, month := range []string{begin, end} {
+		if _, err := time.Parse("200601", month); err != nil || len(month) != 6 {
+			return fmt.Errorf("无效月份 %q，请使用YYYYMM", month)
+		}
+	}
+	if begin > end {
+		return fmt.Errorf("开始月份不能晚于截至月份")
+	}
+	if begin < earliest {
+		return fmt.Errorf("BLS月度查询支持自%s起", earliest)
+	}
+	if end > time.Now().UTC().Format("200601") {
+		return fmt.Errorf("截至月份不能晚于当前UTC月份")
+	}
+	return nil
 }
