@@ -23,12 +23,16 @@ type Client struct {
 	realPCEEndpoint    string
 	incomeEndpoint     string
 	productionEndpoint string
+	moneyEndpoint      string
+	gdpEndpoint        string
 }
 
 func NewClient(cacheDir string) *Client {
 	return &Client{CacheDir: cacheDir, endpoint: pceCSVURL, claimsEndpoint: claimsCSVURL, realPCEEndpoint: realPCECSVURL,
 		incomeEndpoint:     realIncomeCSVURL,
-		productionEndpoint: productionCSVURL}
+		productionEndpoint: productionCSVURL,
+		moneyEndpoint:      moneyCSVURL,
+		gdpEndpoint:        gdpCSVURL}
 }
 
 type csvCache struct {

@@ -54,6 +54,9 @@
 50. Add `macro us real-income` for BEA real disposable personal income distributed by FRED, preserving chained 2017 dollar SAAR levels, non-annualized growth, strict comparison baselines, missing values, source metadata, and validated snapshot caching
 51. Add `macro us industrial-production` and `macro us capacity-utilization` for Federal Reserve total industry and NAICS manufacturing data distributed by FRED, with separate history coverage, index growth and utilization percentage-point changes, shared caching, and JSON exports
 52. Add `macro us effr` using the New York Fed Markets API, preserving effective dates, prior-observation basis-point changes, revision flags and raw fields; handle the 2016 methodology boundary, omit unpublished dates, and document unavailable publication timestamps and historical vintages
+53. Add `macro us target-rate` to collect Federal Reserve target-range adjustments, with prior-range baselines, basis-point changes, independently verified announcement and effective dates, raw source fields, and validated page caching
+54. Add `macro us gdp` for real GDP levels and official annualized quarterly growth distributed by FRED, with strict non-annualized comparison rates and optional BEA release-vintage growth records from 2002Q1; keep unavailable historical real levels and publication times null
+55. Add `macro us money` / `m2` for Federal Reserve monthly seasonally adjusted M2 balances distributed by FRED, with strict year-over-year and monthly growth, raw values, methodology notes, validated snapshot caching, and updated macro collection documentation and TODO status
 
 ### v0.3.15
 
