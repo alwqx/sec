@@ -1,6 +1,6 @@
 # BLS：美国劳工统计局
 
-BLS（Bureau of Labor Statistics）是美国劳工统计局，`provider/bls` 使用其官方 Public Data API。当前实现美国CPI-U（所有城市消费者价格指数）的美国城市平均总指数及核心指数，以及CES非农工资岗位总数，独立于CN数据；核心指数剔除食品和能源。
+BLS（Bureau of Labor Statistics）是美国劳工统计局，`provider/bls` 使用其官方 Public Data API。当前实现美国CPI-U（所有城市消费者价格指数）的美国城市平均总指数及核心指数，以及CES非农工资岗位总数、私人非农平均时薪与每周工时，独立于CN数据；核心指数剔除食品和能源。
 
 ## 使用方式
 
@@ -18,6 +18,10 @@ sec macro us payrolls
 sec macro us payrolls --begin 202501 --end 202609 --json
 sec macro us payrolls --refresh
 sec macro us payrolls --no-cache
+
+sec macro us earnings
+sec macro us weekly-hours --begin 202501 --end 202609
+sec macro us earnings --begin 202501 --end 202609 --json
 ```
 
 起止月份为 `YYYYMM`，包含端点；表格显示 `YYYY-MM`。仅指定截至月时默认向前共12个月，最早不超过191301；仅指定开始月时截至UTC上个月。拒绝无效月份、逆序范围及晚于当前UTC月份的截至月。当前月或上个月可能尚未发布，保留缺失而不估算。
@@ -89,3 +93,27 @@ sec macro us payrolls --no-cache
 官方[就业修订表](https://www.bls.gov/web/empsit/cesnaicsrev.htm)提供首次、第二次、第三次月度新增估计；[历史版本说明](https://www.bls.gov/web/empsit/cesvininfo.htm)列出岗位水平历史版本档案。两者尚未集成，`official_vintage_archive_available`为false，`published_at`为null。当前工作环境无法自动下载这些官方档案，因此完整历史修订数据保留在TODO第二批，不能用本机观测版本冒充。CLI输出中的“本机版本数”亦是观测记录条数，而非官方修订次数。
 
 本地测试全部使用HTTP模拟。`provider/bls/testdata/cpi-2024-2026.json`、`cpi-1913-1914.json` 为2026-10-27从官方v1接口保存的原始响应，四条系列如上，分别请求2024—2026年和1913—1914年。覆盖季调/非季调及核心口径、真实缺失脚注、不跨缺口、年平均过滤、十年分批边界、缓存/刷新/取消/恢复、配额/部分失败及命令输出；不会因运行测试消耗BLS查询额度。
+
+## 平均时薪与每周工时
+
+命令 `sec macro us earnings` 和 `sec macro us weekly-hours` 查询CES私人非农部门全部雇员的月度季调平均数，覆盖全职和兼职雇员，不含政府雇员。
+
+| 命令 | BLS系列 | 水平和月变化的单位 |
+| --- | --- | --- |
+| `earnings` | `CES0500000003` | 美元/小时，表格保留两位小数 |
+| `weekly-hours` | `CES0500000002` | 小时/周，表格保留一位小数 |
+
+按[BLS CES概念说明](https://www.bls.gov/opub/hom/ces/concepts.htm)，平均时薪由工资总额除以支付工时得到，是名义税前平均收入；其变化也会受行业和雇员构成影响，不等同于固定人群的工资涨幅。平均每周工时是支付工时除以相应雇员数，包含全职、兼职及加班等影响。[BLS收入表](https://www.bls.gov/news.release/realer.t01.htm)分别列出名义时薪、周工时与经CPI调整的实际收入；本功能采集上述两条名义时薪/工时系列，不计算实际工资或总劳动成本。
+
+两条系列均自2006年3月起，已通过官方API核验2006—2007年的起始样本。起止范围为包含端点的 `YYYYMM`，拒绝早于200603的开始月。默认截至UTC上个月，共最近12个月；首期或尚未发布月份的缺失基期保留为空。
+
+- `monthly_change` = 当月水平 − 上月水平，单位与该系列水平一致。
+- `mom_percent` =（当月水平 / 上月水平 − 1）×100；`yoy_percent` =（当月水平 / 上年同月水平 − 1）×100，均基于同一季调系列计算，未年化。
+- 当前值或严格基期缺失时不跨缺口计算；零值保留为0，零基期可以计算水平差，但不计算百分比。表格百分比保留两位，JSON保留计算精度。
+- `mom_base`、`yoy_base`保留所属月、系列ID、原始水平、原始文本、P初步标记、脚注及抓取时间。每个请求月份均输出一行；缺失水平为null，表格显示 —。
+
+每次请求同时取得两条系列，两命令在查询年份相同时共享六小时原始响应缓存。为计算同比，查询额外包含前一年；每批最多十个自然年，后续批次重叠一年。每行的当前值和两种基期均使用同一批响应；同批基期缺失时不借用另一批缓存。重叠年按前批次展示，后批次行的基期可能与先前行的展示水平不同，JSON保留各自抓取时间。跨批次任何失败均返回错误，不输出部分结果。
+
+`--refresh`重新采集并更新缓存；`--no-cache`不读写磁盘。本功能不写入非农岗位的本机观测档案。历史结果为当前可见版本，`data_version="latest-available"`；保留P脚注，未标P仍可能修订，实际公布时间为null，官方历史版本档案尚未接入。JSON顶层另含地区、覆盖人群、单位、频率、季调状态与批次元数据；时薪的 `price_basis="current-dollars"`，工时不带价格口径。
+
+`provider/bls/testdata/earnings-hours-2024-2026.json` 与 `earnings-hours-2006-2007.json` 为本次从官方API取得的原始响应，仅供本地模拟测试；生产查询使用API及原始响应缓存，不读取这些样本。测试覆盖实际水平和脚注、系列起点、共享缓存和刷新、缺口与零值、同批修订基期、部分失败、取消及命令输出。
