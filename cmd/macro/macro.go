@@ -46,6 +46,7 @@ func NewMacroCLI() *cobra.Command {
 	us.AddCommand(newUSPCECLI("pce"), newUSPCECLI("core-pce"))
 	us.AddCommand(newUSPayrollsCLI())
 	us.AddCommand(newUSEarningsHoursCLI("earnings"), newUSEarningsHoursCLI("weekly-hours"))
+	us.AddCommand(newUSLaborForceCLI("unemployment"), newUSLaborForceCLI("participation"))
 	root.AddCommand(us)
 	return root
 }
