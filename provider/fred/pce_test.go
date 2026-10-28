@@ -88,7 +88,7 @@ func TestPCEOfficialDataAndCache(t *testing.T) {
 	require.EqualValues(t, 3, calls.Load())
 	fail.Store(false)
 	path := filepath.Join(client.CacheDir, "pce-prices.json")
-	for _, cache := range []pceCache{{Source: client.endpoint, FetchedAt: time.Now().Add(-7 * time.Hour), CSV: raw}, {Source: client.endpoint, FetchedAt: time.Now(), CSV: "<html>error</html>"}} {
+	for _, cache := range []csvCache{{Source: client.endpoint, FetchedAt: time.Now().Add(-7 * time.Hour), CSV: raw}, {Source: client.endpoint, FetchedAt: time.Now(), CSV: "<html>error</html>"}} {
 		data, err := json.Marshal(cache)
 		require.NoError(t, err)
 		require.NoError(t, os.WriteFile(path, data, 0600))

@@ -1,33 +1,17 @@
-// Package fred 通过圣路易斯联储FRED采集官方经济统计数据。
 package fred
 
 import (
 	"context"
 	"encoding/csv"
-	"encoding/json"
 	"fmt"
 	"io"
-	"log/slog"
 	"math"
-	"net/http"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/alwqx/sec/utils"
 )
 
 const pceCSVURL = "https://fred.stlouisfed.org/graph/fredgraph.csv?id=PCEPI,PCEPILFE"
-
-type Client struct {
-	CacheDir string
-	Refresh  bool
-	endpoint string
-}
-
-func NewClient(cacheDir string) *Client { return &Client{CacheDir: cacheDir, endpoint: pceCSVURL} }
 
 type PCERequest struct{ Indicator, Begin, End string }
 
@@ -207,74 +191,15 @@ func parsePCE(raw string) (map[string]map[string]PCEValue, error) {
 	return values, nil
 }
 
-type pceCache struct {
-	Source    string    `json:"source"`
-	FetchedAt time.Time `json:"fetched_at"`
-	CSV       string    `json:"csv"`
-}
-
 func (c *Client) pceValues(ctx context.Context) (map[string]map[string]PCEValue, time.Time, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, time.Time{}, err
-	}
-	path := filepath.Join(c.CacheDir, "pce-prices.json")
-	if c.CacheDir != "" && !c.Refresh {
-		if raw, err := os.ReadFile(path); err == nil {
-			var cache pceCache
-			if json.Unmarshal(raw, &cache) == nil && cache.Source == c.endpoint && time.Since(cache.FetchedAt) >= 0 && time.Since(cache.FetchedAt) < 6*time.Hour {
-				if values, err := parsePCE(cache.CSV); err == nil {
-					return values, cache.FetchedAt, nil
-				}
-			}
-		}
-	}
-	slog.DebugContext(ctx, "请求FRED PCE价格指数", "url", c.endpoint)
-	// FRED公开CSV下载对sec/Go标识会重置连接，使用兼容的通用下载客户端标识。
-	headers := http.Header{"User-Agent": {"curl"}}
-	resp, err := utils.MakeRequest(ctx, http.MethodGet, c.endpoint, headers, nil, 30*time.Second)
+	var values map[string]map[string]PCEValue
+	_, fetched, err := c.csvSnapshot(ctx, c.endpoint, "pce-prices.json", func(raw string) error {
+		var err error
+		values, err = parsePCE(raw)
+		return err
+	})
 	if err != nil {
 		return nil, time.Time{}, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, time.Time{}, fmt.Errorf("FRED返回HTTP %d", resp.StatusCode)
-	}
-	raw, err := io.ReadAll(io.LimitReader(resp.Body, (8<<20)+1))
-	if err != nil {
-		return nil, time.Time{}, err
-	}
-	if len(raw) > 8<<20 {
-		return nil, time.Time{}, fmt.Errorf("FRED响应超过大小限制")
-	}
-	values, err := parsePCE(string(raw))
-	if err != nil {
-		return nil, time.Time{}, err
-	}
-	fetched := time.Now().UTC()
-	if c.CacheDir != "" {
-		if err := os.MkdirAll(c.CacheDir, 0755); err != nil {
-			return nil, time.Time{}, err
-		}
-		data, err := json.Marshal(pceCache{c.endpoint, fetched, string(raw)})
-		if err != nil {
-			return nil, time.Time{}, err
-		}
-		f, err := os.CreateTemp(c.CacheDir, ".fred-pce-*")
-		if err != nil {
-			return nil, time.Time{}, err
-		}
-		defer os.Remove(f.Name())
-		_, writeErr := f.Write(data)
-		closeErr := f.Close()
-		if writeErr != nil {
-			return nil, time.Time{}, writeErr
-		}
-		if closeErr != nil {
-			return nil, time.Time{}, closeErr
-		}
-		if err := os.Rename(f.Name(), path); err != nil {
-			return nil, time.Time{}, err
-		}
 	}
 	return values, fetched, nil
 }
