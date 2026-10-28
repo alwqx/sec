@@ -66,9 +66,12 @@ func (c *Client) Payrolls(ctx context.Context, req *PayrollRequest) (*PayrollRes
 	if first < 1939 {
 		first = 1939
 	}
-	values := map[string]map[string]*monthlyValue{payrollSeriesID: {}}
+	values := map[string]*monthlyValue{}
+	previous := map[string]*monthlyValue{}
+	observed := map[string]*monthlyValue{}
 	result := &PayrollResult{Region: "US", SeriesID: payrollSeriesID, Survey: "CES establishment survey", Frequency: "monthly", Unit: "千个岗位", SeasonallyAdjusted: true, Begin: req.Begin, End: req.End, Source: apiURL, DataVersion: "latest-available", Batches: []CPIBatch{}, HistoryEnabled: c.CacheDir != "", RevisionArchiveSource: "https://www.bls.gov/web/empsit/cesnaicsrev.htm", Observations: []PayrollObservation{}, Note: "BLS季调非农工资岗位总数，不是去重就业人数；兼职多份工作的个人可计为多个岗位。新增=当月水平−上月水平，单位均为千个岗位，不跨缺口。P脚注为初步估计，未标P也可能有年度基准/季调修订。本机观测版本不是官方首次发布/第二次/第三次估计；官方历史版本档案尚未接入（公开下载受限），official_vintage_archive_available=false。API不提供实际公布时间，published_at=null。"}
-	for year := first; year <= end.Year(); year += 10 {
+	// 后续批次重叠一个自然年，为一月提供同一响应中的十二月基期。
+	for year := first; ; year += 9 {
 		last := year + 9
 		if last > end.Year() {
 			last = end.Year()
@@ -77,18 +80,36 @@ func (c *Client) Payrolls(ctx context.Context, req *PayrollRequest) (*PayrollRes
 		if err != nil {
 			return nil, err
 		}
-		if err := mergeMonthly(response, year, last, fetched, values); err != nil {
+		batch := map[string]map[string]*monthlyValue{payrollSeriesID: {}}
+		if err := mergeMonthly(response, year, last, fetched, batch); err != nil {
 			return nil, err
 		}
+		for period, value := range batch[payrollSeriesID] {
+			if old := observed[period]; old == nil || value.FetchedAt.After(old.FetchedAt) {
+				observed[period] = value
+			}
+		}
+		start := year
+		if year != first {
+			start++ // 重叠年只提供下一年基期，不覆盖前批次的展示值。
+		}
+		for month := time.Date(start, 1, 1, 0, 0, 0, 0, time.UTC); month.Year() <= last; month = month.AddDate(0, 1, 0) {
+			period := month.Format("200601")
+			values[period] = batch[payrollSeriesID][period]
+			previous[period] = batch[payrollSeriesID][month.AddDate(0, -1, 0).Format("200601")]
+		}
 		result.Batches = append(result.Batches, CPIBatch{year, last, response.Messages, fetched})
+		if last == end.Year() {
+			break
+		}
 	}
-	history, err := c.observePayrollVersions(ctx, values[payrollSeriesID])
+	history, err := c.observePayrollVersions(ctx, observed)
 	if err != nil {
 		return nil, err
 	}
-	point := func(period string) PayrollValue {
+	point := func(period string, v *monthlyValue) PayrollValue {
 		item := PayrollValue{Period: period, Footnotes: []Footnote{}}
-		if v := values[payrollSeriesID][period]; v != nil {
+		if v != nil {
 			item.Employment = v.Number
 			item.RawValue = v.RawValue
 			item.Footnotes = v.Footnotes
@@ -103,7 +124,7 @@ func (c *Client) Payrolls(ctx context.Context, req *PayrollRequest) (*PayrollRes
 	}
 	for month := begin; !month.After(end); month = month.AddDate(0, 1, 0) {
 		period := month.Format("200601")
-		item := PayrollObservation{PayrollValue: point(period), Previous: point(month.AddDate(0, -1, 0).Format("200601")), ObservedVersions: []PayrollVersion{}}
+		item := PayrollObservation{PayrollValue: point(period, values[period]), Previous: point(month.AddDate(0, -1, 0).Format("200601"), previous[period]), ObservedVersions: []PayrollVersion{}}
 		if versions := history[period]; versions != nil {
 			item.ObservedVersions = versions
 		}

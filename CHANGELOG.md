@@ -46,6 +46,7 @@
 42. Add `macro us cpi` and `macro us core-cpi` using official BLS CPI-U series, with seasonally adjusted and unadjusted indexes, explicitly derived growth and comparison baselines, preserved gaps and footnotes, ten-year batch queries, shared six-hour caching, and JSON exports
 43. Add `macro us pce` and `macro us core-pce` for BEA chain-type price indexes distributed by FRED, with seasonally adjusted year-over-year and monthly growth, explicit comparison baselines and missing values, shared full-history CSV caching, and source/version documentation distinct from consumption amounts and volumes
 44. Add `macro us payrolls` for BLS seasonally adjusted nonfarm payroll job levels and adjacent-month changes, preserving preliminary footnotes, missing values, shared six-hour caching, and locally observed version history; document that official first/second/third estimates and historical vintage archives remain pending
+45. Keep payroll monthly changes within a single response across batch boundaries, persist observation timestamps even when values are unchanged to reject late snapshots, and validate existing archives before writing; preserve legacy history through migration and cover revision, concurrency, missing-baseline, and corrupt-archive cases with regression tests
 
 ### v0.3.15
 

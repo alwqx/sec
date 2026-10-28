@@ -8,6 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gofrs/flock"
@@ -22,9 +24,10 @@ type PayrollVersion struct {
 }
 
 type payrollHistory struct {
-	Schema   int                         `json:"schema"`
-	SeriesID string                      `json:"series_id"`
-	Periods  map[string][]PayrollVersion `json:"periods"`
+	Schema           int                         `json:"schema"`
+	SeriesID         string                      `json:"series_id"`
+	Periods          map[string][]PayrollVersion `json:"periods"`
+	LatestObservedAt map[string]time.Time        `json:"latest_observed_at,omitempty"`
 }
 
 func (c *Client) observePayrollVersions(ctx context.Context, values map[string]*monthlyValue) (map[string][]PayrollVersion, error) {
@@ -49,7 +52,7 @@ func (c *Client) observePayrollVersions(ctx context.Context, values map[string]*
 		return nil, fmt.Errorf("未取得非农观测档案锁")
 	}
 	defer func() { _ = lock.Unlock(); _ = lock.Close() }()
-	history := payrollHistory{Schema: 1, SeriesID: payrollSeriesID, Periods: map[string][]PayrollVersion{}}
+	var history payrollHistory
 	if raw, err := os.ReadFile(path); err == nil {
 		if err := json.Unmarshal(raw, &history); err != nil {
 			return nil, fmt.Errorf("非农本机版本档案损坏，未覆盖原文件: %w", err)
@@ -59,18 +62,30 @@ func (c *Client) observePayrollVersions(ctx context.Context, values map[string]*
 		}
 	} else if !os.IsNotExist(err) {
 		return nil, err
+	} else {
+		history = payrollHistory{Schema: 1, SeriesID: payrollSeriesID, Periods: map[string][]PayrollVersion{}, LatestObservedAt: map[string]time.Time{}}
 	}
 	changed := false
+	// 兼容旧档案：旧格式只记录发生变化的时间。
+	if history.LatestObservedAt == nil {
+		history.LatestObservedAt = map[string]time.Time{}
+		for period, versions := range history.Periods {
+			history.LatestObservedAt[period] = versions[len(versions)-1].ObservedAt
+		}
+		changed = true
+	}
 	for period, point := range values {
 		if point.Number == nil {
 			continue
 		}
+		if !point.FetchedAt.After(history.LatestObservedAt[period]) {
+			continue
+		}
+		history.LatestObservedAt[period] = point.FetchedAt
+		changed = true
 		versions := history.Periods[period]
 		if len(versions) > 0 {
 			last := versions[len(versions)-1]
-			if !point.FetchedAt.After(last.ObservedAt) {
-				continue
-			}
 			if *point.Number == last.Employment && reflect.DeepEqual(point.Footnotes, last.Footnotes) {
 				continue
 			}
@@ -117,10 +132,22 @@ func validatePayrollHistory(history *payrollHistory) error {
 		}
 		var previous time.Time
 		for _, version := range versions {
+			rawValue, err := strconv.ParseFloat(strings.TrimSpace(version.RawValue), 64)
+			if err != nil || rawValue != version.Employment {
+				return invalid()
+			}
 			if math.IsNaN(version.Employment) || math.IsInf(version.Employment, 0) || version.Employment < 0 || version.ObservedAt.IsZero() || !version.ObservedAt.After(previous) {
 				return invalid()
 			}
 			previous = version.ObservedAt
+		}
+		if history.LatestObservedAt != nil && history.LatestObservedAt[period].Before(previous) {
+			return invalid()
+		}
+	}
+	for period := range history.LatestObservedAt {
+		if _, ok := history.Periods[period]; !ok {
+			return invalid()
 		}
 	}
 	return nil
