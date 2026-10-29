@@ -55,22 +55,45 @@ func financialReportPeriod(title string) string {
 }
 
 func (c *Client) loanReports(ctx context.Context, req LoanRequest) (map[string]loanReport, error) {
+	result := map[string]loanReport{}
+	err := c.walkFinancialReports(ctx, req, func(period, source string) error {
+		doc, fetched, err := c.get(ctx, source)
+		if err != nil {
+			return err
+		}
+		report, err := parseLoanReport(doc, period)
+		if err != nil {
+			return fmt.Errorf("%s 金融统计报告（%s）: %w", period, source, err)
+		}
+		report.Source = source
+		report.FetchedAt = fetched
+		result[period] = report
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+// walkFinancialReports 复用报告目录分页，正文由各指标独立解析，避免依赖其他指标是否齐全。
+func (c *Client) walkFinancialReports(ctx context.Context, req LoanRequest, visit func(string, string) error) error {
 	begin, _ := time.Parse("200601", req.Begin)
 	earliest := req.Begin
 	if begin.Month() != time.January {
 		earliest = begin.AddDate(0, -1, 0).Format("200601")
 	}
-	result := map[string]loanReport{}
+	periods := map[string]bool{}
 	seen := map[string]bool{}
 	address := c.origin + financialReportsPath
 	for page := 0; page < 100; page++ {
 		if seen[address] {
-			return nil, fmt.Errorf("金融报告分页链接循环")
+			return fmt.Errorf("金融报告分页链接循环")
 		}
 		seen[address] = true
 		doc, _, err := c.get(ctx, address)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		older := false
 		var parseErr error
@@ -89,7 +112,7 @@ func (c *Client) loanReports(ctx context.Context, req LoanRequest) (map[string]l
 			if period > req.End {
 				return
 			}
-			if _, ok := result[period]; ok {
+			if periods[period] {
 				return
 			}
 			href, _ := a.Attr("href")
@@ -98,25 +121,17 @@ func (c *Client) loanReports(ctx context.Context, req LoanRequest) (map[string]l
 				parseErr = err
 				return
 			}
-			reportDoc, fetched, err := c.get(ctx, source)
-			if err != nil {
+			if err := visit(period, source); err != nil {
 				parseErr = err
 				return
 			}
-			report, err := parseLoanReport(reportDoc, period)
-			if err != nil {
-				parseErr = fmt.Errorf("%s 金融统计报告（%s）: %w", period, source, err)
-				return
-			}
-			report.Source = source
-			report.FetchedAt = fetched
-			result[period] = report
+			periods[period] = true
 		})
 		if parseErr != nil {
-			return nil, parseErr
+			return parseErr
 		}
 		if older {
-			return result, nil
+			return nil
 		}
 		next := ""
 		doc.Find("a").Each(func(_ int, a *goquery.Selection) {
@@ -136,11 +151,11 @@ func (c *Client) loanReports(ctx context.Context, req LoanRequest) (map[string]l
 			}
 		})
 		if next == "" {
-			return result, nil
+			return nil
 		}
 		address = next
 	}
-	return nil, fmt.Errorf("金融统计报告超过100页，请缩小查询范围")
+	return fmt.Errorf("金融统计报告超过100页，请缩小查询范围")
 }
 
 var bankLoanBalancePattern = regexp.MustCompile(`人民币贷款余额(?:为)?([0-9.,]+)(万亿元|亿元)[，,]同比(增长|下降)([0-9.]+)%`)

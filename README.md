@@ -107,6 +107,8 @@ CLI `sec watch` 与 Desktop「我的自选」统一使用 `~/.sec/watchlist.json
 | `macro cn property`                           | 新建商品房销售面积、销售额及房屋新开工面积，见 [房地产文档](docs/cn-property.md) |
 | `macro cn enterprise`                         | 规模以上工业企业利润、总存货/产成品存货及应收账款，区分累计流量与期末余额，见 [工业企业文档](docs/cn-enterprise.md) |
 | `macro cn household` | 全国居民人均累计收入、消费支出及官方实际同比，见 [居民收支文档](docs/cn-household.md) |
+| `macro cn deposits` | 住户人民币存款余额、严格基期计算同比和报告新增额，见 [居民存款文档](docs/cn-deposits.md) |
+| `macro cn fiscal` | 全国一般公共预算、政府性基金累计收支及官方同比，见 [中国财政文档](docs/cn-fiscal.md) |
 | `macro cn unemployment`                       | 全国城镇调查失业率；`--age-groups` 展示年龄分组并标记口径变化 |
 | `macro cn financing` / `macro cn afre`         | 人民银行社融存量、同比、月度/累计增量；`--details` 展示融资结构，见 [PBC 文档](docs/pbc.md) |
 | `macro cn loans`                              | 金融机构人民币贷款余额、同比和新增；`--details` 展示住户／企事业单位期限结构，近似计算值带 `≈` |
@@ -132,6 +134,7 @@ CLI `sec watch` 与 Desktop「我的自选」统一使用 `~/.sec/watchlist.json
 | `macro us trade`、`macro us real-trade`        | 月度名义贸易与季度实际贸易，出口、进口及官方差额；支持商品/服务分项，见 [美国进出口文档](docs/us-trade.md) |
 | `macro us investment`、`macro us equipment-investment` | 住宅开工、建筑许可及季度设备投资，分别保留频率、单位和季调折年口径，见 [美国投资文档](docs/us-investment.md) |
 | `macro us bank-credit`、`macro us lending-standards`、`macro us debt-service` | 月平均银行信贷、季度贷款标准及家庭偿债负担，区分百分比和百分点变化，见 [美国信用文档](docs/us-credit.md) |
+| `macro us fiscal` | 联邦月度收入、支出、官方盈余/赤字及计算财年累计，见 [美国财政文档](docs/us-fiscal.md) |
 | `macro us corporate-profits`、`macro us business-inventories`、`macro us new-orders` | 企业税前利润、商业库存及制造业新订单，分开保留季度流量、月末余额和月度流量，见 [美国企业文档](docs/us-enterprise.md) |
 | `macro us housing`、`macro us house-price`     | 新房与成屋销售、FHFA季度房价指数，保留各自历史覆盖和统计口径，见 [美国房地产文档](docs/us-housing.md) |
 | `strategy ma / macd / rsi / boll`             | 技术指标与信号                           |

@@ -7,6 +7,8 @@
 - 官方统计数据入口：<https://www.pbc.gov.cn/diaochatongjisi/116219/116319/index.html>
 - 2026 年社融目录：<https://www.pbc.gov.cn/diaochatongjisi/116219/116319/2026ntjsj/shrzgm/index.html>
 
+住户人民币存款余额、活期/定期及其他分项、计算同比和报告新增额见 [居民存款](cn-deposits.md)。余额与流量分别采集，全部人民币存款官方同比不套用于住户。
+
 ## 社会融资规模
 
 ```bash
