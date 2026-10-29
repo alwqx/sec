@@ -57,6 +57,10 @@
 53. Add `macro us target-rate` to collect Federal Reserve target-range adjustments, with prior-range baselines, basis-point changes, independently verified announcement and effective dates, raw source fields, and validated page caching
 54. Add `macro us gdp` for real GDP levels and official annualized quarterly growth distributed by FRED, with strict non-annualized comparison rates and optional BEA release-vintage growth records from 2002Q1; keep unavailable historical real levels and publication times null
 55. Add `macro us money` / `m2` for Federal Reserve monthly seasonally adjusted M2 balances distributed by FRED, with strict year-over-year and monthly growth, raw values, methodology notes, validated snapshot caching, and updated macro collection documentation and TODO status
+56. Add `macro cn investment` for cumulative total, manufacturing, infrastructure and real estate development investment from official NBS monthly releases, preserving available amounts, comparable-basis notes, publication times and infrastructure scope changes
+57. Add `macro cn property` for cumulative new commercial building sales area, sales value and housing starts area with official growth rates, historical sales scope metadata, missing values and JSON exports
+58. Add `macro us trade` and `macro us real-trade` for monthly nominal and quarterly real exports, imports and official aggregate balances, with goods and services components, distinct units and accounting bases, strict comparison periods and validated FRED snapshot caching
+59. Validate NBS investment release directories and property metadata and observations before caching, preserve valid cached responses on failed refreshes, recover invalid cached responses, and document collection coverage and remaining real trade component balances
 
 ### v0.3.15
 

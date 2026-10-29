@@ -1,10 +1,12 @@
 # FRED：美国官方经济统计转接
 
-FRED（Federal Reserve Economic Data）由圣路易斯联邦储备银行提供。`provider/fred` 当前采集BEA（Bureau of Economic Analysis，美国经济分析局）的PCE价格指数、实际个人消费支出及主要分项、实际可支配个人收入、实际GDP，美国劳工部ETA（Employment and Training Administration，就业与培训管理局）的初请、续请失业金周度数据，以及美联储的工业生产、产能利用率与M2货币余额。FRED是分发来源，JSON另行保留原始编制机构与来源链接。
+FRED（Federal Reserve Economic Data）由圣路易斯联邦储备银行提供。`provider/fred` 当前采集BEA（Bureau of Economic Analysis，美国经济分析局）的PCE价格指数、实际个人消费支出及主要分项、实际可支配个人收入、实际GDP及实际进出口，BEA与美国人口普查局的月度名义进出口，美国劳工部ETA（Employment and Training Administration，就业与培训管理局）的初请、续请失业金周度数据，以及美联储的工业生产、产能利用率与M2货币余额。FRED是分发来源，JSON另行保留原始编制机构与来源链接。
 
 实际收入的单位、季调折年口径和命令见 [实际可支配个人收入](real-income.md)；工业总量与NAICS制造业系列、产能利用率及各自历史起点见 [工业生产与产能利用率](us-production.md)。有效联邦基金利率直接由 [纽约联储](nyfed.md) 采集。
 
 季度实际GDP与官方环比年化增速见 [美国实际GDP](us-gdp.md)；月度M2季调余额与变化见 [美国货币供应](us-money.md)。联邦基金目标区间及政策事件见 [美联储政策利率](federalreserve.md)。
+
+月度名义贸易与季度实际贸易的出口、进口、差额及商品/服务分项见 [美国进出口](us-trade.md)。两种频率与单位分别保留，季度链式实际分项不据此推算可加总的贸易总量。
 
 ## 使用方式
 

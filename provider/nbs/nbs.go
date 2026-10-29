@@ -37,6 +37,12 @@ type cacheEntry struct {
 func NewClient(cacheDir string) *Client { return &Client{CacheDir: cacheDir, baseURL: baseURL} }
 
 func (c *Client) request(ctx context.Context, path string, params url.Values, body any, dst any) (time.Time, error) {
+	return c.requestValidated(ctx, path, params, body, dst, nil)
+}
+
+// requestValidated 在读取缓存及写入新响应前运行语义校验，拒绝错误响应污染有效缓存。
+// validate 可能对缓存和网络响应各调用一次，不应修改查询状态。
+func (c *Client) requestValidated(ctx context.Context, path string, params url.Values, body any, dst any, validate func([]byte) error) (time.Time, error) {
 	if err := ctx.Err(); err != nil {
 		return time.Time{}, err
 	}
@@ -60,7 +66,7 @@ func (c *Client) request(ctx context.Context, path string, params url.Values, bo
 		if raw, readErr := os.ReadFile(cachePath); readErr == nil {
 			var entry cacheEntry
 			if json.Unmarshal(raw, &entry) == nil && time.Since(entry.FetchedAt) >= 0 && time.Since(entry.FetchedAt) < 6*time.Hour {
-				if json.Unmarshal(entry.Body, dst) == nil {
+				if (validate == nil || validate(entry.Body) == nil) && json.Unmarshal(entry.Body, dst) == nil {
 					return entry.FetchedAt, nil
 				}
 			}
@@ -92,6 +98,11 @@ func (c *Client) request(ctx context.Context, path string, params url.Values, bo
 	}
 	if !envelope.Success {
 		return time.Time{}, fmt.Errorf("国家统计局查询失败: %s", envelope.Message)
+	}
+	if validate != nil {
+		if err := validate(raw); err != nil {
+			return time.Time{}, err
+		}
 	}
 	if err := json.Unmarshal(raw, dst); err != nil {
 		return time.Time{}, fmt.Errorf("解析国家统计局响应失败: %w", err)
