@@ -65,6 +65,7 @@
 61. Add US housing starts, building permits and quarterly equipment investment, preserving nominal and real measures, distinct frequencies, annualized levels and strict calendar comparison baselines
 62. Add US new and existing home sales and the FHFA quarterly house price index, retaining source units, seasonal adjustment, snapshot coverage limits and validated response caching
 63. Simplify the Chinese industrial enterprise terminal table to five columns, keeping survey scope and detailed notes in JSON output and shortening the footer
+64. Add US corporate profits with IVA and CCAdj, total business inventories and manufacturing new orders with distinct frequencies, units and flow or stock definitions, strict comparison bases, validated FRED caching and compact terminal tables
 
 ### v0.3.15
 
