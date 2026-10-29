@@ -61,6 +61,10 @@
 57. Add `macro cn property` for cumulative new commercial building sales area, sales value and housing starts area with official growth rates, historical sales scope metadata, missing values and JSON exports
 58. Add `macro us trade` and `macro us real-trade` for monthly nominal and quarterly real exports, imports and official aggregate balances, with goods and services components, distinct units and accounting bases, strict comparison periods and validated FRED snapshot caching
 59. Validate NBS investment release directories and property metadata and observations before caching, preserve valid cached responses on failed refreshes, recover invalid cached responses, and document collection coverage and remaining real trade component balances
+60. Add Chinese industrial enterprise profit, total and finished-goods inventories, and accounts receivable collection, preserving cumulative flows, period-end balances, official comparable growth rates and statistical scope metadata
+61. Add US housing starts, building permits and quarterly equipment investment, preserving nominal and real measures, distinct frequencies, annualized levels and strict calendar comparison baselines
+62. Add US new and existing home sales and the FHFA quarterly house price index, retaining source units, seasonal adjustment, snapshot coverage limits and validated response caching
+63. Simplify the Chinese industrial enterprise terminal table to five columns, keeping survey scope and detailed notes in JSON output and shortening the footer
 
 ### v0.3.15
 

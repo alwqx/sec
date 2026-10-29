@@ -105,6 +105,8 @@ provider/nbs/investment.go  固定资产投资总量及制造业、基建、房�
 cmd/macro/investment.go     累计投资命令、表格及 JSON 导出
 provider/nbs/property.go    新建商品房销售及房屋新开工面积
 cmd/macro/property.go       房地产命令、表格及 JSON 导出
+provider/nbs/enterprise.go  工业企业利润、总存货/产成品存货及应收账款
+cmd/macro/enterprise.go     工业企业命令、表格及 JSON 导出
 provider/nbs/unemployment.go 失业率采集、年龄分组与口径版本
 cmd/macro/unemployment.go   失业率命令、表格及 JSON 导出
 ```
@@ -112,6 +114,8 @@ cmd/macro/unemployment.go   失业率命令、表格及 JSON 导出
 provider 接收 `context.Context`，支持取消与请求超时；CLI 通过 `cmd.OutOrStdout()` 输出。`nbs.NewClient("")` 可在其他调用方禁用磁盘缓存。
 
 固定资产投资总量及制造业、基建、房地产开发投资的口径和可用历史见 [固定资产投资](cn-investment.md)；新建商品房销售面积、销售额及房屋新开工面积见 [房地产](cn-property.md)。两类指标保留年初至所属月的累计口径，1—2月合并发布，不从累计增速相减构造单月增速。
+
+规模以上工业企业的累计利润和期末总存货、产成品存货、应收账款见 [工业企业经营](cn-enterprise.md)，流量与余额分别保留，官方可比口径同比不以跨期金额相除替代。
 
 ```bash
 go test ./provider/nbs ./cmd/macro

@@ -1,4 +1,4 @@
-// Package fred 通过圣路易斯联储FRED采集官方经济统计数据。
+// Package fred 通过圣路易斯联储FRED采集美国经济统计数据。
 package fred
 
 import (
@@ -16,27 +16,35 @@ import (
 )
 
 type Client struct {
-	CacheDir           string
-	Refresh            bool
-	endpoint           string
-	claimsEndpoint     string
-	realPCEEndpoint    string
-	incomeEndpoint     string
-	productionEndpoint string
-	moneyEndpoint      string
-	gdpEndpoint        string
-	tradeEndpoint      string
-	realTradeEndpoint  string
+	CacheDir                    string
+	Refresh                     bool
+	endpoint                    string
+	claimsEndpoint              string
+	realPCEEndpoint             string
+	incomeEndpoint              string
+	productionEndpoint          string
+	moneyEndpoint               string
+	gdpEndpoint                 string
+	tradeEndpoint               string
+	realTradeEndpoint           string
+	housingInvestmentEndpoint   string
+	equipmentInvestmentEndpoint string
+	housingSalesEndpoint        string
+	housePriceEndpoint          string
 }
 
 func NewClient(cacheDir string) *Client {
 	return &Client{CacheDir: cacheDir, endpoint: pceCSVURL, claimsEndpoint: claimsCSVURL, realPCEEndpoint: realPCECSVURL,
-		incomeEndpoint:     realIncomeCSVURL,
-		productionEndpoint: productionCSVURL,
-		moneyEndpoint:      moneyCSVURL,
-		gdpEndpoint:        gdpCSVURL,
-		tradeEndpoint:      tradeCSVURL,
-		realTradeEndpoint:  realTradeCSVURL}
+		incomeEndpoint:              realIncomeCSVURL,
+		productionEndpoint:          productionCSVURL,
+		moneyEndpoint:               moneyCSVURL,
+		gdpEndpoint:                 gdpCSVURL,
+		tradeEndpoint:               tradeCSVURL,
+		realTradeEndpoint:           realTradeCSVURL,
+		housingInvestmentEndpoint:   housingInvestmentCSVURL,
+		equipmentInvestmentEndpoint: equipmentInvestmentCSVURL,
+		housingSalesEndpoint:        housingSalesCSVURL,
+		housePriceEndpoint:          housePriceCSVURL}
 }
 
 type csvCache struct {
