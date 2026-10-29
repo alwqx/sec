@@ -67,6 +67,7 @@
 63. Simplify the Chinese industrial enterprise terminal table to five columns, keeping survey scope and detailed notes in JSON output and shortening the footer
 64. Add US corporate profits with IVA and CCAdj, total business inventories and manufacturing new orders with distinct frequencies, units and flow or stock definitions, strict comparison bases, validated FRED caching and compact terminal tables
 65. Add US monthly bank credit, quarterly lending standards and household debt service ratios with distinct percentage and percentage-point changes, survey timing, current methodology coverage, validated FRED snapshots and compact terminal output
+66. Add Chinese household per-capita cumulative income and consumption with official real growth, integrated survey coverage, annual own-production scope, raw values, validated NBS response caching and compact terminal output
 
 ### v0.3.15
 
