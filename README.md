@@ -130,6 +130,7 @@ CLI `sec watch` 与 Desktop「我的自选」统一使用 `~/.sec/watchlist.json
 | `macro us money`、`macro us m2`                | 美国M2月度季调余额、同比与月环比，见 [美国货币供应文档](docs/us-money.md) |
 | `macro us trade`、`macro us real-trade`        | 月度名义贸易与季度实际贸易，出口、进口及官方差额；支持商品/服务分项，见 [美国进出口文档](docs/us-trade.md) |
 | `macro us investment`、`macro us equipment-investment` | 住宅开工、建筑许可及季度设备投资，分别保留频率、单位和季调折年口径，见 [美国投资文档](docs/us-investment.md) |
+| `macro us bank-credit`、`macro us lending-standards`、`macro us debt-service` | 月平均银行信贷、季度贷款标准及家庭偿债负担，区分百分比和百分点变化，见 [美国信用文档](docs/us-credit.md) |
 | `macro us corporate-profits`、`macro us business-inventories`、`macro us new-orders` | 企业税前利润、商业库存及制造业新订单，分开保留季度流量、月末余额和月度流量，见 [美国企业文档](docs/us-enterprise.md) |
 | `macro us housing`、`macro us house-price`     | 新房与成屋销售、FHFA季度房价指数，保留各自历史覆盖和统计口径，见 [美国房地产文档](docs/us-housing.md) |
 | `strategy ma / macd / rsi / boll`             | 技术指标与信号                           |
