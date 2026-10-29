@@ -61,6 +61,7 @@ func NewMacroCLI() *cobra.Command {
 	us.AddCommand(newUSTradeCLI(), newUSRealTradeCLI())
 	us.AddCommand(newUSInvestmentCLI(), newUSEquipmentInvestmentCLI())
 	us.AddCommand(newUSHousingCLI(), newUSHousePriceCLI())
+	us.AddCommand(newUSCorporateProfitsCLI(), newUSBusinessInventoriesCLI(), newUSNewOrdersCLI())
 	root.AddCommand(us)
 	return root
 }
