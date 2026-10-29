@@ -32,6 +32,7 @@ type Client struct {
 	housingSalesEndpoint        string
 	housePriceEndpoint          string
 	enterpriseEndpoints         map[string]string
+	creditEndpoints             map[string]string
 }
 
 func NewClient(cacheDir string) *Client {
@@ -46,7 +47,8 @@ func NewClient(cacheDir string) *Client {
 		equipmentInvestmentEndpoint: equipmentInvestmentCSVURL,
 		housingSalesEndpoint:        housingSalesCSVURL,
 		housePriceEndpoint:          housePriceCSVURL,
-		enterpriseEndpoints:         map[string]string{"profit": enterpriseCSVURL("CPROFIT"), "inventory": enterpriseCSVURL("BUSINV"), "new-orders": enterpriseCSVURL("AMTMNO")}}
+		enterpriseEndpoints:         map[string]string{"profit": enterpriseCSVURL("CPROFIT"), "inventory": enterpriseCSVURL("BUSINV"), "new-orders": enterpriseCSVURL("AMTMNO")},
+		creditEndpoints:             map[string]string{"bank": creditCSVURL("LOANINV"), "standards": creditCSVURL("DRTSCILM"), "debt-service": creditCSVURL("TDSP")}}
 }
 
 type csvCache struct {
