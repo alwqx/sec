@@ -1,6 +1,6 @@
 # 汇率采集
 
-`sec fx` 独立提供人民币中间价、在岸市场参考汇率、在岸／离岸人民币和港币行情，以及 FRED 长期历史。所有货币对使用 `基础货币/计价货币`：`USD/CNY` 表示1美元兑换的在岸人民币数量，`USD/CNH` 对应离岸人民币市场。CNH 是离岸人民币市场标识，不能与 CNY 数据合并。
+`FX` 是 Foreign Exchange（外汇）的缩写。`sec fx` 独立提供人民币中间价、在岸市场参考汇率、在岸／离岸人民币和港币行情，以及 FRED 历史与明确标记的推导结果。所有货币对使用 `基础货币/计价货币`：`USD/CNY` 表示1美元兑换的在岸人民币数量，`USD/CNH` 对应离岸人民币市场。CNH 是离岸人民币市场标识，不能与 CNY 数据合并。
 
 ## 命令
 
@@ -49,12 +49,54 @@ JSON 保留以下信息：
 - 观测：日期、基础及计价货币、在岸／离岸市场、汇率、报价买卖价或日线OHLC、上游明确的观测时间、来源URL、抓取时间、原始字段及逐条说明。
 - `value`：报价接口的参考价格、中间价或参考汇率，以及日线收盘值；必须结合 `price_type` 解读。
 
-来源没有日期记录时不补周末或休市日；来源列出的缺失值及被识别的异常记录保留为空。不同价格类型、时区或来源的历史不互相补齐。CNY/CNH价差和交叉汇率计算须另行对齐时点，当前命令不自动套算，也不支持用反向报价替换请求币种。
+来源没有日期记录时不补周末或休市日；来源列出的缺失值及被识别的异常记录保留为空。不同价格类型、时区或来源的历史不互相补齐。原始采集命令不自动套算，也不支持用反向报价替换请求币种；推导计算使用以下独立命令。
+
+## 交叉汇率与在岸／离岸价差
+
+```bash
+# 同一天、纽约中午的FRED输入，推导HKD/CNY及反向汇率
+sec fx cross --source fred --pairs HKD/CNY,CNY/HKD --begin 20240101 --end 20241231
+
+# 同一天、北京时间16:00的CFETS参考汇率，推导USD/HKD
+sec fx cross --source cfets --pairs USD/HKD --at 16:00 --begin 20240101 --end 20240131
+
+# 新浪最近报价；严格模式只计算相同时间戳的所需输入
+sec fx cross --source sina --pairs HKD/CNH,CNH/CNY --json
+sec fx spread --json
+
+# 显式允许不超过60秒的输入时间差，此时结果标记为近似值
+sec fx cross --source sina --pairs HKD/CNH --max-skew 60s
+sec fx spread --max-skew 60s --max-age 15m
+```
+
+`fx cross` 默认来源为 `fred`、目标为 `HKD/CNY`、区间为最近一年。FRED与CFETS支持USD、CNY、HKD之间的有向货币对；新浪报价另支持CNH。只使用同一个来源结果中的输入；CFETS限固定时点参考汇率，FRED限纽约中午价，新浪限带原始时间戳的报价。人民币中间价、HKMA未明确时点的日度公布值和新浪未知收盘时刻的日线均不能混入推导。
+
+基于美元报价时，`HKD/CNY = USD/CNY ÷ USD/HKD`，倒数为 `CNY/HKD = USD/HKD ÷ USD/CNY`。CFETS来源使用同一时点的`USD/CNY`和`HKD/CNY`，因此`USD/HKD = USD/CNY ÷ HKD/CNY`。每条结果带 `is_derived: true`、`formula`、原始 `inputs` 和 `alignment`，不生成不存在的开高低收或买卖价。
+
+日度输入按日期和已核实的固定时点对齐，不补前一交易日。报价默认 `--max-skew 0s`，要求所有所需输入时间完全一致；`--max-age`默认15分钟，最大24小时。允许的时间差上限为60秒，必须显式指定；`within-tolerance`结果保留输入时间范围和实际差值，不伪造单一观测时间。缺少输入、数值为空、过期、时间无效或时间差超限时，结果为空并注明原因。跨午夜使用带时区时间戳判断时间差，结果日期取实际所用输入的最晚日期。日度来源不接受报价专用时间差和年龄参数。
+
+`fx spread` 只使用新浪USD/CNY、USD/CNH报价，其时间限制与新浪交叉汇率一致。终端报价时间统一显示为北京时间 `YYYY-MM-DD HH:mm:ss`，JSON保留原始RFC3339时间戳：
+
+| 输出 | 公式与解释 |
+| --- | --- |
+| `difference_rmb_per_usd` | `USD/CNH − USD/CNY`；正值表示CNH相对CNY更弱，负值更强 |
+| `pips` | 绝对价差×10000，1点=0.0001 |
+| `relative_percent` | 绝对价差÷USD/CNY×100 |
+| `relative_bps` | 绝对价差÷USD/CNY×10000；与绝对点差含义不同 |
+| `implied_cnh_cny` | USD/CNY÷USD/CNH，每1离岸人民币对应的在岸人民币，仅为隐含推导值 |
+
+价差不是两个实际可执行兑换报价之间的套利利润；近似时间对齐也不代表同一时刻成交。当前不从收盘时间未核实的日线生成历史CNY/CNH价差序列。
+
+## 暂缓的HKMA来源
+
+`HKMA` 是 Hong Kong Monetary Authority（香港金融管理局）。[官方汇率字段文档](https://apidocs.hkma.gov.hk/documentation/market-data-and-statistics/monthly-statistical-bulletin/er-ir/er-eeri-daily/)和[通用API文档](https://apidocs.hkma.gov.hk/documentation/)提供公开接口说明，但本轮标准查询、官方最小GET示例及带正常JSON请求头的调用均返回HTTP 405安全拦截页，未能恢复访问。因此暂不接入该来源，采集实现与线上核验保留TODO。
+
+HKMA的 `cny` 字段没有明确在岸／离岸范围，未来接入前需要进一步核验，不能直接将其标作CNH或用于在岸／离岸价差。
 
 ## 测试与后续来源
 
 Go测试使用精简官方样本和HTTP mock，覆盖币种单位、编码、报价时间、日线字段顺序、坏行与缺失值、源覆盖边界、跨月与多页查询、分页重复／截断／总数变化、缓存命中／失败刷新／损坏／未来时间、请求取消、非法参数、四类JSON输出和终端格式。样本仅用于离线回归，线上响应仍可能修订。
 
-HKMA正式汇率API可用于后续港币历史核验，但日频观测不等于每日实时更新，其 `cny` 字段未经口径核验不能认作CNH。[HKMA接口文档](https://apidocs.hkma.gov.hk/documentation/market-data-and-statistics/monthly-statistical-bulletin/er-ir/er-eeri-daily/)
+新增推导测试覆盖所有汇率方向、倒数、输入排列、来源／价格类型拒绝、正负与零价差、点差与相对基点、缺失／重复输入、严格／显式近似对齐、跨午夜、过期、未来与不一致日期，以及推导命令JSON输出和终端报价时间格式。
 
 TMA的USD/CNH、USD/HKD基准有数据使用许可及历史访问要求，当前不将其作为免费默认采集源。[TMA许可说明](https://www.tma.org.hk/TMA%20Notice%20on%20Licensing%20Regime%20with%20FAQ.pdf)

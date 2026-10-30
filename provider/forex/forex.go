@@ -97,6 +97,10 @@ type Observation struct {
 	FetchedAt     time.Time         `json:"fetched_at"`
 	RawValues     map[string]string `json:"raw_values"`
 	Note          string            `json:"note,omitempty"`
+	IsDerived     bool              `json:"is_derived,omitempty"`
+	Formula       string            `json:"formula,omitempty"`
+	Inputs        []Observation     `json:"inputs,omitempty"`
+	Alignment     *Alignment        `json:"alignment,omitempty"`
 }
 
 type Result struct {
@@ -112,6 +116,7 @@ type Result struct {
 	Observations     []Observation        `json:"observations"`
 	SnapshotCoverage map[string][2]string `json:"snapshot_coverage,omitempty"`
 	Notes            []string             `json:"notes"`
+	Derivation       *Derivation          `json:"derivation,omitempty"`
 }
 
 func NewObservation(pair, date, source string, fetched time.Time) Observation {
@@ -122,6 +127,9 @@ func NewObservation(pair, date, source string, fetched time.Time) Observation {
 	}
 	if strings.Contains(pair, "CNH") {
 		market = "offshore"
+		if strings.Contains(pair, "CNY") {
+			market = "onshore-offshore"
+		}
 	}
 	return Observation{Pair: pair, Date: date, BaseCurrency: parts[0], QuoteCurrency: parts[1], Market: market, Source: source, FetchedAt: fetched, RawValues: map[string]string{}}
 }
