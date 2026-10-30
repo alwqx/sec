@@ -79,6 +79,7 @@
 74. Add derived FX cross rates and CNY/CNH quote spreads with formulas, original inputs, strict timestamp and quote-age checks, and explicit approximate alignment; format terminal spread timestamps in Beijing time and retain regression coverage for currency direction, quote validity and derived outputs
 75. Add monthly Chinese services-trade collection in CNY and USD and optional CNY goods-trade partner reports; preserve official balances, monthly and cumulative definitions, missing periods, overlapping partner scopes and raw source values with pagination, cache and command regression tests
 76. Add `macro us debt` for Treasury DTS daily recorded issues and redemptions by marketability, with explicitly derived daily summaries and net recorded issuance; preserve signed adjustments, official cumulative values, raw rows and missing values with validated pagination, caching and regression tests
+77. Add `macro us auctions` for CUSIP-level issuance and reopening events with separate issue-date and auction-date filters; preserve official par amounts, bidder allocations, SOMA/FIMA inclusion definitions and historical nulls with validated pagination, caching and regression tests, including auction-date pagination and future issue-date boundaries
 
 ### v0.3.15
 

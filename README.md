@@ -142,6 +142,7 @@ CLI `sec watch` 与 Desktop「我的自选」统一使用 `~/.sec/watchlist.json
 | `macro us bank-credit`、`macro us lending-standards`、`macro us debt-service` | 月平均银行信贷、季度贷款标准及家庭偿债负担，区分百分比和百分点变化，见 [美国信用文档](docs/us-credit.md) |
 | `macro us fiscal` | 联邦月度收入、支出、官方盈余/赤字及计算财年累计，见 [美国财政文档](docs/us-fiscal.md) |
 | `macro us debt` | 财政部每日可流通／非流通国债记账发行、赎回及计算净额，保留调整与累计值，见 [美国国债交易文档](docs/us-debt.md) |
+| `macro us auctions` | 国债逐券发行日期、拍卖面值与分配、SOMA及再发行事件，见 [美国拍卖文档](docs/us-auctions.md) |
 | `macro us corporate-profits`、`macro us business-inventories`、`macro us new-orders` | 企业税前利润、商业库存及制造业新订单，分开保留季度流量、月末余额和月度流量，见 [美国企业文档](docs/us-enterprise.md) |
 | `macro us housing`、`macro us house-price`     | 新房与成屋销售、FHFA季度房价指数，保留各自历史覆盖和统计口径，见 [美国房地产文档](docs/us-housing.md) |
 | `strategy ma / macd / rsi / boll`             | 技术指标与信号                           |
