@@ -15,7 +15,7 @@ import (
 )
 
 func newRRRCLI() *cobra.Command {
-	command := &cobra.Command{Use: "rrr", Short: "人民币存款准备金率调整、适用机构与分批生效日期（自2020年起）", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, args []string) error {
+	command := &cobra.Command{Use: "rrr", Short: "人民币存款准备金率调整、适用机构与分批生效日期（自2018年起）", Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, args []string) error {
 		begin, _ := cmd.Flags().GetString("begin")
 		end, _ := cmd.Flags().GetString("end")
 		if begin == "" {
@@ -52,7 +52,7 @@ func newRRRCLI() *cobra.Command {
 		return printRRR(cmd.OutOrStdout(), result)
 	}}
 	addQueryFlags(command)
-	command.Flags().Lookup("begin").Usage = "开始生效日期 YYYYMMDD，默认20200101"
+	command.Flags().Lookup("begin").Usage = "开始生效日期 YYYYMMDD，默认20180101"
 	command.Flags().Lookup("end").Usage = "截至生效日期 YYYYMMDD，默认北京时间今天"
 	return command
 }

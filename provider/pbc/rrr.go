@@ -16,7 +16,7 @@ import (
 const rrrNewsPath = "/goutongjiaoliu/113456/113469/index.html"
 
 // RRRCoverageStart 是本采集器覆盖的人民币准备金率决策公告起点。
-const RRRCoverageStart = "20200101"
+const RRRCoverageStart = "20180101"
 
 type RRRRequest struct{ Begin, End string }
 
@@ -33,7 +33,7 @@ func (r RRRRequest) Validate() error {
 		return fmt.Errorf("开始日期不能晚于结束日期")
 	}
 	if r.Begin < RRRCoverageStart {
-		return fmt.Errorf("人民币存款准备金率调整公告当前覆盖自 20200101 起")
+		return fmt.Errorf("人民币存款准备金率调整公告当前覆盖自 20180101 起")
 	}
 	return nil
 }
@@ -91,6 +91,7 @@ var rrrEffectiveDate = regexp.MustCompile(`(?:从|自|于)(?:(\d{4})年)?(\d{1,2
 var rrrSentence = regexp.MustCompile(`[。；;]`)
 var rrrExclusion = regexp.MustCompile(`^[（(]([^）)]*)[）)]`)
 var rrrTimestamp = regexp.MustCompile(`^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$`)
+var rrrPairedTranche = regexp.MustCompile(`其中[，,](\d{4}年\d{1,2}月\d{1,2}日)和(\d{1,2}月\d{1,2}日)分别下调([0-9.]+)个百分点`)
 
 func isRRRDecision(title string) bool {
 	return strings.HasPrefix(title, "中国人民银行决定") && !strings.Contains(title, "外汇") && (strings.Contains(title, "存款准备金率") || strings.Contains(title, "降准"))
@@ -171,6 +172,31 @@ func parseRRR(doc *goquery.Document, title string) ([]RRREvent, error) {
 		base.PublishedAt, base.PublishedPrecision = strings.Replace(stamp, " ", "T", 1)+"+08:00", "second"
 	}
 	statements := rrrSentence.Split(text, -1)
+	// 央行2019年1月公告把总幅度写在前句，再在“其中”分句列出两次生效日及单次幅度。
+	// 把该规范格式拆成两个明确事件，避免把总幅度错误地记作单日调整。
+	if match := rrrPairedTranche.FindStringSubmatch(text); match != nil {
+		main := rrrMainChange.FindStringSubmatch(text)
+		if main != nil && strings.Contains(main[0], "金融机构存款准备金率") {
+			total, totalErr := strconv.ParseFloat(main[3], 64)
+			part, partErr := strconv.ParseFloat(match[3], 64)
+			firstDate := rrrDate.FindStringSubmatch(match[1])
+			secondDate := rrrDate.FindStringSubmatch(match[2])
+			if totalErr == nil && partErr == nil && math.Abs(total-2*part) < 1e-8 && len(firstDate) > 0 && len(secondDate) > 0 {
+				first, firstErr := rrrDateValue(firstDate, pubDate)
+				secondDate = []string{secondDate[0], firstDate[1], secondDate[2], secondDate[3]}
+				second, secondErr := rrrDateValue(secondDate, pubDate)
+				if firstErr == nil && secondErr == nil {
+					base.Scope, base.ScopeType = "金融机构", "broad"
+					base.ChangePPLower, base.ChangePPUpper = -part, -part
+					base.EffectiveDateBasis, base.TrancheCount = "explicit-phased-dates", 2
+					firstEvent, secondEvent := base, base
+					firstEvent.EffectiveDate, firstEvent.TrancheIndex = first, 1
+					secondEvent.EffectiveDate, secondEvent.TrancheIndex = second, 2
+					return []RRREvent{firstEvent, secondEvent}, nil
+				}
+			}
+		}
+	}
 	sharedDates := map[string]bool{}
 	for _, statement := range statements {
 		if !strings.Contains(statement, "存款准备金率") && !strings.Contains(statement, "定向降准") {

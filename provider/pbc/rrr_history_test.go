@@ -18,10 +18,15 @@ import (
 func TestRRREmbeddedHistory(t *testing.T) {
 	history, err := loadRRRHistory()
 	require.NoError(t, err)
-	require.Equal(t, 12, history.AnnouncementCount)
-	require.Len(t, history.Events, 16)
+	require.Equal(t, 17, history.AnnouncementCount)
+	require.Len(t, history.Events, 24)
+	announcementEvents := map[string]int{}
+	for _, event := range history.Events {
+		announcementEvents[event.PublishedAt[:10]]++
+	}
 	for _, event := range history.Events {
 		_, parsed := rrrSample(t, strings.ReplaceAll(event.PublishedAt[:10], "-", ""))
+		require.Len(t, parsed, announcementEvents[event.PublishedAt[:10]], "公告中的所有调整事件必须入库")
 		matched := false
 		for _, candidate := range parsed {
 			if rrrEventKey(candidate) == rrrEventKey(event) {
@@ -41,6 +46,18 @@ func TestRRREmbeddedHistory(t *testing.T) {
 	require.Equal(t, "history-only", result.UpdateStatus)
 	require.Equal(t, 0, result.ScannedPages)
 	require.Nil(t, result.ListFetchedAt)
+	result, err = client.RRR(context.Background(), RRRRequest{"20191001", "20191130"})
+	require.NoError(t, err)
+	require.Len(t, result.Events, 2)
+	for i, event := range result.Events {
+		require.Equal(t, []string{"20191015", "20191115"}[i], event.EffectiveDate)
+		require.Equal(t, "仅在省级行政区域内经营的城市商业银行", event.Scope)
+		require.True(t, event.Additional)
+		require.Equal(t, -0.5, event.ChangePPLower)
+		require.Equal(t, -0.5, event.ChangePPUpper)
+		require.Equal(t, i+1, event.TrancheIndex)
+		require.Equal(t, 2, event.TrancheCount)
+	}
 }
 
 func TestRRRIncrementalAppend(t *testing.T) {

@@ -72,6 +72,8 @@
 67. Add Chinese household RMB deposit balances, demand and time components, strict prior-year calculated growth and reported deposit flows, with explicit approximate monthly differences, source metadata and validated PBC caching
 68. Add Chinese national general public budget and government-managed fund cumulative receipts and expenditures, preserving official, comparable and tax-refund-adjusted growth, combined January-February periods, historical directory gaps and validated MOF page caching
 69. Add US monthly federal receipts, outlays and official surplus or deficit through FRED, with explicit sign conventions, strict calculated fiscal-year totals, missing observations and validated snapshots; keep Treasury issuance and official comparable household deposit growth as separate TODOs
+70. Add `macro cn trade` for separate CNY and USD goods-trade data, `macro cn reverse-repo-history` for verified seven-day reverse repo rates, and extend the embedded RRR archive to 2018; handle MOFCOM TLS compatibility and duplicate directory records with regression tests
+71. Restore both phased city-bank RRR cuts from the September 2019 announcement, retain monthly trade data when partner observations are unavailable, and isolate mocked HTTP transports; add complete-event, missing-partner and cross-page regression coverage
 
 ### v0.3.15
 

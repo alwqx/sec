@@ -24,7 +24,7 @@ func rrrSample(t *testing.T, date string) (*goquery.Document, []RRREvent) {
 
 func TestRRROfficialAnnouncements(t *testing.T) {
 	total, broad, targeted := 0, 0, 0
-	for date, count := range map[string]int{"20200101": 1, "20200313": 2, "20200403": 2, "20210709": 1, "20211206": 1, "20220415": 2, "20221125": 1, "20230317": 1, "20230914": 1, "20240124": 1, "20240927": 1, "20250507": 2} {
+	for date, count := range map[string]int{"20190104": 2, "20200101": 1, "20200313": 2, "20200403": 2, "20210709": 1, "20211206": 1, "20220415": 2, "20221125": 1, "20230317": 1, "20230914": 1, "20240124": 1, "20240927": 1, "20250507": 2} {
 		t.Run(date, func(t *testing.T) {
 			_, events := rrrSample(t, date)
 			require.Len(t, events, count)
@@ -42,10 +42,14 @@ func TestRRROfficialAnnouncements(t *testing.T) {
 			total += len(events)
 		})
 	}
-	require.Equal(t, 16, total)
-	require.Equal(t, 10, broad)
+	require.Equal(t, 18, total)
+	require.Equal(t, 12, broad)
 	require.Equal(t, 6, targeted)
-	_, events := rrrSample(t, "20250507")
+	_, events := rrrSample(t, "20190104")
+	require.Equal(t, []string{"20190115", "20190125"}, []string{events[0].EffectiveDate, events[1].EffectiveDate})
+	require.Equal(t, -0.5, events[0].ChangePPLower)
+	require.Equal(t, 2, events[0].TrancheCount)
+	_, events = rrrSample(t, "20250507")
 	require.Equal(t, "20250515", events[0].EffectiveDate)
 	require.Equal(t, "2025-05-07T10:00:00+08:00", events[0].PublishedAt)
 	require.Contains(t, events[0].Exclusions, "已执行5%")
@@ -107,7 +111,7 @@ func TestRRRCollection(t *testing.T) {
 	files := map[string]string{
 		rrrNewsPath: row("2019-01-01", "置顶旧新闻", "/pinned") + row("2025-05-07", "中国人民银行决定下调金融机构存款准备金率", "/may") + row("2023-09-01", "中国人民银行决定下调金融机构外汇存款准备金率", "/fx") + `<a tagname="/page2">下一页</a>`,
 		"/page2":    row("2020-04-03", "中国人民银行决定对中小银行定向降准", "/phased") + `<a tagname="/page3">下一页</a>`,
-		"/page3":    row("2019-12-31", "新闻", "/older"),
+		"/page3":    row("2017-12-31", "新闻", "/older"),
 		"/may":      sample(t, "rrr-20250507"), "/phased": sample(t, "rrr-20200403"),
 	}
 	var calls atomic.Int32
@@ -148,7 +152,7 @@ func TestRRRCollection(t *testing.T) {
 	cancel()
 	_, err = client.scanRRR(ctx, RRRCoverageStart, nil)
 	require.ErrorIs(t, err, context.Canceled)
-	for _, req := range []RRRRequest{{"20190101", "20250101"}, {"20250230", "20250515"}, {"20250516", "20250515"}} {
+	for _, req := range []RRRRequest{{"20171231", "20250101"}, {"20250230", "20250515"}, {"20250516", "20250515"}} {
 		require.Error(t, req.Validate())
 	}
 }

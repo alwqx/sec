@@ -39,6 +39,7 @@ func NewMacroCLI() *cobra.Command {
 	cn.AddCommand(newLoansCLI())
 	cn.AddCommand(newMoneySupplyCLI())
 	cn.AddCommand(newReverseRepoCLI())
+	cn.AddCommand(newCNReverseRepoHistoryCLI())
 	cn.AddCommand(newLPRCLI())
 	cn.AddCommand(newRRRCLI())
 	cn.AddCommand(newTreasuryCLI())
@@ -46,6 +47,7 @@ func NewMacroCLI() *cobra.Command {
 	cn.AddCommand(newHouseholdCLI())
 	cn.AddCommand(newDepositsCLI())
 	cn.AddCommand(newCNFiscalCLI())
+	cn.AddCommand(newCNTradeCLI())
 	root.AddCommand(cn)
 	us := &cobra.Command{Use: "us", Short: "美国宏观经济数据"}
 	us.AddCommand(newUSCPICLI("cpi"), newUSCPICLI("core-cpi"))
