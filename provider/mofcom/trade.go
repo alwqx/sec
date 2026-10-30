@@ -16,11 +16,14 @@ import (
 )
 
 // TradeRequest 查询全国货物贸易月度值，开始与截至月份均包含在结果中。
-type TradeRequest struct{ Begin, End string }
+type TradeRequest struct{ Begin, End, PartnerCurrency string }
 
 func (r *TradeRequest) Validate() error {
 	if r == nil {
 		return fmt.Errorf("中国货物贸易查询请求不能为空")
+	}
+	if r.PartnerCurrency != "" && r.PartnerCurrency != "usd" && r.PartnerCurrency != "cny" {
+		return fmt.Errorf("伙伴统计币种可选 usd 或 cny")
 	}
 	begin, err := time.Parse("200601", r.Begin)
 	if err != nil || begin.Format("200601") != r.Begin {
@@ -70,21 +73,25 @@ type TradeCurrencyValues struct {
 	RawValues map[string]string `json:"raw_values"`
 }
 
-// TradePartner 保留商务部页面展示的主要贸易伙伴累计统计；不是全体伙伴清单。
+// TradePartner 保留主要贸易伙伴累计统计；人民币报告另含官方月值，行间范围可能交叠。
 type TradePartner struct {
-	Name          string            `json:"name"`
-	Period        string            `json:"period"`
-	Currency      string            `json:"currency"`
-	Unit          string            `json:"unit"`
-	TotalYTD      *float64          `json:"total_ytd"`
-	ExportsYTD    *float64          `json:"exports_ytd"`
-	ImportsYTD    *float64          `json:"imports_ytd"`
-	TotalYTDYoY   *float64          `json:"total_ytd_yoy_percent"`
-	ExportsYTDYoY *float64          `json:"exports_ytd_yoy_percent"`
-	ImportsYTDYoY *float64          `json:"imports_ytd_yoy_percent"`
-	Source        string            `json:"source"`
-	FetchedAt     time.Time         `json:"fetched_at"`
-	RawValues     map[string]string `json:"raw_values"`
+	Name           string            `json:"name"`
+	Period         string            `json:"period"`
+	Currency       string            `json:"currency"`
+	Unit           string            `json:"unit"`
+	TotalMonthly   *float64          `json:"total_monthly,omitempty"`
+	ExportsMonthly *float64          `json:"exports_monthly,omitempty"`
+	ImportsMonthly *float64          `json:"imports_monthly,omitempty"`
+	PublishedDate  string            `json:"published_date,omitempty"`
+	TotalYTD       *float64          `json:"total_ytd"`
+	ExportsYTD     *float64          `json:"exports_ytd"`
+	ImportsYTD     *float64          `json:"imports_ytd"`
+	TotalYTDYoY    *float64          `json:"total_ytd_yoy_percent"`
+	ExportsYTDYoY  *float64          `json:"exports_ytd_yoy_percent"`
+	ImportsYTDYoY  *float64          `json:"imports_ytd_yoy_percent"`
+	Source         string            `json:"source"`
+	FetchedAt      time.Time         `json:"fetched_at"`
+	RawValues      map[string]string `json:"raw_values"`
 }
 
 type TradeResult struct {
@@ -98,6 +105,8 @@ type TradeResult struct {
 	DataVersion      string             `json:"data_version"`
 	Observations     []TradeObservation `json:"observations"`
 	PartnerPeriod    string             `json:"partner_period"`
+	PartnerCurrency  string             `json:"partner_currency"`
+	PartnerScope     string             `json:"partner_scope,omitempty"`
 	PartnerNote      string             `json:"partner_note,omitempty"`
 	PartnerSource    string             `json:"partner_source"`
 	PartnerFetchedAt time.Time          `json:"partner_fetched_at"`
@@ -218,9 +227,11 @@ func (c *Client) Trade(ctx context.Context, req *TradeRequest) (*TradeResult, er
 		partnerEnvelope = result
 		return nil
 	}
-	partnerBytes, partnerFetched, err = c.request(ctx, http.MethodPost, partnerURL, "https://data.mofcom.gov.cn/hwmy/imexCountry.shtml", form, nil, partnerValidate)
-	if err != nil {
-		return nil, err
+	if req.PartnerCurrency != "cny" {
+		partnerBytes, partnerFetched, err = c.request(ctx, http.MethodPost, partnerURL, "https://data.mofcom.gov.cn/hwmy/imexCountry.shtml", form, nil, partnerValidate)
+		if err != nil {
+			return nil, err
+		}
 	}
 	_ = partnerBytes
 	result := &TradeResult{Region: "CN", Measurement: "customs-goods-trade", Frequency: "monthly", Begin: req.Begin, End: req.End, DataVersion: "current-visible-release", Observations: []TradeObservation{}, PartnerPeriod: req.End, PartnerSource: partnerRelease, PartnerFetchedAt: partnerFetched, Partners: []TradePartner{}, Note: "本命令仅含海关货物贸易，不含服务贸易。人民币月度金额来自海关总署发布稿（亿元），美元月值来自商务部数据中心转发海关统计（亿美元）；两币值独立采集，不做汇率换算。贸易伙伴为商务部页面列示的主要伙伴，不是全体国家/地区；伙伴数据为年初至当月累计美元值，未由累计差分构造月度值。未发布月份、缺失值和零值分开保留。"}
@@ -256,6 +267,18 @@ func (c *Client) Trade(ctx context.Context, req *TradeRequest) (*TradeResult, er
 	}
 	for _, row := range partnerEnvelope.Rows {
 		result.Partners = append(result.Partners, TradePartner{Name: row.Name, Period: row.Period, Currency: "USD", Unit: "亿美元", TotalYTD: ptrNumber(row.TotalYTD), ExportsYTD: ptrNumber(row.ExportsYTD), ImportsYTD: ptrNumber(row.ImportsYTD), TotalYTDYoY: ptrNumber(row.TotalYTDYoY), ExportsYTDYoY: ptrNumber(row.ExportsYTDYoY), ImportsYTDYoY: ptrNumber(row.ImportsYTDYoY), Source: partnerRelease, FetchedAt: partnerFetched, RawValues: rawCountry(row)})
+	}
+	result.PartnerCurrency = "USD"
+	if req.PartnerCurrency == "cny" {
+		partners, err := c.cnyPartners(ctx, req.End)
+		if err != nil {
+			return nil, err
+		}
+		result.Partners, result.PartnerCurrency = partners.Rows, "CNY"
+		result.PartnerSource, result.PartnerFetchedAt = partners.Source, partners.FetchedAt
+		result.PartnerNote = partners.Note
+		result.PartnerScope = partners.Scope
+		result.Note = "海关货物贸易，人民币和美元月度值独立采集；伙伴表采用截至月的人民币官方月值及年初累计值，不从累计值差分。保留总值、经济体、区域组织及其成员行，行间范围交叠，不能相加。未发布月份保留缺失。"
 	}
 	if len(result.Partners) == 0 {
 		result.PartnerNote = fmt.Sprintf("商务部未提供%s月主要伙伴统计；保留可用的月度贸易数据", req.End)
@@ -319,6 +342,18 @@ func parseUSD(raw []byte, begin, end string) (map[string]usdRow, error) {
 
 func (c *Client) cnyRows(ctx context.Context, begin, end string) (map[string]cnyRow, error) {
 	result := map[string]cnyRow{}
+	err := c.walkCNYReports(ctx, begin, end, cnyTitleRE, func(item articleRelease) error {
+		row, err := c.cnyArticle(ctx, item)
+		if err == nil {
+			result[item.Period] = row
+		}
+		return err
+	})
+	return result, err
+}
+
+func (c *Client) walkCNYReports(ctx context.Context, begin, end string, title *regexp.Regexp, visit func(articleRelease) error) error {
+	periods := map[string]bool{}
 	start, _ := time.Parse("200601", begin)
 	startIssueMonth := start.Format("200601")
 	var total, page, pageSize int
@@ -336,7 +371,7 @@ func (c *Client) cnyRows(ctx context.Context, begin, end string) (map[string]cny
 				if _, err := time.Parse("2006-01-02", item.IssueDate); err != nil || item.ID <= 0 || strings.TrimSpace(item.Name) == "" {
 					return fmt.Errorf("商务部人民币贸易目录记录无效")
 				}
-				if match := cnyTitleRE.FindStringSubmatch(item.Name); match != nil {
+				if match := title.FindStringSubmatch(item.Name); match != nil {
 					month, _ := strconv.Atoi(match[2])
 					item.Period = fmt.Sprintf("%s%02d", match[1], month)
 					if month < 1 || month > 12 {
@@ -352,23 +387,23 @@ func (c *Client) cnyRows(ctx context.Context, begin, end string) (map[string]cny
 		}
 		_, _, err := c.request(ctx, http.MethodPost, listURL, "https://fdi.mofcom.gov.cn/come-datatongji-con.html", nil, body, validate)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		pagePeriods := map[string]bool{}
 		pageIDs := map[int]articleRelease{}
 		for _, item := range listing.Data {
 			if item.IssueDate > previousIssueDate {
-				return nil, fmt.Errorf("商务部人民币贸易目录分页顺序异常")
+				return fmt.Errorf("商务部人民币贸易目录分页顺序异常")
 			}
 			previousIssueDate = item.IssueDate
 			if prior, exists := pageIDs[item.ID]; exists {
 				if prior.Name != item.Name || prior.IssueDate != item.IssueDate || prior.Source != item.Source {
-					return nil, fmt.Errorf("商务部人民币贸易目录同页记录 ID 冲突：%d", item.ID)
+					return fmt.Errorf("商务部人民币贸易目录同页记录 ID 冲突：%d", item.ID)
 				}
 				continue
 			}
 			pageIDs[item.ID] = item
-			match := cnyTitleRE.FindStringSubmatch(item.Name)
+			match := title.FindStringSubmatch(item.Name)
 			if match == nil {
 				continue
 			}
@@ -376,7 +411,7 @@ func (c *Client) cnyRows(ctx context.Context, begin, end string) (map[string]cny
 			period := fmt.Sprintf("%s%02d", match[1], month)
 			if period >= begin && period <= end {
 				if pagePeriods[period] {
-					return nil, fmt.Errorf("商务部同月人民币贸易报告重复: %s", period)
+					return fmt.Errorf("商务部同月人民币贸易报告重复: %s", period)
 				}
 				pagePeriods[period] = true
 			}
@@ -384,20 +419,20 @@ func (c *Client) cnyRows(ctx context.Context, begin, end string) (map[string]cny
 		if total == 0 {
 			total, pageSize = listing.Total, len(listing.Data)
 		} else if listing.Total != total || len(listing.Data) > pageSize {
-			return nil, fmt.Errorf("商务部人民币贸易目录分页期间总数或页面大小发生变化")
+			return fmt.Errorf("商务部人民币贸易目录分页期间总数或页面大小发生变化")
 		}
 		if page*pageSize < total && len(listing.Data) != pageSize {
-			return nil, fmt.Errorf("商务部人民币贸易目录分页记录数量异常")
+			return fmt.Errorf("商务部人民币贸易目录分页记录数量异常")
 		}
 		for _, item := range listing.Data {
 			if prior, exists := seenIDs[item.ID]; exists {
 				if prior.Name != item.Name || prior.IssueDate != item.IssueDate || prior.Source != item.Source {
-					return nil, fmt.Errorf("商务部人民币贸易目录分页记录 ID 冲突：%d", item.ID)
+					return fmt.Errorf("商务部人民币贸易目录分页记录 ID 冲突：%d", item.ID)
 				}
 				continue
 			}
 			seenIDs[item.ID] = item
-			match := cnyTitleRE.FindStringSubmatch(item.Name)
+			match := title.FindStringSubmatch(item.Name)
 			if match == nil {
 				continue
 			}
@@ -406,29 +441,29 @@ func (c *Client) cnyRows(ctx context.Context, begin, end string) (map[string]cny
 			if item.Period < begin || item.Period > end {
 				continue
 			}
-			if _, exists := result[item.Period]; exists {
-				return nil, fmt.Errorf("商务部同月人民币贸易报告重复: %s", item.Period)
+			if periods[item.Period] {
+				return fmt.Errorf("商务部同月人民币贸易报告重复: %s", item.Period)
 			}
-			row, err := c.cnyArticle(ctx, item)
+			err := visit(item)
 			if err != nil {
-				return nil, err
+				return err
 			}
-			result[item.Period] = row
+			periods[item.Period] = true
 		}
-		if hasOlderCNYReport(listing.Data, startIssueMonth) || page*pageSize >= total {
+		if hasOlderReport(listing.Data, startIssueMonth, title) || page*pageSize >= total {
 			break
 		}
 	}
 	if page > 300 {
-		return nil, fmt.Errorf("商务部人民币贸易目录超过300页")
+		return fmt.Errorf("商务部人民币贸易目录超过300页")
 	}
-	return result, nil
+	return nil
 }
 
-func hasOlderCNYReport(items []articleRelease, begin string) bool {
+func hasOlderReport(items []articleRelease, begin string, title *regexp.Regexp) bool {
 	oldest := ""
 	for _, item := range items {
-		match := cnyTitleRE.FindStringSubmatch(item.Name)
+		match := title.FindStringSubmatch(item.Name)
 		if match == nil {
 			continue
 		}
