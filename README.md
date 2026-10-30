@@ -112,7 +112,8 @@ CLI `sec watch` 与 Desktop「我的自选」统一使用 `~/.sec/watchlist.json
 | `macro cn household` | 全国居民人均累计收入、消费支出及官方实际同比，见 [居民收支文档](docs/cn-household.md) |
 | `macro cn deposits` | 住户人民币存款余额、严格基期计算同比和报告新增额，见 [居民存款文档](docs/cn-deposits.md) |
 | `macro cn fiscal` | 全国一般公共预算、政府性基金累计收支及官方同比，见 [中国财政文档](docs/cn-fiscal.md) |
-| `macro cn trade` | 海关货物进出口人民币/美元月度总量及美元主要伙伴累计数据；不含服务贸易，见 [货物贸易文档](docs/cn-trade.md) |
+| `macro cn trade` | 海关货物进出口人民币/美元月度总量；支持 `--partners-currency cny` 查询人民币伙伴月值及累计值，见 [货物贸易文档](docs/cn-trade.md) |
+| `macro cn services-trade` | 服务贸易人民币/美元月度进出口与官方差额，保留历史缺口，见 [服务贸易文档](docs/cn-services-trade.md) |
 | `macro cn unemployment`                       | 全国城镇调查失业率；`--age-groups` 展示年龄分组并标记口径变化 |
 | `macro cn financing` / `macro cn afre`         | 人民银行社融存量、同比、月度/累计增量；`--details` 展示融资结构，见 [PBC 文档](docs/pbc.md) |
 | `macro cn loans`                              | 金融机构人民币贷款余额、同比和新增；`--details` 展示住户／企事业单位期限结构，近似计算值带 `≈` |

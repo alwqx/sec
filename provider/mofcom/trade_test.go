@@ -234,9 +234,9 @@ func TestTradeRequestValidate(t *testing.T) {
 
 func TestCNYDirectoryStopUsesReportPeriodNotIssueDate(t *testing.T) {
 	items := []articleRelease{{IssueDate: "2024-11-30", Name: "2024年12月全国进出口总值表（人民币值）"}}
-	require.False(t, hasOlderCNYReport(items, "202412"), "发布日期早于开始月，但报告所属期处于查询区间，不应提前停止")
+	require.False(t, hasOlderReport(items, "202412", cnyTitleRE), "发布日期早于开始月，但报告所属期处于查询区间，不应提前停止")
 	items[0].Name = "2024年11月全国进出口总值表（人民币值）"
-	require.True(t, hasOlderCNYReport(items, "202412"), "目录页确认进入请求期以前的月报后才允许停止")
+	require.True(t, hasOlderReport(items, "202412", cnyTitleRE), "目录页确认进入请求期以前的月报后才允许停止")
 }
 
 func TestCurrencyValuesKeepUnitsSeparate(t *testing.T) {

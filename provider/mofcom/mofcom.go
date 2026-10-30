@@ -1,4 +1,4 @@
-// Package mofcom 采集商务部数据中心转发的海关货物贸易数据。
+// Package mofcom 分别采集商务部发布的服务贸易及转发的海关货物贸易数据。
 package mofcom
 
 import (
@@ -84,7 +84,7 @@ func (c *Client) request(ctx context.Context, method, address, referer string, f
 			}
 		}
 	}
-	slog.DebugContext(ctx, "请求商务部海关统计数据", "url", address)
+	slog.DebugContext(ctx, "请求商务部贸易统计数据", "url", address)
 	headers := http.Header{"Referer": {referer}}
 	if body != nil {
 		headers.Set("Content-Type", "application/json;charset=UTF-8")
@@ -109,7 +109,7 @@ func (c *Client) request(ctx context.Context, method, address, referer string, f
 		resp, err = utils.MakeRequest(ctx, method, address, headers, bytesReader(payload), 30*time.Second)
 	}
 	if err != nil {
-		return nil, time.Time{}, fmt.Errorf("请求商务部海关统计数据失败: %w", err)
+		return nil, time.Time{}, fmt.Errorf("请求商务部贸易统计数据失败: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
@@ -120,7 +120,7 @@ func (c *Client) request(ctx context.Context, method, address, referer string, f
 		return nil, time.Time{}, err
 	}
 	if len(raw) > 16<<20 {
-		return nil, time.Time{}, fmt.Errorf("商务部海关统计响应超过16MiB")
+		return nil, time.Time{}, fmt.Errorf("商务部贸易统计响应超过16MiB")
 	}
 	if validate != nil {
 		if err := validate(raw); err != nil {

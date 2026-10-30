@@ -19,7 +19,8 @@ func newCNTradeCLI() *cobra.Command {
 		if err != nil {
 			return err
 		}
-		req := &mofcom.TradeRequest{Begin: begin, End: end}
+		currency, _ := cmd.Flags().GetString("partners-currency")
+		req := &mofcom.TradeRequest{Begin: begin, End: end, PartnerCurrency: currency}
 		if err := req.Validate(); err != nil {
 			return err
 		}
@@ -46,6 +47,7 @@ func newCNTradeCLI() *cobra.Command {
 		return printCNTrade(cmd.OutOrStdout(), result)
 	}}
 	addQueryFlags(command)
+	command.Flags().String("partners-currency", "usd", "伙伴统计币种 usd 或 cny；不改变月度总量的双币种输出")
 	command.Flags().Lookup("begin").Usage = "开始月份 YYYYMM，最早支持201501；默认截至月份前11个月"
 	command.Flags().Lookup("end").Usage = "截至月份 YYYYMM，默认北京时间上个月"
 	return command
@@ -94,7 +96,11 @@ func printCNTrade(out io.Writer, result *mofcom.TradeResult) error {
 		table.Append([]string{period, format(cny.Exports.Monthly), format(cny.Imports.Monthly), format(cny.Balance.Monthly), format(usd.Exports.Monthly), format(usd.Imports.Monthly), format(usd.Balance.Monthly)})
 	}
 	table.Render()
-	if _, err := fmt.Fprintf(out, "人民币单位：亿元；美元单位：亿美元。人民币来源：商务部投资促进事务局发布的海关总署月报；美元来源：商务部数据中心转发海关月度统计。伙伴数据为截至%s的主要伙伴年初累计美元值（亿美元），不是全体伙伴；未由累计值计算单月值。服务贸易未纳入。\n", result.PartnerPeriod); err != nil {
+	unit := "亿美元"
+	if result.PartnerCurrency == "CNY" {
+		unit = "亿元人民币"
+	}
+	if _, err := fmt.Fprintf(out, "人民币单位：亿元；美元单位：亿美元。人民币来源：商务部投资促进事务局发布的海关总署月报；美元来源：商务部数据中心转发海关月度统计。伙伴数据为截至%s的主要伙伴年初累计值（%s），不是全体伙伴；未由累计值计算单月值。服务贸易未纳入。\n", result.PartnerPeriod, unit); err != nil {
 		return err
 	}
 	if len(result.Partners) == 0 {
@@ -108,5 +114,9 @@ func printCNTrade(out io.Writer, result *mofcom.TradeResult) error {
 		partners.Append([]string{item.Name, format(item.TotalYTD), format(item.ExportsYTD), format(item.ImportsYTD), format(item.TotalYTDYoY)})
 	}
 	partners.Render()
+	if result.PartnerNote != "" {
+		_, err := fmt.Fprintln(out, result.PartnerNote)
+		return err
+	}
 	return nil
 }
