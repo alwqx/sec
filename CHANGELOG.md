@@ -69,6 +69,10 @@
 65. Add US monthly bank credit, quarterly lending standards and household debt service ratios with distinct percentage and percentage-point changes, survey timing, current methodology coverage, validated FRED snapshots and compact terminal output
 66. Add Chinese household per-capita cumulative income and consumption with official real growth, integrated survey coverage, annual own-production scope, raw values, validated NBS response caching and compact terminal output
 
+67. Add Chinese household RMB deposit balances, demand and time components, strict prior-year calculated growth and reported deposit flows, with explicit approximate monthly differences, source metadata and validated PBC caching
+68. Add Chinese national general public budget and government-managed fund cumulative receipts and expenditures, preserving official, comparable and tax-refund-adjusted growth, combined January-February periods, historical directory gaps and validated MOF page caching
+69. Add US monthly federal receipts, outlays and official surplus or deficit through FRED, with explicit sign conventions, strict calculated fiscal-year totals, missing observations and validated snapshots; keep Treasury issuance and official comparable household deposit growth as separate TODOs
+
 ### v0.3.15
 
 1. Desktop 升级为研究工作台：顶部全局搜索、左侧工作空间导航、中间证券列表、右侧个股研究，切换功能时保留当前证券

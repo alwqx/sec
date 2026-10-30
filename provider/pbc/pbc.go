@@ -68,6 +68,11 @@ func decodePage(page cachedPage) (*goquery.Document, error) {
 }
 
 func (c *Client) get(ctx context.Context, address string) (*goquery.Document, time.Time, error) {
+	return c.getValidated(ctx, address, nil)
+}
+
+// getValidated 在命中和写入缓存前校验指标语义，异常刷新不覆盖有效响应。
+func (c *Client) getValidated(ctx context.Context, address string, validate func(*goquery.Document) error) (*goquery.Document, time.Time, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, time.Time{}, err
 	}
@@ -81,7 +86,7 @@ func (c *Client) get(ctx context.Context, address string) (*goquery.Document, ti
 		if raw, err := os.ReadFile(path); err == nil {
 			var page cachedPage
 			if json.Unmarshal(raw, &page) == nil && time.Since(page.FetchedAt) >= 0 && time.Since(page.FetchedAt) < 6*time.Hour {
-				if doc, err := decodePage(page); err == nil {
+				if doc, err := decodePage(page); err == nil && (validate == nil || validate(doc) == nil) {
 					return doc, page.FetchedAt, nil
 				}
 			}
@@ -110,6 +115,11 @@ func (c *Client) get(ctx context.Context, address string) (*goquery.Document, ti
 	}
 	if doc.Find("a[href],table tr").Length() == 0 {
 		return nil, time.Time{}, fmt.Errorf("人民银行返回非数据页面")
+	}
+	if validate != nil {
+		if err := validate(doc); err != nil {
+			return nil, time.Time{}, err
+		}
 	}
 	if c.CacheDir != "" {
 		if err := os.MkdirAll(c.CacheDir, 0755); err != nil {
