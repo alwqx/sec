@@ -40,6 +40,7 @@ func NewFXCLI() *cobra.Command {
 		}
 		root.AddCommand(command)
 	}
+	root.AddCommand(newCrossCLI(), newSpreadCLI())
 	return root
 }
 
@@ -161,26 +162,26 @@ func printRates(out io.Writer, result *forex.Result) error {
 			table.SetHeader([]string{"货币对", "观测时间（北京时间）", "参考报价", "买入报价", "卖出报价"})
 		case "provider-daily-bar":
 			table.SetHeader([]string{"来源交易日", "货币对", "开盘", "最高", "最低", "收盘"})
+		case "derived-cross-rate":
+			table.SetHeader([]string{"日期", "货币对", "推导汇率", "对齐状态"})
 		default:
 			table.SetHeader([]string{"日期", "货币对", "汇率"})
 		}
 		for _, item := range result.Observations {
 			switch result.PriceType {
 			case "indicative-quote":
-				stamp := item.ObservedAt
-				if parsed, err := time.Parse(time.RFC3339, stamp); err == nil {
-					stamp = parsed.In(forex.Beijing).Format("2006-01-02 15:04:05")
-				}
-				table.Append([]string{item.Pair, stamp, format(item.Value), format(item.Bid), format(item.Ask)})
+				table.Append([]string{item.Pair, formatQuoteTime(item.ObservedAt), format(item.Value), format(item.Bid), format(item.Ask)})
 			case "provider-daily-bar":
 				table.Append([]string{item.Date, item.Pair, format(item.Open), format(item.High), format(item.Low), format(item.Close)})
+			case "derived-cross-rate":
+				table.Append([]string{item.Date, item.Pair, format(item.Value), alignmentLabel(item.Alignment)})
 			default:
 				table.Append([]string{item.Date, item.Pair, format(item.Value)})
 			}
 		}
 		table.Render()
 	}
-	label := map[string]string{"central-parity": "人民币中间价", "onshore-reference": "在岸市场参考汇率", "indicative-quote": "参考行情", "provider-daily-bar": "来源日线", "noon-buying-rate": "纽约中午买入汇率"}[result.PriceType]
+	label := map[string]string{"central-parity": "人民币中间价", "onshore-reference": "在岸市场参考汇率", "indicative-quote": "参考行情", "provider-daily-bar": "来源日线", "noon-buying-rate": "纽约中午买入汇率", "derived-cross-rate": "交叉汇率（推导值）"}[result.PriceType]
 	provider := map[string]string{"CFETS": "中国外汇交易中心", "Sina": "新浪财经", "Federal Reserve via FRED": "美联储（经 FRED）"}[result.Provider]
 	if provider == "" {
 		provider = result.Provider
@@ -202,6 +203,11 @@ func printRates(out io.Writer, result *forex.Result) error {
 	if _, err := fmt.Fprintf(out, "来源：%s；价格口径：%s；时点：%s；时区：%s。USD/CNY 表示1美元兑换的在岸人民币，USD/CNH 为离岸人民币。终端最多显示6位小数，JSON保留原始精度。\n", provider, label, at, zone); err != nil {
 		return err
 	}
+	if result.Derivation != nil && result.Frequency == "snapshot" {
+		if _, err := fmt.Fprintf(out, "报价推导允许时间差：%.0f秒；最大报价年龄：%.0f秒。\n", result.Derivation.MaxSkewSeconds, result.Derivation.MaxAgeSeconds); err != nil {
+			return err
+		}
+	}
 	for _, note := range result.Notes {
 		if _, err := fmt.Fprintln(out, note); err != nil {
 			return err
@@ -217,4 +223,14 @@ func printRates(out io.Writer, result *forex.Result) error {
 		}
 	}
 	return nil
+}
+
+func formatQuoteTime(stamp string) string {
+	if stamp == "" {
+		return "—"
+	}
+	if parsed, err := time.Parse(time.RFC3339, stamp); err == nil {
+		return parsed.In(forex.Beijing).Format("2006-01-02 15:04:05")
+	}
+	return stamp
 }

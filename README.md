@@ -99,6 +99,7 @@ CLI `sec watch` 与 Desktop「我的自选」统一使用 `~/.sec/watchlist.json
 | `metal`、`metal-history`                      | 黄金日行情与历史                         |
 | `fx quote`、`fx history`                     | 在岸／离岸人民币、美元及港币参考行情、来源独立的新浪／FRED日线，见 [汇率文档](docs/forex.md) |
 | `fx fixing`、`fx reference`                  | 人民币中间价、在岸固定时点参考汇率，保留各自价格和时间口径 |
+| `fx cross`、`fx spread`                      | 按同源同口径计算交叉汇率、在岸／离岸报价价差，保留公式、输入及时间对齐状态 |
 | `bond`、`bond-history`                        | 美债收益率与历史                         |
 | `macro cn cpi`、`macro cn core-cpi`、`macro cn ppi` | 国家统计局月度价格指数，见 [NBS 文档](docs/nbs.md) |
 | `macro cn pmi`                                | 国家统计局制造业 PMI 及生产、订单、出口订单、就业分项 |
