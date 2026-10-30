@@ -78,6 +78,7 @@
 73. Map CFETS central parity values using returned currency columns regardless of request order, retain strict currency-set validation with regression tests, and use English descriptions and flag help for all FX commands
 74. Add derived FX cross rates and CNY/CNH quote spreads with formulas, original inputs, strict timestamp and quote-age checks, and explicit approximate alignment; format terminal spread timestamps in Beijing time and retain regression coverage for currency direction, quote validity and derived outputs
 75. Add monthly Chinese services-trade collection in CNY and USD and optional CNY goods-trade partner reports; preserve official balances, monthly and cumulative definitions, missing periods, overlapping partner scopes and raw source values with pagination, cache and command regression tests
+76. Add `macro us debt` for Treasury DTS daily recorded issues and redemptions by marketability, with explicitly derived daily summaries and net recorded issuance; preserve signed adjustments, official cumulative values, raw rows and missing values with validated pagination, caching and regression tests
 
 ### v0.3.15
 
