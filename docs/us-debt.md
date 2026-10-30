@@ -49,4 +49,4 @@ https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/dt
 
 ## 后续范围
 
-当前未采集逐券CUSIP发行／结算日期、拍卖分配、SOMA及再发行分项。DTS记录日不能代替这些事件字段，含调整的记账发行不能直接当作现金毛发行。因此这些事项继续保留TODO，不标记为完整的国债发行结算与净融资数据体系。
+逐券CUSIP官方发行日期、拍卖分配、SOMA及再发行通过独立的 [`macro us auctions`](us-auctions.md) 提供，不与DTS日汇总拼接。实际到账／结算确认和现金融资仍需核验；DTS记录日、官方发行日期与拍卖面值各有口径，不能直接当作现金毛发行或公众净融资。
