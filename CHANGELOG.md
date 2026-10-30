@@ -74,6 +74,8 @@
 69. Add US monthly federal receipts, outlays and official surplus or deficit through FRED, with explicit sign conventions, strict calculated fiscal-year totals, missing observations and validated snapshots; keep Treasury issuance and official comparable household deposit growth as separate TODOs
 70. Add `macro cn trade` for separate CNY and USD goods-trade data, `macro cn reverse-repo-history` for verified seven-day reverse repo rates, and extend the embedded RRR archive to 2018; handle MOFCOM TLS compatibility and duplicate directory records with regression tests
 71. Restore both phased city-bank RRR cuts from the September 2019 announcement, retain monthly trade data when partner observations are unavailable, and isolate mocked HTTP transports; add complete-event, missing-partner and cross-page regression coverage
+72. Add `fx quote`, `fx history`, `fx fixing` and `fx reference` for CNY, CNH, USD and HKD using Sina, FRED and CFETS; preserve source-specific price and time definitions, raw values, missing and anomalous observations, validated caching and historical coverage with offline regression tests
+73. Map CFETS central parity values using returned currency columns regardless of request order, retain strict currency-set validation with regression tests, and use English descriptions and flag help for all FX commands
 
 ### v0.3.15
 
