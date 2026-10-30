@@ -27,7 +27,7 @@ func TestRRROutput(t *testing.T) {
 }
 
 func TestRRRArguments(t *testing.T) {
-	for _, args := range [][]string{{"cn", "rrr", "--begin", "20190101"}, {"cn", "rrr", "--begin", "20250230"}, {"cn", "rrr", "--begin", "20250516", "--end", "20250515"}, {"cn", "rrr", "extra"}} {
+	for _, args := range [][]string{{"cn", "rrr", "--begin", "20171231"}, {"cn", "rrr", "--begin", "20250230"}, {"cn", "rrr", "--begin", "20250516", "--end", "20250515"}, {"cn", "rrr", "extra"}} {
 		cmd := NewMacroCLI()
 		cmd.SetArgs(args)
 		cmd.SetOut(&bytes.Buffer{})
