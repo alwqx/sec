@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/alwqx/sec/provider/chinabond"
+	"github.com/alwqx/sec/provider/macrodata"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 )
@@ -27,6 +28,11 @@ func newTreasuryCLI() *cobra.Command {
 		if err != nil {
 			return err
 		}
+		standard, _ := cmd.Flags().GetBool("standard-json")
+		if standard {
+			dataset, err := macrodata.CNTreasury(result, chinabond.HistoryQueryURL, begin, end)
+			return writeDataset(cmd, dataset, err)
+		}
 		asJSON, _ := cmd.Flags().GetBool("json")
 		if asJSON {
 			encoder := json.NewEncoder(cmd.OutOrStdout())
@@ -38,6 +44,7 @@ func newTreasuryCLI() *cobra.Command {
 	command.Flags().StringP("begin", "b", "", "开始日期 YYYYMMDD，默认截至日前29天，最早20060301")
 	command.Flags().StringP("end", "e", "", "截至日期 YYYYMMDD，默认北京时间今天；单次区间小于一年")
 	command.Flags().Bool("json", false, "输出中债原始字段 JSON")
+	addStandardJSONFlag(command, "按统一宏观序列格式输出JSON，保留全部关键期限和原文")
 	command.Flags().BoolP("debug", "D", false, "显示调试日志")
 	return command
 }

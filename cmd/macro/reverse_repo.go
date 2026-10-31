@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/alwqx/sec/provider/macrodata"
 	"github.com/alwqx/sec/provider/pbc"
 	"github.com/alwqx/sec/utils"
 	"github.com/olekukonko/tablewriter"
@@ -42,6 +43,11 @@ func newReverseRepoCLI() *cobra.Command {
 		if err != nil {
 			return err
 		}
+		standard, _ := cmd.Flags().GetBool("standard-json")
+		if standard {
+			dataset, err := macrodata.ReverseRepo(&result)
+			return writeDataset(cmd, dataset, err)
+		}
 		asJSON, _ := cmd.Flags().GetBool("json")
 		if asJSON {
 			encoder := json.NewEncoder(cmd.OutOrStdout())
@@ -51,6 +57,7 @@ func newReverseRepoCLI() *cobra.Command {
 		return printReverseRepo(cmd.OutOrStdout(), result)
 	}}
 	addQueryFlags(command)
+	addStandardJSONFlag(command, "按统一宏观序列格式输出JSON，只输出窗口内调整公告，生效日与公布时间分开")
 	command.Flags().Lookup("begin").Usage = "开始生效日期 YYYYMMDD，默认20240722"
 	command.Flags().Lookup("end").Usage = "截至生效日期 YYYYMMDD，默认北京时间今天"
 	return command

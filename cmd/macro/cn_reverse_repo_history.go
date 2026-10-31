@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/alwqx/sec/provider/macrodata"
 	"github.com/alwqx/sec/provider/pbc"
 	"github.com/alwqx/sec/utils"
 	"github.com/olekukonko/tablewriter"
@@ -53,6 +54,12 @@ func newCNReverseRepoHistoryCLI() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			// --limit 只控制展示条数，统一导出保留请求窗口内的全部操作。
+			standard, _ := cmd.Flags().GetBool("standard-json")
+			if standard {
+				dataset, err := macrodata.ReverseRepoHistory(&result)
+				return writeDataset(cmd, dataset, err)
+			}
 			limit, _ := cmd.Flags().GetInt("limit")
 			if limit < 0 {
 				return fmt.Errorf("--limit 不能小于0")
@@ -70,6 +77,7 @@ func newCNReverseRepoHistoryCLI() *cobra.Command {
 		},
 	}
 	addQueryFlags(command)
+	addStandardJSONFlag(command, "按统一宏观序列格式输出JSON，同日多次操作用event_id区分，不受--limit限制")
 	command.Flags().Lookup("begin").Usage = "开始公告公布日期 YYYYMMDD，默认最近12个月可用历史"
 	command.Flags().Lookup("end").Usage = "结束公告公布日期 YYYYMMDD，默认20240719"
 	command.Flags().Int("limit", 20, "最多显示最近记录数；设为0显示区间内全部结果")

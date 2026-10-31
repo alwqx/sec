@@ -19,6 +19,9 @@ import (
 
 const CoverageStart = "20060301"
 
+// HistoryQueryURL 是中债收益率曲线历史查询接口。
+const HistoryQueryURL = "https://yield.chinabond.com.cn/cbweb-czb-web/czb/historyQuery"
+
 // ChinaBondItem 恢复PR #66删除的官方日期行结构，空字符串和null字段均表示未提供值。
 type ChinaBondItem struct {
 	Date        string `json:"workTime"`

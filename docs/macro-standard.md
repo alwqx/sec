@@ -56,25 +56,30 @@ sec macro cn deposits --begin 202601 --end 202609 --standard-json
 sec macro cn fiscal --budget general --begin 202501 --end 202609 --standard-json
 sec macro cn trade --begin 202608 --end 202608 --standard-json
 sec macro cn services-trade --begin 202501 --end 202608 --standard-json
+sec macro cn lpr --begin 202501 --end 202512 --standard-json
+sec macro cn reverse-repo --begin 20250101 --end 20251231 --standard-json
+sec macro cn reverse-repo-history --begin 20240101 --end 20240719 --standard-json
+sec macro cn rrr --begin 20200101 --end 20201231 --standard-json
+sec macro cn treasury --begin 20260901 --end 20260930 --standard-json
 ```
 
 各命令分别输出独立数据集。原有表格、别名、日期默认值、`--json`、`--refresh` 和 `--no-cache` 行为不变；`--json` 与 `--standard-json` 互斥。统一字段用于程序读取，不改变币种、单位或统计口径，也不自动生成中美对比。
 
 ## 契约版本 1
 
-顶层包含 `schema_version="1"`、`region`、`begin/end`、`series`、`observations` 和 `original`。月度所属期使用 YYYYMM，季度使用 YYYYQ1 至 YYYYQ4，日度、周度和事件型使用 YYYYMMDD；每份数据集只包含一种频率，查询端点、观测日期按该频率校验。每个观测只包含一个值，通过 `series_id` 关联序列。消费者应检查版本、频率，并用序列 ID 和所属期作为联合键；观测带 `event_id` 时（如国债拍卖），联合键还要加上 `event_id`。
+顶层包含 `schema_version="1"`、`region`、`begin/end`、`series`、`observations` 和 `original`。月度所属期使用 YYYYMM，季度使用 YYYYQ1 至 YYYYQ4，日度、周度和事件型使用 YYYYMMDD；每份数据集只包含一种频率，查询端点、观测日期按该频率校验。每个观测只包含一个值，通过 `series_id` 关联序列。消费者应检查版本、频率，并用序列 ID 和所属期作为联合键；观测带 `event_id` 时（如国债拍卖、存款准备金率），联合键还要加上 `event_id`。
 
 `series` 为实际返回观测所引用的序列定义；查询窗口没有观测时，部分指标仍保留序列定义以说明口径，不代表有数据。每条定义包含：
 
 | 字段 | 含义 |
 | --- | --- |
 | `id`、`indicator` | 序列标识、指标，例如 `us.m2.level`、`m2` |
-| `measure` | `level`、`yoy_percent`、`mom_percent`、`ytd_level`、`ytd_yoy_percent`；GDP 另有 `qoq_percent`、`qoq_annualized_percent`；EFFR 为 `rate`、`previous_observation_change`；贷款标准和偿债比率为 `rate`、`yoy_percentage_points`、`qoq_percentage_points`；CN失业率为 `rate`；非农新增为 `monthly_change`；贸易差额变化为 `yoy_change`、`mom_change`、`qoq_change`；目标利率为 `lower_bound`、`upper_bound`、`lower_change`、`upper_change`；CN PMI为 `diffusion_index`；CN GDP另有 `yoy_index`、`ytd_yoy_index`；CN居民收支增速为 `ytd_real_yoy_percent`；CN社融、贷款和存款的流量为 `monthly_flow`、`monthly_flow_derived`、`ytd_flow`，贷款另有 `reported_level`，存款另有 `reported_yoy_percent`；DTS官方金额为 `daily`、`month_to_date`、`fiscal_year_to_date`，国债和拍卖的其他 `measure` 见各小节 |
+| `measure` | `level`、`yoy_percent`、`mom_percent`、`ytd_level`、`ytd_yoy_percent`；GDP 另有 `qoq_percent`、`qoq_annualized_percent`；EFFR 为 `rate`、`previous_observation_change`；贷款标准和偿债比率为 `rate`、`yoy_percentage_points`、`qoq_percentage_points`；CN失业率为 `rate`；非农新增为 `monthly_change`；贸易差额变化为 `yoy_change`、`mom_change`、`qoq_change`；目标利率为 `lower_bound`、`upper_bound`、`lower_change`、`upper_change`；CN PMI为 `diffusion_index`；CN LPR、逆回购、国债收益率和准备金率的 `measure` 见各小节；CN GDP另有 `yoy_index`、`ytd_yoy_index`；CN居民收支增速为 `ytd_real_yoy_percent`；CN社融、贷款和存款的流量为 `monthly_flow`、`monthly_flow_derived`、`ytd_flow`，贷款另有 `reported_level`，存款另有 `reported_yoy_percent`；DTS官方金额为 `daily`、`month_to_date`、`fiscal_year_to_date`，国债和拍卖的其他 `measure` 见各小节 |
 | `unit` | `CNY_100_million`（亿元人民币）、`USD_billion`（十亿美元）、`USD_million`（百万美元）、`square_meters_10000`（万平方米）、`percent`、`percentage_points`（百分点）、`basis_points`（基点）、`index`、`claims`（申请件数）、`persons`（人数）、`USD_per_hour`、`hours_per_week`、`housing_units_thousand`（千套）、`housing_units`（套）、`jobs_thousand`（千个岗位）、`USD`（美元面值）、`USD_per_100_par`（每100美元面值的价格）、`CNY_per_person`（元/人）、`USD_100_million`（亿美元） |
 | `frequency` | `monthly`、`quarterly`、`daily`、`weekly`、`event`（只在实际发生时有观测） |
-| `period_basis` | CN 货币为 `month-end`；US 货币为 `monthly-average`；社零单月、CPI、PCE、CN PMI、CN失业率和工业单月同比与环比为 `month`，社零、房地产和工业累计为 `year-to-date`；GDP 为 `quarter`，CN GDP累计和CN居民收支、固定资产投资为 `year-to-date`；CN工业企业利润为 `year-to-date`，余额为 `month-end`；CN社融、贷款和存款的余额为 `month-end`，单月流量为 `month`，累计为 `year-to-date`；CN财政累计和货物贸易累计为 `year-to-date`，贸易单月为 `month`；EFFR 为 `overnight-transaction-date`；目标利率为 `effective-date`；DTS日值为 `record-date`，累计为 `month-to-date`、`fiscal-year-to-date`；拍卖为 `issue-date` 或 `auction-date`；申领为 `week-ending-saturday`；银行信贷为 `pro_rata_average_of_weekly_levels`，贷款标准为 `survey_quarter`，偿债比率为 `calendar_quarter` |
+| `period_basis` | CN 货币为 `month-end`；US 货币为 `monthly-average`；社零单月、CPI、PCE、CN PMI、CN失业率和工业单月同比与环比为 `month`，社零、房地产和工业累计为 `year-to-date`；GDP 为 `quarter`，CN GDP累计和CN居民收支、固定资产投资为 `year-to-date`；CN工业企业利润为 `year-to-date`，余额为 `month-end`；CN社融、贷款和存款的余额为 `month-end`，单月流量为 `month`，累计为 `year-to-date`；CN财政累计和货物贸易累计为 `year-to-date`，贸易单月为 `month`；EFFR 为 `overnight-transaction-date`；目标利率、CN逆回购和准备金率为 `effective-date`；CN逆回购历史为 `publication-date`；CN国债收益率为 `valuation-date`；DTS日值为 `record-date`，累计为 `month-to-date`、`fiscal-year-to-date`；拍卖为 `issue-date` 或 `auction-date`；申领为 `week-ending-saturday`；银行信贷为 `pro_rata_average_of_weekly_levels`，贷款标准为 `survey_quarter`，偿债比率为 `calendar_quarter` |
 | `seasonal_adjustment` | CN（PMI、工业环比和GDP环比除外）、EFFR 为 `not-seasonally-adjusted`；CN PMI、工业环比和GDP环比为 `seasonally-adjusted`；US M2、GDP、申领、PCE、实际消费／收入、工业指标、银行信贷、偿债比率、投资、非农、住宅销售、贸易为 `seasonally-adjusted`；贷款标准、房价指数、目标利率、国债交易与拍卖为 `not-seasonally-adjusted`；CPI各序列分别标记 |
-| `price_basis` | 货币和社零、房地产金额及名义时薪为 `nominal`；实际GDP／消费／收入为 `real-chained`；CN工业增加值增速、CN GDP指数和增速、CN居民收支增速为 `real`（扣除价格因素）；CN GDP金额为 `constant-prices`（分段基期）；CN固定资产投资、工业企业、居民收支、社融、贷款、存款、财政和贸易金额为 `nominal`；CPI／PCE价格为 `price-index`；工业生产为 `volume-index`；房屋面积、PMI、CN失业率、利率、申领数量、产能利用率、劳动力比率、工时、贷款标准、偿债比率和住房套数为 `not_applicable`；银行信贷、名义设备投资和名义贸易为 `nominal`，实际设备投资和实际贸易为 `real-chained`；非农和住宅销售为 `not_applicable`，房价指数为 `price-index`；国债交易为 `nominal`，拍卖金额为 `par-value`，拍卖价格为 `not_applicable` |
+| `price_basis` | 货币和社零、房地产金额及名义时薪为 `nominal`；实际GDP／消费／收入为 `real-chained`；CN工业增加值增速、CN GDP指数和增速、CN居民收支增速为 `real`（扣除价格因素）；CN GDP金额为 `constant-prices`（分段基期）；CN固定资产投资、工业企业、居民收支、社融、贷款、存款、财政和贸易金额为 `nominal`；CPI／PCE价格为 `price-index`；工业生产为 `volume-index`；房屋面积、PMI、CN失业率、利率（含CN LPR、逆回购、准备金率和国债收益率）、申领数量、产能利用率、劳动力比率、工时、贷款标准、偿债比率和住房套数为 `not_applicable`；银行信贷、名义设备投资和名义贸易为 `nominal`，实际设备投资和实际贸易为 `real-chained`；非农和住宅销售为 `not_applicable`，房价指数为 `price-index`；国债交易为 `nominal`，拍卖金额为 `par-value`，拍卖价格为 `not_applicable` |
 | `annualized` | 水平与增速各自标记；US GDP／实际消费／实际收入／企业利润／住宅建设／设备投资／住宅销售／实际贸易水平、实际贸易差额变化和US GDP官方环比年化增速为 true，其余当前序列为 false |
 | `value_origin` | `official` 或 `derived`，不以计算值冒充官方公布值 |
 | `definition`、`formula` | 统计口径标识；计算增速保留公式，官方值公式为 null |
@@ -387,6 +392,28 @@ DTS的类别和细项在不同时期写法不同（如 `Table IIIA` 和 `Table I
 
 `services-trade` 输出 `cn.services-trade.<cny|usd>.<flow>.level`，`flow` 同上。总额和差额直接取官方字段，有独立舍入，不用出口加减进口覆盖。该月没有记录时原因是 `report_not_found`，不拆分合并期。网站记录时间不当作公布时间，`published_at` 为 null。
 
+### 中国LPR：月度报价和相邻月变化
+
+`lpr` 输出 `cn.lpr.1y.rate`、`cn.lpr.5y-plus.rate`（官方报价，`percent`）和 `cn.lpr.1y.change`、`cn.lpr.5y-plus.change`（`basis_points`，标记 `derived`）。`period` 是报价月，`as_of_date` 是公告里的实际报价日（YYYYMMDD），不固定为20日。公布时间精确到秒时写入 `published_at`，只有日期时只写 `published_date`。
+
+变化只比较严格相邻上月，持平是有效的0。上月报价在查询窗口内时 `base` 带值；在窗口外时 `base.value` 为 null 且不反推，变化值仍可用。未检索到当月公告时是 `report_not_found`；缺月后的下一月是 `baseline_missing`，不跨缺口；2019年8月改革首月是 `methodology_break`。
+
+### 中国七天逆回购：调整公告和中标历史
+
+`reverse-repo` 是事件型，`period` 是生效日，只输出窗口内的调整公告：`cn.reverse-repo.7d.rate`（`percent`）和 `cn.reverse-repo.7d.change`（`basis_points`，标记 `derived`），`base.value` 是公告原文的调整前利率。窗口内第一条的 `base.period` 来自区间前最后一次公告；2024-07-22 是覆盖起点，前次生效日未知，`base.period` 为空。窗口内没有调整时 `observations` 为空，某日的有效利率要读 `original.previous_event`，和美国目标利率的处理相同。
+
+`reverse-repo-history` 是固定利率机制前逐次操作的中标利率：`cn.reverse-repo-history.7d.awarded_rate`，`period` 是公告公布日。同一天可有多次操作，所以观测带 `event_id`。正文写明操作日时写入 `as_of_date`，否则为空，不推断。`--limit` 只影响表格和普通 `--json`，统一导出总是包含请求窗口内的全部操作。这是逐次操作结果，不是政策利率调整事件，也不和 `reverse-repo` 连接。
+
+### 中国存款准备金率：调整幅度和机构范围
+
+`rrr` 输出 `cn.rrr.change_lower`、`cn.rrr.change_upper`（`percentage_points`，负值为下调），是官方调整幅度，固定幅度时上下界相等，区间不取均值，也不推算准备金率水平。`period` 是生效日。同一生效日可能有多个机构范围，所以观测带 `event_id`，格式为 `生效日/范围类型/内容哈希`。
+
+顶层可选字段 `policy_events` 每个事件一条，保留适用范围、豁免、是否额外降准、分批序号和公告标题。它和国债拍卖的 `events` 字段内容不同，所以分开；其他导出都不带这个字段。
+
+### 中国国债收益率：全部关键期限
+
+`treasury` 输出 `cn.treasury.<tenor>.yield`，`tenor` 是 `3m`、`6m`、`1y`、`2y`、`3y`、`5y`、`7y`、`10y`、`15y`、`20y`、`30y`，单位 `percent`，`period` 是估值日。表格只显示六个期限，统一导出保留全部十一个，`raw_value` 保留接口原文。空值为 `source_value_missing`，无记录的日期不补行。接口没有公布时间，命令也不缓存，所以 `fetched_at`、`published_at` 为 null。单次查询区间须小于一年，这是接口限制。
+
 ## 缺失与溯源
 
 每条观测保留 `period`（按频率使用YYYYMM、YYYYQn或YYYYMMDD）、`value`、`status`、`missing_reason`、`raw_value`、`source`、`fetched_at`、`published_date`、`published_at`、`revision_id`、`data_version`、`base`、`note`。`index_base`、`inputs`是版本1的可选扩展字段，原出口无此元数据时仍省略，不修改原JSON结构。
@@ -394,7 +421,7 @@ DTS的类别和细项在不同时期写法不同（如 `Table IIIA` 和 `Table I
 - 数值存在时 `status="available"`，包括零值和负增速；`missing_reason=null`。
 - 数值缺失时 `value=null`、`status="missing"`。`report_not_found` 表示人民银行当前目录未检索到月份；`source_value_missing` 表示源水平或报告字段缺失；计算增速另外区分 `current_value_missing`、`baseline_missing`、`zero_baseline`，其他无法计算的情况为 `calculation_unavailable`。CN失业率年龄分组暂停发布期为 `publication_paused`；CN投资和工业企业的其他原因见各小节。缺失不自动归因于未发布、停更或历史不存在。
 - 含 `base` 的计算值保留指标规定的严格基期，见各指标小节；四周均值使用完整 `inputs`。官方水平和直接发布的官方增速的 `base=null`。不重新计算、不跨缺口寻找替代基期。
-- FRED／BLS已提供的官方原值保留源数字字符串，包括缺失标记；计算值的原始字符串为 null。CN居民收支、住户存款、货物贸易和服务贸易保留原文；其他CN provider 未提供逐字段原始数字字符串，该字段为 null，不把格式化后的数值冒充原值。NBS逐字段来源标识另存为 `source_series_id`。EFFR的原始JSON记录保留在 `original`，规则见前节。
+- FRED／BLS已提供的官方原值保留源数字字符串，包括缺失标记；计算值的原始字符串为 null。CN居民收支、住户存款、货物贸易、服务贸易、逆回购历史和国债收益率保留原文；其他CN provider 未提供逐字段原始数字字符串，该字段为 null，不把格式化后的数值冒充原值。NBS逐字段来源标识另存为 `source_series_id`。EFFR的原始JSON记录保留在 `original`，规则见前节。
 - US货币、CPI、申领、劳动力比率、时薪工时、PCE与实际消费／收入、工业、企业、信用、投资、非农、住宅和贸易的 `note` 只出现在缺失观测上。住宅和贸易按各值的缺失原因生成；其余指标说明该行的缺失原因，同一行多个变化值都缺失时共用同一说明，逐值原因以 `missing_reason` 为准。完整逐行备注保留在 `original`。
 - `source` 和 `fetched_at` 保留 provider 实际来源与抓取时刻，命中缓存时保留原抓取时间。未找到 CN 报告时两者均为 null，不输出公元 1 年的虚假时间。
 - CN `published_date` 保留报告原有发布日期字段，仅表示源日期及其原精度；不填充零点作为精确公布时间。无法取得的 `published_at`、`revision_id` 为 null。
@@ -406,6 +433,6 @@ DTS的类别和细项在不同时期写法不同（如 `Table IIIA` 和 `Table I
 
 ## 覆盖与后续迁移
 
-当前已接入指标见上文各小节；尚未将所有宏观 provider 迁移。其余指标继续使用原 JSON，TODO 中全局基础项仍保留未完成状态。其他指标、部分抓取失败、完整历史版本与中美可比性需要各自的适配和测试，不因本批格式扩展而视为已完成。
+`macro us` 和除价格外的 `macro cn` 命令都已接入，各自口径见上文；`macro cn cpi`、`core-cpi`、`ppi` 尚未接入，继续使用原 JSON。TODO 中全局基础项仍保留未完成状态。其他指标、部分抓取失败、完整历史版本与中美可比性需要各自的适配和测试，不因本批格式扩展而视为已完成。
 
 测试覆盖真实离线样本、旧输出回归、官方值／计算值、M1口径边界、房地产范围变化、累计所属期、1—2月合并、零与缺失、严格基期、空结果、元数据空值、重复月份、非法范围、非有限值、上游错误、取消及输出写入失败。

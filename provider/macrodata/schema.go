@@ -18,6 +18,7 @@ type Dataset struct {
 	End           string          `json:"end"`
 	Series        []Series        `json:"series"`
 	Events        []Event         `json:"events,omitempty"`
+	PolicyEvents  []PolicyEvent   `json:"policy_events,omitempty"`
 	Observations  []Observation   `json:"observations"`
 	Original      json.RawMessage `json:"original"`
 }
@@ -38,6 +39,20 @@ type Event struct {
 	InflationIndexed              *bool   `json:"inflation_indexed"`
 	SOMAInsideOffering            *bool   `json:"soma_inside_offering_amount"`
 	FIMACompetitiveInsideOffering *bool   `json:"fima_competitive_inside_offering_amount"`
+}
+
+// PolicyEvent 保存同一生效日可能有多个的政策调整范围，观测通过EventID关联。
+type PolicyEvent struct {
+	ID                 string `json:"id"`
+	EffectiveDate      string `json:"effective_date"`
+	EffectiveDateBasis string `json:"effective_date_basis,omitempty"`
+	ScopeType          string `json:"scope_type"`
+	Scope              string `json:"scope"`
+	Exclusions         string `json:"exclusions,omitempty"`
+	Additional         bool   `json:"additional"`
+	TrancheIndex       int    `json:"tranche_index"`
+	TrancheCount       int    `json:"tranche_count"`
+	Title              string `json:"title,omitempty"`
 }
 
 type Series struct {
