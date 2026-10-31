@@ -23,6 +23,7 @@ type LoanComponent struct {
 	YTDFlow                *float64 `json:"ytd_flow"`
 	MonthlyFlowMethod      string   `json:"monthly_flow_method"`
 	MonthlyFlowApproximate bool     `json:"monthly_flow_approximate"`
+	PreviousYTDFlow        *float64 `json:"previous_ytd_flow,omitempty"`
 }
 
 // LoanObservation 分开保存精确余额表、报告同比及新增额，累计报告差额标记为近似计算值。
@@ -37,6 +38,7 @@ type LoanObservation struct {
 	YTDFlow                *float64        `json:"ytd_flow"`
 	MonthlyFlowMethod      string          `json:"monthly_flow_method"`
 	MonthlyFlowApproximate bool            `json:"monthly_flow_approximate"`
+	PreviousYTDFlow        *float64        `json:"previous_ytd_flow,omitempty"`
 	Unit                   string          `json:"unit"`
 	Components             []LoanComponent `json:"components"`
 	BalanceSource          string          `json:"balance_source"`
@@ -255,11 +257,12 @@ func (c *Client) RMBLoans(ctx context.Context, req LoanRequest) ([]LoanObservati
 		sort.Strings(periods)
 		for _, period := range periods {
 			values := balances.Values[period]
-			if values["total"] == nil {
+			report, ok := reports[period]
+			// 年度表末尾的空模板月份不输出；已有报告时保留该月，不丢弃官方同比和新增。
+			if values["total"] == nil && !ok {
 				continue
 			}
 			item := LoanObservation{Region: "CN", Period: period, YTDPeriod: period[:4] + "01-" + period, Balance: values["total"], Unit: "亿元", BalanceSource: address, BalanceFetchedAt: fetched, BalanceNotes: balances.Notes}
-			report, ok := reports[period]
 			if ok {
 				item.ReportSource = report.Source
 				item.ReportPublishedDate = report.PublishedDate
@@ -275,9 +278,16 @@ func (c *Client) RMBLoans(ctx context.Context, req LoanRequest) ([]LoanObservati
 				item.PreviousReportSource = previous.Source
 			}
 			item.MonthlyFlow, item.MonthlyFlowMethod, item.MonthlyFlowApproximate = monthlyLoanFlow(period, "total", report, previous)
+			if item.MonthlyFlowApproximate {
+				item.PreviousYTDFlow = previous.YTD["total"]
+			}
 			for _, component := range loanComponents[1:] {
 				flow, method, approx := monthlyLoanFlow(period, component.key, report, previous)
-				item.Components = append(item.Components, LoanComponent{Key: component.key, Name: component.name, Balance: values[component.key], MonthlyFlow: flow, YTDFlow: report.YTD[component.key], MonthlyFlowMethod: method, MonthlyFlowApproximate: approx})
+				part := LoanComponent{Key: component.key, Name: component.name, Balance: values[component.key], MonthlyFlow: flow, YTDFlow: report.YTD[component.key], MonthlyFlowMethod: method, MonthlyFlowApproximate: approx}
+				if approx {
+					part.PreviousYTDFlow = previous.YTD[component.key]
+				}
+				item.Components = append(item.Components, part)
 			}
 			if !ok {
 				item.Note = "未检索到该月官方金融统计报告，同比及新增额保留缺失"
