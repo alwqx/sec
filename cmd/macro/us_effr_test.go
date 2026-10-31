@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alwqx/sec/provider/macrodata"
 	"github.com/alwqx/sec/provider/nyfed"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/h2non/gock.v1"
@@ -18,18 +19,36 @@ func TestUSEFFRCLI(t *testing.T) {
 	defer gock.Off()
 	body, err := os.ReadFile("../../provider/nyfed/testdata/effr-holidays.json")
 	require.NoError(t, err)
-	for _, asJSON := range []bool{false, true} {
+	for _, output := range []string{"table", "json", "standard"} {
 		gock.New("https://markets.newyorkfed.org").Get("/api/rates/unsecured/effr/search.json").MatchParam("startDate", "2024-12-02").MatchParam("endDate", "2025-01-06").Reply(200).BodyString(string(body))
 		command := newUSEFFRCLI()
 		args := []string{"--begin", "20250102", "--end", "20250106", "--no-cache", "--refresh"}
-		if asJSON {
+		if output == "json" {
 			args = append(args, "--json")
+		}
+		if output == "standard" {
+			args = append(args, "--standard-json")
 		}
 		command.SetArgs(args)
 		var out bytes.Buffer
 		command.SetOut(&out)
 		require.NoError(t, command.Execute())
-		if asJSON {
+		if output == "standard" {
+			var result macrodata.Dataset
+			require.NoError(t, json.Unmarshal(out.Bytes(), &result))
+			require.Len(t, result.Observations, 6)
+			require.Equal(t, "daily", result.Series[0].Frequency)
+			require.Equal(t, "20250102", result.Observations[0].Period)
+			require.Equal(t, 4.33, *result.Observations[0].Value)
+			require.Equal(t, "20241231", result.Observations[1].Base.Period)
+			require.Nil(t, result.Observations[1].Base.Value)
+			require.NotEmpty(t, result.Observations[1].Note)
+			require.Nil(t, result.Observations[0].PublishedAt)
+			var original nyfed.EFFRResult
+			require.NoError(t, json.Unmarshal(result.Original, &original))
+			require.Len(t, original.Observations, 3)
+			require.NotEmpty(t, original.Observations[0].Raw)
+		} else if output == "json" {
 			var result nyfed.EFFRResult
 			require.NoError(t, json.Unmarshal(out.Bytes(), &result))
 			require.Len(t, result.Observations, 3)

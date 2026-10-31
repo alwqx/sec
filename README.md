@@ -139,6 +139,7 @@ CLI `sec watch` 与 Desktop「我的自选」统一使用 `~/.sec/watchlist.json
 | `macro us money`、`macro us m2`                | 美国M2月度季调余额、同比与月环比，见 [美国货币供应文档](docs/us-money.md) |
 | `macro cn money --standard-json`、`macro us money --standard-json` | 货币指标统一JSON导出：统计口径、来源、缺失状态和原provider结果，见 [统一导出文档](docs/macro-standard.md) |
 | `macro cn retail --standard-json`、`macro cn property --standard-json` | 社零、房地产统一JSON导出：单月／累计所属期、官方同比、历史范围及来源序列，见 [统一导出文档](docs/macro-standard.md) |
+| `macro us gdp --standard-json`、`macro us effr --standard-json` | 季度GDP、日度EFFR统一JSON导出：折年口径、严格基期、交易日和方法边界，见 [统一导出文档](docs/macro-standard.md) |
 | `macro us trade`、`macro us real-trade`        | 月度名义贸易与季度实际贸易，出口、进口及官方差额；支持商品/服务分项，见 [美国进出口文档](docs/us-trade.md) |
 | `macro us investment`、`macro us equipment-investment` | 住宅开工、建筑许可及季度设备投资，分别保留频率、单位和季调折年口径，见 [美国投资文档](docs/us-investment.md) |
 | `macro us bank-credit`、`macro us lending-standards`、`macro us debt-service` | 月平均银行信贷、季度贷款标准及家庭偿债负担，区分百分比和百分点变化，见 [美国信用文档](docs/us-credit.md) |
