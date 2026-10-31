@@ -6,6 +6,7 @@ import (
 	"io"
 	"strconv"
 
+	"github.com/alwqx/sec/provider/macrodata"
 	"github.com/alwqx/sec/provider/nbs"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
@@ -30,6 +31,16 @@ func newRetailCLI() *cobra.Command {
 			return err
 		}
 		asJSON, _ := cmd.Flags().GetBool("json")
+		standard, _ := cmd.Flags().GetBool("standard-json")
+		if standard {
+			dataset, err := macrodata.Retail(items, begin, end)
+			if err != nil {
+				return err
+			}
+			encoder := json.NewEncoder(cmd.OutOrStdout())
+			encoder.SetIndent("", "  ")
+			return encoder.Encode(dataset)
+		}
 		if asJSON {
 			if items == nil {
 				items = []nbs.RetailObservation{}
@@ -41,6 +52,8 @@ func newRetailCLI() *cobra.Command {
 		return printRetail(cmd.OutOrStdout(), items)
 	}}
 	addQueryFlags(command)
+	command.Flags().Bool("standard-json", false, "按统一宏观序列格式输出JSON，区分单月与累计所属期")
+	command.MarkFlagsMutuallyExclusive("json", "standard-json")
 	return command
 }
 

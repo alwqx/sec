@@ -45,20 +45,23 @@ type Base struct {
 }
 
 type Observation struct {
-	SeriesID      string     `json:"series_id"`
-	Period        string     `json:"period"`
-	Value         *float64   `json:"value"`
-	Status        string     `json:"status"`
-	MissingReason *string    `json:"missing_reason"`
-	RawValue      *string    `json:"raw_value"`
-	Source        *string    `json:"source"`
-	FetchedAt     *time.Time `json:"fetched_at"`
-	PublishedDate *string    `json:"published_date"`
-	PublishedAt   *time.Time `json:"published_at"`
-	RevisionID    *string    `json:"revision_id"`
-	DataVersion   string     `json:"data_version"`
-	Base          *Base      `json:"base"`
-	Note          string     `json:"note"`
+	SeriesID       string     `json:"series_id"`
+	Period         string     `json:"period"`
+	PeriodBegin    string     `json:"period_begin,omitempty"`
+	PeriodEnd      string     `json:"period_end,omitempty"`
+	SourceSeriesID string     `json:"source_series_id,omitempty"`
+	Value          *float64   `json:"value"`
+	Status         string     `json:"status"`
+	MissingReason  *string    `json:"missing_reason"`
+	RawValue       *string    `json:"raw_value"`
+	Source         *string    `json:"source"`
+	FetchedAt      *time.Time `json:"fetched_at"`
+	PublishedDate  *string    `json:"published_date"`
+	PublishedAt    *time.Time `json:"published_at"`
+	RevisionID     *string    `json:"revision_id"`
+	DataVersion    string     `json:"data_version"`
+	Base           *Base      `json:"base"`
+	Note           string     `json:"note"`
 }
 
 func text(s string) *string {

@@ -6,6 +6,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/alwqx/sec/provider/macrodata"
 	"github.com/alwqx/sec/provider/nbs"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/h2non/gock.v1"
@@ -13,7 +14,7 @@ import (
 
 func TestPropertyCLI(t *testing.T) {
 	defer gock.Off()
-	for _, asJSON := range []bool{false, true} {
+	for _, output := range []string{"table", "json", "standard"} {
 		origin := "https://data.stats.gov.cn"
 		prefix := "/dg/website/publicrelease/web/external"
 		mock := func(path, file string, params map[string]string) {
@@ -31,14 +32,29 @@ func TestPropertyCLI(t *testing.T) {
 		gock.New(origin).Post(prefix + "/stream/esData").JSON(body).Reply(200).BodyString(string(raw))
 		command := newPropertyCLI()
 		args := []string{"--end", "202609", "--component", "starts-area", "--no-cache", "--refresh"}
-		if asJSON {
+		if output == "json" {
 			args = append(args, "--json")
+		}
+		if output == "standard" {
+			args = append(args, "--standard-json")
 		}
 		command.SetArgs(args)
 		var out bytes.Buffer
 		command.SetOut(&out)
 		require.NoError(t, command.Execute())
-		if asJSON {
+		if output == "standard" {
+			var result macrodata.Dataset
+			require.NoError(t, json.Unmarshal(out.Bytes(), &result))
+			require.Len(t, result.Observations, 18)
+			require.Equal(t, "square_meters_10000", result.Series[0].Unit)
+			require.Equal(t, "year-to-date", result.Series[0].PeriodBasis)
+			require.Equal(t, "202601", result.Observations[16].PeriodBegin)
+			require.Equal(t, "202609", result.Observations[16].PeriodEnd)
+			require.Equal(t, 34031.30, *result.Observations[16].Value)
+			require.Equal(t, -24.9, *result.Observations[17].Value)
+			require.Contains(t, out.String(), `"published_at": null`)
+			require.NotEmpty(t, result.Observations[16].SourceSeriesID)
+		} else if output == "json" {
 			var result nbs.PropertyResult
 			require.NoError(t, json.Unmarshal(out.Bytes(), &result))
 			require.Len(t, result.Observations, 9)

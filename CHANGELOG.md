@@ -82,6 +82,7 @@
 77. Add `macro us auctions` for CUSIP-level issuance and reopening events with separate issue-date and auction-date filters; preserve official par amounts, bidder allocations, SOMA/FIMA inclusion definitions and historical nulls with validated pagination, caching and regression tests, including auction-date pagination and future issue-date boundaries
 78. Add `macro us debt-cash` for official Treasury cash issues and redemptions, explicitly derived net cash flows and original cash-basis adjustment rows; preserve historical labels, signed adjustments, missing values and official cumulative amounts with validated pagination, caching and regression tests
 79. Add opt-in `--standard-json` exports for Chinese M1/M2 and US M2 with a versioned macro series schema, explicit statistical definitions, official versus derived values, missing-value reasons and source provenance; separate Chinese M1 definitions across 2025 and preserve original provider results and strict growth baselines with adapter and CLI regression tests
+80. Extend `--standard-json` to Chinese retail sales and property data with explicit monthly versus year-to-date coverage and upstream series identifiers; retain January-February combined reporting, official growth rates, area versus value units and historical sales scope boundaries without deriving monthly values, with adapter and CLI regression tests
 
 ### v0.3.15
 
