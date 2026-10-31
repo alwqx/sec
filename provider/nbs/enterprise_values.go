@@ -72,12 +72,13 @@ func finishEnterpriseObservation(item *EnterpriseObservation, metric EnterpriseM
 		add("部分单元格未提供数值，不补零或反推")
 	default:
 		add("发布库未提供数值，可能未收录或尚未更新，不等同于官方未发布")
-		if item.Period[4:] == "01" {
-			item.Status = "january_exempt"
-			add("1月免报，不拆出1—2月数据")
-		} else if item.SurveyFrequency == "feb_may_aug_nov" && item.Period[4:] != "02" && item.Period[4:] != "05" && item.Period[4:] != "08" && item.Period[4:] != "11" {
+		// 按季调查的年份没有1月调查，先判断调查频率，不把这些1月算作免报。
+		if item.SurveyFrequency == "feb_may_aug_nov" && item.Period[4:] != "02" && item.Period[4:] != "05" && item.Period[4:] != "08" && item.Period[4:] != "11" {
 			item.Status = "not_surveyed"
 			add("2007—2010年仅2、5、8、11月调查，本月缺口不插值")
+		} else if item.Period[4:] == "01" {
+			item.Status = "january_exempt"
+			add("1月免报，不拆出1—2月数据")
 		} else if item.Metric == "receivables" && strings.HasPrefix(item.Period, "2019") {
 			item.Status = "definition_suspended"
 			add("2019年改发应收票据及应收账款，不用合并口径填应收账款缺口")
