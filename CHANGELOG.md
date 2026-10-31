@@ -87,6 +87,7 @@
 82. Extend `--standard-json` to US CPI/core CPI and initial/continued claims with distinct seasonal-adjustment series, explicit index bases, weekly period support and complete four-week calculation inputs; preserve strict growth baselines, separate claims dates, raw values, missing observations and original footnotes with adapter and CLI regression tests
 83. Extend `--standard-json` to PCE/core PCE price indexes and all five real consumption components, distinguishing price indexes from real SAAR amounts and unannualized growth; preserve strict monthly baselines, raw values, original provider results and explicit chain-component nonadditivity with adapter and CLI regression tests
 84. Extend `--standard-json` to real disposable income, industrial production and capacity utilization, preserving real SAAR income totals, separate industrial sector coverage and percentage versus percentage-point changes; retain strict baselines, raw values, missing observations and distinct zero-baseline rules with adapter and CLI regression tests
+85. Extend `--standard-json` to US unemployment, labor force participation, hourly earnings and weekly hours with explicit CPS/CES survey coverage, ratio numerators and denominators, native-unit versus percentage-point changes and optional preliminary flags; preserve strict same-series baselines, per-point fetch times and original footnotes with adapter and CLI regression tests
 
 ### v0.3.15
 

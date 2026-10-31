@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/alwqx/sec/provider/bls"
+	"github.com/alwqx/sec/provider/macrodata"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/h2non/gock.v1"
 )
@@ -17,18 +18,39 @@ func TestUSLaborForceCLI(t *testing.T) {
 	raw, err := os.ReadFile("../../provider/bls/testdata/labor-force-2024-2026.json")
 	require.NoError(t, err)
 	for _, indicator := range []string{"unemployment", "participation"} {
-		for _, asJSON := range []bool{false, true} {
+		for _, output := range []string{"table", "json", "standard"} {
 			gock.New("https://api.bls.gov").Post("/publicAPI/v1/timeseries/data/").JSON(map[string]any{"seriesid": []string{"LNS14000000", "LNS11300000"}, "startyear": "2024", "endyear": "2026"}).Reply(200).BodyString(string(raw))
 			cmd := NewMacroCLI()
 			args := []string{"us", indicator, "--begin", "202501", "--end", "202609", "--no-cache"}
-			if asJSON {
+			if output == "json" {
 				args = append(args, "--json")
+			}
+			if output == "standard" {
+				args = append(args, "--standard-json")
 			}
 			cmd.SetArgs(args)
 			var out bytes.Buffer
 			cmd.SetOut(&out)
 			require.NoError(t, cmd.Execute())
-			if asJSON {
+			if output == "standard" {
+				var got macrodata.Dataset
+				require.NoError(t, json.Unmarshal(out.Bytes(), &got))
+				require.Len(t, got.Observations, 63)
+				require.Equal(t, "CPS household survey", got.Series[0].Survey)
+				require.Equal(t, "percentage_points", got.Series[1].Unit)
+				require.Equal(t, "percent", got.Series[0].Unit)
+				require.Nil(t, got.Observations[27].Value)
+				require.NotEmpty(t, got.Series[0].Numerator)
+				require.NotEmpty(t, got.Series[0].Denominator)
+				if indicator == "unemployment" {
+					require.Equal(t, 4.2, *got.Observations[60].Value)
+				} else {
+					require.Equal(t, 61.8, *got.Observations[60].Value)
+				}
+				var original bls.LaborForceResult
+				require.NoError(t, json.Unmarshal(got.Original, &original))
+				require.Equal(t, "12", original.Observations[12].Footnotes[0].Code)
+			} else if output == "json" {
 				var got bls.LaborForceResult
 				require.NoError(t, json.Unmarshal(out.Bytes(), &got))
 				require.Equal(t, indicator, got.Indicator)
