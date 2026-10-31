@@ -128,6 +128,8 @@ func TestInvestmentUnitsAndIndependentPriceSeries(t *testing.T) {
 			require.Equal(t, "nominal", d.Series[0].PriceBasis)
 			require.Nil(t, d.Series[0].ReferenceYear)
 		} else {
+			require.Equal(t, component, d.Series[0].Indicator, "住宅开工与建筑许可不共用指标")
+			require.Equal(t, component, d.Series[2].Indicator)
 			require.Equal(t, "housing_units_thousand", d.Series[0].Unit)
 			require.Equal(t, "not_applicable", d.Series[0].PriceBasis)
 		}
@@ -159,6 +161,23 @@ func TestInvestmentUnitsAndIndependentPriceSeries(t *testing.T) {
 	require.Equal(t, "zero_baseline", *d.Observations[2].MissingReason)
 }
 
+func TestAppendPeriodicChangesNamesPreviousMeasureByFrequency(t *testing.T) {
+	for _, test := range []struct {
+		frequency, period, begin, previous, yearAgo, measure string
+	}{
+		{"monthly", "202601", "202601", "202512", "202501", "mom_percentage_points"},
+		{"quarterly", "2026Q1", "2026Q1", "2025Q4", "2025Q1", "qoq_percentage_points"},
+	} {
+		d, err := newDatasetFrequency("US", test.begin, test.period, test.frequency, map[string]string{})
+		require.NoError(t, err)
+		item := periodicObservation{current: periodicValue{test.period, value(2), "2"}, yearAgo: periodicValue{test.yearAgo, value(1), "1"}, previous: periodicValue{test.previous, value(0), "0"}, yoy: value(1), change: value(2)}
+		level := Series{ID: "us.test", Measure: "rate", Unit: "percent", Frequency: test.frequency}
+		require.NoError(t, appendPeriodicChanges(d, level, "difference", monthlyProvenance{}, []periodicObservation{item}, true))
+		require.Equal(t, test.measure, d.Series[2].Measure)
+		require.Equal(t, "us.test."+test.measure, d.Series[2].ID)
+	}
+}
+
 func TestCreditInvestmentRejectInconsistentResults(t *testing.T) {
 	for _, mutate := range []func(*fred.CreditResult){
 		func(r *fred.CreditResult) { r.Metric = "unknown" },
@@ -177,6 +196,10 @@ func TestCreditInvestmentRejectInconsistentResults(t *testing.T) {
 		func(r *fred.CreditResult) { r.Begin = "2026Q2"; r.End = "2026Q2" },
 		func(r *fred.CreditResult) { r.Observations[0].Level = value(math.Inf(1)) },
 		func(r *fred.CreditResult) { r.Observations = append(r.Observations, r.Observations[0]) },
+		func(r *fred.CreditResult) { r.Observations[0].PreviousChangePercent = value(1) },
+		func(r *fred.CreditResult) { r.Observations[0].YearAgoChangePercent = value(1) },
+		func(r *fred.CreditResult) { r.Observations[0].YearAgoBase.Level = nil },
+		func(r *fred.CreditResult) { r.Observations[0].Level = nil },
 	} {
 		r := creditSample("standards")
 		mutate(r)
@@ -203,6 +226,24 @@ func TestCreditInvestmentRejectInconsistentResults(t *testing.T) {
 		mutate(r)
 		d, err := Investment(r)
 		require.Error(t, err)
+		require.Nil(t, d)
+	}
+	for _, mutate := range []func(*fred.CreditResult){
+		func(r *fred.CreditResult) { r.Observations[0].PreviousChangePP = value(1) },
+		func(r *fred.CreditResult) { r.Observations[0].YearAgoChangePP = value(1) },
+		func(r *fred.CreditResult) { r.Observations[0].PreviousBase.Level = value(0) },
+	} {
+		r := creditSample("bank")
+		mutate(r)
+		d, err := Credit(r)
+		require.Error(t, err)
+		require.Nil(t, d)
+	}
+	for _, component := range []string{"housing-starts", "building-permits"} {
+		r := investmentSample(component)
+		r.BEAAccountCode = "Y033RC"
+		d, err := Investment(r)
+		require.Error(t, err, "住宅序列不得携带BEA账户代码")
 		require.Nil(t, d)
 	}
 	_, err := Credit(nil)

@@ -71,6 +71,7 @@ func TestUSInvestmentCLI(t *testing.T) {
 						require.Equal(t, "nominal", result.Series[0].PriceBasis)
 					}
 				} else {
+					require.Equal(t, test.option, result.Series[0].Indicator)
 					require.Equal(t, "housing_units_thousand", result.Series[0].Unit)
 					require.Equal(t, "not_applicable", result.Series[0].PriceBasis)
 					require.Equal(t, "monthly", result.Series[0].Frequency)

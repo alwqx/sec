@@ -12,7 +12,6 @@ import (
 )
 
 func TestCreditInvestmentStandardErrors(t *testing.T) {
-	defer gock.Off()
 	for _, test := range []struct {
 		name, begin, end, file, id string
 		options                    []string
@@ -27,6 +26,7 @@ func TestCreditInvestmentStandardErrors(t *testing.T) {
 	} {
 		for _, mode := range []string{"flags", "cancel", "http", "writer"} {
 			t.Run(test.name+"/"+test.file+"/"+mode+"/"+test.id+"/"+strings.Join(test.options, "_"), func(t *testing.T) {
+				defer gock.Off()
 				args := []string{"us", test.name, "--begin", test.begin, "--end", test.end, "--standard-json", "--no-cache"}
 				args = append(args, test.options...)
 				ctx := context.Background()
@@ -55,13 +55,19 @@ func TestCreditInvestmentStandardErrors(t *testing.T) {
 				cmd.SilenceUsage = true
 				err := cmd.ExecuteContext(ctx)
 				require.Error(t, err)
-				if mode == "cancel" {
+				switch mode {
+				case "flags":
+					require.ErrorContains(t, err, "none of the others can be")
+				case "cancel":
 					require.ErrorIs(t, err, context.Canceled)
-				}
-				if mode == "writer" {
+				case "http":
+					require.ErrorContains(t, err, "503")
+				case "writer":
 					require.ErrorContains(t, err, "测试写入失败")
 				}
-				require.Empty(t, out.String())
+				if mode != "writer" {
+					require.Empty(t, out.String())
+				}
 				require.True(t, gock.IsDone())
 			})
 		}

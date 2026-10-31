@@ -167,7 +167,7 @@ CES官方水平新增可选 `preliminary`，表示原点是否标记P；false只
 | `lending-standards`／`us.lending-standards` | `DRTSCILM`，SLOOS大中型企业C&I贷款标准净收紧比例，`survey="SLOOS"` | `percent`，季度 | 否 | `yoy_percentage_points`、`qoq_percentage_points` |
 | `debt-service`／`us.debt-service` | `TDSP`，当前征信方法的家庭偿债比率 | `percent`，季度 | 是 | `yoy_percentage_points`、`qoq_percentage_points` |
 
-水平序列分别使用 `level`（银行信贷）或 `rate`（两个比率）。可选 `methodology` 标记 `current_h8_monthly_levels`、`sloos_domestic_banks_large_middle_market_ci`、`credit_bureau_based_dsr`；旧方法的偿债比率档案不拼接。可选 `change_method` 只出现在变化序列上：银行信贷为 `level_ratio_not_break_adjusted`，表示由当前水平计算，不是H.8官方经断点调整的折年增速；两个比率为 `difference`，单位为百分点，公式为 `current_level - base_level`。
+水平序列分别使用 `level`（银行信贷）或 `rate`（两个比率）。银行信贷只接受百分比变化字段，两个比率只接受百分点变化字段，混入另一组单位时直接报错。可选 `methodology` 标记 `current_h8_monthly_levels`、`sloos_domestic_banks_large_middle_market_ci`、`credit_bureau_based_dsr`；旧方法的偿债比率档案不拼接。可选 `change_method` 只出现在变化序列上：银行信贷为 `level_ratio_not_break_adjusted`，表示由当前水平计算，不是H.8官方经断点调整的折年增速；两个比率为 `difference`，单位为百分点，公式为 `current_level - base_level`。
 
 百分点差允许负值和零基期，净收紧比例为零是有效值，不产生 `zero_baseline`；银行信贷基期为零时才标记 `zero_baseline`。贷款标准的 `period` 沿用FRED调查季度，不回移到调查询问的回顾期。
 
@@ -180,9 +180,9 @@ CES官方水平新增可选 `preliminary`，表示原点是否标记P；false只
 | `equipment-investment --price-basis real`／`us.equipment-investment.real` | `Y033RX1Q020SBEA`，私人非住宅设备投资 | `USD_billion`，季度 | `real-chained`，`reference_year=2017` |
 | `equipment-investment --price-basis nominal`／`us.equipment-investment.nominal` | `Y033RC1Q027SBEA`，私人非住宅设备投资 | `USD_billion`，季度 | `nominal` |
 
-水平均为季调折年，`annualized=true`，不除以12或4换算为当期量；同比 `yoy_percent` 和上期增速 `mom_percent`／`qoq_percent` 未年化，`change_method="level_ratio"`。实际设备投资水平标记 `components_additive=false`，不与其他链式分项相加；增速序列不带此字段。
+住宅序列的 `indicator` 分别为 `housing-starts`、`building-permits`，设备投资为 `equipment-investment`，按指标分组时不会混合。水平均为季调折年，`annualized=true`，不除以12或4换算为当期量；同比 `yoy_percent` 和上期增速 `mom_percent`／`qoq_percent` 未年化，`change_method="level_ratio"`。实际设备投资水平标记 `components_additive=false`，不与其他链式分项相加；增速序列不带此字段。
 
-住房套数与设备金额的频率、单位不同，名义与实际设备投资的价格口径不同，均不共用序列ID、不拼接。严格基期缺失或为零时增速为空，原因分别为 `baseline_missing`、`zero_baseline`；零水平本身是有效值。BEA账户代码、方法说明及完整来源保留在 `original`，历史仍为当前可见修订值，`published_at`、`revision_id` 为 null。
+住房套数与设备金额的频率、单位不同，名义与实际设备投资的价格口径不同，均不共用序列ID、不拼接。严格基期缺失或为零时增速为空，原因分别为 `baseline_missing`、`zero_baseline`；零水平本身是有效值。信用和投资适配时，若provider在当期或严格基期不可用时仍给出计算值，直接报错，不输出 `available`。BEA账户代码、方法说明及完整来源保留在 `original`，历史仍为当前可见修订值，`published_at`、`revision_id` 为 null。
 
 ## 缺失与溯源
 

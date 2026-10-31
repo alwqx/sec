@@ -40,9 +40,12 @@ func Credit(result *fred.CreditResult) (*Dataset, error) {
 	items := make([]periodicObservation, 0, len(result.Observations))
 	point := func(v fred.CreditValue) periodicValue { return periodicValue{v.Period, v.Level, v.RawLevel} }
 	for _, o := range result.Observations {
-		yoy, previous := o.YearAgoChangePercent, o.PreviousChangePercent
+		yoy, previous, unexpectedYoY, unexpectedPrevious := o.YearAgoChangePercent, o.PreviousChangePercent, o.YearAgoChangePP, o.PreviousChangePP
 		if result.Metric != "bank" {
-			yoy, previous = o.YearAgoChangePP, o.PreviousChangePP
+			yoy, previous, unexpectedYoY, unexpectedPrevious = o.YearAgoChangePP, o.PreviousChangePP, o.YearAgoChangePercent, o.PreviousChangePercent
+		}
+		if unexpectedYoY != nil || unexpectedPrevious != nil {
+			return nil, fmt.Errorf("信用指标变化单位不符合统一导出契约: %s", o.Period)
 		}
 		items = append(items, periodicObservation{point(o.CreditValue), point(o.YearAgoBase), point(o.PreviousBase), yoy, previous, o.Note})
 	}
@@ -57,8 +60,8 @@ func Investment(result *fred.InvestmentResult) (*Dataset, error) {
 	if result == nil {
 		return nil, fmt.Errorf("投资结果不能为空")
 	}
-	s := Series{ID: "us.investment." + result.Component, Indicator: "investment", Measure: "level", Unit: "housing_units_thousand", Frequency: "monthly", PeriodBasis: "month", SeasonalAdjustment: "seasonally-adjusted", PriceBasis: "not_applicable", Annualized: true, ValueOrigin: "official", Definition: result.SeriesID}
-	valid := result.Indicator == "investment" && result.Frequency == "monthly" && result.Measure == "housing_units" && result.PriceBasis == "not_applicable" && result.Unit == "千套（季调折年）" && result.ReferenceYear == nil
+	s := Series{ID: "us.investment." + result.Component, Indicator: result.Component, Measure: "level", Unit: "housing_units_thousand", Frequency: "monthly", PeriodBasis: "month", SeasonalAdjustment: "seasonally-adjusted", PriceBasis: "not_applicable", Annualized: true, ValueOrigin: "official", Definition: result.SeriesID}
+	valid := result.Indicator == "investment" && result.Frequency == "monthly" && result.Measure == "housing_units" && result.PriceBasis == "not_applicable" && result.Unit == "千套（季调折年）" && result.ReferenceYear == nil && result.BEAAccountCode == ""
 	switch result.Component {
 	case "housing-starts":
 		valid = valid && result.SeriesID == "HOUST"
@@ -115,13 +118,13 @@ func appendPeriodicChanges(d *Dataset, level Series, method string, provenance m
 	prefix := level.ID
 	level.ID += "." + level.Measure
 	d.Series = append(d.Series, level)
-	previousMeasure := "mom_percent"
+	previousPrefix := "mom"
 	if level.Frequency == "quarterly" {
-		previousMeasure = "qoq_percent"
+		previousPrefix = "qoq"
 	}
-	measures := []string{"yoy_percent", previousMeasure}
+	measures := []string{"yoy_percent", previousPrefix + "_percent"}
 	if points {
-		measures = []string{"yoy_percentage_points", "qoq_percentage_points"}
+		measures = []string{"yoy_percentage_points", previousPrefix + "_percentage_points"}
 	}
 	for _, measure := range measures {
 		s := level
@@ -154,6 +157,9 @@ func appendPeriodicChanges(d *Dataset, level Series, method string, provenance m
 			} else {
 				if field.base.period != field.expected {
 					return fmt.Errorf("指标计算基期不匹配: %s，预期%s", field.base.period, field.expected)
+				}
+				if field.v != nil && (item.current.value == nil || field.base.value == nil || (!points && *field.base.value == 0)) {
+					return fmt.Errorf("指标计算值缺少有效当期或基期: %s，基期%s", item.current.period, field.base.period)
 				}
 				o.Base = &Base{Period: field.base.period, Value: field.base.value, RawValue: text(field.base.raw)}
 				reason = "calculation_unavailable"
