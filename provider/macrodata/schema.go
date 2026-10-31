@@ -22,6 +22,9 @@ type Dataset struct {
 }
 
 type Series struct {
+	Survey             string  `json:"survey,omitempty"`
+	Numerator          string  `json:"numerator,omitempty"`
+	Denominator        string  `json:"denominator,omitempty"`
 	Coverage           string  `json:"coverage,omitempty"`
 	ComponentsAdditive *bool   `json:"components_additive,omitempty"`
 	IndexBase          string  `json:"index_base,omitempty"`
@@ -47,6 +50,7 @@ type Base struct {
 }
 
 type Observation struct {
+	Preliminary       *bool      `json:"preliminary,omitempty"`
 	Inputs            []Base     `json:"inputs,omitempty"`
 	RevisionIndicator string     `json:"revision_indicator,omitempty"`
 	SeriesID          string     `json:"series_id"`

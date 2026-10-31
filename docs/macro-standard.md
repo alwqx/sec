@@ -1,6 +1,6 @@
 # 宏观数据统一导出
 
-`--standard-json` 提供版本化的宏观序列 JSON，已接入 CN M1/M2、US M2、CN 社零和房地产，以及 US GDP、EFFR、CPI／核心CPI、初请／续请失业金、PCE／核心PCE价格指数、实际个人消费支出、实际可支配收入、工业生产／产能利用率。采集仍使用原来的人民银行、FRED、NBS、纽约联储、BLS provider 和缓存，不增加网络请求。
+`--standard-json` 提供版本化的宏观序列 JSON，已接入 CN M1/M2、US M2、CN 社零和房地产，以及 US GDP、EFFR、CPI／核心CPI、初请／续请失业金、PCE／核心PCE价格指数、实际个人消费支出、实际可支配收入、工业生产／产能利用率、劳动力比率和时薪工时。采集仍使用原来的人民银行、FRED、NBS、纽约联储、BLS provider 和缓存，不增加网络请求。
 
 ```bash
 sec macro cn money --begin 202412 --end 202502 --standard-json
@@ -20,6 +20,10 @@ sec macro us real-pce --component goods --begin 202501 --end 202608 --standard-j
 sec macro us real-income --begin 202501 --end 202608 --standard-json
 sec macro us industrial-production --sector manufacturing --begin 202501 --end 202609 --standard-json
 sec macro us capacity-utilization --sector total --begin 202501 --end 202609 --standard-json
+sec macro us unemployment --begin 202501 --end 202609 --standard-json
+sec macro us participation --begin 202501 --end 202609 --standard-json
+sec macro us earnings --begin 202501 --end 202609 --standard-json
+sec macro us weekly-hours --begin 202501 --end 202609 --standard-json
 ```
 
 各命令分别输出独立数据集。原有表格、别名、日期默认值、`--json`、`--refresh` 和 `--no-cache` 行为不变；`--json` 与 `--standard-json` 互斥。统一字段用于程序读取，不改变币种、单位或统计口径，也不自动生成中美对比。
@@ -34,11 +38,11 @@ sec macro us capacity-utilization --sector total --begin 202501 --end 202609 --s
 | --- | --- |
 | `id`、`indicator` | 序列标识、指标，例如 `us.m2.level`、`m2` |
 | `measure` | `level`、`yoy_percent`、`mom_percent`、`ytd_level`、`ytd_yoy_percent`；GDP 另有 `qoq_percent`、`qoq_annualized_percent`；EFFR 为 `rate`、`previous_observation_change` |
-| `unit` | `CNY_100_million`（亿元人民币）、`USD_billion`（十亿美元）、`square_meters_10000`（万平方米）、`percent`、`percentage_points`（百分点）、`basis_points`（基点）、`index`、`claims`（申请件数）、`persons`（人数） |
+| `unit` | `CNY_100_million`（亿元人民币）、`USD_billion`（十亿美元）、`square_meters_10000`（万平方米）、`percent`、`percentage_points`（百分点）、`basis_points`（基点）、`index`、`claims`（申请件数）、`persons`（人数）、`USD_per_hour`、`hours_per_week` |
 | `frequency` | `monthly`、`quarterly`、`daily`、`weekly` |
 | `period_basis` | CN 货币为 `month-end`；US 货币为 `monthly-average`；社零单月、CPI与PCE为 `month`，社零和房地产累计为 `year-to-date`；GDP 为 `quarter`；EFFR 为 `overnight-transaction-date`；申领为 `week-ending-saturday` |
 | `seasonal_adjustment` | CN、EFFR 为 `not-seasonally-adjusted`；US M2、GDP、申领、PCE、实际消费／收入、工业指标为 `seasonally-adjusted`；CPI各序列分别标记 |
-| `price_basis` | 货币和社零、房地产金额为 `nominal`；实际GDP／消费／收入为 `real-chained`；CPI／PCE价格为 `price-index`；工业生产为 `volume-index`；房屋面积、利率、申领数量和产能利用率为 `not_applicable` |
+| `price_basis` | 货币和社零、房地产金额及名义时薪为 `nominal`；实际GDP／消费／收入为 `real-chained`；CPI／PCE价格为 `price-index`；工业生产为 `volume-index`；房屋面积、利率、申领数量、产能利用率、劳动力比率和工时为 `not_applicable` |
 | `annualized` | 水平与增速各自标记；GDP／实际消费／实际收入水平和GDP官方环比年化增速为 true，其余当前序列为 false |
 | `value_origin` | `official` 或 `derived`，不以计算值冒充官方公布值 |
 | `definition`、`formula` | 统计口径标识；计算增速保留公式，官方值公式为 null |
@@ -110,6 +114,16 @@ PCE价格提供 `us.pce.index`、`us.core-pce.index` 及各自的 `yoy_percent`�
 
 两种变化分别选取provider的对应字段，适配层不重算。零基期不能用于百分比增速，但可用于百分点差；缺失基期均保留 null，不跨缺口替换。日期、原值、抓取时间及原provider结果完整保留。各系列的历史起点保存在原结果中，不因为共享快照而混用历史覆盖范围；未提供的公布时间和修订编号仍为 null。
 
+### 劳动力比率与时薪工时：CPS和CES分别保留
+
+失业率、劳动参与率分别提供 `us.<indicator>.rate`、`yoy_percentage_points`、`mom_percentage_points`。官方季调比率的单位为 `percent`，变化单位为 `percentage_points`，不计算相对百分比增速。序列新增可选 `survey`、`numerator`、`denominator`，直接保留provider的调查、分子和分母定义：失业率为失业人数／平民劳动力，劳动参与率为平民劳动力／非机构平民人口。`coverage` 保留16岁及以上非机构平民人口范围；人口控制脚注和可比性说明保存在 `original`，不把CPS住户调查与CES企业调查混用。
+
+时薪、工时分别提供 `us.earnings.*`、`us.weekly-hours.*` 下的 `level`、`monthly_change`、`yoy_percent`、`mom_percent`。均为CES私人非农全部雇员（含全职、兼职）的月度季调观测，不包含政府雇员。平均时薪是名义税前值，单位 `USD_per_hour`；平均每周工时是平均支付工时，单位 `hours_per_week`，不是周度发布频率。月变化为相邻月水平差，与水平同单位；同／环比为未年化计算增速。水平和变化均不折年，不改成人均收入或劳动总时长。
+
+四个出口均保留严格上月／上年同月的原始水平与来源序列。基期必须属于正确月份和同一来源序列；不从相邻输出行重建、不跨BLS批次拼算，直接保留provider同批计算结果。每条观测的 `fetched_at` 来自该当前点，不用一个批次时间覆盖全部月份。未返回当前点时可为 null，完整批次信息及当前／基期脚注、抓取时间均保留在 `original`。
+
+CES官方水平新增可选 `preliminary`，表示原点是否标记P；false只表示未标P，不代表最终不再修订。没有返回原点时省略，不把未知状态写成false。计算差值／增速不设置该字段，其输入的初步标记可从 `original` 检查。此字段不改变原先各命令的 `--json`。公布时间和修订编号不可得时仍为 null，不从P或latest标记推算发布日期或版本编号。
+
 ## 缺失与溯源
 
 每条观测保留 `period`（按频率使用YYYYMM、YYYYQn或YYYYMMDD）、`value`、`status`、`missing_reason`、`raw_value`、`source`、`fetched_at`、`published_date`、`published_at`、`revision_id`、`data_version`、`base`、`note`。`index_base`、`inputs`是版本1的可选扩展字段，原出口无此元数据时仍省略，不修改原JSON结构。
@@ -128,6 +142,6 @@ PCE价格提供 `us.pce.index`、`us.core-pce.index` 及各自的 `yoy_percent`�
 
 ## 覆盖与后续迁移
 
-当前完成货币指标、社零、房地产与美国GDP、EFFR、CPI／核心CPI、初请／续请、PCE／核心PCE价格、实际消费／收入、工业生产／利用率的统一导出，未将所有宏观 provider 迁移。其余指标继续使用原 JSON，TODO 中全局基础项仍保留未完成状态。其他指标、部分抓取失败、完整历史版本与中美可比性需要各自的适配和测试，不因本批格式扩展而视为已完成。
+当前已接入指标见上文各小节；尚未将所有宏观 provider 迁移。其余指标继续使用原 JSON，TODO 中全局基础项仍保留未完成状态。其他指标、部分抓取失败、完整历史版本与中美可比性需要各自的适配和测试，不因本批格式扩展而视为已完成。
 
 测试覆盖真实离线样本、旧输出回归、官方值／计算值、M1口径边界、房地产范围变化、累计所属期、1—2月合并、零与缺失、严格基期、空结果、元数据空值、重复月份、非法范围、非有限值、上游错误、取消及输出写入失败。

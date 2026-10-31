@@ -144,6 +144,7 @@ CLI `sec watch` 与 Desktop「我的自选」统一使用 `~/.sec/watchlist.json
 | `macro us initial-claims --standard-json`、`macro us continued-claims --standard-json` | 周度申领统一JSON导出：所属周、前周变化、四周均值和输入窗口，见 [统一导出文档](docs/macro-standard.md) |
 | `macro us pce --standard-json`、`macro us core-pce --standard-json`、`macro us real-pce --standard-json` | PCE价格与实际消费统一JSON导出：指数／金额、折年口径和分项不可加性，见 [统一导出文档](docs/macro-standard.md) |
 | `macro us real-income --standard-json`、`macro us industrial-production --standard-json`、`macro us capacity-utilization --standard-json` | 实际收入与工业统一JSON导出：总体范围、折年口径和百分比／百分点变化，见 [统一导出文档](docs/macro-standard.md) |
+| `macro us unemployment --standard-json`、`macro us participation --standard-json`、`macro us earnings --standard-json`、`macro us weekly-hours --standard-json` | 劳动力比率、时薪工时统一JSON导出：CPS／CES范围、分子分母、变化单位与初步标记，见 [统一导出文档](docs/macro-standard.md) |
 | `macro us trade`、`macro us real-trade`        | 月度名义贸易与季度实际贸易，出口、进口及官方差额；支持商品/服务分项，见 [美国进出口文档](docs/us-trade.md) |
 | `macro us investment`、`macro us equipment-investment` | 住宅开工、建筑许可及季度设备投资，分别保留频率、单位和季调折年口径，见 [美国投资文档](docs/us-investment.md) |
 | `macro us bank-credit`、`macro us lending-standards`、`macro us debt-service` | 月平均银行信贷、季度贷款标准及家庭偿债负担，区分百分比和百分点变化，见 [美国信用文档](docs/us-credit.md) |
