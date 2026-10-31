@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/alwqx/sec/provider/macrodata"
 	"github.com/alwqx/sec/provider/nbs"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
@@ -32,6 +33,16 @@ func newPropertyCLI() *cobra.Command {
 			return err
 		}
 		asJSON, _ := cmd.Flags().GetBool("json")
+		standard, _ := cmd.Flags().GetBool("standard-json")
+		if standard {
+			dataset, err := macrodata.Property(result, begin, end)
+			if err != nil {
+				return err
+			}
+			encoder := json.NewEncoder(cmd.OutOrStdout())
+			encoder.SetIndent("", "  ")
+			return encoder.Encode(dataset)
+		}
 		if asJSON {
 			encoder := json.NewEncoder(cmd.OutOrStdout())
 			encoder.SetIndent("", "  ")
@@ -40,6 +51,8 @@ func newPropertyCLI() *cobra.Command {
 		return printProperty(cmd.OutOrStdout(), result)
 	}}
 	addQueryFlags(command)
+	command.Flags().Bool("standard-json", false, "按统一宏观序列格式输出JSON，保留累计所属期和历史统计范围")
+	command.MarkFlagsMutuallyExclusive("json", "standard-json")
 	command.Flags().String("component", "all", "房地产指标：all、sales-area（销售面积）、sales-value（销售额）、starts-area（新开工面积）")
 	return command
 }
