@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/alwqx/sec/provider/macrodata"
 	"github.com/alwqx/sec/provider/nbs"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
@@ -26,6 +27,11 @@ func newHouseholdCLI() *cobra.Command {
 		if err != nil {
 			return err
 		}
+		standard, _ := cmd.Flags().GetBool("standard-json")
+		if standard {
+			dataset, err := macrodata.Household(result)
+			return writeDataset(cmd, dataset, err)
+		}
 		asJSON, _ := cmd.Flags().GetBool("json")
 		if asJSON {
 			encoder := json.NewEncoder(cmd.OutOrStdout())
@@ -35,6 +41,7 @@ func newHouseholdCLI() *cobra.Command {
 		return printHousehold(cmd.OutOrStdout(), result)
 	}}
 	addQueryFlags(command)
+	addStandardJSONFlag(command, "按统一宏观序列格式输出JSON，保留年初累计范围和全年自产自用口径")
 	command.Flags().Lookup("begin").Usage = "开始季度 YYYYQ1至YYYYQ4，默认截至季度前7季；最早2013Q1"
 	command.Flags().Lookup("end").Usage = "截至季度 YYYYQ1至YYYYQ4，默认北京时间上一完整季度"
 	return command

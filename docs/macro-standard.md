@@ -46,6 +46,10 @@ sec macro cn pmi --begin 202607 --end 202609 --standard-json
 sec macro cn nonmanufacturing-pmi --begin 202607 --end 202609 --standard-json
 sec macro cn industrial --begin 202601 --end 202609 --standard-json
 sec macro cn unemployment --age-groups --begin 202306 --end 202401 --standard-json
+sec macro cn gdp --begin 2025Q1 --end 2026Q3 --standard-json
+sec macro cn household --begin 2025Q1 --end 2026Q3 --standard-json
+sec macro cn investment --sector infrastructure --begin 202509 --end 202609 --standard-json
+sec macro cn enterprise --begin 202601 --end 202609 --standard-json
 ```
 
 各命令分别输出独立数据集。原有表格、别名、日期默认值、`--json`、`--refresh` 和 `--no-cache` 行为不变；`--json` 与 `--standard-json` 互斥。统一字段用于程序读取，不改变币种、单位或统计口径，也不自动生成中美对比。
@@ -59,13 +63,13 @@ sec macro cn unemployment --age-groups --begin 202306 --end 202401 --standard-js
 | 字段 | 含义 |
 | --- | --- |
 | `id`、`indicator` | 序列标识、指标，例如 `us.m2.level`、`m2` |
-| `measure` | `level`、`yoy_percent`、`mom_percent`、`ytd_level`、`ytd_yoy_percent`；GDP 另有 `qoq_percent`、`qoq_annualized_percent`；EFFR 为 `rate`、`previous_observation_change`；贷款标准和偿债比率为 `rate`、`yoy_percentage_points`、`qoq_percentage_points`；CN失业率为 `rate`；非农新增为 `monthly_change`；贸易差额变化为 `yoy_change`、`mom_change`、`qoq_change`；目标利率为 `lower_bound`、`upper_bound`、`lower_change`、`upper_change`；CN PMI为 `diffusion_index`；DTS官方金额为 `daily`、`month_to_date`、`fiscal_year_to_date`，国债和拍卖的其他 `measure` 见各小节 |
-| `unit` | `CNY_100_million`（亿元人民币）、`USD_billion`（十亿美元）、`USD_million`（百万美元）、`square_meters_10000`（万平方米）、`percent`、`percentage_points`（百分点）、`basis_points`（基点）、`index`、`claims`（申请件数）、`persons`（人数）、`USD_per_hour`、`hours_per_week`、`housing_units_thousand`（千套）、`housing_units`（套）、`jobs_thousand`（千个岗位）、`USD`（美元面值）、`USD_per_100_par`（每100美元面值的价格） |
+| `measure` | `level`、`yoy_percent`、`mom_percent`、`ytd_level`、`ytd_yoy_percent`；GDP 另有 `qoq_percent`、`qoq_annualized_percent`；EFFR 为 `rate`、`previous_observation_change`；贷款标准和偿债比率为 `rate`、`yoy_percentage_points`、`qoq_percentage_points`；CN失业率为 `rate`；非农新增为 `monthly_change`；贸易差额变化为 `yoy_change`、`mom_change`、`qoq_change`；目标利率为 `lower_bound`、`upper_bound`、`lower_change`、`upper_change`；CN PMI为 `diffusion_index`；CN GDP另有 `yoy_index`、`ytd_yoy_index`；CN居民收支增速为 `ytd_real_yoy_percent`；DTS官方金额为 `daily`、`month_to_date`、`fiscal_year_to_date`，国债和拍卖的其他 `measure` 见各小节 |
+| `unit` | `CNY_100_million`（亿元人民币）、`USD_billion`（十亿美元）、`USD_million`（百万美元）、`square_meters_10000`（万平方米）、`percent`、`percentage_points`（百分点）、`basis_points`（基点）、`index`、`claims`（申请件数）、`persons`（人数）、`USD_per_hour`、`hours_per_week`、`housing_units_thousand`（千套）、`housing_units`（套）、`jobs_thousand`（千个岗位）、`USD`（美元面值）、`USD_per_100_par`（每100美元面值的价格）、`CNY_per_person`（元/人） |
 | `frequency` | `monthly`、`quarterly`、`daily`、`weekly`、`event`（只在实际发生时有观测） |
-| `period_basis` | CN 货币为 `month-end`；US 货币为 `monthly-average`；社零单月、CPI、PCE、CN PMI、CN失业率和工业单月同比与环比为 `month`，社零、房地产和工业累计为 `year-to-date`；GDP 为 `quarter`；EFFR 为 `overnight-transaction-date`；目标利率为 `effective-date`；DTS日值为 `record-date`，累计为 `month-to-date`、`fiscal-year-to-date`；拍卖为 `issue-date` 或 `auction-date`；申领为 `week-ending-saturday`；银行信贷为 `pro_rata_average_of_weekly_levels`，贷款标准为 `survey_quarter`，偿债比率为 `calendar_quarter` |
-| `seasonal_adjustment` | CN（PMI和工业环比除外）、EFFR 为 `not-seasonally-adjusted`；CN PMI和工业环比为 `seasonally-adjusted`；US M2、GDP、申领、PCE、实际消费／收入、工业指标、银行信贷、偿债比率、投资、非农、住宅销售、贸易为 `seasonally-adjusted`；贷款标准、房价指数、目标利率、国债交易与拍卖为 `not-seasonally-adjusted`；CPI各序列分别标记 |
-| `price_basis` | 货币和社零、房地产金额及名义时薪为 `nominal`；实际GDP／消费／收入为 `real-chained`；CN工业增加值增速为 `real`（扣除价格因素的增速）；CPI／PCE价格为 `price-index`；工业生产为 `volume-index`；房屋面积、PMI、CN失业率、利率、申领数量、产能利用率、劳动力比率、工时、贷款标准、偿债比率和住房套数为 `not_applicable`；银行信贷、名义设备投资和名义贸易为 `nominal`，实际设备投资和实际贸易为 `real-chained`；非农和住宅销售为 `not_applicable`，房价指数为 `price-index`；国债交易为 `nominal`，拍卖金额为 `par-value`，拍卖价格为 `not_applicable` |
-| `annualized` | 水平与增速各自标记；GDP／实际消费／实际收入／企业利润／住宅建设／设备投资／住宅销售／实际贸易水平、实际贸易差额变化和GDP官方环比年化增速为 true，其余当前序列为 false |
+| `period_basis` | CN 货币为 `month-end`；US 货币为 `monthly-average`；社零单月、CPI、PCE、CN PMI、CN失业率和工业单月同比与环比为 `month`，社零、房地产和工业累计为 `year-to-date`；GDP 为 `quarter`，CN GDP累计和CN居民收支、固定资产投资为 `year-to-date`；CN工业企业利润为 `year-to-date`，余额为 `month-end`；EFFR 为 `overnight-transaction-date`；目标利率为 `effective-date`；DTS日值为 `record-date`，累计为 `month-to-date`、`fiscal-year-to-date`；拍卖为 `issue-date` 或 `auction-date`；申领为 `week-ending-saturday`；银行信贷为 `pro_rata_average_of_weekly_levels`，贷款标准为 `survey_quarter`，偿债比率为 `calendar_quarter` |
+| `seasonal_adjustment` | CN（PMI、工业环比和GDP环比除外）、EFFR 为 `not-seasonally-adjusted`；CN PMI、工业环比和GDP环比为 `seasonally-adjusted`；US M2、GDP、申领、PCE、实际消费／收入、工业指标、银行信贷、偿债比率、投资、非农、住宅销售、贸易为 `seasonally-adjusted`；贷款标准、房价指数、目标利率、国债交易与拍卖为 `not-seasonally-adjusted`；CPI各序列分别标记 |
+| `price_basis` | 货币和社零、房地产金额及名义时薪为 `nominal`；实际GDP／消费／收入为 `real-chained`；CN工业增加值增速、CN GDP指数和增速、CN居民收支增速为 `real`（扣除价格因素）；CN GDP金额为 `constant-prices`（分段基期）；CN固定资产投资、工业企业和居民收支金额为 `nominal`；CPI／PCE价格为 `price-index`；工业生产为 `volume-index`；房屋面积、PMI、CN失业率、利率、申领数量、产能利用率、劳动力比率、工时、贷款标准、偿债比率和住房套数为 `not_applicable`；银行信贷、名义设备投资和名义贸易为 `nominal`，实际设备投资和实际贸易为 `real-chained`；非农和住宅销售为 `not_applicable`，房价指数为 `price-index`；国债交易为 `nominal`，拍卖金额为 `par-value`，拍卖价格为 `not_applicable` |
+| `annualized` | 水平与增速各自标记；US GDP／实际消费／实际收入／企业利润／住宅建设／设备投资／住宅销售／实际贸易水平、实际贸易差额变化和US GDP官方环比年化增速为 true，其余当前序列为 false |
 | `value_origin` | `official` 或 `derived`，不以计算值冒充官方公布值 |
 | `definition`、`formula` | 统计口径标识；计算增速保留公式，官方值公式为 null |
 
@@ -307,14 +311,48 @@ DTS的类别和细项在不同时期写法不同（如 `Table IIIA` 和 `Table I
 
 16—24岁的同一个官方指标跨越2023年口径调整，所以按 `definition_version` 拆成不同序列，不跨断点连接；`indicator` 相同，都是 `unemployment.age-16-24`。`methodology` 保留口径版本和在校生范围。2023年7—11月暂停发布期，16—24岁和旧25—59岁的空值原因都是 `publication_paused`（16—24岁单列暂停期序列，旧25—59岁沿用原序列）；新分组此时尚未开始发布，是 `source_value_missing`。`note` 说明该月适用的口径，所以有值的观测也会带。
 
+### 中国GDP：金额、指数和增速
+
+`gdp` 输出七条季度序列：
+
+| 序列 | 含义 | 来源 |
+| --- | --- | --- |
+| `cn.gdp.level`、`ytd_level` | 不变价当季、累计金额，亿元 | 官方 |
+| `cn.gdp.yoy_index`、`ytd_yoy_index` | 上年同期=100指数，`index_base` 标明 | 官方 |
+| `cn.gdp.yoy_percent`、`ytd_yoy_percent` | 指数减100，`inputs` 保留官方指数 | 计算 |
+| `cn.gdp.qoq_percent` | 季调环比，未年化 | 官方 |
+
+金额按不同基期分段，`reference_year` 不设置，序列的 `coverage` 保留官方注释，不能跨基期直接比较。累计观测用 `period_begin`、`period_end` 标明范围。发布库不提供逐值原文，`raw_value` 为 null。
+
+### 中国居民收支：累计人均值
+
+`household` 输出 `cn.household.income.*` 和 `cn.household.consumption.*`，`ytd_level` 为现价元/人（`CNY_per_person`），`ytd_real_yoy_percent` 为官方累计实际同比。都是年初至期末累计，未季调、未折年。`raw_value` 保留发布库原文。全年累计含自产自用，季度累计不含，所以Q4的观测带 `note`，不要相减得到第四季度。
+
+### 中国固定资产投资：累计值和统计范围
+
+`investment` 输出 `cn.investment.<sector>.ytd_level` 和 `ytd_yoy_percent`，都是年初累计、名义、未季调。基建的统计范围有断点，序列ID带上范围（`excluding_electricity_heat_gas_water` 或 `including_electricity_heat_gas_water`），不跨范围连接；`indicator` 相同。1月免报和未检索到月报的月份无法确定范围，单独成 `cn.investment.infrastructure.ytd_level` 和 `ytd_yoy_percent`，只有缺失观测，不把它们归入任一范围。
+
+1月免报时原因是 `january_exempt`，未检索到月报时是 `report_not_found`，这两种情况的 `source`、`fetched_at` 都是 null。基建等分项未公布金额时，金额观测为 `source_value_missing` 并说明不反推，增速观测的 `note` 保留当期可比口径说明。`published_at` 取稿件页面时间。
+
+### 中国工业企业：累计利润和月末余额
+
+`enterprise` 输出 `cn.enterprise.<metric>.<scope_standard>[.<accounting_scope>].<measure>`。调查范围和应收账款列报方式变化时序列分开，不跨断点连接；`coverage` 保留调查范围。
+
+| 指标 | `measure` | 含义 |
+| --- | --- | --- |
+| `profit` | `ytd_level`、`ytd_yoy_percent` | 年初累计流量，可以为负；2月是1—2月合并，不是单月 |
+| `inventory`、`finished-goods`、`receivables` | `level`、`yoy_percent` | 月末余额，`as_of_date` 是月末日期 |
+
+缺失原因区分 `january_exempt`、`not_surveyed`（2007—2010年只调查2、5、8、11月，含这些年的1月）、`definition_suspended`（2019年应收账款）和 `official_not_computable`（官方标注利润同比不可计算），其余为 `source_value_missing`。`note` 只出现在缺失观测上，同比都是官方值，不自行计算。
+
 ## 缺失与溯源
 
 每条观测保留 `period`（按频率使用YYYYMM、YYYYQn或YYYYMMDD）、`value`、`status`、`missing_reason`、`raw_value`、`source`、`fetched_at`、`published_date`、`published_at`、`revision_id`、`data_version`、`base`、`note`。`index_base`、`inputs`是版本1的可选扩展字段，原出口无此元数据时仍省略，不修改原JSON结构。
 
 - 数值存在时 `status="available"`，包括零值和负增速；`missing_reason=null`。
-- 数值缺失时 `value=null`、`status="missing"`。`report_not_found` 表示人民银行当前目录未检索到月份；`source_value_missing` 表示源水平或报告字段缺失；计算增速另外区分 `current_value_missing`、`baseline_missing`、`zero_baseline`，其他无法计算的情况为 `calculation_unavailable`。CN失业率年龄分组暂停发布期为 `publication_paused`。缺失不自动归因于未发布、停更或历史不存在。
+- 数值缺失时 `value=null`、`status="missing"`。`report_not_found` 表示人民银行当前目录未检索到月份；`source_value_missing` 表示源水平或报告字段缺失；计算增速另外区分 `current_value_missing`、`baseline_missing`、`zero_baseline`，其他无法计算的情况为 `calculation_unavailable`。CN失业率年龄分组暂停发布期为 `publication_paused`；CN投资和工业企业的其他原因见各小节。缺失不自动归因于未发布、停更或历史不存在。
 - 含 `base` 的计算值保留指标规定的严格基期，见各指标小节；四周均值使用完整 `inputs`。官方水平和直接发布的官方增速的 `base=null`。不重新计算、不跨缺口寻找替代基期。
-- FRED／BLS已提供的官方原值保留源数字字符串，包括缺失标记；计算值的原始字符串为 null。当前接入的 CN provider 未提供逐字段原始数字字符串，该字段为 null，不把格式化后的数值冒充原值。NBS逐字段来源标识另存为 `source_series_id`。EFFR的原始JSON记录保留在 `original`，规则见前节。
+- FRED／BLS已提供的官方原值保留源数字字符串，包括缺失标记；计算值的原始字符串为 null。CN居民收支保留发布库原文；其他CN provider 未提供逐字段原始数字字符串，该字段为 null，不把格式化后的数值冒充原值。NBS逐字段来源标识另存为 `source_series_id`。EFFR的原始JSON记录保留在 `original`，规则见前节。
 - US货币、CPI、申领、劳动力比率、时薪工时、PCE与实际消费／收入、工业、企业、信用、投资、非农、住宅和贸易的 `note` 只出现在缺失观测上。住宅和贸易按各值的缺失原因生成；其余指标说明该行的缺失原因，同一行多个变化值都缺失时共用同一说明，逐值原因以 `missing_reason` 为准。完整逐行备注保留在 `original`。
 - `source` 和 `fetched_at` 保留 provider 实际来源与抓取时刻，命中缓存时保留原抓取时间。未找到 CN 报告时两者均为 null，不输出公元 1 年的虚假时间。
 - CN `published_date` 保留报告原有发布日期字段，仅表示源日期及其原精度；不填充零点作为精确公布时间。无法取得的 `published_at`、`revision_id` 为 null。

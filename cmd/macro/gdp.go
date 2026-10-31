@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/alwqx/sec/provider/macrodata"
 	"github.com/alwqx/sec/provider/nbs"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
@@ -26,6 +27,11 @@ func newGDPCLI() *cobra.Command {
 		if err != nil {
 			return err
 		}
+		standard, _ := cmd.Flags().GetBool("standard-json")
+		if standard {
+			dataset, err := macrodata.CNGDP(result)
+			return writeDataset(cmd, dataset, err)
+		}
 		asJSON, _ := cmd.Flags().GetBool("json")
 		if asJSON {
 			encoder := json.NewEncoder(cmd.OutOrStdout())
@@ -35,6 +41,7 @@ func newGDPCLI() *cobra.Command {
 		return printGDP(cmd.OutOrStdout(), result)
 	}}
 	addQueryFlags(command)
+	addStandardJSONFlag(command, "按统一宏观序列格式输出JSON，区分不变价金额、官方指数、计算同比和季调环比")
 	command.Flags().Lookup("begin").Usage = "开始季度 YYYYQ1至YYYYQ4，默认截至季度前7个季度；最早1992Q1"
 	command.Flags().Lookup("end").Usage = "截至季度 YYYYQ1至YYYYQ4，默认上一个已结束季度"
 	return command

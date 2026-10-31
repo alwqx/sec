@@ -98,6 +98,9 @@ type EnterpriseResult struct {
 	Notes              []string                `json:"notes"`
 }
 
+// EnterpriseYoYNotComputableNote 标记官方把利润同比标注为不可计算的观测。
+const EnterpriseYoYNotComputableNote = "官方利润同比标注为不可计算，不按零处理"
+
 type enterpriseSpec struct {
 	name, valueName, growthName, measurement, valueCode, growthCode, first string
 }
@@ -331,7 +334,7 @@ func parseEnterprise(response enterpriseValuesResponse, req *EnterpriseRequest, 
 						item.YoY = n
 					}
 					if marked {
-						item.Note = "官方利润同比标注为不可计算，不按零处理"
+						item.Note = EnterpriseYoYNotComputableNote
 					}
 				}
 				if !found {
