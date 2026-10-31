@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/alwqx/sec/provider/fred"
+	"github.com/alwqx/sec/provider/macrodata"
 	"github.com/alwqx/sec/utils"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
@@ -36,6 +37,16 @@ func newUSGDPCLI() *cobra.Command {
 			return err
 		}
 		asJSON, _ := cmd.Flags().GetBool("json")
+		standard, _ := cmd.Flags().GetBool("standard-json")
+		if standard {
+			dataset, err := macrodata.USGDP(result)
+			if err != nil {
+				return err
+			}
+			encoder := json.NewEncoder(cmd.OutOrStdout())
+			encoder.SetIndent("", "  ")
+			return encoder.Encode(dataset)
+		}
 		if asJSON {
 			encoder := json.NewEncoder(cmd.OutOrStdout())
 			encoder.SetIndent("", "  ")
@@ -44,6 +55,8 @@ func newUSGDPCLI() *cobra.Command {
 		return printUSGDP(cmd.OutOrStdout(), result)
 	}}
 	addQueryFlags(command)
+	command.Flags().Bool("standard-json", false, "按统一宏观序列格式输出JSON，区分折年水平、年化及未年化增速")
+	command.MarkFlagsMutuallyExclusive("json", "standard-json")
 	command.Flags().Lookup("begin").Usage = "开始季度 YYYYQ1至YYYYQ4，默认截至季度前7个季度；最早1947Q1"
 	command.Flags().Lookup("end").Usage = "截至季度 YYYYQ1至YYYYQ4，默认UTC上一个已结束季度"
 	command.Flags().Bool("vintages", false, "附带BEA官方发布版本档案（2002Q1起的各版实际增速及发布日期）")

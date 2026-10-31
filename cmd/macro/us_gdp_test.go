@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/alwqx/sec/provider/fred"
+	"github.com/alwqx/sec/provider/macrodata"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/h2non/gock.v1"
 )
@@ -16,18 +17,33 @@ func TestUSGDPCLI(t *testing.T) {
 	defer gock.Off()
 	raw, err := os.ReadFile("../../provider/fred/testdata/us-gdp.csv")
 	require.NoError(t, err)
-	for _, asJSON := range []bool{false, true} {
+	for _, output := range []string{"table", "json", "standard"} {
 		gock.New("https://fred.stlouisfed.org").Get("/graph/fredgraph.csv").MatchParam("id", "GDPC1,A191RL1Q225SBEA").MatchHeader("User-Agent", "curl").Reply(200).BodyString(string(raw))
 		cmd := NewMacroCLI()
 		args := []string{"us", "gdp", "--begin", "2026Q1", "--end", "2026Q2", "--no-cache"}
-		if asJSON {
+		if output == "json" {
 			args = append(args, "--json")
+		}
+		if output == "standard" {
+			args = append(args, "--standard-json")
 		}
 		cmd.SetArgs(args)
 		var out bytes.Buffer
 		cmd.SetOut(&out)
 		require.NoError(t, cmd.Execute())
-		if asJSON {
+		if output == "standard" {
+			var result macrodata.Dataset
+			require.NoError(t, json.Unmarshal(out.Bytes(), &result))
+			require.Len(t, result.Observations, 8)
+			require.Equal(t, "quarterly", result.Series[0].Frequency)
+			require.True(t, result.Series[0].Annualized)
+			require.True(t, result.Series[1].Annualized)
+			require.False(t, result.Series[2].Annualized)
+			require.Equal(t, 2017, *result.Series[0].ReferenceYear)
+			require.Equal(t, 24408.011, *result.Observations[4].Value)
+			require.Equal(t, 2.2, *result.Observations[5].Value)
+			require.Equal(t, "2026Q1", result.Observations[6].Base.Period)
+		} else if output == "json" {
 			var result fred.GDPResult
 			require.NoError(t, json.Unmarshal(out.Bytes(), &result))
 			require.Len(t, result.Observations, 2)
@@ -53,19 +69,32 @@ func TestUSGDPVintagesCLI(t *testing.T) {
 	require.NoError(t, err)
 	workbook, err := os.ReadFile("../../provider/fred/testdata/us-gdp-vintages.xlsx")
 	require.NoError(t, err)
-	for _, asJSON := range []bool{false, true} {
+	for _, output := range []string{"table", "json", "standard"} {
 		gock.New("https://fred.stlouisfed.org").Get("/graph/fredgraph.csv").Reply(200).BodyString(string(raw))
 		gock.New("https://apps.bea.gov").Get("/national/xls/gdp-gdi-vintage-history.xlsx").Reply(200).Body(bytes.NewReader(workbook))
 		cmd := NewMacroCLI()
 		args := []string{"us", "gdp", "--begin", "2026Q2", "--end", "2026Q2", "--vintages", "--no-cache"}
-		if asJSON {
+		if output == "json" {
 			args = append(args, "--json")
+		}
+		if output == "standard" {
+			args = append(args, "--standard-json")
 		}
 		cmd.SetArgs(args)
 		var out bytes.Buffer
 		cmd.SetOut(&out)
 		require.NoError(t, cmd.Execute())
-		if asJSON {
+		if output == "standard" {
+			var result macrodata.Dataset
+			require.NoError(t, json.Unmarshal(out.Bytes(), &result))
+			require.Len(t, result.Observations, 4, "发布档案不混入当前序列")
+			var original fred.GDPResult
+			require.NoError(t, json.Unmarshal(result.Original, &original))
+			require.True(t, original.VintagesRequested)
+			require.Len(t, original.Observations[0].Vintages, 3)
+			require.Nil(t, original.Observations[0].Vintages[0].RealLevel)
+			require.Equal(t, "2026-07-30", original.Observations[0].Vintages[0].ReleaseDate)
+		} else if output == "json" {
 			var result fred.GDPResult
 			require.NoError(t, json.Unmarshal(out.Bytes(), &result))
 			require.True(t, result.VintagesRequested)
