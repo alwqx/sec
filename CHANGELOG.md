@@ -85,6 +85,7 @@
 80. Extend `--standard-json` to Chinese retail sales and property data with explicit monthly versus year-to-date coverage and upstream series identifiers; retain January-February combined reporting, official growth rates, area versus value units and historical sales scope boundaries without deriving monthly values, with adapter and CLI regression tests
 81. Extend `--standard-json` to US quarterly GDP and daily EFFR with frequency-aware period validation, distinct GDP annualization and reference-year metadata, strict growth baselines and EFFR methodology boundaries; preserve revision flags, unknown out-of-window baseline levels and original GDP vintage records with adapter and CLI regression tests
 82. Extend `--standard-json` to US CPI/core CPI and initial/continued claims with distinct seasonal-adjustment series, explicit index bases, weekly period support and complete four-week calculation inputs; preserve strict growth baselines, separate claims dates, raw values, missing observations and original footnotes with adapter and CLI regression tests
+83. Extend `--standard-json` to PCE/core PCE price indexes and all five real consumption components, distinguishing price indexes from real SAAR amounts and unannualized growth; preserve strict monthly baselines, raw values, original provider results and explicit chain-component nonadditivity with adapter and CLI regression tests
 
 ### v0.3.15
 
