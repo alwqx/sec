@@ -2,6 +2,7 @@ package macrodata
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/alwqx/sec/provider/bls"
@@ -19,6 +20,44 @@ type laborMeasure struct {
 	value                  *float64
 	base                   *laborPoint
 	ratio                  bool
+}
+
+// Payrolls 保留CES岗位水平和严格相邻月差额，单位不转换为人数；本机观测版本只放在original。
+func Payrolls(result *bls.PayrollResult) (*Dataset, error) {
+	if result == nil {
+		return nil, fmt.Errorf("非农就业结果不能为空")
+	}
+	if result.SeriesID != "CES0000000001" || result.Survey == "" || result.Frequency != "monthly" || result.Unit != "千个岗位" || !result.SeasonallyAdjusted {
+		return nil, fmt.Errorf("非农就业统计口径不符合统一导出契约")
+	}
+	d, err := newDataset("US", result.Begin, result.End, result)
+	if err != nil {
+		return nil, err
+	}
+	s := Series{ID: "us.payrolls", Indicator: "payrolls", Frequency: "monthly", PeriodBasis: "month", SeasonalAdjustment: "seasonally-adjusted", PriceBasis: "not_applicable", Definition: result.SeriesID, Coverage: "美国总非农工资岗位，所有雇员；按岗位计数，不是去重就业人数", Survey: result.Survey}
+	point := func(v bls.PayrollValue) laborPoint {
+		p := cesPoint(v.Period, result.SeriesID, v.RawValue, v.Employment, v.FetchedAt, v.Preliminary)
+		if p.fetchedAt.IsZero() {
+			p.fetchedAt = payrollBatchFetchedAt(result.Batches, v.Period)
+		}
+		return p
+	}
+	seen := map[string]bool{}
+	for _, o := range result.Observations {
+		if seen[o.Period] {
+			return nil, fmt.Errorf("非农就业月份重复: %s", o.Period)
+		}
+		seen[o.Period] = true
+		if o.Change != nil && (o.Employment == nil || o.Previous.Employment == nil) {
+			return nil, fmt.Errorf("非农新增缺少当月或上月水平: %s", o.Period)
+		}
+		previous := point(o.Previous)
+		specs := []laborMeasure{{"level", "jobs_thousand", "", o.Employment, nil, false}, {"monthly_change", "jobs_thousand", "current_level - base_level", o.Change, &previous, false}}
+		if err := appendLaborRow(d, s, point(o.PayrollValue), specs, result.Source, result.PublishedAt, o.Note); err != nil {
+			return nil, err
+		}
+	}
+	return d, nil
 }
 
 // LaborForce 保留CPS官方比率及分子分母，变化为严格基期百分点差。
@@ -73,11 +112,7 @@ func EarningsHours(result *bls.EarningsHoursResult) (*Dataset, error) {
 	}
 	s := Series{ID: "us." + result.Indicator, Indicator: result.Indicator, Frequency: "monthly", PeriodBasis: "month", SeasonalAdjustment: "seasonally-adjusted", PriceBasis: price, Definition: id, Coverage: result.Population, Survey: "CES establishment survey"}
 	point := func(v bls.EarningsHoursValue) laborPoint {
-		p := laborPoint{period: v.Period, id: v.SeriesID, raw: v.RawValue, value: v.Value, fetchedAt: v.FetchedAt}
-		if v.Value != nil || v.RawValue != "" || !v.FetchedAt.IsZero() {
-			p.preliminary = &v.Preliminary
-		}
-		return p
+		return cesPoint(v.Period, v.SeriesID, v.RawValue, v.Value, v.FetchedAt, v.Preliminary)
 	}
 	seen := map[string]bool{}
 	for _, o := range result.Observations {
@@ -92,6 +127,29 @@ func EarningsHours(result *bls.EarningsHoursResult) (*Dataset, error) {
 		}
 	}
 	return d, nil
+}
+
+// cesPoint 只在返回了原点时设置初步标记，未知状态不写成false。
+func cesPoint(period, id, raw string, value *float64, fetchedAt time.Time, preliminary bool) laborPoint {
+	p := laborPoint{period: period, id: id, raw: raw, value: value, fetchedAt: fetchedAt}
+	if value != nil || raw != "" || !fetchedAt.IsZero() {
+		p.preliminary = &preliminary
+	}
+	return p
+}
+
+// payrollBatchFetchedAt 返回展示该月的批次抓取时间；重叠年由较早批次展示，因此取首个匹配。
+func payrollBatchFetchedAt(batches []bls.CPIBatch, period string) time.Time {
+	year, err := strconv.Atoi(period[:min(4, len(period))])
+	if err != nil {
+		return time.Time{}
+	}
+	for _, batch := range batches {
+		if year >= batch.StartYear && year <= batch.EndYear {
+			return batch.FetchedAt
+		}
+	}
+	return time.Time{}
 }
 
 // appendLaborRow 使用当前点的实际抓取时间；基期值来自provider同批结果，不跨批重建。

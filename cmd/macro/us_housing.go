@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/alwqx/sec/provider/fred"
+	"github.com/alwqx/sec/provider/macrodata"
 	"github.com/alwqx/sec/utils"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
@@ -61,6 +62,11 @@ func housingCommand(price bool) *cobra.Command {
 		if err != nil {
 			return err
 		}
+		standard, _ := cmd.Flags().GetBool("standard-json")
+		if standard {
+			dataset, err := macrodata.Housing(result)
+			return writeDataset(cmd, dataset, err)
+		}
 		asJSON, _ := cmd.Flags().GetBool("json")
 		if asJSON {
 			encoder := json.NewEncoder(cmd.OutOrStdout())
@@ -70,6 +76,7 @@ func housingCommand(price bool) *cobra.Command {
 		return housingPrint(cmd.OutOrStdout(), result)
 	}}
 	addQueryFlags(command)
+	addStandardJSONFlag(command, "按统一宏观序列格式输出JSON，分开新房、成屋和房价指数的单位与季调口径")
 	command.Flags().Lookup("begin").Usage = "开始月份 YYYYMM，默认截至月份前11个月；最早196301，成屋仅当前公开快照可见范围"
 	command.Flags().Lookup("end").Usage = "截至月份 YYYYMM，默认UTC上个月"
 	if price {

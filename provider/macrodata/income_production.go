@@ -67,7 +67,7 @@ func Production(result *fred.ProductionResult) (*Dataset, error) {
 		}
 		items = append(items, periodicObservation{current: point(o.ProductionValue), yearAgo: point(o.YoYBase), previous: point(o.MoMBase), yoy: yoy, change: mom, note: o.Note})
 	}
-	if err := appendPeriodicChanges(d, s, monthlyProvenance{result.Source, result.FetchedAt, result.PublishedAt, result.RevisionID}, items, periodicRule{points: points}); err != nil {
+	if err := appendPeriodicChanges(d, s, monthlyProvenance{result.Source, result.FetchedAt, result.PublishedAt, result.RevisionID}, items, periodicRule{kind: percentOrPoints(points)}); err != nil {
 		return nil, err
 	}
 	return d, nil
