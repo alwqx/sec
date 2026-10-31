@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/alwqx/sec/provider/fred"
+	"github.com/alwqx/sec/provider/macrodata"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/h2non/gock.v1"
 )
@@ -17,18 +18,39 @@ func TestUSClaimsCLI(t *testing.T) {
 	raw, err := os.ReadFile("../../provider/fred/testdata/jobless-claims.csv")
 	require.NoError(t, err)
 	for _, indicator := range []string{"initial-claims", "continued-claims"} {
-		for _, asJSON := range []bool{false, true} {
+		for _, output := range []string{"table", "json", "standard"} {
 			gock.New("https://fred.stlouisfed.org").Get("/graph/fredgraph.csv").MatchParam("id", "ICSA,CCSA").MatchHeader("User-Agent", "curl").Reply(200).BodyString(string(raw))
 			cmd := NewMacroCLI()
 			args := []string{"us", indicator, "--begin", "20261001", "--end", "20261024", "--no-cache"}
-			if asJSON {
+			if output == "json" {
 				args = append(args, "--json")
+			}
+			if output == "standard" {
+				args = append(args, "--standard-json")
 			}
 			cmd.SetArgs(args)
 			var out bytes.Buffer
 			cmd.SetOut(&out)
 			require.NoError(t, cmd.Execute())
-			if asJSON {
+			if output == "standard" {
+				var result macrodata.Dataset
+				require.NoError(t, json.Unmarshal(out.Bytes(), &result))
+				require.Len(t, result.Observations, 12)
+				require.Equal(t, "weekly", result.Series[0].Frequency)
+				require.Equal(t, "20261003", result.Observations[0].Period)
+				require.Len(t, result.Observations[2].Inputs, 4)
+				require.Equal(t, "20260926", result.Observations[1].Base.Period)
+				require.Nil(t, result.Observations[9].Value)
+				require.Nil(t, result.Observations[0].PublishedAt)
+				if indicator == "initial-claims" {
+					require.Equal(t, "claims", result.Series[0].Unit)
+					require.Equal(t, 194000.0, *result.Observations[6].Value)
+					require.Equal(t, 197750.0, *result.Observations[8].Value)
+				} else {
+					require.Equal(t, "persons", result.Series[0].Unit)
+					require.Nil(t, result.Observations[6].Value, "续请所属周不前移")
+				}
+			} else if output == "json" {
 				var got fred.ClaimsResult
 				require.NoError(t, json.Unmarshal(out.Bytes(), &got))
 				require.Len(t, got.Observations, 4)

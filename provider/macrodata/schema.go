@@ -22,6 +22,7 @@ type Dataset struct {
 }
 
 type Series struct {
+	IndexBase          string  `json:"index_base,omitempty"`
 	ReferenceYear      *int    `json:"reference_year,omitempty"`
 	ID                 string  `json:"id"`
 	Indicator          string  `json:"indicator"`
@@ -44,6 +45,7 @@ type Base struct {
 }
 
 type Observation struct {
+	Inputs            []Base     `json:"inputs,omitempty"`
 	RevisionIndicator string     `json:"revision_indicator,omitempty"`
 	SeriesID          string     `json:"series_id"`
 	Period            string     `json:"period"`
@@ -92,7 +94,7 @@ func validatePeriod(period, frequency string) error {
 		}
 	} else {
 		layout := "200601"
-		if frequency == "daily" {
+		if frequency == "daily" || frequency == "weekly" {
 			layout = "20060102"
 		} else if frequency != "monthly" {
 			return fmt.Errorf("不支持的频率: %s", frequency)
