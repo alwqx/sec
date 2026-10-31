@@ -94,7 +94,7 @@ func CPI(result *bls.CPIResult) (*Dataset, error) {
 					reason = "zero_baseline"
 				}
 			}
-			if err := d.append(o, reason); err != nil {
+			if err := d.appendDiagnostic(o, reason); err != nil {
 				return nil, err
 			}
 		}

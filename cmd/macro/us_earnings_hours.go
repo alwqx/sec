@@ -46,12 +46,7 @@ func newUSEarningsHoursCLI(indicator string) *cobra.Command {
 		standard, _ := cmd.Flags().GetBool("standard-json")
 		if standard {
 			dataset, err := macrodata.EarningsHours(result)
-			if err != nil {
-				return err
-			}
-			encoder := json.NewEncoder(cmd.OutOrStdout())
-			encoder.SetIndent("", "  ")
-			return encoder.Encode(dataset)
+			return writeDataset(cmd, dataset, err)
 		}
 		if asJSON {
 			encoder := json.NewEncoder(cmd.OutOrStdout())
@@ -61,8 +56,7 @@ func newUSEarningsHoursCLI(indicator string) *cobra.Command {
 		return printUSEarningsHours(cmd.OutOrStdout(), result)
 	}}
 	addQueryFlags(command)
-	command.Flags().Bool("standard-json", false, "按统一宏观序列格式输出JSON，保留私人非农范围、原单位和初步标记")
-	command.MarkFlagsMutuallyExclusive("json", "standard-json")
+	addStandardJSONFlag(command, "按统一宏观序列格式输出JSON，保留私人非农范围、原单位和初步标记")
 	command.Flags().Lookup("end").Usage = "截至月份 YYYYMM，默认UTC上个月"
 	return command
 }

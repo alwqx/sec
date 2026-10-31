@@ -77,7 +77,7 @@ func Claims(result *fred.ClaimsResult) (*Dataset, error) {
 					}
 				}
 			}
-			if err := d.append(o, reason); err != nil {
+			if err := d.appendDiagnostic(o, reason); err != nil {
 				return nil, err
 			}
 		}

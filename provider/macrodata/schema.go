@@ -22,6 +22,8 @@ type Dataset struct {
 }
 
 type Series struct {
+	Methodology        string  `json:"methodology,omitempty"`
+	ChangeMethod       string  `json:"change_method,omitempty"`
 	TaxBasis           string  `json:"tax_basis,omitempty"`
 	Survey             string  `json:"survey,omitempty"`
 	Numerator          string  `json:"numerator,omitempty"`
@@ -130,6 +132,15 @@ func newDatasetFrequency(region, begin, end, frequency string, original any) (*D
 		return nil, fmt.Errorf("保存原始provider结果失败: %w", err)
 	}
 	return &Dataset{frequency: frequency, SchemaVersion: "1", Region: region, Begin: begin, End: end, Series: []Series{}, Observations: []Observation{}, Original: raw}, nil
+}
+
+// appendDiagnostic 用于备注只说明逐行缺失原因的provider：有值的观测不带备注，
+// 避免可用观测带上其他序列的基期说明。
+func (d *Dataset) appendDiagnostic(o Observation, reason string) error {
+	if o.Value != nil {
+		o.Note = ""
+	}
+	return d.append(o, reason)
 }
 
 func (d *Dataset) append(o Observation, reason string) error {

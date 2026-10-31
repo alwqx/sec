@@ -46,12 +46,7 @@ func newUSClaimsCLI(indicator string) *cobra.Command {
 		standard, _ := cmd.Flags().GetBool("standard-json")
 		if standard {
 			dataset, err := macrodata.Claims(result)
-			if err != nil {
-				return err
-			}
-			encoder := json.NewEncoder(cmd.OutOrStdout())
-			encoder.SetIndent("", "  ")
-			return encoder.Encode(dataset)
+			return writeDataset(cmd, dataset, err)
 		}
 		if asJSON {
 			encoder := json.NewEncoder(cmd.OutOrStdout())
@@ -61,8 +56,7 @@ func newUSClaimsCLI(indicator string) *cobra.Command {
 		return printUSClaims(cmd.OutOrStdout(), result)
 	}}
 	addQueryFlags(command)
-	command.Flags().Bool("standard-json", false, "按统一宏观序列格式输出JSON，保留所属周、前周基期与四周均值窗口")
-	command.MarkFlagsMutuallyExclusive("json", "standard-json")
+	addStandardJSONFlag(command, "按统一宏观序列格式输出JSON，保留所属周、前周基期与四周均值窗口")
 	command.Flags().Lookup("begin").Usage = "开始日期 YYYYMMDD，默认截至日期前最近12个周六；最早19670107"
 	command.Flags().Lookup("end").Usage = "截至日期 YYYYMMDD，默认UTC今天；按区间内的周六所属周筛选"
 	return command

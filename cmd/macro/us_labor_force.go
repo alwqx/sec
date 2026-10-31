@@ -47,12 +47,7 @@ func newUSLaborForceCLI(indicator string) *cobra.Command {
 		standard, _ := cmd.Flags().GetBool("standard-json")
 		if standard {
 			dataset, err := macrodata.LaborForce(result)
-			if err != nil {
-				return err
-			}
-			encoder := json.NewEncoder(cmd.OutOrStdout())
-			encoder.SetIndent("", "  ")
-			return encoder.Encode(dataset)
+			return writeDataset(cmd, dataset, err)
 		}
 		if asJSON {
 			encoder := json.NewEncoder(cmd.OutOrStdout())
@@ -62,8 +57,7 @@ func newUSLaborForceCLI(indicator string) *cobra.Command {
 		return printUSLaborForce(cmd.OutOrStdout(), result)
 	}}
 	addQueryFlags(command)
-	command.Flags().Bool("standard-json", false, "按统一宏观序列格式输出JSON，保留调查总体、比率分母和百分点变化")
-	command.MarkFlagsMutuallyExclusive("json", "standard-json")
+	addStandardJSONFlag(command, "按统一宏观序列格式输出JSON，保留调查总体、比率分母和百分点变化")
 	command.Flags().Lookup("end").Usage = "截至月份 YYYYMM，默认UTC上个月"
 	return command
 }

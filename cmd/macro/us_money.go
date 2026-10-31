@@ -41,12 +41,7 @@ func newUSMoneyCLI() *cobra.Command {
 		standard, _ := cmd.Flags().GetBool("standard-json")
 		if standard {
 			dataset, err := macrodata.USMoney(result)
-			if err != nil {
-				return err
-			}
-			encoder := json.NewEncoder(cmd.OutOrStdout())
-			encoder.SetIndent("", "  ")
-			return encoder.Encode(dataset)
+			return writeDataset(cmd, dataset, err)
 		}
 		asJSON, _ := cmd.Flags().GetBool("json")
 		if asJSON {
@@ -57,8 +52,7 @@ func newUSMoneyCLI() *cobra.Command {
 		return printUSMoney(cmd.OutOrStdout(), result)
 	}}
 	addQueryFlags(command)
-	command.Flags().Bool("standard-json", false, "按统一宏观序列格式输出JSON，包含统计口径、来源和缺失状态")
-	command.MarkFlagsMutuallyExclusive("json", "standard-json")
+	addStandardJSONFlag(command, "按统一宏观序列格式输出JSON，包含统计口径、来源和缺失状态")
 	command.Flags().Lookup("begin").Usage = "开始月份 YYYYMM，默认截至月份前11个月；最早195901"
 	command.Flags().Lookup("end").Usage = "截至月份 YYYYMM，默认UTC上个月"
 	return command

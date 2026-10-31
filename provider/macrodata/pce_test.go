@@ -71,7 +71,7 @@ func TestPCEMissingAndZeroValues(t *testing.T) {
 		reason := "baseline_missing"
 		switch mode {
 		case "current":
-			r.Observations[0].Index = nil
+			r.Observations[0].Index, r.Observations[0].MoM = nil, nil
 			reason = "current_value_missing"
 		case "base":
 			r.Observations[0].YoYBase.Index = nil
