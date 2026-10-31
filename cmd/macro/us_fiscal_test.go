@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/alwqx/sec/provider/fred"
+	"github.com/alwqx/sec/provider/macrodata"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/h2non/gock.v1"
 )
@@ -16,18 +17,39 @@ func TestUSFiscalCLI(t *testing.T) {
 	defer gock.Off()
 	raw, err := os.ReadFile("../../provider/fred/testdata/us-fiscal.csv")
 	require.NoError(t, err)
-	for _, asJSON := range []bool{false, true} {
+	for _, output := range []string{"table", "json", "standard"} {
 		gock.New("https://fred.stlouisfed.org").Get("/graph/fredgraph.csv").MatchParam("id", "MTSR133FMS,MTSO133FMS,MTSDS133FMS").Reply(200).BodyString(string(raw))
 		command := newUSFiscalCLI()
 		args := []string{"--begin", "202609", "--end", "202610", "--no-cache", "--refresh"}
-		if asJSON {
+		if output == "json" {
 			args = append(args, "--json")
+		}
+		if output == "standard" {
+			args = append(args, "--standard-json")
 		}
 		command.SetArgs(args)
 		var out bytes.Buffer
 		command.SetOut(&out)
 		require.NoError(t, command.Execute())
-		if asJSON {
+		if output == "standard" {
+			var result macrodata.Dataset
+			require.NoError(t, json.Unmarshal(out.Bytes(), &result))
+			require.Len(t, result.Series, 8)
+			require.Len(t, result.Observations, 16)
+			require.Equal(t, "USD_million", result.Series[0].Unit)
+			require.Equal(t, -26900.34710202, *result.Observations[2].Value)
+			require.Equal(t, 26900.34710202, *result.Observations[3].Value)
+			require.Equal(t, "official", result.Series[2].ValueOrigin)
+			require.Equal(t, "derived", result.Series[3].ValueOrigin)
+			require.Equal(t, "derived", result.Series[4].ValueOrigin)
+			require.Equal(t, "202510", result.Observations[4].PeriodBegin)
+			require.Equal(t, "202610", result.Observations[12].PeriodBegin)
+			require.Equal(t, 2027, result.Observations[12].FiscalYear)
+			require.Nil(t, result.Observations[8].Value)
+			var original fred.FiscalResult
+			require.NoError(t, json.Unmarshal(result.Original, &original))
+			require.Len(t, original.Observations, 2)
+		} else if output == "json" {
 			var result fred.FiscalResult
 			require.NoError(t, json.Unmarshal(out.Bytes(), &result))
 			require.Len(t, result.Observations, 2)
