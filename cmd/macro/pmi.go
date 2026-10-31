@@ -7,18 +7,19 @@ import (
 	"io"
 	"strconv"
 
+	"github.com/alwqx/sec/provider/macrodata"
 	"github.com/alwqx/sec/provider/nbs"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 )
 
 func newPMICLI() *cobra.Command {
-	return newPMIQueryCLI("pmi", "制造业采购经理指数及生产、订单、出口订单、就业分项", (*nbs.Client).ManufacturingPMI, func(cmd *cobra.Command, items []nbs.PMIObservation) error {
+	return newPMIQueryCLI("pmi", "manufacturing", "制造业采购经理指数及生产、订单、出口订单、就业分项", (*nbs.Client).ManufacturingPMI, func(cmd *cobra.Command, items []nbs.PMIObservation) error {
 		return printPMI(cmd.OutOrStdout(), items)
 	})
 }
 
-func newPMIQueryCLI(use, short string, query func(*nbs.Client, context.Context, nbs.PMIRequest) ([]nbs.PMIObservation, error), render func(*cobra.Command, []nbs.PMIObservation) error) *cobra.Command {
+func newPMIQueryCLI(use, survey, short string, query func(*nbs.Client, context.Context, nbs.PMIRequest) ([]nbs.PMIObservation, error), render func(*cobra.Command, []nbs.PMIObservation) error) *cobra.Command {
 	command := &cobra.Command{Use: use, Short: short, Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, args []string) error {
 		begin, end, err := queryMonths(cmd)
 		if err != nil {
@@ -36,6 +37,11 @@ func newPMIQueryCLI(use, short string, query func(*nbs.Client, context.Context, 
 		if err != nil {
 			return err
 		}
+		standard, _ := cmd.Flags().GetBool("standard-json")
+		if standard {
+			dataset, err := macrodata.PMI(items, survey, begin, end)
+			return writeDataset(cmd, dataset, err)
+		}
 		asJSON, _ := cmd.Flags().GetBool("json")
 		if asJSON {
 			if items == nil {
@@ -48,6 +54,7 @@ func newPMIQueryCLI(use, short string, query func(*nbs.Client, context.Context, 
 		return render(cmd, items)
 	}}
 	addQueryFlags(command)
+	addStandardJSONFlag(command, "按统一宏观序列格式输出JSON，保留季调扩散指数和调查范围")
 	return command
 }
 

@@ -6,6 +6,7 @@ import (
 	"io"
 	"strconv"
 
+	"github.com/alwqx/sec/provider/macrodata"
 	"github.com/alwqx/sec/provider/nbs"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
@@ -29,6 +30,11 @@ func newIndustrialCLI() *cobra.Command {
 		if err != nil {
 			return err
 		}
+		standard, _ := cmd.Flags().GetBool("standard-json")
+		if standard {
+			dataset, err := macrodata.Industrial(items, begin, end)
+			return writeDataset(cmd, dataset, err)
+		}
 		asJSON, _ := cmd.Flags().GetBool("json")
 		if asJSON {
 			if items == nil {
@@ -41,6 +47,7 @@ func newIndustrialCLI() *cobra.Command {
 		return printIndustrial(cmd.OutOrStdout(), items)
 	}}
 	addQueryFlags(command)
+	addStandardJSONFlag(command, "按统一宏观序列格式输出JSON，区分单月同比、累计同比和季调环比")
 	return command
 }
 

@@ -6,6 +6,7 @@ import (
 	"io"
 	"strconv"
 
+	"github.com/alwqx/sec/provider/macrodata"
 	"github.com/alwqx/sec/provider/nbs"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
@@ -30,6 +31,11 @@ func newUnemploymentCLI() *cobra.Command {
 		if err != nil {
 			return err
 		}
+		standard, _ := cmd.Flags().GetBool("standard-json")
+		if standard {
+			dataset, err := macrodata.Unemployment(items, begin, end)
+			return writeDataset(cmd, dataset, err)
+		}
 		asJSON, _ := cmd.Flags().GetBool("json")
 		if asJSON {
 			if items == nil {
@@ -42,6 +48,7 @@ func newUnemploymentCLI() *cobra.Command {
 		return printUnemployment(cmd.OutOrStdout(), items)
 	}}
 	addQueryFlags(command)
+	addStandardJSONFlag(command, "按统一宏观序列格式输出JSON，按口径版本分开年龄分组序列")
 	command.Flags().Bool("age-groups", false, "同时查询年龄分组，并标记在校生口径变化与暂停期")
 	return command
 }

@@ -128,7 +128,7 @@ func (c *Client) supplementIndustrialMoM(ctx context.Context, items []Industrial
 			if items[i].Note != "" {
 				items[i].Note += "；"
 			}
-			items[i].Note += "官方可检索发布稿未提供该月季调环比"
+			items[i].Note += IndustrialMoMMissingNote
 		}
 	}
 	return nil

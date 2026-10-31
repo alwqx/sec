@@ -9,6 +9,9 @@ import (
 	"time"
 )
 
+// IndustrialMoMMissingNote 说明环比缺失，与同行其他备注用“；”分隔。
+const IndustrialMoMMissingNote = "官方可检索发布稿未提供该月季调环比"
+
 // IndustrialRequest 查询全国规模以上工业增加值增速，月份为 YYYYMM。
 type IndustrialRequest struct{ Begin, End string }
 

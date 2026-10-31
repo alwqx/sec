@@ -12,7 +12,7 @@ import (
 )
 
 func newNonManufacturingCLI() *cobra.Command {
-	command := newPMIQueryCLI("nonmanufacturing-pmi", "非制造业商务活动指数、服务业、建筑业及相关分项", (*nbs.Client).NonManufacturingPMI, func(cmd *cobra.Command, items []nbs.PMIObservation) error {
+	command := newPMIQueryCLI("nonmanufacturing-pmi", "nonmanufacturing", "非制造业商务活动指数、服务业、建筑业及相关分项", (*nbs.Client).NonManufacturingPMI, func(cmd *cobra.Command, items []nbs.PMIObservation) error {
 		details, _ := cmd.Flags().GetBool("details")
 		return printNonManufacturing(cmd.OutOrStdout(), items, details)
 	})

@@ -88,6 +88,10 @@ func Property(result *nbs.PropertyResult, begin, end string) (*Dataset, error) {
 }
 
 func (d *Dataset) appendNBS(s Series, o Observation, cumulative bool, ytd string) error {
+	return d.appendNBSReason(s, o, cumulative, ytd, "source_value_missing")
+}
+
+func (d *Dataset) appendNBSReason(s Series, o Observation, cumulative bool, ytd, reason string) error {
 	month, err := time.Parse("200601", o.Period)
 	if err != nil || month.Format("200601") != o.Period {
 		return fmt.Errorf("无效所属月份: %s", o.Period)
@@ -116,5 +120,5 @@ func (d *Dataset) appendNBS(s Series, o Observation, cumulative bool, ytd string
 	if !found {
 		d.Series = append(d.Series, s)
 	}
-	return d.append(o, "source_value_missing")
+	return d.append(o, reason)
 }
