@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/alwqx/sec/provider/fred"
+	"github.com/alwqx/sec/provider/macrodata"
 	"github.com/alwqx/sec/utils"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
@@ -60,6 +61,11 @@ func newUSTradeCommand(real bool) *cobra.Command {
 		if err != nil {
 			return err
 		}
+		standard, _ := cmd.Flags().GetBool("standard-json")
+		if standard {
+			dataset, err := macrodata.Trade(result)
+			return writeDataset(cmd, dataset, err)
+		}
 		asJSON, _ := cmd.Flags().GetBool("json")
 		if asJSON {
 			encoder := json.NewEncoder(cmd.OutOrStdout())
@@ -69,6 +75,7 @@ func newUSTradeCommand(real bool) *cobra.Command {
 		return printUSTrade(cmd.OutOrStdout(), result)
 	}}
 	addQueryFlags(command)
+	addStandardJSONFlag(command, "按统一宏观序列格式输出JSON，分开出口、进口和官方差额，差额变化保留原单位")
 	command.Flags().String("component", "total", "贸易分类：total（合计）、goods（商品）、services（服务）")
 	command.Flags().Lookup("begin").Usage = "开始月份 YYYYMM，默认截至月份前11个月；最早199201"
 	command.Flags().Lookup("end").Usage = "截至月份 YYYYMM，默认UTC上个月"

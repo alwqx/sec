@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/alwqx/sec/provider/bls"
+	"github.com/alwqx/sec/provider/macrodata"
 	"github.com/alwqx/sec/utils"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
@@ -37,6 +38,11 @@ func newUSPayrollsCLI() *cobra.Command {
 		if err != nil {
 			return err
 		}
+		standard, _ := cmd.Flags().GetBool("standard-json")
+		if standard {
+			dataset, err := macrodata.Payrolls(result)
+			return writeDataset(cmd, dataset, err)
+		}
 		asJSON, _ := cmd.Flags().GetBool("json")
 		if asJSON {
 			encoder := json.NewEncoder(cmd.OutOrStdout())
@@ -46,6 +52,7 @@ func newUSPayrollsCLI() *cobra.Command {
 		return printUSPayrolls(cmd.OutOrStdout(), result)
 	}}
 	addQueryFlags(command)
+	addStandardJSONFlag(command, "按统一宏观序列格式输出JSON，保留岗位水平、严格相邻月差额和初步标记")
 	command.Flags().Lookup("begin").Usage = "开始月份 YYYYMM，默认最近 12 个月"
 	command.Flags().Lookup("end").Usage = "截至月份 YYYYMM，默认 UTC 上个月"
 	command.Flags().Lookup("no-cache").Usage = "不读写磁盘缓存及本机观测版本档案"

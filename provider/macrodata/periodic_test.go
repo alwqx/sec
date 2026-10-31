@@ -37,8 +37,8 @@ func TestPeriodicRuleBaselines(t *testing.T) {
 		{"positive base rejects negative", periodicRule{positiveBase: true}, -1, nil, "nonpositive_baseline", false},
 		{"positive base rejects zero", periodicRule{positiveBase: true}, 0, nil, "nonpositive_baseline", false},
 		{"positive base with value", periodicRule{positiveBase: true}, -1, value(1), "", true},
-		{"points allow zero base", periodicRule{points: true}, 0, value(2), "", false},
-		{"points allow negative base", periodicRule{points: true}, -1, value(3), "", false},
+		{"points allow zero base", periodicRule{kind: pointsChange}, 0, value(2), "", false},
+		{"points allow negative base", periodicRule{kind: pointsChange}, -1, value(3), "", false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			d, err := newDatasetFrequency("US", "202601", "202601", "monthly", map[string]string{})

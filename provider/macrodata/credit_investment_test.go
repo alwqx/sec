@@ -172,7 +172,7 @@ func TestAppendPeriodicChangesNamesPreviousMeasureByFrequency(t *testing.T) {
 		require.NoError(t, err)
 		item := periodicObservation{current: periodicValue{test.period, value(2), "2"}, yearAgo: periodicValue{test.yearAgo, value(1), "1"}, previous: periodicValue{test.previous, value(0), "0"}, yoy: value(1), change: value(2)}
 		level := Series{ID: "us.test", Measure: "rate", Unit: "percent", Frequency: test.frequency}
-		require.NoError(t, appendPeriodicChanges(d, level, monthlyProvenance{}, []periodicObservation{item}, periodicRule{method: "difference", points: true}))
+		require.NoError(t, appendPeriodicChanges(d, level, monthlyProvenance{}, []periodicObservation{item}, periodicRule{method: "difference", kind: pointsChange}))
 		require.Equal(t, test.measure, d.Series[2].Measure)
 		require.Equal(t, "us.test."+test.measure, d.Series[2].ID)
 	}

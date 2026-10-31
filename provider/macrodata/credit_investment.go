@@ -49,7 +49,7 @@ func Credit(result *fred.CreditResult) (*Dataset, error) {
 		}
 		items = append(items, periodicObservation{current: point(o.CreditValue), yearAgo: point(o.YearAgoBase), previous: point(o.PreviousBase), yoy: yoy, change: previous, note: o.Note})
 	}
-	if err := appendPeriodicChanges(d, s, monthlyProvenance{result.Source, result.FetchedAt, result.PublishedAt, result.RevisionID}, items, periodicRule{method: result.ChangeMethod, points: result.Metric != "bank"}); err != nil {
+	if err := appendPeriodicChanges(d, s, monthlyProvenance{result.Source, result.FetchedAt, result.PublishedAt, result.RevisionID}, items, periodicRule{method: result.ChangeMethod, kind: percentOrPoints(result.Metric != "bank")}); err != nil {
 		return nil, err
 	}
 	return d, nil

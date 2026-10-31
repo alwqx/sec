@@ -26,15 +26,43 @@ type periodicObservation struct {
 	asOfDate                   *string
 }
 
-// periodicRule 说明变化值的单位和基期要求；零值表示百分比增速且只排除零基期。
+// periodicKind 决定变化值的单位：百分比增速要求基期非零，差值允许零及负基期。
+type periodicKind int
+
+const (
+	percentChange periodicKind = iota
+	pointsChange
+	nativeChange
+)
+
+func percentOrPoints(points bool) periodicKind {
+	if points {
+		return pointsChange
+	}
+	return percentChange
+}
+
+// periodicRule 说明变化值的单位和基期要求；reasonNotes 按缺失原因逐值生成备注，
+// 用于provider整行备注可能说错单个序列缺失原因的指标，此时 note 只说明当期缺失。
 type periodicRule struct {
 	method       string
-	points       bool
+	kind         periodicKind
 	positiveBase bool
+	reasonNotes  bool
+}
+
+var periodicReasonNotes = map[string]string{
+	"source_value_missing":    "当前快照未提供数值",
+	"current_value_missing":   "当期水平缺失",
+	"baseline_missing":        "严格基期缺失",
+	"zero_baseline":           "严格基期为零，不计算百分比",
+	"nonpositive_baseline":    "严格基期非正，不计算百分比",
+	"calculation_unavailable": "provider未给出计算值",
 }
 
 // appendPeriodicChanges 适配严格月／季基期的水平及两种变化值，不重新计算provider数值。
 func appendPeriodicChanges(d *Dataset, level Series, provenance monthlyProvenance, items []periodicObservation, rule periodicRule) error {
+	offset := len(d.Series)
 	prefix := level.ID
 	level.ID += "." + level.Measure
 	d.Series = append(d.Series, level)
@@ -42,17 +70,18 @@ func appendPeriodicChanges(d *Dataset, level Series, provenance monthlyProvenanc
 	if level.Frequency == "quarterly" {
 		previousPrefix = "qoq"
 	}
-	measures := []string{"yoy_percent", previousPrefix + "_percent"}
-	if rule.points {
-		measures = []string{"yoy_percentage_points", previousPrefix + "_percentage_points"}
+	suffix, unit, formula, annualized := "_percent", "percent", "(current_level / base_level - 1) * 100", false
+	switch rule.kind {
+	case pointsChange:
+		suffix, unit, formula = "_percentage_points", "percentage_points", "current_level - base_level"
+	case nativeChange:
+		// 折年水平之差仍是折年口径，与未年化增速不同。
+		suffix, unit, formula, annualized = "_change", level.Unit, "current_level - base_level", level.Annualized
 	}
-	for _, measure := range measures {
+	for _, measure := range []string{"yoy" + suffix, previousPrefix + suffix} {
 		s := level
-		s.ID, s.Measure, s.Unit, s.Annualized, s.ComponentsAdditive = prefix+"."+measure, measure, "percent", false, nil
-		s.ValueOrigin, s.Formula, s.ChangeMethod = "derived", text("(current_level / base_level - 1) * 100"), rule.method
-		if rule.points {
-			s.Unit, s.Formula = "percentage_points", text("current_level - base_level")
-		}
+		s.ID, s.Measure, s.Unit, s.Annualized, s.ComponentsAdditive = prefix+"."+measure, measure, unit, annualized, nil
+		s.ValueOrigin, s.Formula, s.ChangeMethod = "derived", text(formula), rule.method
 		d.Series = append(d.Series, s)
 	}
 	seen := map[string]bool{}
@@ -70,7 +99,7 @@ func appendPeriodicChanges(d *Dataset, level Series, provenance monthlyProvenanc
 			base     *periodicValue
 			expected string
 		}{{item.current.value, nil, ""}, {item.yoy, &item.yearAgo, yearAgo}, {item.change, &item.previous, previous}} {
-			o := Observation{SeriesID: d.Series[i].ID, Period: item.current.period, Value: field.v, AsOfDate: item.asOfDate, SourceSeriesID: level.Definition, Source: text(provenance.source), FetchedAt: timestamp(provenance.fetchedAt), PublishedAt: provenance.publishedAt, RevisionID: provenance.revisionID, DataVersion: "current_visible_revision", Note: item.note}
+			o := Observation{SeriesID: d.Series[offset+i].ID, Period: item.current.period, Value: field.v, AsOfDate: item.asOfDate, SourceSeriesID: level.Definition, Source: text(provenance.source), FetchedAt: timestamp(provenance.fetchedAt), PublishedAt: provenance.publishedAt, RevisionID: provenance.revisionID, DataVersion: "current_visible_revision", Note: item.note}
 			reason := "source_value_missing"
 			if i == 0 {
 				o.RawValue = text(item.current.raw)
@@ -89,8 +118,14 @@ func appendPeriodicChanges(d *Dataset, level Series, provenance monthlyProvenanc
 					reason = "baseline_missing"
 				} else if rule.positiveBase && *field.base.value <= 0 {
 					reason = "nonpositive_baseline"
-				} else if !rule.points && *field.base.value == 0 {
+				} else if rule.kind == percentChange && *field.base.value == 0 {
 					reason = "zero_baseline"
+				}
+			}
+			if rule.reasonNotes {
+				o.Note = periodicReasonNotes[reason]
+				if item.note != "" && (reason == "source_value_missing" || reason == "current_value_missing") {
+					o.Note = item.note
 				}
 			}
 			if err := d.appendDiagnostic(o, reason); err != nil {
@@ -105,7 +140,7 @@ func (r periodicRule) rejectsBase(base float64) bool {
 	if r.positiveBase {
 		return base <= 0
 	}
-	return !r.points && base == 0
+	return r.kind == percentChange && base == 0
 }
 
 func periodicBasePeriods(period, frequency string) (string, string) {
