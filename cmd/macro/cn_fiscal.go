@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alwqx/sec/provider/macrodata"
 	"github.com/alwqx/sec/provider/mof"
 	"github.com/alwqx/sec/utils"
 	"github.com/olekukonko/tablewriter"
@@ -39,6 +40,11 @@ func newCNFiscalCLI() *cobra.Command {
 		if err != nil {
 			return err
 		}
+		standard, _ := cmd.Flags().GetBool("standard-json")
+		if standard {
+			dataset, err := macrodata.CNFiscal(result)
+			return writeDataset(cmd, dataset, err)
+		}
 		asJSON, _ := cmd.Flags().GetBool("json")
 		if asJSON {
 			encoder := json.NewEncoder(cmd.OutOrStdout())
@@ -48,6 +54,7 @@ func newCNFiscalCLI() *cobra.Command {
 		return printCNFiscal(cmd.OutOrStdout(), result)
 	}}
 	addQueryFlags(command)
+	addStandardJSONFlag(command, "按统一宏观序列格式输出JSON，保留累计范围，分开主同比、同口径和调整后同比")
 	command.Flags().String("budget", "all", "预算类型：all、general（一般公共预算）、fund（政府性基金）")
 	command.Flags().Lookup("begin").Usage = "开始月份 YYYYMM，最早201501；默认截至月份前11个月"
 	return command

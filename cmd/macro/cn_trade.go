@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/alwqx/sec/provider/macrodata"
 	"github.com/alwqx/sec/provider/mofcom"
 	"github.com/alwqx/sec/utils"
 	"github.com/olekukonko/tablewriter"
@@ -38,6 +39,11 @@ func newCNTradeCLI() *cobra.Command {
 		if err != nil {
 			return err
 		}
+		standard, _ := cmd.Flags().GetBool("standard-json")
+		if standard {
+			dataset, err := macrodata.CNTrade(result)
+			return writeDataset(cmd, dataset, err)
+		}
 		asJSON, _ := cmd.Flags().GetBool("json")
 		if asJSON {
 			encoder := json.NewEncoder(cmd.OutOrStdout())
@@ -47,6 +53,7 @@ func newCNTradeCLI() *cobra.Command {
 		return printCNTrade(cmd.OutOrStdout(), result)
 	}}
 	addQueryFlags(command)
+	addStandardJSONFlag(command, "按统一宏观序列格式输出JSON，人民币和美元各成序列，伙伴行不可相加")
 	command.Flags().String("partners-currency", "usd", "伙伴统计币种 usd 或 cny；不改变月度总量的双币种输出")
 	command.Flags().Lookup("begin").Usage = "开始月份 YYYYMM，最早支持201501；默认截至月份前11个月"
 	command.Flags().Lookup("end").Usage = "截至月份 YYYYMM，默认北京时间上个月"
