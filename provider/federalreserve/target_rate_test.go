@@ -122,7 +122,7 @@ func TestTargetRateInitialRangeAndUnavailableTime(t *testing.T) {
 	mockTable(t)
 	mockCalendar(t)
 	mockStatement(t, "/newsevents/press/monetary/20081216b.htm", "statement-20081216.html")
-	result, err := NewClient("").TargetRate(context.Background(), &TargetRateRequest{Begin: earliest, End: earliest})
+	result, err := NewClient("").TargetRate(context.Background(), &TargetRateRequest{Begin: EarliestDate, End: EarliestDate})
 	require.NoError(t, err)
 	require.Nil(t, result.Baseline)
 	require.Len(t, result.Events, 1)
@@ -158,12 +158,12 @@ func TestTargetTableRejectsInvalid(t *testing.T) {
 }
 
 func TestTargetRequestValidationAndCancellation(t *testing.T) {
-	for _, req := range []*TargetRateRequest{nil, {}, {Begin: "20081215", End: earliest}, {Begin: "20250230", End: "20250301"}, {Begin: "20250102", End: "20250101"}, {Begin: "20250101", End: "29990101"}, {Begin: "2025-01-01", End: "20250102"}} {
+	for _, req := range []*TargetRateRequest{nil, {}, {Begin: "20081215", End: EarliestDate}, {Begin: "20250230", End: "20250301"}, {Begin: "20250102", End: "20250101"}, {Begin: "20250101", End: "29990101"}, {Begin: "2025-01-01", End: "20250102"}} {
 		require.Error(t, req.Validate())
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, err := NewClient("").TargetRate(ctx, &TargetRateRequest{Begin: earliest, End: earliest})
+	_, err := NewClient("").TargetRate(ctx, &TargetRateRequest{Begin: EarliestDate, End: EarliestDate})
 	require.ErrorIs(t, err, context.Canceled)
 }
 
@@ -171,7 +171,7 @@ func TestTargetRateMainSourceFailure(t *testing.T) {
 	defer gock.Off()
 	for _, status := range []int{503, 200} {
 		gock.New("https://www.federalreserve.gov").Get("/monetarypolicy/openmarket.htm").Reply(status).BodyString("<html>unavailable</html>")
-		_, err := NewClient("").TargetRate(context.Background(), &TargetRateRequest{Begin: earliest, End: earliest})
+		_, err := NewClient("").TargetRate(context.Background(), &TargetRateRequest{Begin: EarliestDate, End: EarliestDate})
 		require.Error(t, err)
 	}
 	require.True(t, gock.IsDone())

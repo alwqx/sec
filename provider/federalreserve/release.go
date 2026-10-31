@@ -2,6 +2,7 @@ package federalreserve
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"regexp"
@@ -197,7 +198,7 @@ func (r *releaseResolver) links(ctx context.Context, year int) ([]statementLink,
 		r.years[year] = nil
 	}
 	if err != nil && r.currentError != nil {
-		err = fmt.Errorf("会议日历不可用（%v）；历史日历不可用（%w）", r.currentError, err)
+		err = fmt.Errorf("会议日历不可用（%w）；历史日历不可用（%w）", r.currentError, err)
 	}
 	r.yearErrors[year] = err
 	return r.years[year], err
@@ -223,10 +224,13 @@ func (r *releaseResolver) enrich(ctx context.Context, event *TargetRateEvent) er
 	var matchedURL string
 	var matchedAt time.Time
 	var failures []string
+	fetchFailed := false
 	for _, candidate := range candidates {
 		body, fetched, err := r.client.fetch(ctx, candidate.url, func(body []byte) error { _, err := parseStatement(body); return err })
 		if err != nil {
 			failures = append(failures, err.Error())
+			var fetchErr *FetchError
+			fetchFailed = fetchFailed || errors.As(err, &fetchErr)
 			continue
 		}
 		statement, err := parseStatement(body)
@@ -242,7 +246,11 @@ func (r *releaseResolver) enrich(ctx context.Context, event *TargetRateEvent) er
 		matched, matchedURL, matchedAt = statement, candidate.url, fetched
 	}
 	if matched == nil || len(failures) > 0 {
-		return fmt.Errorf("无法完整核验对应声明及目标区间%s", failureDetail(failures))
+		err := fmt.Errorf("无法完整核验对应声明及目标区间%s", failureDetail(failures))
+		if fetchFailed {
+			return &FetchError{err}
+		}
+		return err
 	}
 	event.AnnouncedDate, event.PublishedAt = &matched.date, matched.published
 	event.StatementSourceURL, event.StatementFetchedAt, event.StatementRaw = matchedURL, &matchedAt, &matched.raw

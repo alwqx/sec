@@ -59,6 +59,7 @@ FRED 的 `DFEDTARL`、`DFEDTARU` 是日度有效目标区间序列；其日标�
 缺失的 `announced_date`、`published_at`、`statement_fetched_at`、`statement_raw` 以 `null` 表示，
 `release_note` 解释原因。公布信息不可用时，官方调整表仍可提供完整的区间及生效日期；
 终端明确显示“未取得”及原因，JSON保留缺失状态，不把猜测写入字段。
+声明或日历页暂时无法下载（网络错误、404和410以外的HTTP错误）时，事件额外标记 `release_fetch_failed=true`，`--standard-json` 因此报错。
 主调整表下载失败或未通过校验时，整个查询失败。取消上下文时立即返回取消错误。
 
 旧声明或未来网页结构可能无法自动解析；这时保留真实缺失，后续可按官方结构扩展解析器。

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/alwqx/sec/provider/federalreserve"
+	"github.com/alwqx/sec/provider/macrodata"
 	"github.com/alwqx/sec/utils"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
@@ -38,6 +39,11 @@ func newUSTargetRateCLI() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			standard, _ := cmd.Flags().GetBool("standard-json")
+			if standard {
+				dataset, err := macrodata.TargetRate(result)
+				return writeDataset(cmd, dataset, err)
+			}
 			asJSON, _ := cmd.Flags().GetBool("json")
 			if asJSON {
 				encoder := json.NewEncoder(cmd.OutOrStdout())
@@ -47,7 +53,8 @@ func newUSTargetRateCLI() *cobra.Command {
 			return printUSTargetRate(cmd.OutOrStdout(), result)
 		}}
 	addQueryFlags(command)
-	command.Flags().Lookup("begin").Usage = "开始生效日期 YYYYMMDD，默认截至日期前29天；最早20081216"
+	addStandardJSONFlag(command, "按统一宏观序列格式输出JSON，保留调整事件、生效与公布日期，只输出窗口内实际调整")
+	command.Flags().Lookup("begin").Usage = "开始生效日期 YYYYMMDD，默认截至日期前29天；最早" + federalreserve.EarliestDate
 	command.Flags().Lookup("end").Usage = "截至生效日期 YYYYMMDD，默认UTC今天；保留截至当日有效的区间"
 	return command
 }
@@ -64,8 +71,8 @@ func queryTargetRateDates(cmd *cobra.Command, now time.Time) (string, string, er
 	}
 	if begin == "" {
 		begin = date.AddDate(0, 0, -29).Format("20060102")
-		if begin < "20081216" {
-			begin = "20081216"
+		if begin < federalreserve.EarliestDate {
+			begin = federalreserve.EarliestDate
 		}
 	}
 	return begin, end, nil

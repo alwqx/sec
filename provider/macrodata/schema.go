@@ -105,7 +105,7 @@ func validatePeriod(period, frequency string) error {
 		}
 	} else {
 		layout := "200601"
-		if frequency == "daily" || frequency == "weekly" {
+		if frequency == "daily" || frequency == "weekly" || frequency == "event" {
 			layout = "20060102"
 		} else if frequency != "monthly" {
 			return fmt.Errorf("不支持的频率: %s", frequency)

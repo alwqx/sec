@@ -3,6 +3,7 @@ package federalreserve
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"regexp"
@@ -17,7 +18,12 @@ import (
 const (
 	openMarketURL = "https://www.federalreserve.gov/monetarypolicy/openmarket.htm"
 	calendarURL   = "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm"
-	earliest      = "20081216"
+)
+
+// 目标区间机制起点：此前为单一目标利率，不与区间比较。
+const (
+	EarliestDate   = "20081216"
+	RangeStartDate = "2008-12-16"
 )
 
 type Client struct {
@@ -48,8 +54,8 @@ func (r *TargetRateRequest) Validate() error {
 			return fmt.Errorf("无效日期 %q，请使用YYYYMMDD", value)
 		}
 	}
-	if r.Begin < earliest {
-		return fmt.Errorf("目标区间最早支持20081216，此前为单一目标利率")
+	if r.Begin < EarliestDate {
+		return fmt.Errorf("目标区间最早支持%s，此前为单一目标利率", EarliestDate)
 	}
 	if r.Begin > r.End {
 		return fmt.Errorf("开始日期不能晚于截至日期")
@@ -72,6 +78,7 @@ type TargetRateEvent struct {
 	PublishedAt            *time.Time    `json:"published_at"`
 	ReleaseStatus          string        `json:"release_status"`
 	ReleaseNote            string        `json:"release_note"`
+	ReleaseFetchFailed     bool          `json:"release_fetch_failed,omitempty"`
 	StatementSourceURL     string        `json:"statement_source_url,omitempty"`
 	StatementFetchedAt     *time.Time    `json:"statement_fetched_at"`
 	StatementRaw           *StatementRaw `json:"statement_raw"`
@@ -162,7 +169,7 @@ func parseTable(body []byte) ([]*TargetRateEvent, error) {
 				parseErr = fmt.Errorf("美联储返回无效生效日期 %s %s", year, rawDate)
 				return
 			}
-			if date.Format("20060102") < earliest {
+			if date.Format("20060102") < EarliestDate {
 				return
 			}
 			raw := RateTableRaw{year, rawDate, clean(cells.Eq(1).Text()), clean(cells.Eq(2).Text()), clean(cells.Eq(3).Text())}
@@ -185,8 +192,8 @@ func parseTable(body []byte) ([]*TargetRateEvent, error) {
 		return nil, parseErr
 	}
 	sort.Slice(events, func(i, j int) bool { return events[i].EffectiveDate < events[j].EffectiveDate })
-	if len(events) == 0 || events[0].EffectiveDate != "2008-12-16" {
-		return nil, fmt.Errorf("美联储调整表缺少2008-12-16区间机制起点")
+	if len(events) == 0 || events[0].EffectiveDate != RangeStartDate {
+		return nil, fmt.Errorf("美联储调整表缺少%s区间机制起点", RangeStartDate)
 	}
 	for i, event := range events {
 		if i == 0 {
@@ -263,6 +270,8 @@ func (c *Client) TargetRate(ctx context.Context, req *TargetRateRequest) (*Targe
 				return nil, ctx.Err()
 			}
 			event.ReleaseNote = "公布信息不可用：" + err.Error()
+			var fetchErr *FetchError
+			event.ReleaseFetchFailed = errors.As(err, &fetchErr)
 		}
 	}
 	return result, nil
