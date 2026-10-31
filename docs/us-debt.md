@@ -35,7 +35,7 @@ https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/dt
 
 ## 终端计算汇总
 
-终端按记录日和可流通性分别展示发行、赎回及净记账发行，单位百万美元。`≈` 和JSON的 `is_derived=true` 标记计算值。发行、赎回分别为同日同市场对应明细的 `transaction_today_amt` 之和；净记账发行等于上述发行减赎回。`input_rows` 记录该组输入行数，JSON `rows` 保留全部明细、官方原始字段、请求URL和抓取时间，可按日期及市场回溯。
+终端按记录日和可流通性分别展示发行、赎回及净记账发行，单位百万美元。`≈` 和JSON的 `is_derived=true` 标记计算值。发行、赎回分别为同日同市场对应明细的 `transaction_today_amt` 之和；净记账发行等于上述发行减赎回。`input_rows` 记录该组输入行数；内容完全相同的上游重复行（如2007-02-06）不计入汇总，`duplicate_rows_excluded` 记录其行数，`rows` 仍保留它们。JSON `rows` 保留全部明细、官方原始字段、请求URL和抓取时间，可按日期及市场回溯。
 
 任一对应输入为空，或对应交易类型没有记录，该侧汇总为 `null`；两侧齐全才计算净额。全区间没有记录时明确提示，不生成连续日历零值。汇总不混加可流通与非流通，也不混加汇总行与明细；上游出现未知市场、交易类别或合计行时返回错误，待核验结构。
 

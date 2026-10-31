@@ -81,6 +81,48 @@ func TestDebtEmptyNullAndZero(t *testing.T) {
 	require.True(t, gock.IsDone())
 }
 
+func TestDebtSummaryExcludesIdenticalDuplicates(t *testing.T) {
+	defer gock.Off()
+	env := fixture(t, "debt-20260930.json")
+	repeated := map[string]string{}
+	for key, value := range env.Data[0] {
+		repeated[key] = value
+	}
+	env.Data[0]["transaction_today_amt"], repeated["transaction_today_amt"] = "500", "500"
+	env.Data[0]["transaction_mtd_amt"], repeated["transaction_mtd_amt"] = "600", "600"
+	repeated["src_line_nbr"] = "1000"
+	env.Data = append(env.Data, repeated)
+	env.Meta.Count, env.Meta.Total = len(env.Data), len(env.Data)
+	mock(t, env, 1)
+	result, err := NewClient("").Debt(context.Background(), &DebtRequest{Begin: "20260930", End: "20260930"})
+	require.NoError(t, err)
+	require.Len(t, result.Rows, 24, "重复行保留在明细中")
+	require.Equal(t, 1, result.Summaries[0].DuplicateRows)
+	baseline := 0.0
+	for _, row := range result.Rows[:len(result.Rows)-1] {
+		if row.Market == "Marketable" && row.Transaction == "Issues" {
+			baseline += *row.Today
+		}
+	}
+	require.Equal(t, baseline, *result.Summaries[0].Issues, "相同的重复行不重复计入汇总")
+	encoded, err := json.Marshal(result.Summaries[1])
+	require.NoError(t, err)
+	require.NotContains(t, string(encoded), "duplicate_rows_excluded", "无重复时原JSON不变")
+	require.True(t, gock.IsDone())
+}
+
+func TestUniqueRowsKeepDifferentAmounts(t *testing.T) {
+	one, two := 1.0, 2.0
+	rows := []DebtRow{{Date: "d", Market: "m", Today: &one, Raw: map[string]string{"src_line_nbr": "1"}}, {Date: "d", Market: "m", Today: &one, Raw: map[string]string{"src_line_nbr": "2"}}, {Date: "d", Market: "m", Today: &two, Raw: map[string]string{"src_line_nbr": "3"}}, {Date: "d", Market: "m", Today: &one, Raw: map[string]string{"src_line_nbr": "4"}}}
+	unique, lines := UniqueDebtRows(rows)
+	require.Len(t, unique, 2)
+	require.Equal(t, []string{"1", "2", "4"}, lines[0])
+	require.Empty(t, lines[1])
+	cash, lines := UniqueCashRows([]CashRow{{Date: "d", Category: "c", CashAmounts: CashAmounts{Today: &one}, Raw: map[string]string{"src_line_nbr": "5"}}, {Date: "d", Category: "c", CashAmounts: CashAmounts{Today: &one}, Raw: map[string]string{"src_line_nbr": "6"}}})
+	require.Len(t, cash, 1)
+	require.Equal(t, []string{"5", "6"}, lines[0])
+}
+
 func TestDebtInvalidResponses(t *testing.T) {
 	for name, change := range map[string]func(*envelope){
 		"unit":           func(e *envelope) { e.Meta.Formats["transaction_today_amt"] = "$1,000" },
@@ -124,6 +166,7 @@ func TestDebtMultiPageCompleteness(t *testing.T) {
 					copy[k] = v
 				}
 				copy["src_line_nbr"] = fmt.Sprint(i)
+				copy["transaction_mtd_amt"] = fmt.Sprint(i) // 金额不同才不是上游重复行。
 				env.Data = append(env.Data, copy)
 			}
 			env.Meta.Total, env.Meta.Count, env.Meta.Pages = 1001, 1000, 2
@@ -131,6 +174,7 @@ func TestDebtMultiPageCompleteness(t *testing.T) {
 			second := fixture(t, "debt-20260930.json")
 			second.Data = second.Data[:1]
 			second.Data[0]["src_line_nbr"] = "1001"
+			second.Data[0]["transaction_mtd_amt"] = "1001"
 			second.Meta.Total, second.Meta.Count, second.Meta.Pages = 1001, 1, 2
 			if mode == "count changes" {
 				second.Meta.Total = 1002
