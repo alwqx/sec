@@ -140,7 +140,7 @@ func appendLaborRow(d *Dataset, prefix Series, current laborPoint, specs []labor
 		if !found {
 			d.Series = append(d.Series, s)
 		}
-		if err := d.append(o, reason); err != nil {
+		if err := d.appendDiagnostic(o, reason); err != nil {
 			return err
 		}
 	}

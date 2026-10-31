@@ -18,15 +18,15 @@ func RealIncome(result *fred.RealIncomeResult) (*Dataset, error) {
 	if err != nil {
 		return nil, err
 	}
-	point := func(v fred.RealIncomeValue) monthlyLevelValue {
-		return monthlyLevelValue{v.Period, v.Level, v.RawValue}
+	point := func(v fred.RealIncomeValue) periodicValue {
+		return periodicValue{v.Period, v.Level, v.RawValue}
 	}
-	items := make([]monthlyLevelObservation, 0, len(result.Observations))
+	items := make([]periodicObservation, 0, len(result.Observations))
 	for _, o := range result.Observations {
-		items = append(items, monthlyLevelObservation{point(o.RealIncomeValue), point(o.YoYBase), point(o.MoMBase), o.YoY, o.MoM, o.Note})
+		items = append(items, periodicObservation{current: point(o.RealIncomeValue), yearAgo: point(o.YoYBase), previous: point(o.MoMBase), yoy: o.YoY, change: o.MoM, note: o.Note})
 	}
 	s := Series{ID: "us.real-income", Indicator: "real-income", Measure: "level", Unit: "USD_billion", Frequency: "monthly", PeriodBasis: "month", SeasonalAdjustment: "seasonally-adjusted", PriceBasis: "real-chained", ReferenceYear: &result.ReferenceYear, Annualized: true, ValueOrigin: "official", Definition: result.SeriesID, Coverage: "实际可支配个人收入总量（税后、扣除价格影响），非人均"}
-	if err := appendMonthlyLevels(d, s, monthlyProvenance{result.Source, result.FetchedAt, result.PublishedAt, result.RevisionID}, items); err != nil {
+	if err := appendPeriodicChanges(d, s, monthlyProvenance{result.Source, result.FetchedAt, result.PublishedAt, result.RevisionID}, items, periodicRule{}); err != nil {
 		return nil, err
 	}
 	return d, nil
@@ -56,18 +56,18 @@ func Production(result *fred.ProductionResult) (*Dataset, error) {
 	} else if result.ChangeUnit != "percent" || result.ReferenceYear == nil || *result.ReferenceYear != 2017 {
 		return nil, fmt.Errorf("生产指数必须使用2017参考年和百分比增速")
 	}
-	point := func(v fred.ProductionValue) monthlyLevelValue {
-		return monthlyLevelValue{v.Period, v.Level, v.RawValue}
+	point := func(v fred.ProductionValue) periodicValue {
+		return periodicValue{v.Period, v.Level, v.RawValue}
 	}
-	items := make([]monthlyLevelObservation, 0, len(result.Observations))
+	items := make([]periodicObservation, 0, len(result.Observations))
 	for _, o := range result.Observations {
 		yoy, mom := o.YoY, o.MoM
 		if points {
 			yoy, mom = o.YoYPercentagePoints, o.MoMPercentagePoints
 		}
-		items = append(items, monthlyLevelObservation{point(o.ProductionValue), point(o.YoYBase), point(o.MoMBase), yoy, mom, o.Note})
+		items = append(items, periodicObservation{current: point(o.ProductionValue), yearAgo: point(o.YoYBase), previous: point(o.MoMBase), yoy: yoy, change: mom, note: o.Note})
 	}
-	if err := appendMonthlyChanges(d, s, monthlyProvenance{result.Source, result.FetchedAt, result.PublishedAt, result.RevisionID}, items, points); err != nil {
+	if err := appendPeriodicChanges(d, s, monthlyProvenance{result.Source, result.FetchedAt, result.PublishedAt, result.RevisionID}, items, periodicRule{points: points}); err != nil {
 		return nil, err
 	}
 	return d, nil

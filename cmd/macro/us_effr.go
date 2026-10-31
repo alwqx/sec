@@ -42,12 +42,7 @@ func newUSEFFRCLI() *cobra.Command {
 		standard, _ := cmd.Flags().GetBool("standard-json")
 		if standard {
 			dataset, err := macrodata.EFFR(result)
-			if err != nil {
-				return err
-			}
-			encoder := json.NewEncoder(cmd.OutOrStdout())
-			encoder.SetIndent("", "  ")
-			return encoder.Encode(dataset)
+			return writeDataset(cmd, dataset, err)
 		}
 		if asJSON {
 			encoder := json.NewEncoder(cmd.OutOrStdout())
@@ -57,8 +52,7 @@ func newUSEFFRCLI() *cobra.Command {
 		return printUSEFFR(cmd.OutOrStdout(), result)
 	}}
 	addQueryFlags(command)
-	command.Flags().Bool("standard-json", false, "按统一宏观序列格式输出JSON，保留交易所属日、方法变化与修订标记")
-	command.MarkFlagsMutuallyExclusive("json", "standard-json")
+	addStandardJSONFlag(command, "按统一宏观序列格式输出JSON，保留交易所属日、方法变化与修订标记")
 	command.Flags().Lookup("begin").Usage = "开始所属日期 YYYYMMDD，默认截至日期前29天；最早20000703"
 	command.Flags().Lookup("end").Usage = "截至所属日期 YYYYMMDD，默认UTC今天；仅返回已公布观测"
 	return command

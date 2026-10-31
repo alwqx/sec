@@ -34,12 +34,7 @@ func newRetailCLI() *cobra.Command {
 		standard, _ := cmd.Flags().GetBool("standard-json")
 		if standard {
 			dataset, err := macrodata.Retail(items, begin, end)
-			if err != nil {
-				return err
-			}
-			encoder := json.NewEncoder(cmd.OutOrStdout())
-			encoder.SetIndent("", "  ")
-			return encoder.Encode(dataset)
+			return writeDataset(cmd, dataset, err)
 		}
 		if asJSON {
 			if items == nil {
@@ -52,8 +47,7 @@ func newRetailCLI() *cobra.Command {
 		return printRetail(cmd.OutOrStdout(), items)
 	}}
 	addQueryFlags(command)
-	command.Flags().Bool("standard-json", false, "按统一宏观序列格式输出JSON，区分单月与累计所属期")
-	command.MarkFlagsMutuallyExclusive("json", "standard-json")
+	addStandardJSONFlag(command, "按统一宏观序列格式输出JSON，区分单月与累计所属期")
 	return command
 }
 

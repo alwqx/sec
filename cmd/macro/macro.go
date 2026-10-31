@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/alwqx/sec/provider/macrodata"
 	"github.com/alwqx/sec/provider/nbs"
 	"github.com/alwqx/sec/utils"
 	"github.com/olekukonko/tablewriter"
@@ -124,6 +125,22 @@ func prices(cmd *cobra.Command, indicator string) error {
 	table.Render()
 	_, err = fmt.Fprintln(cmd.OutOrStdout(), "来源：国家统计局；涨跌幅 = 原始指数 − 100；未季调。空值显示为 —，缺少的月份不补值。")
 	return err
+}
+
+// addStandardJSONFlag 注册统一导出参数，与原 --json 互斥。
+func addStandardJSONFlag(command *cobra.Command, usage string) {
+	command.Flags().Bool("standard-json", false, usage)
+	command.MarkFlagsMutuallyExclusive("json", "standard-json")
+}
+
+// writeDataset 输出适配结果；适配失败时不写入任何内容。
+func writeDataset(cmd *cobra.Command, dataset *macrodata.Dataset, err error) error {
+	if err != nil {
+		return err
+	}
+	encoder := json.NewEncoder(cmd.OutOrStdout())
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(dataset)
 }
 
 func addQueryFlags(command *cobra.Command) {

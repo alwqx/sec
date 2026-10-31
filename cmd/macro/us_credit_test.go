@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/alwqx/sec/provider/fred"
+	"github.com/alwqx/sec/provider/macrodata"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/h2non/gock.v1"
 )
@@ -24,18 +25,57 @@ func TestUSCreditCLI(t *testing.T) {
 	} {
 		raw, err := os.ReadFile("../../provider/fred/testdata/us-credit-" + test.metric + ".csv")
 		require.NoError(t, err)
-		for _, asJSON := range []bool{false, true} {
+		for _, output := range []string{"table", "json", "standard"} {
 			gock.New("https://fred.stlouisfed.org").Get("/graph/fredgraph.csv").MatchParam("id", test.id).MatchHeader("User-Agent", "curl").Reply(200).BodyString(string(raw))
 			command := usCreditCommand(test.metric)
 			args := []string{"--begin", test.begin, "--end", test.end, "--no-cache", "--refresh"}
-			if asJSON {
+			if output == "json" {
 				args = append(args, "--json")
+			}
+			if output == "standard" {
+				args = append(args, "--standard-json")
 			}
 			command.SetArgs(args)
 			var out bytes.Buffer
 			command.SetOut(&out)
 			require.NoError(t, command.Execute())
-			if asJSON {
+			if output == "standard" {
+				var result macrodata.Dataset
+				require.NoError(t, json.Unmarshal(out.Bytes(), &result))
+				require.Len(t, result.Series, 3)
+				require.Len(t, result.Observations, 6)
+				require.Equal(t, test.level, *result.Observations[0].Value)
+				require.Equal(t, test.id, result.Observations[0].SourceSeriesID)
+				require.NotNil(t, result.Observations[0].RawValue)
+				require.Nil(t, result.Observations[3].Value)
+				require.Equal(t, "source_value_missing", *result.Observations[3].MissingReason)
+				require.Equal(t, "current_value_missing", *result.Observations[4].MissingReason)
+				require.Nil(t, result.Observations[0].PublishedAt)
+				require.False(t, result.Series[1].Annualized)
+				require.Equal(t, "derived", result.Series[1].ValueOrigin)
+				require.False(t, result.Series[0].Annualized)
+				if test.metric == "bank" {
+					require.Equal(t, "USD_billion", result.Series[0].Unit)
+					require.Equal(t, "pro_rata_average_of_weekly_levels", result.Series[0].PeriodBasis)
+					require.Equal(t, "level_ratio_not_break_adjusted", result.Series[1].ChangeMethod)
+					require.Equal(t, "mom_percent", result.Series[2].Measure)
+				} else {
+					require.Equal(t, "percent", result.Series[0].Unit)
+					require.Equal(t, "percentage_points", result.Series[1].Unit)
+					require.Equal(t, "qoq_percentage_points", result.Series[2].Measure)
+					if test.metric == "standards" {
+						require.Equal(t, "survey_quarter", result.Series[0].PeriodBasis)
+						require.Equal(t, "not-seasonally-adjusted", result.Series[0].SeasonalAdjustment)
+						require.Equal(t, "available", result.Observations[0].Status)
+					} else {
+						require.Equal(t, "credit_bureau_based_dsr", result.Series[0].Methodology)
+					}
+				}
+				var original fred.CreditResult
+				require.NoError(t, json.Unmarshal(result.Original, &original))
+				require.Equal(t, test.id, original.SeriesID)
+				require.Len(t, original.Observations, 2)
+			} else if output == "json" {
 				var result fred.CreditResult
 				require.NoError(t, json.Unmarshal(out.Bytes(), &result))
 				require.Equal(t, test.id, result.SeriesID)
