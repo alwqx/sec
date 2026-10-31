@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/alwqx/sec/provider/fred"
+	"github.com/alwqx/sec/provider/macrodata"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/h2non/gock.v1"
 )
@@ -16,18 +17,37 @@ func TestUSRealIncomeCLI(t *testing.T) {
 	defer gock.Off()
 	raw, err := os.ReadFile("../../provider/fred/testdata/real-income.csv")
 	require.NoError(t, err)
-	for _, asJSON := range []bool{false, true} {
+	for _, output := range []string{"table", "json", "standard"} {
 		gock.New("https://fred.stlouisfed.org").Get("/graph/fredgraph.csv").MatchParam("id", "DSPIC96").MatchHeader("User-Agent", "curl").Reply(200).BodyString(string(raw))
 		cmd := newUSRealIncomeCLI()
 		args := []string{"--begin", "202608", "--end", "202609", "--no-cache"}
-		if asJSON {
+		if output == "json" {
 			args = append(args, "--json")
+		}
+		if output == "standard" {
+			args = append(args, "--standard-json")
 		}
 		cmd.SetArgs(args)
 		var out bytes.Buffer
 		cmd.SetOut(&out)
 		require.NoError(t, cmd.Execute())
-		if asJSON {
+		if output == "standard" {
+			var got macrodata.Dataset
+			require.NoError(t, json.Unmarshal(out.Bytes(), &got))
+			require.Len(t, got.Observations, 6)
+			require.Equal(t, "us.real-income.level", got.Series[0].ID)
+			require.Equal(t, "DSPIC96", got.Observations[0].SourceSeriesID)
+			require.Equal(t, 18410.5, *got.Observations[0].Value)
+			require.True(t, got.Series[0].Annualized)
+			require.False(t, got.Series[1].Annualized)
+			require.Equal(t, 2017, *got.Series[0].ReferenceYear)
+			require.Contains(t, got.Series[0].Coverage, "非人均")
+			require.Nil(t, got.Observations[3].Value)
+			require.Equal(t, "current_value_missing", *got.Observations[4].MissingReason)
+			var original fred.RealIncomeResult
+			require.NoError(t, json.Unmarshal(got.Original, &original))
+			require.Len(t, original.Observations, 2)
+		} else if output == "json" {
 			var got fred.RealIncomeResult
 			require.NoError(t, json.Unmarshal(out.Bytes(), &got))
 			require.Equal(t, "DSPIC96", got.SeriesID)
