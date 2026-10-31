@@ -1,6 +1,6 @@
 # 宏观数据统一导出
 
-`--standard-json` 提供版本化的宏观序列 JSON，已接入 CN M1/M2、US M2、CN 社零和房地产，以及 US GDP、EFFR、CPI／核心CPI、初请／续请失业金、PCE／核心PCE价格指数、实际个人消费支出、实际可支配收入、工业生产／产能利用率、劳动力比率和时薪工时。采集仍使用原来的人民银行、FRED、NBS、纽约联储、BLS provider 和缓存，不增加网络请求。
+`--standard-json` 提供版本化的宏观序列 JSON。已接入指标及各自口径见下文，包括货币、消费、就业、生产、财政和企业部门。采集仍使用原provider及缓存，不增加网络请求。
 
 ```bash
 sec macro cn money --begin 202412 --end 202502 --standard-json
@@ -24,6 +24,10 @@ sec macro us unemployment --begin 202501 --end 202609 --standard-json
 sec macro us participation --begin 202501 --end 202609 --standard-json
 sec macro us earnings --begin 202501 --end 202609 --standard-json
 sec macro us weekly-hours --begin 202501 --end 202609 --standard-json
+sec macro us fiscal --begin 202609 --end 202610 --standard-json
+sec macro us corporate-profits --begin 2025Q1 --end 2026Q2 --standard-json
+sec macro us business-inventories --begin 202501 --end 202608 --standard-json
+sec macro us new-orders --begin 202501 --end 202608 --standard-json
 ```
 
 各命令分别输出独立数据集。原有表格、别名、日期默认值、`--json`、`--refresh` 和 `--no-cache` 行为不变；`--json` 与 `--standard-json` 互斥。统一字段用于程序读取，不改变币种、单位或统计口径，也不自动生成中美对比。
@@ -38,7 +42,7 @@ sec macro us weekly-hours --begin 202501 --end 202609 --standard-json
 | --- | --- |
 | `id`、`indicator` | 序列标识、指标，例如 `us.m2.level`、`m2` |
 | `measure` | `level`、`yoy_percent`、`mom_percent`、`ytd_level`、`ytd_yoy_percent`；GDP 另有 `qoq_percent`、`qoq_annualized_percent`；EFFR 为 `rate`、`previous_observation_change` |
-| `unit` | `CNY_100_million`（亿元人民币）、`USD_billion`（十亿美元）、`square_meters_10000`（万平方米）、`percent`、`percentage_points`（百分点）、`basis_points`（基点）、`index`、`claims`（申请件数）、`persons`（人数）、`USD_per_hour`、`hours_per_week` |
+| `unit` | `CNY_100_million`（亿元人民币）、`USD_billion`（十亿美元）、`USD_million`（百万美元）、`square_meters_10000`（万平方米）、`percent`、`percentage_points`（百分点）、`basis_points`（基点）、`index`、`claims`（申请件数）、`persons`（人数）、`USD_per_hour`、`hours_per_week` |
 | `frequency` | `monthly`、`quarterly`、`daily`、`weekly` |
 | `period_basis` | CN 货币为 `month-end`；US 货币为 `monthly-average`；社零单月、CPI与PCE为 `month`，社零和房地产累计为 `year-to-date`；GDP 为 `quarter`；EFFR 为 `overnight-transaction-date`；申领为 `week-ending-saturday` |
 | `seasonal_adjustment` | CN、EFFR 为 `not-seasonally-adjusted`；US M2、GDP、申领、PCE、实际消费／收入、工业指标为 `seasonally-adjusted`；CPI各序列分别标记 |
@@ -123,6 +127,30 @@ PCE价格提供 `us.pce.index`、`us.core-pce.index` 及各自的 `yoy_percent`�
 四个出口均保留严格上月／上年同月的原始水平与来源序列。基期必须属于正确月份和同一来源序列；不从相邻输出行重建、不跨BLS批次拼算，直接保留provider同批计算结果。每条观测的 `fetched_at` 来自该当前点，不用一个批次时间覆盖全部月份。未返回当前点时可为 null，完整批次信息及当前／基期脚注、抓取时间均保留在 `original`。
 
 CES官方水平新增可选 `preliminary`，表示原点是否标记P；false只表示未标P，不代表最终不再修订。没有返回原点时省略，不把未知状态写成false。计算差值／增速不设置该字段，其输入的初步标记可从 `original` 检查。此字段不改变原先各命令的 `--json`。公布时间和修订编号不可得时仍为 null，不从P或latest标记推算发布日期或版本编号。
+
+### 美国财政：月度流量、赤字符号和财年累计
+
+财政导出八条序列：`us.fiscal.receipts`、`outlays`、`surplus_or_deficit`、`deficit_positive`，以及对应的 `fytd_` 前缀序列。单位统一为 `USD_million`、名义、未季调、未折年，覆盖联邦统一预算，不是国债余额、债务发行或NIPA政府消费投资。
+
+月度收入、支出、盈余／赤字为官方独立系列。`surplus_or_deficit` 为盈余正、赤字负；`deficit_positive` 对官方余额取反，正值为赤字、负值为盈余，并标记 `value_origin="derived"`。不以收入减支出覆盖官方余额；正赤字表示的 `inputs` 保留对应官方余额及原始字符串，转换值本身不伪造原始字符串。
+
+财年累计为provider按当前快照内严格月份求和的计算值，全部标记 derived，不是另行采集的官方累计值。`period_basis="fiscal-year-to-date"`、`period_begin/period_end` 保留实际累计范围；新增可选 `fiscal_year` 保留所属财年。美国财年从前一年10月至当年9月，10月重新累计；适配时校验财年、财年月序、累计起止期及方法，不对累计值再次求和。各指标存在任一期缺失时，该累计值为 null、原因为 `window_incomplete`，不连带丢弃仍可用的当月值或其他指标。
+
+累计数据的完整月度窗口输入未由provider结果返回，标准输出明确在 `note` 中说明，不从查询窗口内的几行重新构造累计。`original` 保留原累计值、方法与日期，而非完整HTTP响应或可独立复算全部累计的数据包。日期和来源仍可追溯到FRED全快照，原缓存策略保持不变。
+
+### 企业部门：利润流量、月末库存和新订单
+
+三个出口分别输出官方水平和严格同比、上期计算增速，不跨频率拼接或加总：
+
+| 命令／序列前缀 | 水平口径 | 单位／频率 | 是否折年 |
+| --- | --- | --- | --- |
+| `corporate-profits`／`us.corporate-profits` | 含IVA、CCAdj的企业税前利润，含上市／非上市企业及来自世界其他地区的净利润 | `USD_billion`，季度 | 水平是SAAR；增速未年化 |
+| `business-inventories`／`us.business-inventories` | 制造业、商人批发业、零售业的月末库存账面余额 | `USD_million`，月度 | 不折年 |
+| `new-orders`／`us.new-orders` | 制造业当月新接订单扣除取消额 | `USD_million`，月度 | 不折年 |
+
+均为名义、季调，利润不是扣除通胀的实际利润，库存不是库存投资流量，订单不是未完成订单余额。水平使用 `level`；同比为 `yoy_percent`，上期增速按频率使用 `qoq_percent` 或 `mom_percent`。严格基期缺失或非正时不计算增速，原因分别为 `baseline_missing`、`nonpositive_baseline`，不跳到附近可用值；负的当期利润保留，不将其冒充缺失。
+
+`tax_basis="before_tax"` 为利润序列的可选元数据；`coverage` 保留官方定义。库存的可选 `as_of_date` 是provider按所属月生成的月末日期，不是实际公布日。NAICS范围重编、订单估计限制及完整来源信息保留在 `original`。这些可选字段不改变旧表格或原 `--json`；历史仍为当前可见修订值。
 
 ## 缺失与溯源
 

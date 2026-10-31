@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/alwqx/sec/provider/fred"
+	"github.com/alwqx/sec/provider/macrodata"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/h2non/gock.v1"
 )
@@ -25,18 +26,45 @@ func TestUSEnterpriseCLI(t *testing.T) {
 	} {
 		raw, err := os.ReadFile("../../provider/fred/testdata/us-enterprise-" + test.metric + ".csv")
 		require.NoError(t, err)
-		for _, asJSON := range []bool{false, true} {
+		for _, output := range []string{"table", "json", "standard"} {
 			gock.New("https://fred.stlouisfed.org").Get("/graph/fredgraph.csv").MatchParam("id", test.id).MatchHeader("User-Agent", "curl").Reply(200).BodyString(string(raw))
 			command := usEnterpriseCommand(test.metric)
 			args := []string{"--begin", test.begin, "--end", test.end, "--no-cache", "--refresh"}
-			if asJSON {
+			if output == "json" {
 				args = append(args, "--json")
+			}
+			if output == "standard" {
+				args = append(args, "--standard-json")
 			}
 			command.SetArgs(args)
 			var out bytes.Buffer
 			command.SetOut(&out)
 			require.NoError(t, command.Execute())
-			if asJSON {
+			if output == "standard" {
+				var result macrodata.Dataset
+				require.NoError(t, json.Unmarshal(out.Bytes(), &result))
+				require.Len(t, result.Observations, 6)
+				require.Equal(t, test.level, *result.Observations[0].Value)
+				require.Equal(t, test.id, result.Observations[0].SourceSeriesID)
+				require.Nil(t, result.Observations[3].Value)
+				if test.metric == "profit" {
+					require.True(t, result.Series[0].Annualized)
+					require.Equal(t, "quarterly", result.Series[0].Frequency)
+					require.Equal(t, "before_tax", result.Series[0].TaxBasis)
+					require.Equal(t, "qoq_percent", result.Series[2].Measure)
+				} else {
+					require.False(t, result.Series[0].Annualized)
+					require.Equal(t, "monthly", result.Series[0].Frequency)
+					require.Equal(t, "mom_percent", result.Series[2].Measure)
+				}
+				if test.metric == "inventory" {
+					require.Equal(t, "month-end", result.Series[0].PeriodBasis)
+					require.Equal(t, "2026-08-31", *result.Observations[0].AsOfDate)
+				}
+				var original fred.EnterpriseResult
+				require.NoError(t, json.Unmarshal(result.Original, &original))
+				require.Equal(t, test.metric, original.Metric)
+			} else if output == "json" {
 				var result fred.EnterpriseResult
 				require.NoError(t, json.Unmarshal(out.Bytes(), &result))
 				require.Equal(t, test.id, result.SeriesID)

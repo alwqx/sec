@@ -22,6 +22,7 @@ type Dataset struct {
 }
 
 type Series struct {
+	TaxBasis           string  `json:"tax_basis,omitempty"`
 	Survey             string  `json:"survey,omitempty"`
 	Numerator          string  `json:"numerator,omitempty"`
 	Denominator        string  `json:"denominator,omitempty"`
@@ -50,6 +51,8 @@ type Base struct {
 }
 
 type Observation struct {
+	AsOfDate          *string    `json:"as_of_date,omitempty"`
+	FiscalYear        int        `json:"fiscal_year,omitempty"`
 	Preliminary       *bool      `json:"preliminary,omitempty"`
 	Inputs            []Base     `json:"inputs,omitempty"`
 	RevisionIndicator string     `json:"revision_indicator,omitempty"`
