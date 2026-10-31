@@ -146,7 +146,7 @@ func Household(result *nbs.HouseholdResult) (*Dataset, error) {
 		}
 		for i, spec := range specs {
 			source := sources[spec.key]
-			o := Observation{SeriesID: d.Series[i].ID, Period: item.Period, PeriodBegin: quarterYTDBegin(item.Period), PeriodEnd: item.Period, Value: spec.value(item), RawValue: householdRaw(item.RawValues[spec.key]), SourceSeriesID: source.SeriesID, Source: text(source.Source), FetchedAt: timestamp(source.FetchedAt), PublishedAt: result.PublishedAt, RevisionID: result.RevisionID, DataVersion: "current_visible_revision"}
+			o := Observation{SeriesID: d.Series[i].ID, Period: item.Period, PeriodBegin: quarterYTDBegin(item.Period), PeriodEnd: item.Period, Value: spec.value(item), RawValue: rawJSONValue(item.RawValues[spec.key]), SourceSeriesID: source.SeriesID, Source: text(source.Source), FetchedAt: timestamp(source.FetchedAt), PublishedAt: result.PublishedAt, RevisionID: result.RevisionID, DataVersion: "current_visible_revision"}
 			if item.IncludesOwnProduction {
 				o.Note = "全年累计含自产自用部分，季度累计不含，不能相减得到第四季度"
 			}
@@ -158,8 +158,8 @@ func Household(result *nbs.HouseholdResult) (*Dataset, error) {
 	return d, nil
 }
 
-// householdRaw 解码源字符串；JSON null和空字符串都是缺失，不写成字符串。
-func householdRaw(raw json.RawMessage) *string {
+// rawJSONValue 解码源字符串；JSON null和空字符串都是缺失，不写成字符串。
+func rawJSONValue(raw json.RawMessage) *string {
 	var value string
 	if json.Unmarshal(raw, &value) == nil {
 		return text(value)

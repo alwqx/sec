@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/alwqx/sec/provider/macrodata"
 	"github.com/alwqx/sec/provider/mofcom"
 	"github.com/alwqx/sec/utils"
 	"github.com/olekukonko/tablewriter"
@@ -37,6 +38,11 @@ func newCNServicesCLI() *cobra.Command {
 		if err != nil {
 			return err
 		}
+		standard, _ := cmd.Flags().GetBool("standard-json")
+		if standard {
+			dataset, err := macrodata.CNServices(result)
+			return writeDataset(cmd, dataset, err)
+		}
 		asJSON, _ := cmd.Flags().GetBool("json")
 		if asJSON {
 			encoder := json.NewEncoder(cmd.OutOrStdout())
@@ -46,6 +52,7 @@ func newCNServicesCLI() *cobra.Command {
 		return printCNServices(cmd.OutOrStdout(), result)
 	}}
 	addQueryFlags(command)
+	addStandardJSONFlag(command, "按统一宏观序列格式输出JSON，人民币和美元各成序列，保留官方总额和差额")
 	command.Flags().Lookup("begin").Usage = "开始月份 YYYYMM，最早201601；默认截至月份前11个月"
 	command.Flags().Lookup("end").Usage = "截至月份 YYYYMM，默认北京时间上个月"
 	return command
