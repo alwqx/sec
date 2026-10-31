@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/alwqx/sec/provider/fiscaldata"
+	"github.com/alwqx/sec/provider/macrodata"
 	"github.com/alwqx/sec/utils"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
@@ -46,6 +47,11 @@ func newUSDebtCLI() *cobra.Command {
 		if err != nil {
 			return err
 		}
+		standard, _ := cmd.Flags().GetBool("standard-json")
+		if standard {
+			dataset, err := macrodata.Debt(result)
+			return writeDataset(cmd, dataset, err)
+		}
 		asJSON, _ := cmd.Flags().GetBool("json")
 		if asJSON {
 			e := json.NewEncoder(cmd.OutOrStdout())
@@ -55,6 +61,7 @@ func newUSDebtCLI() *cobra.Command {
 		return printUSDebt(cmd.OutOrStdout(), result)
 	}}
 	addQueryFlags(cmd)
+	addStandardJSONFlag(cmd, "按统一宏观序列格式输出JSON，分开官方明细、累计值和计算汇总")
 	cmd.Flags().Lookup("begin").Usage = "开始日期YYYYMMDD，最早20051003；默认截至日前6天"
 	cmd.Flags().Lookup("end").Usage = "截至日期YYYYMMDD，默认UTC今天；未发布日不补"
 	return cmd

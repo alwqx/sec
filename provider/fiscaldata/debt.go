@@ -71,6 +71,8 @@ type DebtSummary struct {
 	Net         *float64 `json:"net_recorded_issuance_million_usd"`
 	IsDerived   bool     `json:"is_derived"`
 	InputRows   int      `json:"input_rows"`
+	// DuplicateRows 是未计入汇总的上游重复行数，这些行仍保留在Rows中。
+	DuplicateRows int `json:"duplicate_rows_excluded,omitempty"`
 }
 type DebtResult struct {
 	Region      string        `json:"region"`
@@ -279,7 +281,16 @@ func (c *Client) Debt(ctx context.Context, req *DebtRequest) (*DebtResult, error
 	}
 	groups := map[string][]DebtRow{}
 	keys := []string{}
+	uniqueDebt, _ := UniqueDebtRows(result.Rows)
+	repeats := map[string]int{}
+	counted := map[string]int{}
 	for _, r := range result.Rows {
+		counted[r.Date+"/"+r.Market]++
+	}
+	for _, r := range uniqueDebt {
+		repeats[r.Date+"/"+r.Market]++
+	}
+	for _, r := range uniqueDebt {
 		key := r.Date + "/" + r.Market
 		if _, ok := groups[key]; !ok {
 			keys = append(keys, key)
@@ -289,7 +300,7 @@ func (c *Client) Debt(ctx context.Context, req *DebtRequest) (*DebtResult, error
 	sort.Strings(keys)
 	for _, key := range keys {
 		rows := groups[key]
-		s := DebtSummary{Date: rows[0].Date, Market: rows[0].Market, IsDerived: true, InputRows: len(rows)}
+		s := DebtSummary{Date: rows[0].Date, Market: rows[0].Market, IsDerived: true, InputRows: len(rows), DuplicateRows: counted[key] - repeats[key]}
 		for _, kind := range []string{"Issues", "Redemptions"} {
 			sum := 0.0
 			found, valid := false, true

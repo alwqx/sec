@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/alwqx/sec/provider/fiscaldata"
+	"github.com/alwqx/sec/provider/macrodata"
 	"github.com/alwqx/sec/utils"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
@@ -46,6 +47,11 @@ func newUSDebtCashCLI() *cobra.Command {
 		if e != nil {
 			return e
 		}
+		standard, _ := cmd.Flags().GetBool("standard-json")
+		if standard {
+			dataset, err := macrodata.DebtCash(result)
+			return writeDataset(cmd, dataset, err)
+		}
 		asJSON, _ := cmd.Flags().GetBool("json")
 		if asJSON {
 			enc := json.NewEncoder(cmd.OutOrStdout())
@@ -55,6 +61,7 @@ func newUSDebtCashCLI() *cobra.Command {
 		return printUSDebtCash(cmd.OutOrStdout(), result)
 	}}
 	addQueryFlags(cmd)
+	addStandardJSONFlag(cmd, "按统一宏观序列格式输出JSON，分开官方现金总额、计算净额和调整明细")
 	cmd.Flags().Lookup("begin").Usage = "开始日期YYYYMMDD，最早20051003；默认截至日前6天"
 	cmd.Flags().Lookup("end").Usage = "截至日期YYYYMMDD，默认UTC今天；无记录日不补"
 	return cmd

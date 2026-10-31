@@ -17,8 +17,27 @@ type Dataset struct {
 	Begin         string          `json:"begin"`
 	End           string          `json:"end"`
 	Series        []Series        `json:"series"`
+	Events        []Event         `json:"events,omitempty"`
 	Observations  []Observation   `json:"observations"`
 	Original      json.RawMessage `json:"original"`
+}
+
+// Event 保存同一日期可能有多个的事件元数据，观测通过EventID关联。
+type Event struct {
+	ID                            string  `json:"id"`
+	CUSIP                         string  `json:"cusip"`
+	SecurityType                  string  `json:"security_type"`
+	Term                          string  `json:"security_term"`
+	AnnouncementDate              *string `json:"announcement_date"`
+	AuctionDate                   string  `json:"auction_date"`
+	IssueDate                     string  `json:"issue_date"`
+	MaturityDate                  string  `json:"maturity_date"`
+	OriginalIssueDate             *string `json:"original_issue_date"`
+	Reopening                     *bool   `json:"reopening"`
+	FloatingRate                  *bool   `json:"floating_rate"`
+	InflationIndexed              *bool   `json:"inflation_indexed"`
+	SOMAInsideOffering            *bool   `json:"soma_inside_offering_amount"`
+	FIMACompetitiveInsideOffering *bool   `json:"fima_competitive_inside_offering_amount"`
 }
 
 type Series struct {
@@ -53,6 +72,7 @@ type Base struct {
 }
 
 type Observation struct {
+	EventID           string     `json:"event_id,omitempty"`
 	AsOfDate          *string    `json:"as_of_date,omitempty"`
 	FiscalYear        int        `json:"fiscal_year,omitempty"`
 	Preliminary       *bool      `json:"preliminary,omitempty"`

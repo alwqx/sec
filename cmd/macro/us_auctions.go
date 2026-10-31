@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/alwqx/sec/provider/fiscaldata"
+	"github.com/alwqx/sec/provider/macrodata"
 	"github.com/alwqx/sec/utils"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
@@ -47,6 +48,11 @@ func newUSAuctionsCLI() *cobra.Command {
 		if e != nil {
 			return e
 		}
+		standard, _ := cmd.Flags().GetBool("standard-json")
+		if standard {
+			dataset, err := macrodata.Auctions(result)
+			return writeDataset(cmd, dataset, err)
+		}
 		asJSON, _ := cmd.Flags().GetBool("json")
 		if asJSON {
 			enc := json.NewEncoder(cmd.OutOrStdout())
@@ -56,6 +62,7 @@ func newUSAuctionsCLI() *cobra.Command {
 		return printUSAuctions(cmd.OutOrStdout(), result)
 	}}
 	addQueryFlags(cmd)
+	addStandardJSONFlag(cmd, "按统一宏观序列格式输出JSON，用event_id区分同日拍卖事件，金额为面值")
 	cmd.Flags().String("date-basis", "issue", "日期筛选口径 issue（官方发行日，默认）或 auction（拍卖日）")
 	cmd.Flags().Lookup("begin").Usage = "开始日期YYYYMMDD，最早19980727；默认截至日前29天"
 	cmd.Flags().Lookup("end").Usage = "截至日期YYYYMMDD，默认UTC今天"

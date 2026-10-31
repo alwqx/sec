@@ -149,6 +149,7 @@ CLI `sec watch` 与 Desktop「我的自选」统一使用 `~/.sec/watchlist.json
 | `macro us bank-credit --standard-json`、`macro us lending-standards --standard-json`、`macro us debt-service --standard-json`、`macro us investment --standard-json`、`macro us equipment-investment --standard-json` | 信用与投资统一JSON导出：月平均余额、调查净比例、百分比／百分点变化、折年水平和名义／实际口径，见 [统一导出文档](docs/macro-standard.md) |
 | `macro us payrolls --standard-json`、`macro us housing --standard-json`、`macro us house-price --standard-json`、`macro us trade --standard-json`、`macro us real-trade --standard-json` | 非农、住宅与贸易统一JSON导出：岗位差额、新房／成屋单位、房价指数基期、官方差额和名义／实际口径，见 [统一导出文档](docs/macro-standard.md) |
 | `macro us target-rate --standard-json` | 联邦基金目标区间统一JSON导出：实际调整事件、上下限、基点变化及生效／公布日期，见 [统一导出文档](docs/macro-standard.md) |
+| `macro us debt --standard-json`、`macro us debt-cash --standard-json`、`macro us auctions --standard-json` | 国债统一JSON导出：DTS官方明细、累计值、现金总额与计算净额，逐券拍卖事件及面值分配，见 [统一导出文档](docs/macro-standard.md) |
 | `macro us trade`、`macro us real-trade`        | 月度名义贸易与季度实际贸易，出口、进口及官方差额；支持商品/服务分项，见 [美国进出口文档](docs/us-trade.md) |
 | `macro us investment`、`macro us equipment-investment` | 住宅开工、建筑许可及季度设备投资，分别保留频率、单位和季调折年口径，见 [美国投资文档](docs/us-investment.md) |
 | `macro us bank-credit`、`macro us lending-standards`、`macro us debt-service` | 月平均银行信贷、季度贷款标准及家庭偿债负担，区分百分比和百分点变化，见 [美国信用文档](docs/us-credit.md) |
