@@ -6,6 +6,7 @@ import (
 	"io"
 	"strconv"
 
+	"github.com/alwqx/sec/provider/macrodata"
 	"github.com/alwqx/sec/provider/pbc"
 	"github.com/alwqx/sec/utils"
 	"github.com/olekukonko/tablewriter"
@@ -36,6 +37,16 @@ func newMoneySupplyCLI() *cobra.Command {
 		if err != nil {
 			return err
 		}
+		standard, _ := cmd.Flags().GetBool("standard-json")
+		if standard {
+			dataset, err := macrodata.CNMoney(items, begin, end)
+			if err != nil {
+				return err
+			}
+			encoder := json.NewEncoder(cmd.OutOrStdout())
+			encoder.SetIndent("", "  ")
+			return encoder.Encode(dataset)
+		}
 		asJSON, _ := cmd.Flags().GetBool("json")
 		if asJSON {
 			encoder := json.NewEncoder(cmd.OutOrStdout())
@@ -45,6 +56,8 @@ func newMoneySupplyCLI() *cobra.Command {
 		return printMoneySupply(cmd.OutOrStdout(), items)
 	}}
 	addQueryFlags(command)
+	command.Flags().Bool("standard-json", false, "按统一宏观序列格式输出JSON，包含统计口径、来源和缺失状态")
+	command.MarkFlagsMutuallyExclusive("json", "standard-json")
 	return command
 }
 
