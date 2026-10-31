@@ -46,7 +46,7 @@ func Enterprise(result *fred.EnterpriseResult) (*Dataset, error) {
 			return nil, fmt.Errorf("企业指标所属期重复: %s", item.Period)
 		}
 		seen[item.Period] = true
-		previous, yearAgo := enterpriseBasePeriods(item.Period, spec.frequency)
+		previous, yearAgo := periodicBasePeriods(item.Period, spec.frequency)
 		for i, field := range []struct {
 			value    *float64
 			base     *fred.EnterpriseValue
@@ -78,7 +78,7 @@ func Enterprise(result *fred.EnterpriseResult) (*Dataset, error) {
 	return d, nil
 }
 
-func enterpriseBasePeriods(period, frequency string) (string, string) {
+func periodicBasePeriods(period, frequency string) (string, string) {
 	if frequency == "quarterly" {
 		year, _ := strconv.Atoi(period[:4])
 		q := year*4 + int(period[5]-'1')

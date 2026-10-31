@@ -1,6 +1,6 @@
 # 宏观数据统一导出
 
-`--standard-json` 提供版本化的宏观序列 JSON。已接入指标及各自口径见下文，包括货币、消费、就业、生产、财政和企业部门。采集仍使用原provider及缓存，不增加网络请求。
+`--standard-json` 提供版本化的宏观序列 JSON。已接入指标及各自口径见下文，包括货币、消费、就业、生产、财政、企业部门、信用和投资。采集仍使用原provider及缓存，不增加网络请求。
 
 ```bash
 sec macro cn money --begin 202412 --end 202502 --standard-json
@@ -28,6 +28,11 @@ sec macro us fiscal --begin 202609 --end 202610 --standard-json
 sec macro us corporate-profits --begin 2025Q1 --end 2026Q2 --standard-json
 sec macro us business-inventories --begin 202501 --end 202608 --standard-json
 sec macro us new-orders --begin 202501 --end 202608 --standard-json
+sec macro us bank-credit --begin 202501 --end 202609 --standard-json
+sec macro us lending-standards --begin 2025Q1 --end 2026Q3 --standard-json
+sec macro us debt-service --begin 2025Q1 --end 2026Q2 --standard-json
+sec macro us investment --component building-permits --begin 202501 --end 202608 --standard-json
+sec macro us equipment-investment --price-basis nominal --begin 2025Q1 --end 2026Q2 --standard-json
 ```
 
 各命令分别输出独立数据集。原有表格、别名、日期默认值、`--json`、`--refresh` 和 `--no-cache` 行为不变；`--json` 与 `--standard-json` 互斥。统一字段用于程序读取，不改变币种、单位或统计口径，也不自动生成中美对比。
@@ -41,13 +46,13 @@ sec macro us new-orders --begin 202501 --end 202608 --standard-json
 | 字段 | 含义 |
 | --- | --- |
 | `id`、`indicator` | 序列标识、指标，例如 `us.m2.level`、`m2` |
-| `measure` | `level`、`yoy_percent`、`mom_percent`、`ytd_level`、`ytd_yoy_percent`；GDP 另有 `qoq_percent`、`qoq_annualized_percent`；EFFR 为 `rate`、`previous_observation_change` |
-| `unit` | `CNY_100_million`（亿元人民币）、`USD_billion`（十亿美元）、`USD_million`（百万美元）、`square_meters_10000`（万平方米）、`percent`、`percentage_points`（百分点）、`basis_points`（基点）、`index`、`claims`（申请件数）、`persons`（人数）、`USD_per_hour`、`hours_per_week` |
+| `measure` | `level`、`yoy_percent`、`mom_percent`、`ytd_level`、`ytd_yoy_percent`；GDP 另有 `qoq_percent`、`qoq_annualized_percent`；EFFR 为 `rate`、`previous_observation_change`；贷款标准和偿债比率为 `rate`、`yoy_percentage_points`、`qoq_percentage_points` |
+| `unit` | `CNY_100_million`（亿元人民币）、`USD_billion`（十亿美元）、`USD_million`（百万美元）、`square_meters_10000`（万平方米）、`percent`、`percentage_points`（百分点）、`basis_points`（基点）、`index`、`claims`（申请件数）、`persons`（人数）、`USD_per_hour`、`hours_per_week`、`housing_units_thousand`（千套） |
 | `frequency` | `monthly`、`quarterly`、`daily`、`weekly` |
-| `period_basis` | CN 货币为 `month-end`；US 货币为 `monthly-average`；社零单月、CPI与PCE为 `month`，社零和房地产累计为 `year-to-date`；GDP 为 `quarter`；EFFR 为 `overnight-transaction-date`；申领为 `week-ending-saturday` |
-| `seasonal_adjustment` | CN、EFFR 为 `not-seasonally-adjusted`；US M2、GDP、申领、PCE、实际消费／收入、工业指标为 `seasonally-adjusted`；CPI各序列分别标记 |
-| `price_basis` | 货币和社零、房地产金额及名义时薪为 `nominal`；实际GDP／消费／收入为 `real-chained`；CPI／PCE价格为 `price-index`；工业生产为 `volume-index`；房屋面积、利率、申领数量、产能利用率、劳动力比率和工时为 `not_applicable` |
-| `annualized` | 水平与增速各自标记；GDP／实际消费／实际收入水平和GDP官方环比年化增速为 true，其余当前序列为 false |
+| `period_basis` | CN 货币为 `month-end`；US 货币为 `monthly-average`；社零单月、CPI与PCE为 `month`，社零和房地产累计为 `year-to-date`；GDP 为 `quarter`；EFFR 为 `overnight-transaction-date`；申领为 `week-ending-saturday`；银行信贷为 `pro_rata_average_of_weekly_levels`，贷款标准为 `survey_quarter`，偿债比率为 `calendar_quarter` |
+| `seasonal_adjustment` | CN、EFFR 为 `not-seasonally-adjusted`；US M2、GDP、申领、PCE、实际消费／收入、工业指标、银行信贷、偿债比率、投资为 `seasonally-adjusted`；贷款标准为 `not-seasonally-adjusted`；CPI各序列分别标记 |
+| `price_basis` | 货币和社零、房地产金额及名义时薪为 `nominal`；实际GDP／消费／收入为 `real-chained`；CPI／PCE价格为 `price-index`；工业生产为 `volume-index`；房屋面积、利率、申领数量、产能利用率、劳动力比率、工时、贷款标准、偿债比率和住房套数为 `not_applicable`；银行信贷和名义设备投资为 `nominal`，实际设备投资为 `real-chained` |
+| `annualized` | 水平与增速各自标记；GDP／实际消费／实际收入／企业利润／住宅建设／设备投资水平和GDP官方环比年化增速为 true，其余当前序列为 false |
 | `value_origin` | `official` 或 `derived`，不以计算值冒充官方公布值 |
 | `definition`、`formula` | 统计口径标识；计算增速保留公式，官方值公式为 null |
 
@@ -151,6 +156,33 @@ CES官方水平新增可选 `preliminary`，表示原点是否标记P；false只
 均为名义、季调，利润不是扣除通胀的实际利润，库存不是库存投资流量，订单不是未完成订单余额。水平使用 `level`；同比为 `yoy_percent`，上期增速按频率使用 `qoq_percent` 或 `mom_percent`。严格基期缺失或非正时不计算增速，原因分别为 `baseline_missing`、`nonpositive_baseline`，不跳到附近可用值；负的当期利润保留，不将其冒充缺失。
 
 `tax_basis="before_tax"` 为利润序列的可选元数据；`coverage` 保留官方定义。库存的可选 `as_of_date` 是provider按所属月生成的月末日期，不是实际公布日。NAICS范围重编、订单估计限制及完整来源信息保留在 `original`。这些可选字段不改变旧表格或原 `--json`；历史仍为当前可见修订值。
+
+### 美国信用：月平均余额、调查净比例和偿债比率
+
+三个命令各自输出独立数据集，均未折年，不合并成一个信用指标：
+
+| 命令／序列前缀 | 水平口径 | 单位／频率 | 季调 | 变化序列 |
+| --- | --- | --- | --- | --- |
+| `bank-credit`／`us.bank-credit` | `LOANINV`，H.8商业银行信贷，周三余额按比例计算的月平均，不是月末余额或当月新增 | `USD_billion`，月度 | 是 | `yoy_percent`、`mom_percent` |
+| `lending-standards`／`us.lending-standards` | `DRTSCILM`，SLOOS大中型企业C&I贷款标准净收紧比例，`survey="SLOOS"` | `percent`，季度 | 否 | `yoy_percentage_points`、`qoq_percentage_points` |
+| `debt-service`／`us.debt-service` | `TDSP`，当前征信方法的家庭偿债比率 | `percent`，季度 | 是 | `yoy_percentage_points`、`qoq_percentage_points` |
+
+水平序列分别使用 `level`（银行信贷）或 `rate`（两个比率）。可选 `methodology` 标记 `current_h8_monthly_levels`、`sloos_domestic_banks_large_middle_market_ci`、`credit_bureau_based_dsr`；旧方法的偿债比率档案不拼接。可选 `change_method` 只出现在变化序列上：银行信贷为 `level_ratio_not_break_adjusted`，表示由当前水平计算，不是H.8官方经断点调整的折年增速；两个比率为 `difference`，单位为百分点，公式为 `current_level - base_level`。
+
+百分点差允许负值和零基期，净收紧比例为零是有效值，不产生 `zero_baseline`；银行信贷基期为零时才标记 `zero_baseline`。贷款标准的 `period` 沿用FRED调查季度，不回移到调查询问的回顾期。
+
+### 美国投资：住宅建设套数和设备投资
+
+| 命令与选项／序列前缀 | 水平口径 | 单位／频率 | 价格口径 |
+| --- | --- | --- | --- |
+| `investment --component housing-starts`／`us.investment.housing-starts` | `HOUST`，私人住宅新开工单元 | `housing_units_thousand`，月度 | `not_applicable` |
+| `investment --component building-permits`／`us.investment.building-permits` | `PERMIT`，签发许可地区获准新建的私人住房单元 | `housing_units_thousand`，月度 | `not_applicable` |
+| `equipment-investment --price-basis real`／`us.equipment-investment.real` | `Y033RX1Q020SBEA`，私人非住宅设备投资 | `USD_billion`，季度 | `real-chained`，`reference_year=2017` |
+| `equipment-investment --price-basis nominal`／`us.equipment-investment.nominal` | `Y033RC1Q027SBEA`，私人非住宅设备投资 | `USD_billion`，季度 | `nominal` |
+
+水平均为季调折年，`annualized=true`，不除以12或4换算为当期量；同比 `yoy_percent` 和上期增速 `mom_percent`／`qoq_percent` 未年化，`change_method="level_ratio"`。实际设备投资水平标记 `components_additive=false`，不与其他链式分项相加；增速序列不带此字段。
+
+住房套数与设备金额的频率、单位不同，名义与实际设备投资的价格口径不同，均不共用序列ID、不拼接。严格基期缺失或为零时增速为空，原因分别为 `baseline_missing`、`zero_baseline`；零水平本身是有效值。BEA账户代码、方法说明及完整来源保留在 `original`，历史仍为当前可见修订值，`published_at`、`revision_id` 为 null。
 
 ## 缺失与溯源
 

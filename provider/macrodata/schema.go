@@ -22,6 +22,8 @@ type Dataset struct {
 }
 
 type Series struct {
+	Methodology        string  `json:"methodology,omitempty"`
+	ChangeMethod       string  `json:"change_method,omitempty"`
 	TaxBasis           string  `json:"tax_basis,omitempty"`
 	Survey             string  `json:"survey,omitempty"`
 	Numerator          string  `json:"numerator,omitempty"`

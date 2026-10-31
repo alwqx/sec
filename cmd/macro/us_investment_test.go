@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/alwqx/sec/provider/fred"
+	"github.com/alwqx/sec/provider/macrodata"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/h2non/gock.v1"
 )
@@ -25,21 +26,61 @@ func TestUSInvestmentCLI(t *testing.T) {
 		}
 		raw, err := os.ReadFile("../../provider/fred/testdata/us-investment-" + file + ".csv")
 		require.NoError(t, err)
-		for _, asJSON := range []bool{false, true} {
+		for _, output := range []string{"table", "json", "standard"} {
 			gock.New("https://fred.stlouisfed.org").Get("/graph/fredgraph.csv").MatchParam("id", ids).MatchHeader("User-Agent", "curl").Reply(200).BodyString(string(raw))
 			cmd := newUSInvestmentCLI()
 			if test.quarterly {
 				cmd = newUSEquipmentInvestmentCLI()
 			}
 			args := []string{"--begin", begin, "--end", end, flag, test.option, "--no-cache", "--refresh"}
-			if asJSON {
+			if output == "json" {
 				args = append(args, "--json")
+			}
+			if output == "standard" {
+				args = append(args, "--standard-json")
 			}
 			cmd.SetArgs(args)
 			var out bytes.Buffer
 			cmd.SetOut(&out)
 			require.NoError(t, cmd.Execute())
-			if asJSON {
+			if output == "standard" {
+				var result macrodata.Dataset
+				require.NoError(t, json.Unmarshal(out.Bytes(), &result))
+				require.Len(t, result.Series, 3)
+				require.Len(t, result.Observations, 6)
+				require.Equal(t, test.level, *result.Observations[0].Value)
+				require.Equal(t, test.id, result.Observations[0].SourceSeriesID)
+				require.NotNil(t, result.Observations[0].RawValue)
+				require.Nil(t, result.Observations[3].Value)
+				require.Equal(t, "source_value_missing", *result.Observations[3].MissingReason)
+				require.Equal(t, "current_value_missing", *result.Observations[4].MissingReason)
+				require.Nil(t, result.Observations[0].PublishedAt)
+				require.False(t, result.Series[1].Annualized)
+				require.Equal(t, "derived", result.Series[1].ValueOrigin)
+				require.True(t, result.Series[0].Annualized)
+				if test.quarterly {
+					require.Equal(t, "USD_billion", result.Series[0].Unit)
+					require.Equal(t, "quarterly", result.Series[0].Frequency)
+					require.Equal(t, "qoq_percent", result.Series[2].Measure)
+					if test.option == "real" {
+						require.Equal(t, "real-chained", result.Series[0].PriceBasis)
+						require.Equal(t, 2017, *result.Series[0].ReferenceYear)
+						require.False(t, *result.Series[0].ComponentsAdditive)
+						require.Nil(t, result.Series[1].ComponentsAdditive)
+					} else {
+						require.Equal(t, "nominal", result.Series[0].PriceBasis)
+					}
+				} else {
+					require.Equal(t, "housing_units_thousand", result.Series[0].Unit)
+					require.Equal(t, "not_applicable", result.Series[0].PriceBasis)
+					require.Equal(t, "monthly", result.Series[0].Frequency)
+					require.Equal(t, "mom_percent", result.Series[2].Measure)
+				}
+				var original fred.InvestmentResult
+				require.NoError(t, json.Unmarshal(result.Original, &original))
+				require.Equal(t, test.id, original.SeriesID)
+				require.Len(t, original.Observations, 2)
+			} else if output == "json" {
 				var result fred.InvestmentResult
 				require.NoError(t, json.Unmarshal(out.Bytes(), &result))
 				require.Equal(t, test.id, result.SeriesID)

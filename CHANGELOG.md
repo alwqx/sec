@@ -89,6 +89,7 @@
 84. Extend `--standard-json` to real disposable income, industrial production and capacity utilization, preserving real SAAR income totals, separate industrial sector coverage and percentage versus percentage-point changes; retain strict baselines, raw values, missing observations and distinct zero-baseline rules with adapter and CLI regression tests
 85. Extend `--standard-json` to US unemployment, labor force participation, hourly earnings and weekly hours with explicit CPS/CES survey coverage, ratio numerators and denominators, native-unit versus percentage-point changes and optional preliminary flags; preserve strict same-series baselines, per-point fetch times and original footnotes with adapter and CLI regression tests
 86. Extend `--standard-json` to US fiscal flows, corporate profits, business inventories and manufacturing orders; distinguish official balances from derived deficit signs and fiscal-year totals, preserve quarterly SAAR versus monthly stock/flow definitions, strict baselines and nonpositive-base handling with adapter and CLI regression tests
+87. Extend `--standard-json` to US bank credit, lending standards, household debt service, housing starts, building permits and equipment investment; distinguish monthly average balances, survey net shares, current-methodology ratios and SAAR levels, separate percent from percentage-point changes and nominal from real series, and preserve strict baselines, raw values, zero-baseline handling and original provider results with adapter and CLI regression tests
 
 ### v0.3.15
 
