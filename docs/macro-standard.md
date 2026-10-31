@@ -38,24 +38,25 @@ sec macro us housing --begin 202501 --end 202609 --standard-json
 sec macro us house-price --begin 2025Q1 --end 2026Q2 --standard-json
 sec macro us trade --component goods --begin 202501 --end 202608 --standard-json
 sec macro us real-trade --begin 2025Q1 --end 2026Q2 --standard-json
+sec macro us target-rate --begin 20200301 --end 20200331 --standard-json
 ```
 
 各命令分别输出独立数据集。原有表格、别名、日期默认值、`--json`、`--refresh` 和 `--no-cache` 行为不变；`--json` 与 `--standard-json` 互斥。统一字段用于程序读取，不改变币种、单位或统计口径，也不自动生成中美对比。
 
 ## 契约版本 1
 
-顶层包含 `schema_version="1"`、`region`、`begin/end`、`series`、`observations` 和 `original`。月度所属期使用 YYYYMM，季度使用 YYYYQ1 至 YYYYQ4，日度、周度使用 YYYYMMDD；每份数据集只包含一种频率，查询端点、观测日期按该频率校验。每个观测只包含一个值，通过 `series_id` 关联序列。消费者应检查版本、频率，并用序列 ID 和所属期作为联合键。
+顶层包含 `schema_version="1"`、`region`、`begin/end`、`series`、`observations` 和 `original`。月度所属期使用 YYYYMM，季度使用 YYYYQ1 至 YYYYQ4，日度、周度和事件型使用 YYYYMMDD；每份数据集只包含一种频率，查询端点、观测日期按该频率校验。每个观测只包含一个值，通过 `series_id` 关联序列。消费者应检查版本、频率，并用序列 ID 和所属期作为联合键。
 
-`series` 为实际返回观测所引用的序列定义，包含：
+`series` 为实际返回观测所引用的序列定义；查询窗口没有观测时，部分指标仍保留序列定义以说明口径，不代表有数据。每条定义包含：
 
 | 字段 | 含义 |
 | --- | --- |
 | `id`、`indicator` | 序列标识、指标，例如 `us.m2.level`、`m2` |
-| `measure` | `level`、`yoy_percent`、`mom_percent`、`ytd_level`、`ytd_yoy_percent`；GDP 另有 `qoq_percent`、`qoq_annualized_percent`；EFFR 为 `rate`、`previous_observation_change`；贷款标准和偿债比率为 `rate`、`yoy_percentage_points`、`qoq_percentage_points`；非农新增为 `monthly_change`；贸易差额变化为 `yoy_change`、`mom_change`、`qoq_change` |
+| `measure` | `level`、`yoy_percent`、`mom_percent`、`ytd_level`、`ytd_yoy_percent`；GDP 另有 `qoq_percent`、`qoq_annualized_percent`；EFFR 为 `rate`、`previous_observation_change`；贷款标准和偿债比率为 `rate`、`yoy_percentage_points`、`qoq_percentage_points`；非农新增为 `monthly_change`；贸易差额变化为 `yoy_change`、`mom_change`、`qoq_change`；目标利率为 `lower_bound`、`upper_bound`、`lower_change`、`upper_change` |
 | `unit` | `CNY_100_million`（亿元人民币）、`USD_billion`（十亿美元）、`USD_million`（百万美元）、`square_meters_10000`（万平方米）、`percent`、`percentage_points`（百分点）、`basis_points`（基点）、`index`、`claims`（申请件数）、`persons`（人数）、`USD_per_hour`、`hours_per_week`、`housing_units_thousand`（千套）、`housing_units`（套）、`jobs_thousand`（千个岗位） |
-| `frequency` | `monthly`、`quarterly`、`daily`、`weekly` |
-| `period_basis` | CN 货币为 `month-end`；US 货币为 `monthly-average`；社零单月、CPI与PCE为 `month`，社零和房地产累计为 `year-to-date`；GDP 为 `quarter`；EFFR 为 `overnight-transaction-date`；申领为 `week-ending-saturday`；银行信贷为 `pro_rata_average_of_weekly_levels`，贷款标准为 `survey_quarter`，偿债比率为 `calendar_quarter` |
-| `seasonal_adjustment` | CN、EFFR 为 `not-seasonally-adjusted`；US M2、GDP、申领、PCE、实际消费／收入、工业指标、银行信贷、偿债比率、投资、非农、住宅销售、贸易为 `seasonally-adjusted`；贷款标准、房价指数为 `not-seasonally-adjusted`；CPI各序列分别标记 |
+| `frequency` | `monthly`、`quarterly`、`daily`、`weekly`、`event`（只在实际发生时有观测） |
+| `period_basis` | CN 货币为 `month-end`；US 货币为 `monthly-average`；社零单月、CPI与PCE为 `month`，社零和房地产累计为 `year-to-date`；GDP 为 `quarter`；EFFR 为 `overnight-transaction-date`；目标利率为 `effective-date`；申领为 `week-ending-saturday`；银行信贷为 `pro_rata_average_of_weekly_levels`，贷款标准为 `survey_quarter`，偿债比率为 `calendar_quarter` |
+| `seasonal_adjustment` | CN、EFFR 为 `not-seasonally-adjusted`；US M2、GDP、申领、PCE、实际消费／收入、工业指标、银行信贷、偿债比率、投资、非农、住宅销售、贸易为 `seasonally-adjusted`；贷款标准、房价指数、目标利率为 `not-seasonally-adjusted`；CPI各序列分别标记 |
 | `price_basis` | 货币和社零、房地产金额及名义时薪为 `nominal`；实际GDP／消费／收入为 `real-chained`；CPI／PCE价格为 `price-index`；工业生产为 `volume-index`；房屋面积、利率、申领数量、产能利用率、劳动力比率、工时、贷款标准、偿债比率和住房套数为 `not_applicable`；银行信贷、名义设备投资和名义贸易为 `nominal`，实际设备投资和实际贸易为 `real-chained`；非农和住宅销售为 `not_applicable`，房价指数为 `price-index` |
 | `annualized` | 水平与增速各自标记；GDP／实际消费／实际收入／企业利润／住宅建设／设备投资／住宅销售／实际贸易水平、实际贸易差额变化和GDP官方环比年化增速为 true，其余当前序列为 false |
 | `value_origin` | `official` 或 `derived`，不以计算值冒充官方公布值 |
@@ -221,6 +222,23 @@ CES官方水平新增可选 `preliminary`，表示原点是否标记P；false只
 出口和进口的变化为未年化百分比，`change_method="level_ratio"`。差额可为负或零，所以不计算百分比：变化为 `yoy_change` 和 `mom_change` 或 `qoq_change`，单位与水平相同，`change_method="difference"`，允许零及负基期。实际贸易的差额变化是折年水平之差，因此 `annualized=true`，与未年化的增速不同。差额水平直接保留官方值，不以出口减进口替代。
 
 实际贸易的水平序列标记 `components_additive=false`。商品和服务的官方实际净额未采集，`real-trade --component goods|services` 不输出 `real-net-exports` 序列，也不用分项相减。
+
+### 美国联邦基金目标区间：调整事件
+
+`target-rate` 的 `frequency="event"`，`period` 是官方生效日（YYYYMMDD，`period_basis="effective-date"`）。观测只包含查询窗口内的实际调整，不为每日、周末或维持利率的会议补行；窗口内没有调整时 `observations` 为空。
+
+| 序列 | 单位 | 口径 |
+| --- | --- | --- |
+| `us.target-rate.lower_bound`、`upper_bound` | `percent` | 官方调整表的区间上下限，`raw_value` 都保留区间原文，如 `1.00-1.25` |
+| `us.target-rate.lower_change`、`upper_change` | `basis_points` | 上下限分别相对上一次实际调整的差值，标记 `derived` |
+
+变化由上下限相减得到，provider已校验它与官方调整基点一致，因此 `change_method="difference_checked_against_official_adjustment"`。`base.period` 是上一次调整的生效日，可以在窗口外；两个变化的 `base` 分别保留上限或下限。相邻变化的前次生效日或数值不一致，或非起点事件缺少变化值时，直接报错。区间前基准和窗口内事件都校验日期、上下限、来源、抓取时间和公布信息；公布日期须为YYYY-MM-DD且不晚于生效日，`published_at` 须与其同一天。
+
+2008-12-16 由单一目标切换为区间，没有同口径前值：变化为 null，原因为 `methodology_break`，`base` 为 null；官方 `75-100` 基点原文保留在 `original`。下限 0 和所有负变化都是有效值。
+
+公布信息与生效日分开：`published_date` 是通过核验的声明日期（YYYY-MM-DD），`published_at` 是具体公布时间，并保留官方时区。声明未提供时间（`date-only`）或页面不存在、内容无法匹配（`unavailable`）时，相应字段为 null，并在该事件的所有观测的 `note` 中说明原因，这些说明不代表数值缺失。声明或日历页暂时无法下载（网络错误、404和410以外的HTTP错误）时，`--standard-json` 直接报错，不输出部分结果；普通表格和 `--json` 仍显示调整表数据，`--json` 用 `release_fetch_failed=true` 标记该事件。不把生效日减一天，也不把会议日期当作公布日期。
+
+区间前基准 `baseline` 和截至查询结束日仍有效的区间 `current` 不是窗口内事件，只保留在 `original`。查询“某日的有效区间”应读取 `original.current`；新增规范观测会把它们混入调整事件。声明链接和原文同样在 `original`。历史为当前可见版本，不提供当时可得版本的回测保证。
 
 ## 缺失与溯源
 

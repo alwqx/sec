@@ -2,6 +2,7 @@ package federalreserve
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -66,6 +67,52 @@ func TestReleaseFailureIsExplicitAndNotGuessed(t *testing.T) {
 		require.Equal(t, "2026-09-17", event.EffectiveDate)
 	}
 	require.True(t, gock.IsDone())
+}
+
+func TestReleaseFetchFailureIsDistinguished(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		mock     func()
+		failed   bool
+		noteText string
+	}{
+		{"statement outage", func() {
+			mockCalendar(t)
+			gock.New("https://www.federalreserve.gov").Get("/newsevents/pressreleases/monetary20260916a.htm").Reply(503)
+		}, true, "503"},
+		{"statement missing", func() {
+			mockCalendar(t)
+			gock.New("https://www.federalreserve.gov").Get("/newsevents/pressreleases/monetary20260916a.htm").Reply(404)
+		}, false, "404"},
+		{"calendar outage hides history 404", func() {
+			gock.New("https://www.federalreserve.gov").Get("/monetarypolicy/fomccalendars.htm").Reply(503)
+			gock.New("https://www.federalreserve.gov").Get("/monetarypolicy/fomchistorical2026.htm").Reply(404)
+		}, true, "503"},
+		{"history page missing", func() {
+			gock.New("https://www.federalreserve.gov").Get("/monetarypolicy/fomccalendars.htm").Reply(200).BodyString(`<div><strong>Statement:</strong><br><a href="/newsevents/pressreleases/monetary20200303a.htm">HTML</a></div>`)
+			gock.New("https://www.federalreserve.gov").Get("/monetarypolicy/fomchistorical2026.htm").Reply(404)
+		}, false, "404"},
+		{"unmatched content", func() {
+			mockCalendar(t)
+			gock.New("https://www.federalreserve.gov").Get("/newsevents/pressreleases/monetary20260916a.htm").Reply(200).BodyString("error page")
+		}, false, "不可用"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			defer gock.Off()
+			mockTable(t)
+			test.mock()
+			result, err := NewClient("").TargetRate(context.Background(), &TargetRateRequest{Begin: "20260917", End: "20260917"})
+			require.NoError(t, err, "普通查询仍保留调整表结果")
+			event := result.Events[0]
+			require.Equal(t, test.failed, event.ReleaseFetchFailed)
+			require.Equal(t, "unavailable", event.ReleaseStatus)
+			require.Contains(t, event.ReleaseNote, test.noteText)
+			encoded, err := json.Marshal(event)
+			require.NoError(t, err)
+			require.Equal(t, test.failed, strings.Contains(string(encoded), "release_fetch_failed"), "未失败时原JSON不变")
+			require.True(t, gock.IsDone())
+		})
+	}
 }
 
 func TestHistoricalCalendarFallback(t *testing.T) {

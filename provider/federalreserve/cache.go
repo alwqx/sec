@@ -16,6 +16,13 @@ import (
 	"github.com/alwqx/sec/utils"
 )
 
+// FetchError 表示页面暂时无法下载，区别于已下载但内容无法匹配或解析；
+// 页面不存在（404、410）属于后者。
+type FetchError struct{ Err error }
+
+func (e *FetchError) Error() string { return e.Err.Error() }
+func (e *FetchError) Unwrap() error { return e.Err }
+
 type cachedPage struct {
 	SourceURL string    `json:"source_url"`
 	FetchedAt time.Time `json:"fetched_at"`
@@ -47,15 +54,19 @@ func (c *Client) fetch(ctx context.Context, address string, validate func([]byte
 	slog.DebugContext(ctx, "请求美联储官方页面", "url", address)
 	response, err := utils.MakeRequest(ctx, http.MethodGet, address, http.Header{"User-Agent": {utils.UserAgent()}}, nil, 30*time.Second)
 	if err != nil {
-		return nil, time.Time{}, fmt.Errorf("请求美联储失败: %w", err)
+		return nil, time.Time{}, &FetchError{fmt.Errorf("请求美联储失败: %w", err)}
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		return nil, time.Time{}, fmt.Errorf("美联储返回HTTP %d: %s", response.StatusCode, address)
+		err := fmt.Errorf("美联储返回HTTP %d: %s", response.StatusCode, address)
+		if response.StatusCode == http.StatusNotFound || response.StatusCode == http.StatusGone {
+			return nil, time.Time{}, err
+		}
+		return nil, time.Time{}, &FetchError{err}
 	}
 	body, err := io.ReadAll(io.LimitReader(response.Body, (8<<20)+1))
 	if err != nil {
-		return nil, time.Time{}, err
+		return nil, time.Time{}, &FetchError{err}
 	}
 	if len(body) > 8<<20 {
 		return nil, time.Time{}, fmt.Errorf("美联储页面超过大小限制")
