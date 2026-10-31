@@ -88,6 +88,37 @@ func TestRMBLoans(t *testing.T) {
 	require.ErrorIs(t, err, context.Canceled)
 }
 
+func TestRMBLoansKeepsReportWhenBalanceMissing(t *testing.T) {
+	files := map[string]string{
+		statisticsPath:       `<a href="/year2026.html">2026年统计数据</a>`,
+		"/year2026.html":     `<a href="/credit.html">金融机构信贷收支统计 Sources and Uses</a>`,
+		"/credit.html":       `<table><tr><td>金融机构人民币信贷收支表<br>RMB</td><td><a href="/loans.htm">htm</a></td></tr></table>`,
+		"/loans.htm":         strings.Replace(sample(t, "loans-2026"), "2834357.83", "", 1),
+		financialReportsPath: `<a href="/r202609.html">2026年前三季度金融统计数据报告</a><a href="/r202608.html">2026年8月金融统计数据报告</a>`,
+		"/r202609.html":      sample(t, "loan-report-202609"), "/r202608.html": sample(t, "loan-report-202608"),
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if body, ok := files[r.URL.Path]; ok {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			fmt.Fprint(w, body)
+		} else {
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	client := NewClient(t.TempDir())
+	client.origin = server.URL
+	items, err := client.RMBLoans(context.Background(), LoanRequest{"202609", "202609"})
+	require.NoError(t, err)
+	require.Len(t, items, 1, "余额表未更新时不丢弃已发布的报告值")
+	require.Nil(t, items[0].Balance)
+	require.Equal(t, 4.8, *items[0].YoY)
+	require.Equal(t, 104400.0, *items[0].PreviousYTDFlow)
+	items, err = client.RMBLoans(context.Background(), LoanRequest{"202610", "202610"})
+	require.NoError(t, err)
+	require.Empty(t, items, "没有报告的空模板月份仍不输出")
+}
+
 func TestLoanReportPeriods(t *testing.T) {
 	september := reportSample(t, "202609")
 	require.Equal(t, 3596300.0, *september.M2Balance)

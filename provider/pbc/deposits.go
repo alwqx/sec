@@ -51,6 +51,7 @@ type DepositObservation struct {
 	YTDFlow                *float64       `json:"ytd_flow"`
 	MonthlyFlowMethod      string         `json:"monthly_flow_method"`
 	MonthlyFlowApproximate bool           `json:"monthly_flow_approximate"`
+	PreviousYTDFlow        *float64       `json:"previous_ytd_flow,omitempty"`
 	ReportSource           string         `json:"report_source"`
 	ReportPublishedDate    string         `json:"report_published_date"`
 	ReportFetchedAt        *time.Time     `json:"report_fetched_at"`
@@ -368,6 +369,7 @@ func (c *Client) RMBDeposits(ctx context.Context, req *DepositRequest) (*Deposit
 			}
 			if item.MonthlyFlowApproximate {
 				item.PreviousReportSource = previous.Source
+				item.PreviousYTDFlow = previous.YTD
 			}
 		}
 		notes := []string{}

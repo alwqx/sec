@@ -6,6 +6,7 @@ import (
 	"io"
 	"strconv"
 
+	"github.com/alwqx/sec/provider/macrodata"
 	"github.com/alwqx/sec/provider/pbc"
 	"github.com/alwqx/sec/utils"
 	"github.com/olekukonko/tablewriter"
@@ -36,6 +37,11 @@ func newLoansCLI() *cobra.Command {
 		if err != nil {
 			return err
 		}
+		standard, _ := cmd.Flags().GetBool("standard-json")
+		if standard {
+			dataset, err := macrodata.Loans(items, begin, end)
+			return writeDataset(cmd, dataset, err)
+		}
 		asJSON, _ := cmd.Flags().GetBool("json")
 		if asJSON {
 			if items == nil {
@@ -49,6 +55,7 @@ func newLoansCLI() *cobra.Command {
 		return printLoans(cmd.OutOrStdout(), items, details)
 	}}
 	addQueryFlags(command)
+	addStandardJSONFlag(command, "按统一宏观序列格式输出JSON，分开精确余额、报告余额、官方新增和近似新增")
 	command.Flags().Bool("details", false, "展示住户、企事业单位及短期/中长期、票据融资分项")
 	return command
 }

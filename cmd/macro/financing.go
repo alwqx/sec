@@ -6,6 +6,7 @@ import (
 	"io"
 	"strconv"
 
+	"github.com/alwqx/sec/provider/macrodata"
 	"github.com/alwqx/sec/provider/pbc"
 	"github.com/alwqx/sec/utils"
 	"github.com/olekukonko/tablewriter"
@@ -36,6 +37,11 @@ func newFinancingCLI() *cobra.Command {
 		if err != nil {
 			return err
 		}
+		standard, _ := cmd.Flags().GetBool("standard-json")
+		if standard {
+			dataset, err := macrodata.Financing(items, begin, end)
+			return writeDataset(cmd, dataset, err)
+		}
 		asJSON, _ := cmd.Flags().GetBool("json")
 		if asJSON {
 			if items == nil {
@@ -49,6 +55,7 @@ func newFinancingCLI() *cobra.Command {
 		return printFinancing(cmd.OutOrStdout(), items, details)
 	}}
 	addQueryFlags(command)
+	addStandardJSONFlag(command, "按统一宏观序列格式输出JSON，分开存量、官方同比、月度增量和计算累计")
 	command.Flags().Bool("details", false, "展示各融资结构分项")
 	return command
 }
