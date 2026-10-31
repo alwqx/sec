@@ -22,6 +22,7 @@ type Dataset struct {
 }
 
 type Series struct {
+	ComponentsAdditive *bool   `json:"components_additive,omitempty"`
 	IndexBase          string  `json:"index_base,omitempty"`
 	ReferenceYear      *int    `json:"reference_year,omitempty"`
 	ID                 string  `json:"id"`

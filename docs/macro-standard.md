@@ -1,6 +1,6 @@
 # 宏观数据统一导出
 
-`--standard-json` 提供版本化的宏观序列 JSON，已接入 CN M1/M2、US M2、CN 社零和房地产，以及 US GDP、EFFR、CPI／核心CPI、初请／续请失业金。采集仍使用原来的人民银行、FRED、NBS、纽约联储、BLS provider 和缓存，不增加网络请求。
+`--standard-json` 提供版本化的宏观序列 JSON，已接入 CN M1/M2、US M2、CN 社零和房地产，以及 US GDP、EFFR、CPI／核心CPI、初请／续请失业金、PCE／核心PCE价格指数、实际个人消费支出。采集仍使用原来的人民银行、FRED、NBS、纽约联储、BLS provider 和缓存，不增加网络请求。
 
 ```bash
 sec macro cn money --begin 202412 --end 202502 --standard-json
@@ -14,6 +14,9 @@ sec macro us cpi --begin 202501 --end 202609 --standard-json
 sec macro us core-cpi --begin 202501 --end 202609 --standard-json
 sec macro us initial-claims --begin 20261001 --end 20261024 --standard-json
 sec macro us continued-claims --begin 20261001 --end 20261024 --standard-json
+sec macro us pce --begin 202501 --end 202608 --standard-json
+sec macro us core-pce --begin 202501 --end 202608 --standard-json
+sec macro us real-pce --component goods --begin 202501 --end 202608 --standard-json
 ```
 
 各命令分别输出独立数据集。原有表格、别名、日期默认值、`--json`、`--refresh` 和 `--no-cache` 行为不变；`--json` 与 `--standard-json` 互斥。统一字段用于程序读取，不改变币种、单位或统计口径，也不自动生成中美对比。
@@ -30,10 +33,10 @@ sec macro us continued-claims --begin 20261001 --end 20261024 --standard-json
 | `measure` | `level`、`yoy_percent`、`mom_percent`、`ytd_level`、`ytd_yoy_percent`；GDP 另有 `qoq_percent`、`qoq_annualized_percent`；EFFR 为 `rate`、`previous_observation_change` |
 | `unit` | `CNY_100_million`（亿元人民币）、`USD_billion`（十亿美元）、`square_meters_10000`（万平方米）、`percent`、`basis_points`（基点）、`index`、`claims`（申请件数）、`persons`（人数） |
 | `frequency` | `monthly`、`quarterly`、`daily`、`weekly` |
-| `period_basis` | CN 货币为 `month-end`；US 货币为 `monthly-average`；社零单月与CPI为 `month`，社零和房地产累计为 `year-to-date`；GDP 为 `quarter`；EFFR 为 `overnight-transaction-date`；申领为 `week-ending-saturday` |
-| `seasonal_adjustment` | CN、EFFR 为 `not-seasonally-adjusted`；US M2、GDP、申领为 `seasonally-adjusted`；CPI各序列分别标记 |
-| `price_basis` | 货币和社零、房地产金额为 `nominal`；实际GDP为 `real-chained`；CPI为 `price-index`；房屋面积、利率和申领数量为 `not_applicable` |
-| `annualized` | 水平与增速各自标记；GDP 水平和官方环比年化增速为 true，其余当前序列为 false |
+| `period_basis` | CN 货币为 `month-end`；US 货币为 `monthly-average`；社零单月、CPI与PCE为 `month`，社零和房地产累计为 `year-to-date`；GDP 为 `quarter`；EFFR 为 `overnight-transaction-date`；申领为 `week-ending-saturday` |
+| `seasonal_adjustment` | CN、EFFR 为 `not-seasonally-adjusted`；US M2、GDP、申领、PCE及实际消费为 `seasonally-adjusted`；CPI各序列分别标记 |
+| `price_basis` | 货币和社零、房地产金额为 `nominal`；实际GDP／消费为 `real-chained`；CPI／PCE价格为 `price-index`；房屋面积、利率和申领数量为 `not_applicable` |
+| `annualized` | 水平与增速各自标记；GDP／实际消费水平和GDP官方环比年化增速为 true，其余当前序列为 false |
 | `value_origin` | `official` 或 `derived`，不以计算值冒充官方公布值 |
 | `definition`、`formula` | 统计口径标识；计算增速保留公式，官方值公式为 null |
 
@@ -83,6 +86,16 @@ EFFR非空修订标记用可选 `revision_indicator` 保留，不将其冒充 `r
 
 不前移续请所属周，也不因初请已有新值而补出续请值。最新可得周、各序列发布进度说明和完整provider结果保留在 `original`，缺失周不冒充零。原provider仍负责生成请求区间内的周六所属周；统一导出不额外补自然日。基期窗口可早于查询开始日，均来自同份已校验快照。
 
+### PCE价格与实际消费：指数、金额和不可加性
+
+PCE价格提供 `us.pce.index`、`us.core-pce.index` 及各自的 `yoy_percent`、`mom_percent`。指数基期为 `index_base="2017=100"`，单位为 `index`、季调、不折年，来源分别为PCEPI、PCEPILFE；这是链式价格指数，不是名义消费金额或实际消费量。同比和月环比均使用同一季调指数序列，属于未年化计算值，区别于CPI使用NSA指数计算同比。
+
+实际消费提供 `us.real-pce.<component>.level`、`yoy_percent`、`mom_percent`，`component` 为 `total`、`goods`、`durable-goods`、`nondurable-goods` 或 `services`。水平单位为 `USD_billion`，`price_basis="real-chained"`、`reference_year=2017`、季调折年；不除以12冒充官方当月实际发生额。同比和月环比保留未年化计算值。
+
+实际消费水平序列新增可选 `components_additive=false`，明确链式美元分项通常不可加；本次导出每个请求所选的官方序列，不相加耐用品与非耐用品生成商品，不相加商品与服务生成总量，也不计算分项贡献度。计算增速不带这个水平可加性字段；其他出口无此元数据时继续省略。序列ID同时包含指标和分项，价格指数、实际总量及各分项不会混为同一个联合键。
+
+两类出口均保留官方水平的原始数字字符串、来源序列、抓取时间，以及计算增速的严格上一年同月／上一月基期。不重新计算或跨缺口换基期，零值和缺失分开处理；窗口外的基期仍来自同份快照。完整BEA口径、来源与原provider结果保存在 `original`，未提供的公布时间和修订编号保持 null。当前仍为可见修订版本，不是历史首次公布值。
+
 ## 缺失与溯源
 
 每条观测保留 `period`（按频率使用YYYYMM、YYYYQn或YYYYMMDD）、`value`、`status`、`missing_reason`、`raw_value`、`source`、`fetched_at`、`published_date`、`published_at`、`revision_id`、`data_version`、`base`、`note`。`index_base`、`inputs`是版本1的可选扩展字段，原出口无此元数据时仍省略，不修改原JSON结构。
@@ -101,6 +114,6 @@ EFFR非空修订标记用可选 `revision_indicator` 保留，不将其冒充 `r
 
 ## 覆盖与后续迁移
 
-当前完成货币指标、社零、房地产与美国GDP、EFFR、CPI／核心CPI、初请／续请的统一导出，未将所有宏观 provider 迁移。其余指标继续使用原 JSON，TODO 中全局基础项仍保留未完成状态。其他指标、部分抓取失败、完整历史版本与中美可比性需要各自的适配和测试，不因本批格式扩展而视为已完成。
+当前完成货币指标、社零、房地产与美国GDP、EFFR、CPI／核心CPI、初请／续请、PCE／核心PCE价格、实际消费的统一导出，未将所有宏观 provider 迁移。其余指标继续使用原 JSON，TODO 中全局基础项仍保留未完成状态。其他指标、部分抓取失败、完整历史版本与中美可比性需要各自的适配和测试，不因本批格式扩展而视为已完成。
 
 测试覆盖真实离线样本、旧输出回归、官方值／计算值、M1口径边界、房地产范围变化、累计所属期、1—2月合并、零与缺失、严格基期、空结果、元数据空值、重复月份、非法范围、非有限值、上游错误、取消及输出写入失败。

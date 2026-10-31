@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/alwqx/sec/provider/fred"
+	"github.com/alwqx/sec/provider/macrodata"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/h2non/gock.v1"
 )
@@ -20,21 +21,42 @@ func TestUSRealPCECLI(t *testing.T) {
 		component, label, id string
 		level                float64
 	}{{"total", "总量", "PCEC96", 16955.3}, {"goods", "商品", "DGDSRX1", 5803.7}, {"durable-goods", "耐用品", "PCEDGC96", 2219.9}, {"nondurable-goods", "非耐用品", "PCENDC96", 3598.8}, {"services", "服务", "PCESC96", 11177.8}} {
-		for _, asJSON := range []bool{false, true} {
+		for _, output := range []string{"table", "json", "standard"} {
 			gock.New("https://fred.stlouisfed.org").Get("/graph/fredgraph.csv").MatchParam("id", "PCEC96,DGDSRX1,PCEDGC96,PCENDC96,PCESC96").MatchHeader("User-Agent", "curl").Reply(200).BodyString(string(raw))
 			cmd := NewMacroCLI()
 			args := []string{"us", "real-pce", "--begin", "202608", "--end", "202609", "--no-cache"}
 			if test.component != "total" {
 				args = append(args, "--component", test.component)
 			}
-			if asJSON {
+			if output == "json" {
 				args = append(args, "--json")
+			}
+			if output == "standard" {
+				args = append(args, "--standard-json")
 			}
 			cmd.SetArgs(args)
 			var out bytes.Buffer
 			cmd.SetOut(&out)
 			require.NoError(t, cmd.Execute())
-			if asJSON {
+			if output == "standard" {
+				var result macrodata.Dataset
+				require.NoError(t, json.Unmarshal(out.Bytes(), &result))
+				require.Len(t, result.Observations, 6)
+				require.Equal(t, "us.real-pce."+test.component+".level", result.Series[0].ID)
+				require.Equal(t, test.id, result.Observations[0].SourceSeriesID)
+				require.Equal(t, test.level, *result.Observations[0].Value)
+				require.Equal(t, "USD_billion", result.Series[0].Unit)
+				require.True(t, result.Series[0].Annualized)
+				require.False(t, result.Series[1].Annualized)
+				require.NotNil(t, result.Series[0].ComponentsAdditive)
+				require.False(t, *result.Series[0].ComponentsAdditive)
+				require.Equal(t, 2017, *result.Series[0].ReferenceYear)
+				require.Nil(t, result.Observations[3].Value)
+				require.Nil(t, result.Observations[0].PublishedAt)
+				var original fred.RealPCEResult
+				require.NoError(t, json.Unmarshal(result.Original, &original))
+				require.Equal(t, test.component, original.Component)
+			} else if output == "json" {
 				var got fred.RealPCEResult
 				require.NoError(t, json.Unmarshal(out.Bytes(), &got))
 				require.Equal(t, test.component, got.Component)

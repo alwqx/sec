@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/alwqx/sec/provider/fred"
+	"github.com/alwqx/sec/provider/macrodata"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/h2non/gock.v1"
 )
@@ -17,18 +18,42 @@ func TestUSPCECLI(t *testing.T) {
 	raw, err := os.ReadFile("../../provider/fred/testdata/pce-prices.csv")
 	require.NoError(t, err)
 	for _, indicator := range []string{"pce", "core-pce"} {
-		for _, asJSON := range []bool{false, true} {
+		for _, output := range []string{"table", "json", "standard"} {
 			gock.New("https://fred.stlouisfed.org").Get("/graph/fredgraph.csv").MatchParam("id", "PCEPI,PCEPILFE").MatchHeader("User-Agent", "curl").Reply(200).BodyString(string(raw))
 			cmd := NewMacroCLI()
 			args := []string{"us", indicator, "--begin", "202608", "--end", "202609", "--no-cache"}
-			if asJSON {
+			if output == "json" {
 				args = append(args, "--json")
+			}
+			if output == "standard" {
+				args = append(args, "--standard-json")
 			}
 			cmd.SetArgs(args)
 			var out bytes.Buffer
 			cmd.SetOut(&out)
 			require.NoError(t, cmd.Execute())
-			if asJSON {
+			if output == "standard" {
+				var result macrodata.Dataset
+				require.NoError(t, json.Unmarshal(out.Bytes(), &result))
+				require.Len(t, result.Observations, 6)
+				require.Equal(t, "index", result.Series[0].Unit)
+				require.Equal(t, "2017=100", result.Series[0].IndexBase)
+				require.False(t, result.Series[0].Annualized)
+				require.False(t, result.Series[1].Annualized)
+				require.Nil(t, result.Series[0].ComponentsAdditive)
+				require.Equal(t, "202508", result.Observations[1].Base.Period)
+				require.Equal(t, "202607", result.Observations[2].Base.Period)
+				require.Nil(t, result.Observations[3].Value)
+				require.Equal(t, "current_value_missing", *result.Observations[4].MissingReason)
+				if indicator == "pce" {
+					require.Equal(t, 131.579, *result.Observations[0].Value)
+				} else {
+					require.Equal(t, 130.455, *result.Observations[0].Value)
+				}
+				var original fred.PCEResult
+				require.NoError(t, json.Unmarshal(result.Original, &original))
+				require.Equal(t, indicator, original.Indicator)
+			} else if output == "json" {
 				var result fred.PCEResult
 				require.NoError(t, json.Unmarshal(out.Bytes(), &result))
 				require.Len(t, result.Observations, 2)
