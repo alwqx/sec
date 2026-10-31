@@ -49,4 +49,4 @@ https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/accounting/dt
 
 ## 后续范围
 
-逐券CUSIP官方发行日期、拍卖分配、SOMA及再发行通过独立的 [`macro us auctions`](us-auctions.md) 提供，不与DTS日汇总拼接。实际到账／结算确认和现金融资仍需核验；DTS记录日、官方发行日期与拍卖面值各有口径，不能直接当作现金毛发行或公众净融资。
+逐券CUSIP官方发行日期、拍卖分配、SOMA及再发行通过独立的 [`macro us auctions`](us-auctions.md) 提供，不与DTS日汇总拼接。官方现金发行／赎回总额与现金口径调整明细通过 [`macro us debt-cash`](us-debt-cash.md) 提供。逐券实际到账／结算确认和持有人净融资拆分仍需核验；DTS记账日值、官方发行日期、拍卖面值和整体现金流不能直接互换。
