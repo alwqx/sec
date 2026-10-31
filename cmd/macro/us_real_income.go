@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/alwqx/sec/provider/fred"
+	"github.com/alwqx/sec/provider/macrodata"
 	"github.com/alwqx/sec/utils"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
@@ -38,6 +39,16 @@ func newUSRealIncomeCLI() *cobra.Command {
 			return err
 		}
 		asJSON, _ := cmd.Flags().GetBool("json")
+		standard, _ := cmd.Flags().GetBool("standard-json")
+		if standard {
+			dataset, err := macrodata.RealIncome(result)
+			if err != nil {
+				return err
+			}
+			encoder := json.NewEncoder(cmd.OutOrStdout())
+			encoder.SetIndent("", "  ")
+			return encoder.Encode(dataset)
+		}
 		if asJSON {
 			encoder := json.NewEncoder(cmd.OutOrStdout())
 			encoder.SetIndent("", "  ")
@@ -46,6 +57,8 @@ func newUSRealIncomeCLI() *cobra.Command {
 		return printUSRealIncome(cmd.OutOrStdout(), result)
 	}}
 	addQueryFlags(command)
+	command.Flags().Bool("standard-json", false, "按统一宏观序列格式输出JSON，保留实际收入总量与折年口径")
+	command.MarkFlagsMutuallyExclusive("json", "standard-json")
 	command.Flags().Lookup("begin").Usage = "开始月份 YYYYMM，默认截至月份前11个月；最早195901"
 	command.Flags().Lookup("end").Usage = "截至月份 YYYYMM，默认UTC上个月"
 	return command

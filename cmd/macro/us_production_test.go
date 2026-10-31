@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/alwqx/sec/provider/fred"
+	"github.com/alwqx/sec/provider/macrodata"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/h2non/gock.v1"
 )
@@ -26,18 +27,45 @@ func TestUSProductionCLI(t *testing.T) {
 		{"capacity-utilization", "total", "TCU", 76.5157},
 		{"capacity-utilization", "manufacturing", "MCUMFN", 76.0838},
 	} {
-		for _, asJSON := range []bool{false, true} {
+		for _, output := range []string{"table", "json", "standard"} {
 			gock.New("https://fred.stlouisfed.org").Get("/graph/fredgraph.csv").MatchParam("id", "INDPRO,IPMAN,TCU,MCUMFN").MatchHeader("User-Agent", "curl").Reply(200).BodyString(string(raw))
 			cmd := NewMacroCLI()
 			args := []string{"us", test.indicator, "--sector", test.sector, "--begin", "202402", "--end", "202402", "--no-cache"}
-			if asJSON {
+			if output == "json" {
 				args = append(args, "--json")
+			}
+			if output == "standard" {
+				args = append(args, "--standard-json")
 			}
 			cmd.SetArgs(args)
 			var out bytes.Buffer
 			cmd.SetOut(&out)
 			require.NoError(t, cmd.Execute())
-			if asJSON {
+			if output == "standard" {
+				var got macrodata.Dataset
+				require.NoError(t, json.Unmarshal(out.Bytes(), &got))
+				require.Len(t, got.Observations, 3)
+				require.Equal(t, test.level, *got.Observations[0].Value)
+				require.Equal(t, test.id, got.Observations[0].SourceSeriesID)
+				require.Contains(t, got.Series[0].ID, test.sector)
+				require.NotEmpty(t, got.Series[0].Coverage)
+				require.False(t, got.Series[0].Annualized)
+				require.Equal(t, "202401", got.Observations[2].Base.Period)
+				if test.indicator == "industrial-production" {
+					require.Equal(t, "index", got.Series[0].Unit)
+					require.Equal(t, "2017=100", got.Series[0].IndexBase)
+					require.Equal(t, "percent", got.Series[2].Unit)
+				} else {
+					require.Equal(t, "percent", got.Series[0].Unit)
+					require.Equal(t, "percentage_points", got.Series[2].Unit)
+					require.Equal(t, "mom_percentage_points", got.Series[2].Measure)
+					require.Nil(t, got.Series[0].ReferenceYear)
+					require.Empty(t, got.Series[0].IndexBase)
+				}
+				var original fred.ProductionResult
+				require.NoError(t, json.Unmarshal(got.Original, &original))
+				require.Equal(t, original.Coverage, got.Series[0].Coverage)
+			} else if output == "json" {
 				var got fred.ProductionResult
 				require.NoError(t, json.Unmarshal(out.Bytes(), &got))
 				require.Equal(t, test.indicator, got.Indicator)

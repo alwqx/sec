@@ -85,13 +85,25 @@ func RealPCE(result *fred.RealPCEResult) (*Dataset, error) {
 
 // appendMonthlyLevels 复用月度官方水平与两种未年化增速的溯源逻辑，不重算provider值。
 func appendMonthlyLevels(d *Dataset, level Series, provenance monthlyProvenance, items []monthlyLevelObservation) error {
+	return appendMonthlyChanges(d, level, provenance, items, false)
+}
+
+// appendMonthlyChanges 在百分比增速与百分点差之间明确选择；只保留provider计算值。
+func appendMonthlyChanges(d *Dataset, level Series, provenance monthlyProvenance, items []monthlyLevelObservation, percentagePoints bool) error {
 	prefix := level.ID
 	level.ID += "." + level.Measure
 	d.Series = append(d.Series, level)
-	for _, measure := range []string{"yoy_percent", "mom_percent"} {
+	measures := []string{"yoy_percent", "mom_percent"}
+	if percentagePoints {
+		measures = []string{"yoy_percentage_points", "mom_percentage_points"}
+	}
+	for _, measure := range measures {
 		s := level
 		s.ID, s.Measure, s.Unit, s.Annualized, s.ComponentsAdditive = prefix+"."+measure, measure, "percent", false, nil
 		s.ValueOrigin, s.Formula = "derived", text("(current_level / base_level - 1) * 100")
+		if percentagePoints {
+			s.Unit, s.Formula = "percentage_points", text("current_level - base_level")
+		}
 		d.Series = append(d.Series, s)
 	}
 	seen := map[string]bool{}
@@ -125,7 +137,7 @@ func appendMonthlyLevels(d *Dataset, level Series, provenance monthlyProvenance,
 					reason = "current_value_missing"
 				} else if spec.base.value == nil {
 					reason = "baseline_missing"
-				} else if *spec.base.value == 0 {
+				} else if !percentagePoints && *spec.base.value == 0 {
 					reason = "zero_baseline"
 				}
 			}
