@@ -112,7 +112,7 @@ func QueryIPOByDateRange(ctx context.Context, startDate, endDate string, max int
 				continue
 			}
 			if a.Time > 0 {
-				a.Date = time.Unix(a.Time/1000, 0).Format("20060102")
+				a.Date = time.Unix(a.Time/1000, 0).In(Beijing).Format("20060102")
 			}
 			// if a.AdjunctURL != "" && !strings.HasPrefix(a.AdjunctURL, "http") {
 			// 	a.PDFURL = "http://static.cninfo.com.cn/" + strings.TrimLeft(a.AdjunctURL, "/")
@@ -281,7 +281,7 @@ func QueryIPOs(ctx context.Context, stockCode string, size int) ([]*Announcement
 		}
 		// 从毫秒时间戳派生日期（YYYYMMDD）
 		if a.Time > 0 {
-			a.Date = time.Unix(a.Time/1000, 0).Format("20060102")
+			a.Date = time.Unix(a.Time/1000, 0).In(Beijing).Format("20060102")
 		}
 
 		// 解析 PDF 直链：优先用 AdjunctURL 直接拼接，

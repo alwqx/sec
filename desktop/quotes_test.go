@@ -68,6 +68,7 @@ func TestQuotesAcceptsUSCodes(t *testing.T) {
 // 解析不了的证券只标记自己，不发额外请求。
 func TestQuotesMarksUnavailableCodesWithoutExtraRequests(t *testing.T) {
 	defer gock.Off()
+	gock.CleanUnmatchedRequest()
 	mockSina("/list=sh600036,sh999999", fmt.Sprintf(sinaLine, "sh600036", "A")+"\n"+`var hq_str_sh999999="";`+"\n")
 	status, codes, missing := quotesResponse(t, "/api/v1/quotes?codes=SH600036,SH999999")
 	require.Equal(t, http.StatusOK, status)

@@ -57,6 +57,7 @@ export interface PageResult<T> {
   results: T[]
   total: number
   has_more: boolean
+  truncated?: boolean
 }
 
 export interface IPOListing {

@@ -17,6 +17,9 @@
 13. Add MA and Bollinger Band overlays to Desktop candlestick charts, computed on the backend with warm-up data so the first day of a range has a full window
 14. Add a shared `indicator` package for moving averages and Bollinger Bands, used by `sec kline`, `sec strategy` and Desktop
 15. Skip securities that cannot be parsed in Sina batch quotes, so `sec watch` and `sec quote` still show the others, and report an error for non-200 responses and bodies that are not quote lines
+16. Add insider announcements to Desktop stock announcements and an IPO announcement date view to the Desktop IPO page, stating that they are title matches and announcement dates rather than structured trades or a subscription calendar
+17. Make `sec insider` match titles strictly, remove duplicates, clean highlight tags and fetch beyond the first 30 results of each keyword, through a provider query shared with Desktop
+18. Show CNINFO announcement dates in Beijing time in `sec insider`, `sec ipo calendar` and prospectus queries, regardless of the local time zone
 
 ### v0.4.1
 
