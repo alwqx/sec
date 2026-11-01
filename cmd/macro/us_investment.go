@@ -18,11 +18,12 @@ func newUSInvestmentCLI() *cobra.Command          { return investmentCommand(fal
 func newUSEquipmentInvestmentCLI() *cobra.Command { return investmentCommand(true) }
 
 func investmentCommand(quarterly bool) *cobra.Command {
-	use, short := "investment", "美国住宅开工和建筑许可住房套数（月度、季调折年）"
+	// investment 是改名前的命令名，保留为别名。
+	use, short, aliases := "housing-starts", "美国住宅开工和建筑许可住房套数（月度、季调折年）", []string{"investment"}
 	if quarterly {
-		use, short = "equipment-investment", "美国私人非住宅设备投资（季度、季调折年，默认实际口径）"
+		use, short, aliases = "equipment-investment", "美国私人非住宅设备投资（季度、季调折年，默认实际口径）", nil
 	}
-	command := &cobra.Command{Use: use, Short: short, Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, args []string) error {
+	command := &cobra.Command{Use: use, Aliases: aliases, Short: short, Args: cobra.NoArgs, RunE: func(cmd *cobra.Command, args []string) error {
 		var begin, end, component, basis string
 		var err error
 		if quarterly {

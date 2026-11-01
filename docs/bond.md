@@ -12,6 +12,27 @@ https://home.treasury.gov/resource-center/data-chart-center/interest-rates/pages
 
 数据覆盖从 1990 年至今的每日国债收益率曲线，采用 Atom feed + 内嵌 XML 的双层结构。
 
+## macro us treasury
+
+`sec macro us treasury` 把美债收益率放进宏观命令，与 `sec macro cn treasury` 对应。`bond`、`bond-history` 继续可用。
+
+```bash
+# 默认截至 UTC 今天，向前共 30 个自然日
+sec macro us treasury
+
+sec macro us treasury --begin 20260901 --end 20260930
+sec macro us treasury --begin 20260901 --end 20260930 --json
+sec macro us treasury --begin 20260901 --end 20260930 --standard-json
+```
+
+日期为 `YYYYMMDD`，包含端点，最早 19900102。与 `bond-history` 的区别：
+
+- 显示 1 个月至 30 年的十一个期限，未公布的期限显示为 `—`，不显示为 0。
+- 不输出部分结果（`QueryBondReq.Strict`）：年度抓取失败、已过去的年度没有记录、记录或数值无法解析、日期重复都报错。当前年度没有记录时返回空结果。`bond-history` 仍只记录警告并继续。
+- `--json` 只输出日期和各期限收益率，未公布的期限为 `null`，不含 `YClose`、`Change` 等依赖查询范围的计算字段。
+
+统一导出口径见[统一导出文档](macro-standard.md#美国国债收益率全部关键期限)。
+
 ## 实现架构
 
 ```shell

@@ -11,8 +11,8 @@ SEC（Security Information Client）提供 CLI 与 Desktop 两种界面，用于
 | 证券搜索与自选 | 名称／代码／拼音搜索，自选增删，与 CLI 共享存储                           | `search`、`watch`                             |
 | 实时与历史行情 | 行情自动刷新，日 K 线、成交量与成交额，日期范围、快捷区间和复权选择       | `quote`、`quote-history`、`kline`             |
 | 公司研究       | 公司资料、行业、PE、PB、总市值、流通市值与分红记录                        | `info`                                        |
-| 财务报表       | 资产负债表、利润表、现金流量表，报告期筛选，CSV／JSON 导出                | `balance-sheet`                               |
-| 报告原文       | 年报、半年报、一季报、三季报，年份范围查询、单份／多选 PDF 下载及任务进度 | `balance-sheet-download`（年报）              |
+| 财务报表       | 资产负债表、利润表、现金流量表，报告期筛选，CSV／JSON 导出                | `financials`                               |
+| 报告原文       | 年报、半年报、一季报、三季报，年份范围查询、单份／多选 PDF 下载及任务进度 | `annual-report`（年报）              |
 | 公告           | 标题搜索、报告类别筛选、分页与原文查看                                    | `announcements`、`insider`（增减持公告）      |
 | IPO            | 新股上市日期筛选，招股说明书查询、原文查看及单份／多选下载                | `ipo list / calendar / prospectus / download` |
 | 黄金           | Au99.99 最新日行情、历史蜡烛图与日期筛选                                  | `metal`、`metal-history`                      |
@@ -85,6 +85,8 @@ CLI `sec watch` 与 Desktop「我的自选」统一使用 `~/.sec/watchlist.json
 
 ## CLI 命令
 
+命令按功能的分类及其在 Desktop 中的位置见[命令与 Desktop 功能对照](docs/commands.md)。
+
 | 命令                                          | 用途                                     |
 | --------------------------------------------- | ---------------------------------------- |
 | `search`                                      | 按代码、名称或拼音搜索证券               |
@@ -92,8 +94,8 @@ CLI `sec watch` 与 Desktop「我的自选」统一使用 `~/.sec/watchlist.json
 | `kline`                                       | 终端蜡烛图，支持 MA、布林带叠加          |
 | `info`                                        | 公司资料、核心指标与分红                 |
 | `watch`、`watch add`、`watch remove`          | 自选行情总览及增删                       |
-| `balance-sheet`                               | 三类财务报表查询及 CSV／JSON 导出        |
-| `balance-sheet-download`                      | 按单年或年份范围下载年报 PDF             |
+| `financials`                               | 三类财务报表查询及 CSV／JSON 导出        |
+| `annual-report`                      | 按单年或年份范围下载年报 PDF             |
 | `announcements`、`insider`                    | 公司公告、增减持公告                     |
 | `ipo list / calendar / prospectus / download` | 新股列表、IPO 公告日历、招股书查询与下载 |
 | `metal`、`metal-history`                      | 黄金日行情与历史                         |
@@ -101,6 +103,7 @@ CLI `sec watch` 与 Desktop「我的自选」统一使用 `~/.sec/watchlist.json
 | `fx fixing`、`fx reference`                  | 人民币中间价、在岸固定时点参考汇率，保留各自价格和时间口径 |
 | `fx cross`、`fx spread`                      | 按同源同口径计算交叉汇率、在岸／离岸报价价差，保留公式、输入及时间对齐状态 |
 | `bond`、`bond-history`                        | 美债收益率与历史                         |
+| `macro us treasury` | 美债收益率全部期限，支持 `--standard-json`，见 [美债文档](docs/bond.md#macro-us-treasury) |
 | `macro cn cpi`、`macro cn core-cpi`、`macro cn ppi` | 国家统计局月度价格指数，见 [NBS 文档](docs/nbs.md) |
 | `macro cn pmi`                                | 国家统计局制造业 PMI 及生产、订单、出口订单、就业分项 |
 | `macro cn nonmanufacturing-pmi` / `macro cn npmi` | 非制造业、服务业、建筑业商务活动指数；`--details` 展示九个全国分项 |
@@ -146,7 +149,7 @@ CLI `sec watch` 与 Desktop「我的自选」统一使用 `~/.sec/watchlist.json
 | `macro us real-income --standard-json`、`macro us industrial-production --standard-json`、`macro us capacity-utilization --standard-json` | 实际收入与工业统一JSON导出：总体范围、折年口径和百分比／百分点变化，见 [统一导出文档](docs/macro-standard.md) |
 | `macro us unemployment --standard-json`、`macro us participation --standard-json`、`macro us earnings --standard-json`、`macro us weekly-hours --standard-json` | 劳动力比率、时薪工时统一JSON导出：CPS／CES范围、分子分母、变化单位与初步标记，见 [统一导出文档](docs/macro-standard.md) |
 | `macro us fiscal --standard-json`、`macro us corporate-profits --standard-json`、`macro us business-inventories --standard-json`、`macro us new-orders --standard-json` | 财政与企业统一JSON导出：财年累计、赤字符号、利润流量、库存余额和订单口径，见 [统一导出文档](docs/macro-standard.md) |
-| `macro us bank-credit --standard-json`、`macro us lending-standards --standard-json`、`macro us debt-service --standard-json`、`macro us investment --standard-json`、`macro us equipment-investment --standard-json` | 信用与投资统一JSON导出：月平均余额、调查净比例、百分比／百分点变化、折年水平和名义／实际口径，见 [统一导出文档](docs/macro-standard.md) |
+| `macro us bank-credit --standard-json`、`macro us lending-standards --standard-json`、`macro us debt-service --standard-json`、`macro us housing-starts --standard-json`、`macro us equipment-investment --standard-json` | 信用与投资统一JSON导出：月平均余额、调查净比例、百分比／百分点变化、折年水平和名义／实际口径，见 [统一导出文档](docs/macro-standard.md) |
 | `macro us payrolls --standard-json`、`macro us housing --standard-json`、`macro us house-price --standard-json`、`macro us trade --standard-json`、`macro us real-trade --standard-json` | 非农、住宅与贸易统一JSON导出：岗位差额、新房／成屋单位、房价指数基期、官方差额和名义／实际口径，见 [统一导出文档](docs/macro-standard.md) |
 | `macro us target-rate --standard-json` | 联邦基金目标区间统一JSON导出：实际调整事件、上下限、基点变化及生效／公布日期，见 [统一导出文档](docs/macro-standard.md) |
 | `macro us debt --standard-json`、`macro us debt-cash --standard-json`、`macro us auctions --standard-json` | 国债统一JSON导出：DTS官方明细、累计值、现金总额与计算净额，逐券拍卖事件及面值分配，见 [统一导出文档](docs/macro-standard.md) |
@@ -157,7 +160,7 @@ CLI `sec watch` 与 Desktop「我的自选」统一使用 `~/.sec/watchlist.json
 | `macro cn cpi --standard-json`、`macro cn core-cpi --standard-json`、`macro cn ppi --standard-json` | 中国价格统一JSON导出：官方相对指数和计算涨跌幅分开，保留缺口与历史目录来源，见 [统一导出文档](docs/macro-standard.md) |
 | `macro cn lpr --standard-json`、`macro cn reverse-repo --standard-json`、`macro cn reverse-repo-history --standard-json`、`macro cn rrr --standard-json`、`macro cn treasury --standard-json` | 中国利率统一JSON导出：LPR报价与相邻月变化、逆回购调整事件和中标历史、准备金率幅度与机构范围、全部期限国债收益率，见 [统一导出文档](docs/macro-standard.md) |
 | `macro us trade`、`macro us real-trade`        | 月度名义贸易与季度实际贸易，出口、进口及官方差额；支持商品/服务分项，见 [美国进出口文档](docs/us-trade.md) |
-| `macro us investment`、`macro us equipment-investment` | 住宅开工、建筑许可及季度设备投资，分别保留频率、单位和季调折年口径，见 [美国投资文档](docs/us-investment.md) |
+| `macro us housing-starts`、`macro us equipment-investment` | 住宅开工、建筑许可及季度设备投资，分别保留频率、单位和季调折年口径，见 [美国投资文档](docs/us-investment.md) |
 | `macro us bank-credit`、`macro us lending-standards`、`macro us debt-service` | 月平均银行信贷、季度贷款标准及家庭偿债负担，区分百分比和百分点变化，见 [美国信用文档](docs/us-credit.md) |
 | `macro us fiscal` | 联邦月度收入、支出、官方盈余/赤字及计算财年累计，见 [美国财政文档](docs/us-fiscal.md) |
 | `macro us debt` | 财政部每日可流通／非流通国债记账发行、赎回及计算净额，保留调整与累计值，见 [美国国债交易文档](docs/us-debt.md) |
@@ -177,8 +180,8 @@ sec watch add SH600036 SZ002475
 sec watch
 
 # 财报查询与导出
-sec balance-sheet SH600036 --type balance --period annual --output balance.csv
-sec balance-sheet-download SH600036 --start-year 2023 --end-year 2025 --output-dir ./reports
+sec financials SH600036 --type balance --period annual --output balance.csv
+sec annual-report SH600036 --start-year 2023 --end-year 2025 --output-dir ./reports
 
 # 新股上市日期范围、招股书查询
 sec ipo list --since 2026-01-01 --until 2026-06-30

@@ -20,6 +20,11 @@ var (
 	treasuryYieldCurveURL = "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/pages/xml?data=daily_treasury_yield_curve&field_tdr_date_value=%d"
 )
 
+// YieldCurveYearURL 返回财政部收益率曲线单个年度的 XML 地址。
+func YieldCurveYearURL(year int) string {
+	return fmt.Sprintf(treasuryYieldCurveURL, year)
+}
+
 // BondYieldItem 单日国债收益率数据
 type BondYieldItem struct {
 	Date          string
@@ -93,9 +98,31 @@ func (v nullableYield) number() (float64, bool) {
 	return value, err == nil
 }
 
+// invalidTenor 返回第一个既不是空值、也不是数值的期限，全部合法时返回空字符串。
+func (p treasuryProperties) invalidTenor() string {
+	for _, tenor := range []struct {
+		id    string
+		value nullableYield
+	}{
+		{"1m", p.BC1Month}, {"3m", p.BC3Month}, {"6m", p.BC6Month}, {"1y", p.BC1Year}, {"2y", p.BC2Year}, {"3y", p.BC3Year},
+		{"5y", p.BC5Year}, {"7y", p.BC7Year}, {"10y", p.BC10Year}, {"20y", p.BC20Year}, {"30y", p.BC30Year},
+	} {
+		if tenor.value.Null == "true" || strings.TrimSpace(tenor.value.Text) == "" {
+			continue
+		}
+		if _, ok := tenor.value.number(); !ok {
+			return tenor.id
+		}
+	}
+	return ""
+}
+
 // QueryBondReq 请求结构体
 type QueryBondReq struct {
 	Start, End string
+	// Strict 为 true 时不输出部分结果：年度抓取失败、已过去的年度没有记录、记录或数值无法解析都返回错误。
+	// 当前年度可以没有记录，此时返回空列表。
+	Strict bool
 }
 
 // QueryBondResp 返回数据结构体
@@ -130,15 +157,21 @@ func QueryBond(ctx context.Context, req *QueryBondReq) (*QueryBondResp, error) {
 
 	var allItems []*BondYieldItem
 	for y := range years {
-		items, err := fetchYearData(ctx, y)
+		items, err := fetchYearData(ctx, y, req.Strict)
+		if err == nil && req.Strict && len(items) == 0 && y < time.Now().UTC().Year() {
+			err = errors.New("no records for a past year")
+		}
 		if err != nil {
+			if req.Strict {
+				return nil, fmt.Errorf("fetch treasury data %d: %w", y, err)
+			}
 			slog.WarnContext(ctx, "failed fetch treasury data", "year", y, "error", err)
 			continue
 		}
 		allItems = append(allItems, items...)
 	}
 
-	if len(allItems) == 0 {
+	if len(allItems) == 0 && !req.Strict {
 		return nil, errors.New("no treasury yield data fetched")
 	}
 
@@ -174,9 +207,46 @@ func QueryBond(ctx context.Context, req *QueryBondReq) (*QueryBondResp, error) {
 	return &QueryBondResp{Data: data}, nil
 }
 
+// CurveDay 是一天的收益率曲线，未公布的期限为 null。
+type CurveDay struct {
+	Date   string   `json:"date"`
+	Month1 *float64 `json:"1m"`
+	Month3 *float64 `json:"3m"`
+	Month6 *float64 `json:"6m"`
+	Year1  *float64 `json:"1y"`
+	Year2  *float64 `json:"2y"`
+	Year3  *float64 `json:"3y"`
+	Year5  *float64 `json:"5y"`
+	Year7  *float64 `json:"7y"`
+	Year10 *float64 `json:"10y"`
+	Year20 *float64 `json:"20y"`
+	Year30 *float64 `json:"30y"`
+}
+
+// CurveDays 转为官方期限的输出结构，不含 YClose、Change 等依赖查询范围的计算字段。
+func CurveDays(items []*BondYieldItem) []CurveDay {
+	days := make([]CurveDay, 0, len(items))
+	for _, item := range items {
+		yield := func(id string, value float64) *float64 {
+			if item.MissingTenors[id] {
+				return nil
+			}
+			return &value
+		}
+		days = append(days, CurveDay{
+			Date:   item.Date,
+			Month1: yield("1m", item.BC1Month), Month3: yield("3m", item.BC3Month), Month6: yield("6m", item.BC6Month),
+			Year1: yield("1y", item.BC1Year), Year2: yield("2y", item.BC2Year), Year3: yield("3y", item.BC3Year),
+			Year5: yield("5y", item.BC5Year), Year7: yield("7y", item.BC7Year), Year10: yield("10y", item.BC10Year),
+			Year20: yield("20y", item.BC20Year), Year30: yield("30y", item.BC30Year),
+		})
+	}
+	return days
+}
+
 // fetchYearData 获取指定年份的国债收益率数据
-func fetchYearData(ctx context.Context, year int) ([]*BondYieldItem, error) {
-	url := fmt.Sprintf(treasuryYieldCurveURL, year)
+func fetchYearData(ctx context.Context, year int, strict bool) ([]*BondYieldItem, error) {
+	url := YieldCurveYearURL(year)
 	slog.DebugContext(ctx, "fetchYearData", "reqURL", url)
 	resp, err := utils.MakeRequest(ctx, http.MethodGet, url, nil, nil, 0)
 	if err != nil {
@@ -184,16 +254,25 @@ func fetchYearData(ctx context.Context, year int) ([]*BondYieldItem, error) {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("treasury yield curve returned HTTP %d", resp.StatusCode)
+	}
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
 
-	return parseAtomFeed(body)
+	return parseFeed(body, strict)
 }
 
 // parseAtomFeed 解析 Atom feed XML 返回 BondYieldItem 列表
 func parseAtomFeed(data []byte) ([]*BondYieldItem, error) {
+	return parseFeed(data, false)
+}
+
+// parseFeed 解析 Atom feed；strict 为 true 时无法解析的记录和重复日期返回错误，否则跳过。
+func parseFeed(data []byte, strict bool) ([]*BondYieldItem, error) {
 	var feed atomFeed
 	if err := xml.Unmarshal(data, &feed); err != nil {
 		return nil, err
@@ -203,10 +282,16 @@ func parseAtomFeed(data []byte) ([]*BondYieldItem, error) {
 	for _, entry := range feed.Entry {
 		innerXML := strings.TrimSpace(entry.Content.InnerXML)
 		if innerXML == "" {
+			if strict {
+				return nil, errors.New("treasury entry has no content")
+			}
 			continue
 		}
 		var props treasuryProperties
 		if err := xml.Unmarshal([]byte(innerXML), &props); err != nil {
+			if strict {
+				return nil, fmt.Errorf("parse treasury entry: %w", err)
+			}
 			slog.Warn("failed parse inner properties", "error", err)
 			continue
 		}
@@ -218,8 +303,16 @@ func parseAtomFeed(data []byte) ([]*BondYieldItem, error) {
 		}
 		dateTime, err := time.Parse(utils.LayoutYYMMDD, dateStr)
 		if err != nil {
+			if strict {
+				return nil, fmt.Errorf("parse treasury date %q: %w", props.NewDate, err)
+			}
 			slog.Warn("failed parse date", "date", props.NewDate, "error", err)
 			continue
+		}
+		if strict {
+			if tenor := props.invalidTenor(); tenor != "" {
+				return nil, fmt.Errorf("treasury %s %s is not a number", dateStr, tenor)
+			}
 		}
 
 		item := &BondYieldItem{Date: dateStr, DateTime: dateTime, MissingTenors: map[string]bool{}}
@@ -288,6 +381,9 @@ func parseAtomFeed(data []byte) ([]*BondYieldItem, error) {
 	deduped := make([]*BondYieldItem, 0, len(items))
 	for i, item := range items {
 		if i > 0 && items[i-1].Date == item.Date {
+			if strict {
+				return nil, fmt.Errorf("duplicate treasury date %s", item.Date)
+			}
 			continue
 		}
 		deduped = append(deduped, item)
