@@ -1,4 +1,4 @@
-import type { BasicSecurity, SecurityQuote, Company, Dividend, WorkspaceState, PageResult, IPOListing, Announcement, FinancialReport, MetalData, HistoryQuote, BondData, CompanyMetrics, SavedDownload, AnnualReportsPage, ProspectusPage , MacroCatalog, MacroDataset } from './types'
+import type { BasicSecurity, SecurityQuote, Company, Dividend, WorkspaceState, PageResult, IPOListing, Announcement, FinancialReport, MetalData, HistoryQuote, BondData, CompanyMetrics, SavedDownload, AnnualReportsPage, ProspectusPage , MacroCatalog, MacroDataset , FxDataset, FxSpread } from './types'
 
 async function request<T>(path: string, signal?: AbortSignal, options?: RequestInit): Promise<T> {
   const resp = await fetch(path, { ...options, signal })
@@ -123,4 +123,12 @@ export function macroCatalog(signal?: AbortSignal): Promise<MacroCatalog> {
 
 export function macroData(query: Record<string, string>, signal?: AbortSignal): Promise<MacroDataset> {
   return request(`/api/v1/macro/data?${new URLSearchParams(query)}`, signal)
+}
+
+export function fxOptions(signal?: AbortSignal): Promise<{ cross_pairs: Record<string, string[]> }> {
+  return request('/api/v1/fx/options', signal)
+}
+
+export function fxData(query: Record<string, string>, signal?: AbortSignal): Promise<FxDataset | FxSpread> {
+  return request(`/api/v1/fx/data?${new URLSearchParams(query)}`, signal)
 }

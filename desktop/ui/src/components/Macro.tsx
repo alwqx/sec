@@ -101,7 +101,7 @@ function SeriesHistory({ data, series }: { data: MacroDataset; series: MacroSeri
     {series.coverage && <p className="data-note">范围：{series.coverage}</p>}
     {isEventSeries(data, rows)
       ? <p className="data-note">这是事件型数据，各事件不是连续序列，因此不绘制走势，请查看下方明细。</p>
-      : <BondChart key={series.id} title={seriesName(series)} points={rows.map(item => ({ label: item.period, value: item.value }))} format={value => `${valueText(value)} ${unit}`} tick={tickText} emptyText="此区间暂无可用数据" valueLabel={`单位${unit}`} axisLabel="所属期" />}
+      : <BondChart key={series.id} title={seriesName(series)} points={rows.map(item => ({ label: item.period, value: item.value }))} format={value => `${valueText(value)} ${unit}`} tick={tickText} minPadding={0} emptyText="此区间暂无可用数据" valueLabel={`单位${unit}`} axisLabel="所属期" />}
     <div className="table-scroll"><table className="data-table"><thead><tr><th>所属期</th>{hasEvents && <th>事件</th>}<th>数值</th><th>状态</th><th>公布时间</th><th>说明</th></tr></thead>
       <tbody>{shown.map((item, index) => <tr key={`${item.period}-${item.event_id ?? index}`}><td>{item.period}</td>{hasEvents && <td>{eventText(data, item.event_id)}</td>}<td>{valueText(item.value)}</td><td>{statusText(item)}</td><td>{item.published_at ?? item.published_date ?? '—'}</td><td>{item.note || ''}</td></tr>)}</tbody></table></div>
     <Pagination page={page} total={rows.length} hasMore={page * pageSize < rows.length} loading={false} onPage={setPage} />
@@ -156,8 +156,8 @@ function IndicatorView({ indicator }: { indicator: MacroIndicator }) {
     if (query.end) params.end = query.end
     if (query.refresh) params.refresh = 'true'
     const data = await macroData(params, signal)
-    // 只回填命令默认窗口决定的一端，不覆盖用户正在输入的日期。
-    setDraft(current => ({ begin: query.begin ? current.begin : toInput(indicator.period, data.begin), end: query.end ? current.end : toInput(indicator.period, data.end) }))
+    // 只回填仍为空的输入框，不覆盖用户正在输入的日期。
+    setDraft(current => ({ begin: current.begin || toInput(indicator.period, data.begin), end: current.end || toInput(indicator.period, data.end) }))
     return data
   }, [indicator, query])
   const resource = useResource(load)

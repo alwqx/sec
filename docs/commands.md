@@ -12,7 +12,7 @@
 | IPO | `ipo *` | 已有，缺 `ipo calendar` |
 | 公告中心 | `announcements`、`insider` | 已有，缺增减持 |
 | 宏观 | `macro *`、`bond`、`bond-history` | 已有；原“美债收益率”菜单已并入 |
-| 汇率 | `fx *` | 规划 |
+| 汇率 | `fx *` | 已有 |
 | 黄金行情 | `metal`、`metal-history` | 已有 |
 | 设置 | `upgrade` | 已有 |
 
@@ -64,7 +64,7 @@
 
 ## 汇率
 
-全部为规划。
+全部已有，位于「汇率」菜单，每个命令一个栏目。
 
 | 命令 | 数据 |
 | --- | --- |

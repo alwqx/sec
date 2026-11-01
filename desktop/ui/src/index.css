@@ -347,3 +347,6 @@ h1, h2, h3 { font-weight: 600; }
   .macro-page { grid-template-columns: minmax(0, 1fr); }
   .macro-menu { position: static; max-height: 280px; }
 }
+
+.fx-views { margin-bottom: 16px; }
+.fx-inputs { margin-top: 16px; }

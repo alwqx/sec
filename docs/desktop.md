@@ -102,8 +102,8 @@ CLI 的根 `main.go` 保持不变；桌面版是独立二进制：`go build ./de
 ### 页面与导航
 
 - 「自选与行情」证券列表上方提供证券搜索，支持名称、代码与拼音；搜索保留当前研究证券，查询结果显示在列表中，其他页面不显示证券搜索框。
-- 导航图标使用 `lucide-react` 静态导入的 SVG：自选与行情 ChartCandlestick、IPO FilePlusCorner、公告中心 Newspaper、宏观 Landmark、黄金行情 Coins、设置 Settings。统一 20px、1.75px 描边，使用 currentColor 跟随主题和选中状态；保留文字标签，装饰图标不进入无障碍名称。
-- 左侧全局导航：自选与行情、IPO、公告中心、宏观、黄金行情、设置。
+- 导航图标使用 `lucide-react` 静态导入的 SVG：自选与行情 ChartCandlestick、IPO FilePlusCorner、公告中心 Newspaper、宏观 Landmark、汇率 ArrowLeftRight、黄金行情 Coins、设置 Settings。统一 20px、1.75px 描边，使用 currentColor 跟随主题和选中状态；保留文字标签，装饰图标不进入无障碍名称。
+- 左侧全局导航：自选与行情、IPO、公告中心、宏观、汇率、黄金行情、设置。
 - 自选与行情：中间切换「我的自选 / 搜索结果」，右侧围绕选中证券展示「概览 / 公司 / 财报 / 分红 / 公告」。切换全局页面保留当前证券与个股栏目。
 - 概览：实时行情、可选择日期范围与复权方式的日 K 线蜡烛图（开高低收）、成交量副图与所选交易日的成交额。仅概览页按偏好轮询行情，其他页面不轮询；历史走势默认近 3 个月、不复权，支持近 1／3／6 个月、近 1 年及自定义日期（1990 年至上海今日，单次最多 5 年），支持不复权／前复权／后复权；查询后显示已生效条件，复权不改变实时行情报价。历史走势进入概览或提交条件时加载。切换证券与页面取消旧请求。
 - 公司、财报、分红、个股公告：暂仅支持沪深北 A 股；财报支持资产负债表、利润表、现金流量表与报告期筛选，金额单位亿元，每股收益元/股。历史走势图支持沪深证券与港股，其余市场保留实时行情。
@@ -151,6 +151,25 @@ GET /api/v1/macro/data?region=cn&command=cpi&begin=202601&end=202609
 
 依赖 `original` 的内容不展示，例如 `macro us gdp --vintages` 的修订档案和目标区间的当前有效值。序列名称来自 `definition` 和口径，部分美国序列（如 `us debt`）的名称保留英文原文。
 
+### 汇率
+
+「汇率」覆盖 `sec fx` 的 6 个命令，每个命令一个栏目。与宏观相同，`fx.Export` 在进程内运行命令的 `--json`，保留来源、价格类型和时间口径。详细口径见[汇率文档](forex.md)。
+
+```text
+GET /api/v1/fx/options
+GET /api/v1/fx/data?command=fixing&begin=20260101&end=20260131
+```
+
+`command` 可选 `quote`、`fixing`、`reference`、`history`、`cross`、`spread`；其余参数是 `source`、`pair`、`at`、`max_skew`、`max_age`、`refresh`。与所选命令和来源无关的参数不会传给命令，例如新浪交叉汇率不带日期。取值或日期格式无效返回 400，覆盖范围和上游失败等命令错误返回 502。
+
+页面按数据形态展示：
+
+- 最新行情和新浪交叉汇率是报价：逐行显示数值和观测时间，交叉汇率另外显示公式和原始输入。
+- 中间价、参考汇率、历史日线和 FRED、CFETS 交叉汇率是日度序列：切换货币对后显示走势和明细，交叉汇率的明细带每天的公式输入。
+- 价差显示绝对价差、点差、相对价差和隐含 CNH/CNY，以及原始输入。
+
+报价过期或时间差超限时不计算，页面显示 `—` 和原因。休市时报价常常超过 24 小时，这时放宽报价年龄上限也不会有结果。
+
 ### 美债收益率
 
 位于「宏观 → 美国 → 利率与收益率」。
@@ -194,6 +213,8 @@ macOS 按当前进程架构匹配 `sec-<tag>-desktop-darwin-<arch>.dmg`，不将
 | GET | `/api/v1/annual-reports?code=SH600036&start_year=2022&end_year=2025&page=1` | 按报告年度范围查询正文，兼容 year 单年度参数；范围参数必须成对提供，type 为 annual（默认）/halfyear/q1/q3 |
 | POST | `/api/v1/annual-reports/download` | JSON 参数 code/year（字符串）/url/type（默认 annual）；下载定期报告 PDF 并返回本地文件路径及大小 |
 | GET | `/api/v1/financials?code=SH600036&report=balance&period=annual` | 财报；report 为 balance/income/cashflow，period 可省略或 annual/halfyear/q1/q3 |
+| GET | `/api/v1/fx/options` | 交叉汇率各来源支持的货币对 |
+| GET | `/api/v1/fx/data?command=fixing` | 汇率命令的 JSON 结果，详见「汇率」 |
 | GET | `/api/v1/macro/catalog` | 宏观主题分类和指标清单 |
 | GET | `/api/v1/macro/data?region=cn&command=cpi` | 单个宏观指标的统一格式数据，详见「宏观」 |
 | GET | `/api/v1/bond?begin=2026-01-01&end=2026-01-31` | 美国国债最新各期限收益率与区间历史；起止日期 YYYY-MM-DD，默认美东今日向前 30 天，单次最多 5 年 |

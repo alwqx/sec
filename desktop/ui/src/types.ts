@@ -196,3 +196,14 @@ export interface MacroObservation {
   published_date?: string | null; published_at?: string | null; note?: string; source?: string | null; raw_value?: string | null
 }
 export interface MacroDataset { begin: string; end: string; series: MacroSeries[]; observations: MacroObservation[]; events?: Record<string, unknown>[]; policy_events?: Record<string, unknown>[] }
+
+export interface FxObservation {
+  date: string; pair: string; market: string; value: number | null; bid?: number | null; ask?: number | null; open?: number | null; high?: number | null; low?: number | null; close?: number | null
+  observed_at?: string; source?: string; note?: string; is_derived?: boolean; formula?: string; inputs?: FxObservation[]; alignment?: FxAlignment
+}
+export interface FxAlignment { status: string; skew_seconds?: number; time_start?: string; time_end?: string; note?: string }
+export interface FxDataset { provider: string; price_type: string; frequency: string; timezone: string; observation_time?: string; begin?: string; end?: string; observations: FxObservation[] | null; notes?: string[] }
+export interface FxSpread {
+  provider: string; as_of: string; is_derived: boolean; formula: string; inputs: FxObservation[] | null; alignment: FxAlignment; notes?: string[]
+  difference_rmb_per_usd: number | null; pips: number | null; relative_percent: number | null; relative_bps: number | null; implied_cnh_cny: number | null
+}
