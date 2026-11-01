@@ -26,6 +26,7 @@ func NewMacroCLI() *cobra.Command {
 			RunE: func(cmd *cobra.Command, args []string) error { return prices(cmd, name) },
 		}
 		addQueryFlags(command)
+		addStandardJSONFlag(command, "按统一宏观序列格式输出JSON，官方相对指数和涨跌幅分开，保留缺口和原结果")
 		cn.AddCommand(command)
 	}
 	cn.AddCommand(newPMICLI())
@@ -94,6 +95,11 @@ func prices(cmd *cobra.Command, indicator string) error {
 	items, err := client.Prices(cmd.Context(), req)
 	if err != nil {
 		return err
+	}
+	standard, _ := cmd.Flags().GetBool("standard-json")
+	if standard {
+		dataset, err := macrodata.CNPrices(items, indicator, begin, end)
+		return writeDataset(cmd, dataset, err)
 	}
 	asJSON, _ := cmd.Flags().GetBool("json")
 	if asJSON {
