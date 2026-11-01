@@ -12,6 +12,7 @@
 8. Add `docs/commands.md` mapping data commands to Desktop features and grouping macro commands by topic
 9. Add a Desktop macro page covering all 61 `sec macro` indicators by country and topic, with a series list, charts and per-period details, served through a generic API that runs each command's `--standard-json` in process; move the US Treasury yields page under it
 10. Add a macro indicator catalog shared by Desktop and `sec macro --help`, which now groups commands by topic, with a test keeping it in sync with the commands
+11. Add a Desktop FX page covering all six `sec fx` commands, showing quotes, daily series with charts and the onshore-offshore spread with their sources, formulas and original inputs, served through an API that runs each command's `--json` in process
 
 ### v0.4.1
 

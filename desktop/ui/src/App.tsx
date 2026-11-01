@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
-import { ChartCandlestick, FilePlusCorner, Newspaper, Coins, Landmark, Settings as SettingsIcon, RefreshCw, Star, type LucideIcon } from 'lucide-react'
+import { ArrowLeftRight, ChartCandlestick, FilePlusCorner, Newspaper, Coins, Landmark, Settings as SettingsIcon, RefreshCw, Star, type LucideIcon } from 'lucide-react'
 import { loadWorkspace, saveWorkspace, search, loadWatchlist, changeWatchlist } from './api'
 import type { BasicSecurity, WorkspaceSettings, WorkspaceState } from './types'
 import SearchBar from './components/SearchBar'
@@ -12,15 +12,17 @@ import Announcements from './components/Announcements'
 import Settings from './components/Settings'
 import Metal from './components/Metal'
 import Macro from './components/Macro'
+import Fx from './components/Fx'
 import secLogo from '../../assets/sec-logo.png'
 
-type Page = 'stocks' | 'ipo' | 'announcements' | 'macro' | 'metal' | 'settings'
+type Page = 'stocks' | 'ipo' | 'announcements' | 'macro' | 'fx' | 'metal' | 'settings'
 type Tab = 'overview' | 'company' | 'financials' | 'dividends' | 'announcements'
 const pages: { id: Page; title: string; icon: LucideIcon }[] = [
   { id: 'stocks', title: '自选与行情', icon: ChartCandlestick },
   { id: 'ipo', title: 'IPO', icon: FilePlusCorner },
   { id: 'announcements', title: '公告中心', icon: Newspaper },
   { id: 'macro', title: '宏观', icon: Landmark },
+  { id: 'fx', title: '汇率', icon: ArrowLeftRight },
   { id: 'metal', title: '黄金行情', icon: Coins },
   { id: 'settings', title: '设置', icon: SettingsIcon },
 ]
@@ -205,6 +207,7 @@ export default function App() {
           </section>
         </div>}
         {page === 'macro' && <Macro />}
+        {page === 'fx' && <Fx />}
         {page === 'metal' && <Metal />}
         {page === 'ipo' && <IPOCalendar onSelect={openIPO} />}
         {page === 'announcements' && <div className="global-announcements page-panel"><div className="scope-bar"><span>公告范围</span><button aria-pressed={announcementScope === 'latest' || !aShare} onClick={() => setAnnouncementScope('latest')}>最新披露</button><button disabled={!aShare} aria-pressed={announcementScope === 'selected' && !!aShare} onClick={() => setAnnouncementScope('selected')}>{selected ? selected.name : '当前证券'}</button></div><Announcements compact key={announcementScope === 'selected' && aShare ? selected!.ex_code : 'latest'} code={announcementScope === 'selected' && aShare ? selected!.ex_code : ''} /></div>}

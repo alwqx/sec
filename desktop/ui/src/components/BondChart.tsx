@@ -5,8 +5,8 @@ interface Point { label: string; value: number | null }
 const percent = (value: number) => `${value.toFixed(2)}%`
 
 // 收益率只有单日值，以折线展示；缺失期限或日期保留断点，不插值为 0%。
-export default function BondChart({ points, title, curve = false, format = percent, tick = percent, emptyText = '此区间暂无可用收益率数据', valueLabel = '收益率单位百分比', axisLabel = '交易日期' }: {
-  points: Point[]; title: string; curve?: boolean; format?: (value: number) => string; tick?: (value: number) => string; emptyText?: string; valueLabel?: string; axisLabel?: string
+export default function BondChart({ points, title, curve = false, format = percent, tick = percent, minPadding = .05, emptyText = '此区间暂无可用收益率数据', valueLabel = '收益率单位百分比', axisLabel = '交易日期' }: {
+  points: Point[]; title: string; curve?: boolean; format?: (value: number) => string; tick?: (value: number) => string; minPadding?: number; emptyText?: string; valueLabel?: string; axisLabel?: string
 }) {
   const container = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(480)
@@ -20,7 +20,7 @@ export default function BondChart({ points, title, curve = false, format = perce
   const values = points.flatMap(point => point.value !== null && Number.isFinite(point.value) ? [point.value] : [])
   if (!points.length || !values.length) return <div className="empty-state">{emptyText}</div>
   const left = 58, right = width - 14, top = 16, bottom = 196, height = 250
-  const min = Math.min(...values), max = Math.max(...values), padding = Math.max((max - min) * .15, .05)
+  const min = Math.min(...values), max = Math.max(...values), padding = Math.max((max - min) * .15, minPadding) || Math.abs(max) * .001 || 1
   const low = min - padding, high = max + padding
   const x = (i: number) => points.length === 1 ? (left + right) / 2 : left + i * (right - left) / (points.length - 1)
   const y = (value: number) => bottom - (value - low) / (high - low) * (bottom - top)
