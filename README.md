@@ -356,7 +356,7 @@ go build -o sec .
 go test -v ./...
 ```
 
-macOS Desktop 还需要 Node.js（Release 使用 Node 20）、npm 与 Xcode Command Line Tools，先构建前端，再编译桌面端：
+macOS Desktop 还需要 Node.js（Release 使用 Node 24）、npm 与 Xcode Command Line Tools，先构建前端，再编译桌面端：
 
 ```shell
 npm ci --prefix desktop/ui

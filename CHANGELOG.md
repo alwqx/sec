@@ -4,6 +4,8 @@
 
 1. Upgrade the Desktop UI dev dependency Vite from 5.4 to 6.4 and esbuild from 0.21 to 0.25 to resolve open Dependabot alerts on the dev server, and point `package-lock.json` at the official npm registry instead of a mirror so `npm ci` works with npm 12
 2. Replace the CodeQL default setup with a workflow and config file that exclude `testdata` directories, since saved upstream pages are only read as text by tests and raised false alerts for their external scripts
+3. Build the macOS Desktop frontend on Node 24 instead of Node 20 in the release workflow, and upgrade `actions/setup-node` from v4 to v7 so the action itself also runs on Node 24
+4. Pin the Ubuntu jobs in the CI, CodeQL and release workflows to `ubuntu-24.04` instead of `ubuntu-latest`
 
 ### v0.4.1
 
