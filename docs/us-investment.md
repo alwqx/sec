@@ -1,17 +1,17 @@
 # 美国住宅建设与设备投资
 
-美国投资相关指标分为两个命令：`investment` 查询月度住宅开工、建筑许可住房套数；`equipment-investment` 查询季度私人非住宅设备投资。月度与季度使用独立日期参数，不放入同一时间序列。数据经 FRED 公开 CSV 转接 Census/HUD 与 BEA 官方统计，无需 API key。
+美国投资相关指标分为两个命令：`housing-starts`（旧名 `investment` 仍可用）查询月度住宅开工、建筑许可住房套数；`equipment-investment` 查询季度私人非住宅设备投资。月度与季度使用独立日期参数，不放入同一时间序列。数据经 FRED 公开 CSV 转接 Census/HUD 与 BEA 官方统计，无需 API key。
 
 ```bash
 # 月度住宅开工，默认 component=housing-starts
-sec macro us investment --begin 202501 --end 202609
-sec macro us investment --component building-permits --begin 202501 --end 202609 --json
+sec macro us housing-starts --begin 202501 --end 202609
+sec macro us housing-starts --component building-permits --begin 202501 --end 202609 --json
 
 # 季度设备投资，默认 price-basis=real
 sec macro us equipment-investment --begin 2025Q1 --end 2026Q2
 sec macro us equipment-investment --price-basis nominal --begin 2025Q1 --end 2026Q2 --json
 
-sec macro us investment --refresh
+sec macro us housing-starts --refresh
 sec macro us equipment-investment --no-cache
 ```
 

@@ -1,6 +1,6 @@
 # 宏观指标一览
 
-`sec macro cn`、`sec macro us` 及 `sec bond` 已实现指标的频率、字段和官方来源。覆盖范围和限制见各指标文档，`--standard-json` 的口径见[统一导出文档](macro-standard.md)，汇率见[汇率文档](forex.md)。
+`sec macro cn`、`sec macro us` 及 `sec bond` 已实现指标的频率、字段和官方来源。覆盖范围和限制见各指标文档，`--standard-json` 的口径见[统一导出文档](macro-standard.md)，汇率见[汇率文档](forex.md)，命令分类和 Desktop 位置见[命令与 Desktop 功能对照](commands.md)。
 
 ## 中国
 
@@ -50,7 +50,7 @@
 | 工业生产、产能利用率 | 月度 | 工业总量与NAICS制造业的2017=100季调生产指数、未年化同比/月环比，以及产能利用率和百分点差；分别保留历史起点与当前可见修订版本，见 [工业生产文档](us-production.md) | 美联储，经FRED转接 |
 | 联邦基金目标利率区间 | 事件型 | 2008-12-16起的上下限、基点变化、生效日期及区间前基准；按官方声明核验公布日期/时间，不可取得时明确标记，见 [美联储政策利率文档](federalreserve.md) | 美联储官方调整表与FOMC声明 |
 | 有效联邦基金利率 | 日度 | EFFR官方利率、交易所属日期、前一可用观测的基点变化、修订标记及原始字段；区分2016-03-01方法变化，不补周末/节假日，逐条公布时间不可得时为null，见 [纽约联储文档](nyfed.md) | 纽约联储 |
-| 美国国债收益率曲线 | 日度 | 已有多个期限收益率，复用 `provider/bond` 的 `QueryBond`，见 [美国国债文档](bond.md) | 美国财政部 |
+| 美国国债收益率曲线 | 日度 | 1 个月至 30 年期收益率；`macro us treasury` 和 `bond`、`bond-history` 都使用 `provider/bond` 的 `QueryBond`，见 [美国国债文档](bond.md) | 美国财政部 |
 | 实际 GDP | 季度 | GDPC1实际水平、官方环比年化增速及计算同比/环比；可选BEA自2002Q1起的初值与后续修订增速档案，保留发布日期，档案未提供的历史实际水平为null，见 [美国GDP文档](us-gdp.md) | BEA，当前水平经FRED转接 |
 
 其他指标：

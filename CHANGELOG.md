@@ -7,6 +7,9 @@
 3. Build the macOS Desktop frontend on Node 24 instead of Node 20 in the release workflow, and upgrade `actions/setup-node` from v4 to v7 so the action itself also runs on Node 24
 4. Pin the Ubuntu jobs in the CI, CodeQL and release workflows to `ubuntu-24.04` instead of `ubuntu-latest`
 5. Keep only open items in `TODO.md`, move the overview of implemented macro indicators to `docs/macro-coverage.md`, split the remaining reserve requirement history gaps into their own open item, and replace outdated TODO references in the docs
+6. Add `macro us treasury` with all 11 yield curve tenors, nullable `--json` output and `--standard-json`; it fails rather than returning partial data when a year cannot be fetched, a past year has no records, or a record or value cannot be parsed, and Treasury yield curve requests now check the HTTP status
+7. Rename `balance-sheet` to `financials`, `balance-sheet-download` to `annual-report` and `macro us investment` to `macro us housing-starts`, keeping the old names as aliases
+8. Add `docs/commands.md` mapping data commands to Desktop features and grouping macro commands by topic
 
 ### v0.4.1
 

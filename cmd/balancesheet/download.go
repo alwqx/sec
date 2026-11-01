@@ -16,8 +16,8 @@ import (
 
 func NewBalanceSheetDownloadCLI() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:           "balance-sheet-download",
-		Aliases:       []string{"bsd"},
+		Use:           "annual-report",
+		Aliases:       []string{"bsd", "balance-sheet-download"},
 		Short:         "Download annual report PDFs from CNINFO",
 		SilenceUsage:  true,
 		SilenceErrors: true,

@@ -17,8 +17,8 @@ import (
 
 func NewBalanceSheetCLI() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:           "balance-sheet",
-		Aliases:       []string{"bs"},
+		Use:           "financials",
+		Aliases:       []string{"bs", "balance-sheet"},
 		Short:         "Print financial statements of specific security",
 		SilenceUsage:  true,
 		SilenceErrors: true,

@@ -1,4 +1,6 @@
-# sec balance-sheet — 财务报表查询与下载
+# sec financials — 财务报表查询与下载
+
+> 命令已改名：`balance-sheet` 现为 `financials`，`balance-sheet-download` 现为 `annual-report`。旧名和 `bs`、`bsd` 别名继续可用，下文保留调研时的写法。
 
 ## 调研概述
 

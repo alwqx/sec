@@ -34,7 +34,7 @@ sec macro us new-orders --begin 202501 --end 202608 --standard-json
 sec macro us bank-credit --begin 202501 --end 202609 --standard-json
 sec macro us lending-standards --begin 2025Q1 --end 2026Q3 --standard-json
 sec macro us debt-service --begin 2025Q1 --end 2026Q2 --standard-json
-sec macro us investment --component building-permits --begin 202501 --end 202608 --standard-json
+sec macro us housing-starts --component building-permits --begin 202501 --end 202608 --standard-json
 sec macro us equipment-investment --price-basis nominal --begin 2025Q1 --end 2026Q2 --standard-json
 sec macro us payrolls --begin 202501 --end 202609 --standard-json
 sec macro us housing --begin 202501 --end 202609 --standard-json
@@ -64,6 +64,7 @@ sec macro cn reverse-repo --begin 20250101 --end 20251231 --standard-json
 sec macro cn reverse-repo-history --begin 20240101 --end 20240719 --standard-json
 sec macro cn rrr --begin 20200101 --end 20201231 --standard-json
 sec macro cn treasury --begin 20260901 --end 20260930 --standard-json
+sec macro us treasury --begin 20260901 --end 20260930 --standard-json
 ```
 
 各命令分别输出独立数据集。原有表格、别名、日期默认值、`--json`、`--refresh` 和 `--no-cache` 行为不变，例外是 `macro cn lpr --json` 新增 `previous_one_year_rate_percent`、`previous_five_year_plus_rate_percent` 两个上月报价字段；`--json` 与 `--standard-json` 互斥。统一字段用于程序读取，不改变币种、单位或统计口径，也不自动生成中美对比。
@@ -206,8 +207,8 @@ CES官方水平新增可选 `preliminary`，表示原点是否标记P；false只
 
 | 命令与选项／序列前缀 | 水平口径 | 单位／频率 | 价格口径 |
 | --- | --- | --- | --- |
-| `investment --component housing-starts`／`us.investment.housing-starts` | `HOUST`，私人住宅新开工单元 | `housing_units_thousand`，月度 | `not_applicable` |
-| `investment --component building-permits`／`us.investment.building-permits` | `PERMIT`，签发许可地区获准新建的私人住房单元 | `housing_units_thousand`，月度 | `not_applicable` |
+| `housing-starts --component housing-starts`／`us.investment.housing-starts` | `HOUST`，私人住宅新开工单元 | `housing_units_thousand`，月度 | `not_applicable` |
+| `housing-starts --component building-permits`／`us.investment.building-permits` | `PERMIT`，签发许可地区获准新建的私人住房单元 | `housing_units_thousand`，月度 | `not_applicable` |
 | `equipment-investment --price-basis real`／`us.equipment-investment.real` | `Y033RX1Q020SBEA`，私人非住宅设备投资 | `USD_billion`，季度 | `real-chained`，`reference_year=2017` |
 | `equipment-investment --price-basis nominal`／`us.equipment-investment.nominal` | `Y033RC1Q027SBEA`，私人非住宅设备投资 | `USD_billion`，季度 | `nominal` |
 
@@ -416,6 +417,10 @@ DTS的类别和细项在不同时期写法不同（如 `Table IIIA` 和 `Table I
 ### 中国国债收益率：全部关键期限
 
 `treasury` 输出 `cn.treasury.<tenor>.yield`，`tenor` 是 `3m`、`6m`、`1y`、`2y`、`3y`、`5y`、`7y`、`10y`、`15y`、`20y`、`30y`，`measure=yield_to_maturity`，单位 `percent`，`period` 是估值日。表格只显示六个期限，统一导出保留全部十一个，`raw_value` 保留接口原文。空值是 `source_value_missing`，无记录的日期不补行。`3y`、`7y`、`15y`、`20y`、`30y` 的 `--` 这类非数值标记也是 `source_value_missing`，并在 `note` 中说明；另外六个期限遇到这类标记时，provider 直接报错，不输出部分结果，和表格、普通 `--json` 相同。命令不缓存，`fetched_at` 是本次请求的时间；接口没有公布时间，`published_at` 为 null。单次查询区间须小于一年，这是接口限制。
+
+### 美国国债收益率：全部关键期限
+
+`treasury` 输出 `us.treasury.<tenor>.yield`，`tenor` 是 `1m`、`3m`、`6m`、`1y`、`2y`、`3y`、`5y`、`7y`、`10y`、`20y`、`30y`，`measure=par_yield`，单位 `percent`，`period` 是记录日。这是财政部的平价收益率，与中债的到期收益率不是同一口径，不直接比较。期限未公布时是 `source_value_missing`，如 2003 年的 `30y`；真实 0% 保留为值，无记录的日期不补行。provider 只解析数值，没有 `raw_value`；官方新增的 1.5 个月、2 个月、4 个月期限未导出。`original` 只含日期和各期限收益率，缺失期限为 `null`。`source` 是该观测所属年度的请求地址。上游返回无法解析的记录或数值、已过去的年度没有记录时报错，不当作缺失或无记录，也不输出部分结果。
 
 ### 中国价格：相对指数和涨跌幅
 
