@@ -10,7 +10,7 @@ on:
 
 jobs:
   build-go-binary:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         goos: [linux, windows, darwin] # 需要打包的系统
@@ -56,9 +56,9 @@ jobs:
           cache: true
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version: '24'
           cache: npm
           cache-dependency-path: desktop/ui/package-lock.json
 
