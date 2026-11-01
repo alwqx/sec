@@ -5,6 +5,7 @@ import ResourceState from './ResourceState'
 import CandlestickChart from './CandlestickChart'
 
 const adjustments = { bfq: '不复权', qfq: '前复权', hfq: '后复权' }
+const maPeriods = [5, 10, 20, 60]
 type Adjustment = keyof typeof adjustments
 
 function marketToday() {
@@ -29,7 +30,9 @@ function LoadedHistory({ code }: { code: string }) {
   const [filters, setFilters] = useState(() => recentRange(3))
   const [draft, setDraft] = useState(filters)
   const [validation, setValidation] = useState('')
-  const load = useCallback((signal: AbortSignal) => history(code, filters, signal), [code, filters])
+  // 指标随行情一次取回，切换时不重新请求，图表也不会滚回最新交易日。
+  const load = useCallback((signal: AbortSignal) => history(code, { ...filters, ma: maPeriods.join(','), boll: '20,2' }, signal), [code, filters])
+  const [shown, setShown] = useState<string[]>([])
   const resource = useResource(load)
   const apply = (next: typeof filters) => {
     setValidation('')
@@ -53,9 +56,13 @@ function LoadedHistory({ code }: { code: string }) {
     apply(next)
   }
   // 保持历史数据引用稳定，避免实时行情刷新时触发 K 线自动滚回最新交易日。
-  const values = useMemo(() => resource.data?.filter(item =>
-    [item.open, item.close, item.high, item.low].every(Number.isFinite),
-  ) ?? [], [resource.data])
+  const results = resource.data?.results
+  const keep = useMemo(() => (results ?? []).map(item => [item.open, item.close, item.high, item.low].every(Number.isFinite)), [results])
+  const values = useMemo(() => (results ?? []).filter((_, index) => keep[index]), [results, keep])
+  const overlays = useMemo(() => (resource.data?.overlays ?? [])
+    .filter(overlay => shown.includes(overlay.kind === 'boll' ? 'BOLL' : overlay.label))
+    .map(overlay => ({ ...overlay, values: overlay.values.filter((_, index) => keep[index]) })), [resource.data, shown, keep])
+  const toggle = (name: string) => setShown(current => current.includes(name) ? current.filter(item => item !== name) : [...current, name])
   return <div className="history-section">
     <form className="history-filters" onSubmit={submit} aria-label="历史行情查询">
       <label>开始日期<input aria-label="历史行情开始日期" type="date" min="1990-01-01" max={marketToday()} value={draft.begin} onChange={e => setDraft({ ...draft, begin: e.target.value })} required /></label>
@@ -66,8 +73,9 @@ function LoadedHistory({ code }: { code: string }) {
     <div className="history-shortcuts" aria-label="历史行情快捷区间">{[[1, '近 1 个月'], [3, '近 3 个月'], [6, '近 6 个月'], [12, '近 1 年']].map(([months, label]) => <button key={months} onClick={() => quickRange(Number(months))}>{label}</button>)}</div>
     {validation && <p className="error" role="alert">{validation}</p>}
     <p className="data-note">{filters.begin} 至 {filters.end} · {adjustments[filters.fq]} · 日 K 线；休市日无记录。前复权／后复权仅影响历史行情，实时行情仍为实际报价。</p>
+    <div className="history-indicators" role="group" aria-label="技术指标"><span className="data-note">指标</span>{[...maPeriods.map(period => `MA${period}`), 'BOLL'].map(name => <label key={name}><input type="checkbox" checked={shown.includes(name)} onChange={() => toggle(name)} />{name === 'BOLL' ? 'BOLL(20,2)' : name}</label>)}</div>
     <ResourceState {...resource} retry={resource.reload} />
-    {resource.data && (values.length ? <CandlestickChart key={`${code}-${filters.begin}-${filters.end}-${filters.fq}`} data={values} name={code} showVolume unit={code.startsWith('HK') ? '港元' : '元'} /> : <p className="data-note">所选区间暂无历史行情</p>)}
+    {resource.data && (values.length ? <CandlestickChart key={`${code}-${filters.begin}-${filters.end}-${filters.fq}`} data={values} overlays={overlays} name={code} showVolume unit={code.startsWith('HK') ? '港元' : '元'} /> : <p className="data-note">所选区间暂无历史行情</p>)}
   </div>
 }
 

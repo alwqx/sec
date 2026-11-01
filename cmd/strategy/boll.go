@@ -2,8 +2,8 @@ package strategy
 
 import (
 	"fmt"
-	"math"
 
+	"github.com/alwqx/sec/indicator"
 	"github.com/alwqx/sec/provider/eastmoney"
 	"github.com/spf13/cobra"
 )
@@ -29,21 +29,7 @@ func ComputeBollinger(quotes []*eastmoney.Quote, period int, k float64) (headers
 		dates[i] = q.Date.Format("2006-01-02")
 	}
 
-	middle := sma(prices, period)
-	upper := make([]float64, n)
-	lower := make([]float64, n)
-
-	for i := period - 1; i < n; i++ {
-		// Calculate stddev
-		sum := 0.0
-		for j := i - period + 1; j <= i; j++ {
-			diff := prices[j] - middle[i]
-			sum += diff * diff
-		}
-		stddev := math.Sqrt(sum / float64(period))
-		upper[i] = middle[i] + k*stddev
-		lower[i] = middle[i] - k*stddev
-	}
+	middle, upper, lower := indicator.Bollinger(prices, period, k)
 
 	headers = []string{"日期", "收盘", "下轨", "中轨", "上轨", "信号"}
 	data = make([][]string, n)

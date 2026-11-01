@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { ArrowLeftRight, ChartCandlestick, FilePlusCorner, Newspaper, Coins, Landmark, Settings as SettingsIcon, RefreshCw, Star, type LucideIcon } from 'lucide-react'
 import { loadWorkspace, saveWorkspace, search, loadWatchlist, changeWatchlist } from './api'
 import type { BasicSecurity, WorkspaceSettings, WorkspaceState } from './types'
@@ -11,12 +11,14 @@ import IPOCalendar from './components/IPOCalendar'
 import Announcements from './components/Announcements'
 import Settings from './components/Settings'
 import Metal from './components/Metal'
+import WatchQuotes, { type CompareState } from './components/WatchQuotes'
+import { useQuotes } from './hooks/useQuotes'
 import Macro from './components/Macro'
 import Fx from './components/Fx'
 import secLogo from '../../assets/sec-logo.png'
 
 type Page = 'stocks' | 'ipo' | 'announcements' | 'macro' | 'fx' | 'metal' | 'settings'
-type Tab = 'overview' | 'company' | 'financials' | 'dividends' | 'announcements'
+type Tab = 'overview' | 'company' | 'financials' | 'dividends' | 'announcements' | 'quotes'
 const pages: { id: Page; title: string; icon: LucideIcon }[] = [
   { id: 'stocks', title: '自选与行情', icon: ChartCandlestick },
   { id: 'ipo', title: 'IPO', icon: FilePlusCorner },
@@ -28,7 +30,7 @@ const pages: { id: Page; title: string; icon: LucideIcon }[] = [
 ]
 const tabs: { id: Tab; title: string }[] = [
   { id: 'overview', title: '概览' }, { id: 'company', title: '公司' }, { id: 'financials', title: '财报' },
-  { id: 'dividends', title: '分红' }, { id: 'announcements', title: '公告' },
+  { id: 'dividends', title: '分红' }, { id: 'announcements', title: '公告' }, { id: 'quotes', title: '自选行情' },
 ]
 const initialWorkspace: WorkspaceState = { watchlist: [], settings: { refresh_seconds: 5, theme: 'dark', download_directory: '' } }
 
@@ -52,6 +54,8 @@ export default function App() {
   const savingRef = useRef(false)
   const watchRevision = useRef(0)
   const [watchRefresh, setWatchRefresh] = useState(0)
+  // 对比选择放在这一层，切换证券和栏目都保留。
+  const [compare, setCompare] = useState<CompareState>({ checked: [], only: false })
 
   useEffect(() => {
     const controller = new AbortController()
@@ -150,6 +154,9 @@ export default function App() {
   const saveSettings = (settings: WorkspaceSettings) => persist({ ...workspace, settings })
   const currentPage = pages.find(item => item.id === page)!
   const items = listMode === 'watchlist' ? workspace.watchlist : results
+  const watchCodes = useMemo(() => workspace.watchlist.map(item => item.ex_code), [workspace.watchlist])
+  // 只在能看到行情时轮询：自选列表或自选行情栏目。
+  const watchQuotes = useQuotes(watchCodes, workspace.settings.refresh_seconds, ready && page === 'stocks' && (listMode === 'watchlist' || tab === 'quotes'))
   const aShare = selected?.security_type === 'stock' && /^(SH|SZ|BJ)\d{6}$/i.test(selected.ex_code)
 
   const tabKey = (e: KeyboardEvent<HTMLButtonElement>, index: number) => {
@@ -189,8 +196,9 @@ export default function App() {
             </div>
             <div className="results-caption">{listMode === 'watchlist' ? '关注的证券，随时继续研究' : searchedKey ? `“${searchedKey}” · ${results.length} 个结果` : '在上方输入名称或代码'}</div>
             {listMode === 'search' && searchError && <div className="error" role="alert">{searchError}</div>}
+            {listMode === 'watchlist' && watchQuotes.error && <div className="error" role="alert">行情刷新失败，价格可能不是最新。</div>}
             {listMode === 'search' && searching ? <div className="empty-state" role="status">正在搜索证券…</div>
-              : <SecurityList items={items} selected={selected} onSelect={onSelect} emptyText={listMode === 'watchlist' ? '暂无自选证券。搜索并选中证券后，点击“加入自选”。' : searchedKey ? '未找到证券，请尝试其他名称或代码' : '输入关键字搜索证券'} />}
+              : <SecurityList items={items} selected={selected} onSelect={onSelect} quotes={listMode === 'watchlist' ? watchQuotes.quotes : undefined} emptyText={listMode === 'watchlist' ? '暂无自选证券。搜索并选中证券后，点击“加入自选”。' : searchedKey ? '未找到证券，请尝试其他名称或代码' : '输入关键字搜索证券'} />}
           </section>
           <section className="research-workspace" aria-label="个股研究">
             {selected ? <>
@@ -198,6 +206,7 @@ export default function App() {
               <div className="research-tabs" role="tablist" aria-label="个股研究栏目">{tabs.map((item, index) => <button key={item.id} id={`tab-${item.id}`} role="tab" aria-controls="research-panel" aria-selected={tab === item.id} tabIndex={tab === item.id ? 0 : -1} onKeyDown={e => tabKey(e, index)} onClick={() => setTab(item.id)}>{item.title}</button>)}</div>
               <div className="research-panel" role="tabpanel" id="research-panel" aria-labelledby={`tab-${tab}`} key={`${selected.ex_code}-${tab}`}>
                 {tab === 'overview' ? <Overview security={selected} interval={workspace.settings.refresh_seconds} />
+                  : tab === 'quotes' ? <WatchQuotes items={workspace.watchlist} state={watchQuotes} selected={selected} onSelect={onSelect} compare={compare} onCompare={setCompare} />
                   : !aShare ? <div className="empty-state">此栏目暂仅支持沪深北 A 股，当前证券可在概览中查看行情。</div>
                   : tab === 'financials' ? <Financials security={selected} />
                   : tab === 'announcements' ? <Announcements code={selected.ex_code} compact />

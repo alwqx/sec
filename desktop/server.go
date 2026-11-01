@@ -31,6 +31,7 @@ func (s *desktopServer) Handler() http.Handler {
 	// dev 模式跳过鉴权并打开 CORS。
 	mux.Handle("GET /api/v1/search", s.withAuth(s.withCORS(http.HandlerFunc(s.handleSearch))))
 	mux.Handle("GET /api/v1/quote", s.withAuth(s.withCORS(http.HandlerFunc(s.handleQuote))))
+	mux.Handle("GET /api/v1/quotes", s.withAuth(http.HandlerFunc(s.handleQuotes)))
 
 	mux.Handle("GET /api/v1/metrics", s.withAuth(s.withCORS(http.HandlerFunc(s.handleMetrics))))
 	mux.Handle("GET /api/v1/company", s.withAuth(s.withCORS(http.HandlerFunc(s.handleCompany))))

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
-import type { HistoryQuote } from '../types'
+import type { HistoryOverlay, HistoryQuote } from '../types'
 
 function compactNumber(value: number | undefined) {
   if (value === undefined || !Number.isFinite(value)) return '—'
@@ -8,11 +8,14 @@ function compactNumber(value: number | undefined) {
   return value.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
 }
 
-export default function CandlestickChart({ data, name, unit, showVolume = false }: {
+const overlayClass = (label: string) => label.startsWith('BOLL') ? 'boll' : label.toLowerCase()
+
+export default function CandlestickChart({ data, name, unit, showVolume = false, overlays = [] }: {
   data: HistoryQuote[]
   name: string
   unit: string
   showVolume?: boolean
+  overlays?: HistoryOverlay[]
 }) {
   const container = useRef<HTMLDivElement>(null)
   const scroll = useRef<HTMLDivElement>(null)
@@ -37,8 +40,9 @@ export default function CandlestickChart({ data, name, unit, showVolume = false 
   }, [chartWidth, data])
 
   if (!data.length) return <p className="data-note">暂无历史行情</p>
-  const minimum = Math.min(...data.map(item => item.low))
-  const maximum = Math.max(...data.map(item => item.high))
+  const overlayValues = overlays.flatMap(overlay => overlay.values.flatMap(value => value === null ? [] : [value]))
+  const minimum = Math.min(...data.map(item => item.low), ...overlayValues)
+  const maximum = Math.max(...data.map(item => item.high), ...overlayValues)
   const padding = Math.max((maximum - minimum) * .08, maximum * .002, .01)
   const low = minimum - padding, high = maximum + padding
   const step = (chartWidth - left - right) / data.length
@@ -68,11 +72,22 @@ export default function CandlestickChart({ data, name, unit, showVolume = false 
     }
   }
   const ticks = [...new Set([0, Math.floor((data.length - 1) / 2), data.length - 1])]
+  // 窗口不足的日期是空值，线段在这里断开，不从 0 连过来。
+  const overlayPath = (values: (number | null)[]) => {
+    let continued = false
+    return values.map((value, index) => {
+      if (value === null) { continued = false; return '' }
+      const command = continued ? 'L' : 'M'
+      continued = true
+      return `${command}${x(index)},${y(value)}`
+    }).join(' ')
+  }
 
   return <div className="history-chart candle-chart" ref={container}>
     <div className="section-caption"><span>{name} · 日 K 线 · {unit}</span><span>红：收盘高于开盘 · 绿：收盘低于开盘</span></div>
     <div className="candle-detail"><time>{item.date}</time><span>开 {item.open.toFixed(2)}</span><span>高 {item.high.toFixed(2)}</span><span>低 {item.low.toFixed(2)}</span><span>收 {item.close.toFixed(2)}</span>
       {showVolume && <><span>成交量 {compactNumber(item.volume)} 股/份</span><span>成交额 {compactNumber(item.turnover)} {unit}</span></>}
+      {overlays.map(overlay => <span key={overlay.label} className={`overlay-text overlay-${overlayClass(overlay.label)}`}>{overlay.label} {overlay.values[current]?.toFixed(2) ?? '—'}</span>)}
     </div>
     <div className="candle-plot">
       <svg className="candle-axis" width={axisWidth} height={height} viewBox={`0 0 ${axisWidth} ${height}`} aria-hidden="true">
@@ -106,6 +121,7 @@ export default function CandlestickChart({ data, name, unit, showVolume = false 
               {showVolume && <rect className="candle-volume" x={x(index) - bodyWidth / 2} y={volumeY(volume(candle))} width={bodyWidth} height={volumeBottom - volumeY(volume(candle))} />}
             </g>
           })}
+          {overlays.map(overlay => <path key={overlay.label} className={`overlay-line overlay-${overlayClass(overlay.label)}`} d={overlayPath(overlay.values)} />)}
           {showVolume && <line className="chart-grid" x1={left} x2={chartWidth - right} y1={volumeBottom} y2={volumeBottom} />}
           {selected !== null && <line className="chart-grid" x1={x(current)} x2={x(current)} y1={top} y2={showVolume ? volumeBottom : bottom} strokeDasharray="3 4" />}
           {ticks.map((index, i) => <text key={index} x={i === 0 ? left : i === ticks.length - 1 ? chartWidth - right : x(index)} y={dateY} textAnchor={i === 0 ? 'start' : i === ticks.length - 1 ? 'end' : 'middle'}>{data[index].date}</text>)}

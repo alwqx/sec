@@ -13,6 +13,10 @@
 9. Add a Desktop macro page covering all 61 `sec macro` indicators by country and topic, with a series list, charts and per-period details, served through a generic API that runs each command's `--standard-json` in process; move the US Treasury yields page under it
 10. Add a macro indicator catalog shared by Desktop and `sec macro --help`, which now groups commands by topic, with a test keeping it in sync with the commands
 11. Add a Desktop FX page covering all six `sec fx` commands, showing quotes, daily series with charts and the onshore-offshore spread with their sources, formulas and original inputs, served through an API that runs each command's `--json` in process
+12. Show latest prices and changes in the Desktop watchlist, and add a watchlist quotes tab for comparing selected securities, backed by a batch quotes API where one unavailable security does not affect the others
+13. Add MA and Bollinger Band overlays to Desktop candlestick charts, computed on the backend with warm-up data so the first day of a range has a full window
+14. Add a shared `indicator` package for moving averages and Bollinger Bands, used by `sec kline`, `sec strategy` and Desktop
+15. Skip securities that cannot be parsed in Sina batch quotes, so `sec watch` and `sec quote` still show the others, and report an error for non-200 responses and bodies that are not quote lines
 
 ### v0.4.1
 

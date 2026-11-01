@@ -5,10 +5,10 @@ import (
 	"log/slog"
 	"sync"
 
-	"math"
 	"strconv"
 	"strings"
 
+	"github.com/alwqx/sec/indicator"
 	"github.com/alwqx/sec/provider/eastmoney"
 	"github.com/alwqx/sec/provider/sina"
 	"github.com/alwqx/sec/render"
@@ -219,56 +219,24 @@ func toCandles(quotes []*eastmoney.Quote) []render.Candle {
 	return candles
 }
 
+// closes extracts closing prices from quotes.
+func closes(quotes []*eastmoney.Quote) []float64 {
+	values := make([]float64, len(quotes))
+	for i, quote := range quotes {
+		values[i] = quote.Close
+	}
+	return values
+}
+
 // computeMAOverlay returns the SMA values for the given period, aligned with quotes.
 // Values before the period is complete are set to 0 (not drawn).
 func computeMAOverlay(quotes []*eastmoney.Quote, period int) []float64 {
-	result := make([]float64, len(quotes))
-	if len(quotes) < period {
-		return result
-	}
-	sum := 0.0
-	for i := 0; i < period-1; i++ {
-		sum += quotes[i].Close
-	}
-	for i := period - 1; i < len(quotes); i++ {
-		sum += quotes[i].Close
-		result[i] = sum / float64(period)
-		sum -= quotes[i-period+1].Close
-	}
-	return result
+	return indicator.SMA(closes(quotes), period)
 }
 
 // computeBollOverlay returns mid, upper, lower Bollinger Band values.
 func computeBollOverlay(quotes []*eastmoney.Quote, period int, k float64) (mid, upper, lower []float64) {
-	n := len(quotes)
-	mid = make([]float64, n)
-	upper = make([]float64, n)
-	lower = make([]float64, n)
-	if n < period {
-		return
-	}
-
-	// Compute mid line (SMA)
-	sum := 0.0
-	for i := 0; i < period-1; i++ {
-		sum += quotes[i].Close
-	}
-	for i := period - 1; i < n; i++ {
-		sum += quotes[i].Close
-		mid[i] = sum / float64(period)
-		sum -= quotes[i-period+1].Close
-
-		// Stddev
-		sqSum := 0.0
-		for j := i - period + 1; j <= i; j++ {
-			diff := quotes[j].Close - mid[i]
-			sqSum += diff * diff
-		}
-		stddev := math.Sqrt(sqSum / float64(period))
-		upper[i] = mid[i] + k*stddev
-		lower[i] = mid[i] - k*stddev
-	}
-	return
+	return indicator.Bollinger(closes(quotes), period, k)
 }
 
 // maColor returns a color for the MA line based on period.
