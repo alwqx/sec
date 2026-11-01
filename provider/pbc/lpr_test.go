@@ -92,6 +92,8 @@ func TestLPRCollection(t *testing.T) {
 	require.Equal(t, -10.0, *items[0].FiveYearPlusChangeBP)
 	require.Equal(t, "changed", items[0].ChangeStatus)
 	require.Equal(t, "20250421", items[0].PreviousQuoteDate)
+	require.NotNil(t, items[0].PreviousOneYearRate)
+	require.NotNil(t, items[0].PreviousFiveYearPlusRate)
 	require.Equal(t, server.URL+"/apr", items[0].PreviousSource)
 	require.Equal(t, int32(4), calls.Load())
 	_, err = client.LPR(context.Background(), req)

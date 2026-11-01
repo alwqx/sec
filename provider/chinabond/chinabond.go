@@ -19,6 +19,13 @@ import (
 
 const CoverageStart = "20060301"
 
+const (
+	chinaBondOrigin  = "https://yield.chinabond.com.cn"
+	historyQueryPath = "/cbweb-czb-web/czb/historyQuery"
+	// HistoryQueryURL 是中债收益率曲线历史查询接口。
+	HistoryQueryURL = chinaBondOrigin + historyQueryPath
+)
+
 // ChinaBondItem 恢复PR #66删除的官方日期行结构，空字符串和null字段均表示未提供值。
 type ChinaBondItem struct {
 	Date        string `json:"workTime"`
@@ -60,7 +67,7 @@ func GetChinaBond(ctx context.Context, req *GetChinaBondReq) (*GetChinaBondResp,
 	if start.After(end) || !end.Before(start.AddDate(1, 0, 0)) {
 		return nil, fmt.Errorf("单次国债查询区间需按日期升序且小于一年")
 	}
-	raw, err := requestChinaBond(ctx, chinaBondURL("https://yield.chinabond.com.cn", req))
+	raw, err := requestChinaBond(ctx, chinaBondURL(chinaBondOrigin, req))
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +100,7 @@ func GetChinaBond(ctx context.Context, req *GetChinaBondReq) (*GetChinaBondResp,
 
 func chinaBondURL(origin string, req *GetChinaBondReq) string {
 	query := url.Values{"startDate": {req.Start}, "endDate": {req.End}, "gjqx": {"0"}, "locale": {"cn_ZH"}, "qxmc": {"1"}}
-	return origin + "/cbweb-czb-web/czb/historyQuery?" + query.Encode()
+	return origin + historyQueryPath + "?" + query.Encode()
 }
 
 func decodeChinaBond(raw []byte) (*GetChinaBondResp, error) {

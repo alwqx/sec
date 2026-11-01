@@ -48,8 +48,11 @@ type LPRObservation struct {
 	FetchedAt            *time.Time `json:"fetched_at"`
 	PreviousQuoteDate    string     `json:"previous_quote_date,omitempty"`
 	PreviousSource       string     `json:"previous_source,omitempty"`
-	Validity             string     `json:"validity"`
-	Note                 string     `json:"note,omitempty"`
+	// 上月两个期限的报价，只在计算了相邻月变化时返回。
+	PreviousOneYearRate      *float64 `json:"previous_one_year_rate_percent,omitempty"`
+	PreviousFiveYearPlusRate *float64 `json:"previous_five_year_plus_rate_percent,omitempty"`
+	Validity                 string   `json:"validity"`
+	Note                     string   `json:"note,omitempty"`
 }
 
 var lprTitleDate = regexp.MustCompile(`^(\d{4})年(\d{1,2})月(\d{1,2})日全国银行间同业拆借中心受权公布贷款市场报价利率[（(]LPR[）)]`)
@@ -253,6 +256,7 @@ func (c *Client) LPR(ctx context.Context, req LPRRequest) ([]LPRObservation, err
 			five := math.Round((*item.FiveYearPlusRate-*previous.FiveYearPlusRate)*100*1e6) / 1e6
 			item.OneYearChangeBP, item.FiveYearPlusChangeBP = &one, &five
 			item.PreviousQuoteDate, item.PreviousSource = previous.QuoteDate, previous.Source
+			item.PreviousOneYearRate, item.PreviousFiveYearPlusRate = previous.OneYearRate, previous.FiveYearPlusRate
 			item.ChangeMethod, item.ChangeStatus = "difference-of-adjacent-monthly-releases", "unchanged"
 			if one != 0 || five != 0 {
 				item.ChangeStatus = "changed"
