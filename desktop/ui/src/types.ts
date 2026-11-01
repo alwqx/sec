@@ -186,3 +186,13 @@ export interface UpdateDetails {
   release_url: string
   asset: { name: string; browser_download_url: string; size: number } | null
 }
+
+export interface MacroOption { flag: string; label: string; values?: { value: string; label: string }[] }
+export interface MacroIndicator { region: 'cn' | 'us'; command: string; title: string; category: string; period: 'month' | 'quarter' | 'date'; default_begin?: string; latest_end?: string; options?: MacroOption[] }
+export interface MacroCatalog { categories: { id: string; title: string }[]; indicators: MacroIndicator[] }
+export interface MacroSeries { id: string; measure: string; unit: string; frequency: string; value_origin: string; definition: string; formula: string | null; coverage?: string }
+export interface MacroObservation {
+  series_id: string; period: string; value: number | null; status: string; event_id?: string; missing_reason?: string | null
+  published_date?: string | null; published_at?: string | null; note?: string; source?: string | null; raw_value?: string | null
+}
+export interface MacroDataset { begin: string; end: string; series: MacroSeries[]; observations: MacroObservation[]; events?: Record<string, unknown>[]; policy_events?: Record<string, unknown>[] }

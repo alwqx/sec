@@ -10,6 +10,8 @@
 6. Add `macro us treasury` with all 11 yield curve tenors, nullable `--json` output and `--standard-json`; it fails rather than returning partial data when a year cannot be fetched, a past year has no records, or a record or value cannot be parsed, and Treasury yield curve requests now check the HTTP status
 7. Rename `balance-sheet` to `financials`, `balance-sheet-download` to `annual-report` and `macro us investment` to `macro us housing-starts`, keeping the old names as aliases
 8. Add `docs/commands.md` mapping data commands to Desktop features and grouping macro commands by topic
+9. Add a Desktop macro page covering all 61 `sec macro` indicators by country and topic, with a series list, charts and per-period details, served through a generic API that runs each command's `--standard-json` in process; move the US Treasury yields page under it
+10. Add a macro indicator catalog shared by Desktop and `sec macro --help`, which now groups commands by topic, with a test keeping it in sync with the commands
 
 ### v0.4.1
 

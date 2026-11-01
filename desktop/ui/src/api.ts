@@ -1,4 +1,4 @@
-import type { BasicSecurity, SecurityQuote, Company, Dividend, WorkspaceState, PageResult, IPOListing, Announcement, FinancialReport, MetalData, HistoryQuote, BondData, CompanyMetrics, SavedDownload, AnnualReportsPage, ProspectusPage } from './types'
+import type { BasicSecurity, SecurityQuote, Company, Dividend, WorkspaceState, PageResult, IPOListing, Announcement, FinancialReport, MetalData, HistoryQuote, BondData, CompanyMetrics, SavedDownload, AnnualReportsPage, ProspectusPage , MacroCatalog, MacroDataset } from './types'
 
 async function request<T>(path: string, signal?: AbortSignal, options?: RequestInit): Promise<T> {
   const resp = await fetch(path, { ...options, signal })
@@ -115,4 +115,12 @@ export function versionDetails(signal?: AbortSignal): Promise<import('./types').
 }
 export function checkUpdates(signal?: AbortSignal): Promise<import('./types').UpdateDetails> {
   return request('/api/v1/updates', signal)
+}
+
+export function macroCatalog(signal?: AbortSignal): Promise<MacroCatalog> {
+  return request('/api/v1/macro/catalog', signal)
+}
+
+export function macroData(query: Record<string, string>, signal?: AbortSignal): Promise<MacroDataset> {
+  return request(`/api/v1/macro/data?${new URLSearchParams(query)}`, signal)
 }

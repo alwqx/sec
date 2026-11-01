@@ -102,8 +102,8 @@ CLI 的根 `main.go` 保持不变；桌面版是独立二进制：`go build ./de
 ### 页面与导航
 
 - 「自选与行情」证券列表上方提供证券搜索，支持名称、代码与拼音；搜索保留当前研究证券，查询结果显示在列表中，其他页面不显示证券搜索框。
-- 导航图标使用 `lucide-react` 静态导入的 SVG：自选与行情 ChartCandlestick、IPO FilePlusCorner、公告中心 Newspaper、黄金行情 Coins、美债收益率 Landmark、设置 Settings。统一 20px、1.75px 描边，使用 currentColor 跟随主题和选中状态；保留文字标签，装饰图标不进入无障碍名称。
-- 左侧全局导航：自选与行情、IPO、公告中心、黄金行情、美债收益率、设置。
+- 导航图标使用 `lucide-react` 静态导入的 SVG：自选与行情 ChartCandlestick、IPO FilePlusCorner、公告中心 Newspaper、宏观 Landmark、黄金行情 Coins、设置 Settings。统一 20px、1.75px 描边，使用 currentColor 跟随主题和选中状态；保留文字标签，装饰图标不进入无障碍名称。
+- 左侧全局导航：自选与行情、IPO、公告中心、宏观、黄金行情、设置。
 - 自选与行情：中间切换「我的自选 / 搜索结果」，右侧围绕选中证券展示「概览 / 公司 / 财报 / 分红 / 公告」。切换全局页面保留当前证券与个股栏目。
 - 概览：实时行情、可选择日期范围与复权方式的日 K 线蜡烛图（开高低收）、成交量副图与所选交易日的成交额。仅概览页按偏好轮询行情，其他页面不轮询；历史走势默认近 3 个月、不复权，支持近 1／3／6 个月、近 1 年及自定义日期（1990 年至上海今日，单次最多 5 年），支持不复权／前复权／后复权；查询后显示已生效条件，复权不改变实时行情报价。历史走势进入概览或提交条件时加载。切换证券与页面取消旧请求。
 - 公司、财报、分红、个股公告：暂仅支持沪深北 A 股；财报支持资产负债表、利润表、现金流量表与报告期筛选，金额单位亿元，每股收益元/股。历史走势图支持沪深证券与港股，其余市场保留实时行情。
@@ -127,7 +127,33 @@ CLI 的根 `main.go` 保持不变；桌面版是独立二进制：`go build ./de
 
 概览中核心指标每次请求完成后等待 60 秒刷新，可手动刷新；公司页按进入时加载并提供手动刷新。核心指标、公司资料和实时行情分别加载、分别重试，一项失败不会阻塞其他内容。自动刷新失败保留并标明上次成功快照；切换证券或页面时取消请求。指标快照时间与实时行情刷新周期分别标注。
 
+### 宏观
+
+「宏观」覆盖 `sec macro` 的全部 61 个指标。页面先切换中国／美国，再按 10 个主题分类选择指标；指标清单在 `cmd/macro/catalog.go`，`--help` 分组和页面菜单共用，测试保证它与实际命令一致。
+
+Desktop 不为每个指标单独取数：`macro.Export` 在进程内运行命令的 `--standard-json`，所有指标共用缓存、校验和统一格式。`region`、`command`、选项取值和日期格式必须符合清单，否则返回 400，不会把任意参数传给命令。覆盖范围、上游失败等命令错误返回 502，错误信息直接显示给用户。缓存写入都是临时文件加重命名，并发查询不会写坏文件。
+
+```text
+GET /api/v1/macro/catalog
+GET /api/v1/macro/data?region=cn&command=cpi&begin=202601&end=202609
+```
+
+`begin`、`end` 使用命令的格式（YYYYMM、YYYYQ1、YYYYMMDD），留空时使用命令的默认窗口。`refresh=true` 重新采集，没有缓存的命令忽略。响应是统一导出格式，去掉了体积较大的 `original`。
+
+序列数量差别很大（`cn trade` 有 36 条，`us debt` 有 75 条，选项可能再改变序列），所以页面不做透视表，而是：
+
+- 序列列表显示最新值、单位、所属期及官方／计算口径，超过 8 条时可筛选。查询窗口内没有观测的序列不列出。
+- 选中序列后显示走势和逐期明细。缺失值显示 `—` 和原因（如“官方未公布”“1月免报”），不补值；图表保留断点。重新查询时保留选中序列和筛选文字。
+- 事件型指标（国债拍卖、存款准备金率，以及同一日期有多条记录的序列）只显示明细和事件范围或 CUSIP，不绘制走势，同一最新日期有多条记录时最新值显示“多个事件”。
+- 月份用文本框输入（WKWebView 不支持 `type="month"`），提交前校验格式。七天逆回购中标利率历史截至 2024-07-19，快捷区间从这个日期往前推算。
+
+`us treasury` 仍使用下面的美债页面。`us target-rate` 的默认窗口经常没有调整事件，首次打开从 20081216 查询。
+
+依赖 `original` 的内容不展示，例如 `macro us gdp --vintages` 的修订档案和目标区间的当前有效值。序列名称来自 `definition` 和口径，部分美国序列（如 `us debt`）的名称保留英文原文。
+
 ### 美债收益率
+
+位于「宏观 → 美国 → 利率与收益率」。
 
 「美债收益率」复用 CLI `bond` / `bond-history` 的美国财政部年度 XML 数据，展示 1/3/6 个月、1/2/3/5/7/10/20/30 年共 11 个期限。最新交易日独立于历史查询区间；日期使用 `America/New_York` 时区，日收益率单位为百分比，10 年期日变动为 bp（1 bp = 0.01 个百分点）。红绿仅表示收益率上升/下降，不表示债券价格涨跌。
 
@@ -168,6 +194,8 @@ macOS 按当前进程架构匹配 `sec-<tag>-desktop-darwin-<arch>.dmg`，不将
 | GET | `/api/v1/annual-reports?code=SH600036&start_year=2022&end_year=2025&page=1` | 按报告年度范围查询正文，兼容 year 单年度参数；范围参数必须成对提供，type 为 annual（默认）/halfyear/q1/q3 |
 | POST | `/api/v1/annual-reports/download` | JSON 参数 code/year（字符串）/url/type（默认 annual）；下载定期报告 PDF 并返回本地文件路径及大小 |
 | GET | `/api/v1/financials?code=SH600036&report=balance&period=annual` | 财报；report 为 balance/income/cashflow，period 可省略或 annual/halfyear/q1/q3 |
+| GET | `/api/v1/macro/catalog` | 宏观主题分类和指标清单 |
+| GET | `/api/v1/macro/data?region=cn&command=cpi` | 单个宏观指标的统一格式数据，详见「宏观」 |
 | GET | `/api/v1/bond?begin=2026-01-01&end=2026-01-31` | 美国国债最新各期限收益率与区间历史；起止日期 YYYY-MM-DD，默认美东今日向前 30 天，单次最多 5 年 |
 | GET | `/api/v1/metal?begin=2026-01-01&end=2026-01-31` | Au99.99 最新日行情与区间历史；日期格式 YYYY-MM-DD，省略 end 时默认上海时区今日，省略 begin 时默认 end 向前 30 天 |
 | GET | `/api/v1/history?code=SH600036&begin=2024-01-01&end=2024-12-31&fq=qfq` | 沪深/港股历史开高低收与量额（date/open/close/high/low/volume/turnover）；日期为 YYYY-MM-DD，默认近 3 个月，fq 为 bfq/qfq/hfq（默认 bfq），单次最多 5 年 |
