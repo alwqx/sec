@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -236,25 +237,41 @@ func (s *desktopServer) handleHistory(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 400, "复权方式必须为 bfq、qfq 或 hfq")
 		return
 	}
+	specs, err := parseOverlays(query.Get("ma"), query.Get("boll"))
+	if err != nil {
+		writeError(w, 400, err.Error())
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
 	items, err := eastmoney.GetQuoteHistory(ctx, &eastmoney.GetQuoteHistoryReq{
-		Code: symbol, MarketCode: market, Begin: beginTime.Format("20060102"), End: endTime.Format("20060102"), FQT: fqt,
+		Code: symbol, MarketCode: market, Begin: warmupBegin(beginTime, specs).Format("20060102"), End: endTime.Format("20060102"), FQT: fqt,
 	})
 	if err != nil {
 		slog.ErrorContext(ctx, "查询历史行情失败", "error", err)
 		writeError(w, http.StatusBadGateway, "历史行情获取失败，请稍后重试")
 		return
 	}
-	results := make([]map[string]any, 0, len(items))
+	quotes := make([]*eastmoney.Quote, 0, len(items))
 	for _, item := range items {
 		if item != nil {
-			results = append(results, map[string]any{
-				"date": item.Date.Format("2006-01-02"), "open": item.Open, "close": item.Close,
-				"high": item.High, "low": item.Low,
-				"volume": item.Volume, "turnover": item.TurnOver,
-			})
+			quotes = append(quotes, item)
 		}
 	}
-	writeJSON(w, map[string]any{"results": results})
+	// 预热数据只用于计算指标，不进入结果。
+	beginDay := beginTime.Format("2006-01-02")
+	first := sort.Search(len(quotes), func(i int) bool { return quotes[i].Date.Format("2006-01-02") >= beginDay })
+	results := make([]map[string]any, 0, len(quotes)-first)
+	for _, item := range quotes[first:] {
+		results = append(results, map[string]any{
+			"date": item.Date.Format("2006-01-02"), "open": item.Open, "close": item.Close,
+			"high": item.High, "low": item.Low,
+			"volume": item.Volume, "turnover": item.TurnOver,
+		})
+	}
+	response := map[string]any{"results": results}
+	if len(specs) > 0 {
+		response["overlays"] = computeOverlays(quotes, first, specs)
+	}
+	writeJSON(w, response)
 }

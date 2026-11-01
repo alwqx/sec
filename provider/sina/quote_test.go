@@ -181,3 +181,19 @@ func TestParseSecQuoteInvalidLine(t *testing.T) {
 		require.Nil(t, q, exCode)
 	}
 }
+
+// 一只证券解析不了时只跳过这一只；整个响应都不是行情时才报错。
+func TestParseQuoteListBodySkipsBadLines(t *testing.T) {
+	good := `var hq_str_sh600036="招商银行,43.290,42.940,43.550,43.550,42.800,43.540,43.550,102000000,4442000000.000,100,43.540,200,43.530,300,43.520,400,43.510,500,43.500,100,43.550,200,43.560,300,43.570,400,43.580,500,43.590,2026-10-30,15:34:59,00,";`
+	res, err := parseQuoteListBody(`var hq_str_sh999999="";` + "\n" + `var hq_str_of000001="基金,1.0";` + "\n" + good + "\n")
+	require.NoError(t, err)
+	require.Len(t, res, 1)
+	require.Equal(t, "SH600036", res[0].ExCode)
+
+	res, err = parseQuoteListBody(`var hq_str_sh999999="";` + "\n")
+	require.NoError(t, err, "证券都不可用不是响应错误")
+	require.Empty(t, res)
+
+	_, err = parseQuoteListBody("<html>error</html>\n")
+	require.ErrorContains(t, err, "invalid quote list body")
+}

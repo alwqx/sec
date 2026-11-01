@@ -1,4 +1,4 @@
-import type { BasicSecurity, SecurityQuote, Company, Dividend, WorkspaceState, PageResult, IPOListing, Announcement, FinancialReport, MetalData, HistoryQuote, BondData, CompanyMetrics, SavedDownload, AnnualReportsPage, ProspectusPage , MacroCatalog, MacroDataset , FxDataset, FxSpread } from './types'
+import type { BasicSecurity, SecurityQuote, Company, Dividend, WorkspaceState, PageResult, IPOListing, Announcement, FinancialReport, MetalData, HistoryQuote, BondData, CompanyMetrics, SavedDownload, AnnualReportsPage, ProspectusPage , MacroCatalog, MacroDataset , FxDataset, FxSpread , HistoryOverlay } from './types'
 
 async function request<T>(path: string, signal?: AbortSignal, options?: RequestInit): Promise<T> {
   const resp = await fetch(path, { ...options, signal })
@@ -55,9 +55,12 @@ export function financials(code: string, report: string, period: string, signal?
   return request(`/api/v1/financials?${new URLSearchParams({ code, report, period })}`, signal)
 }
 
-export async function history(code: string, filters: { begin: string; end: string; fq: string }, signal?: AbortSignal): Promise<HistoryQuote[]> {
-  const data = await request<{ results: HistoryQuote[] }>(`/api/v1/history?${new URLSearchParams({ code, ...filters })}`, signal)
-  return data.results
+export function history(code: string, filters: { begin: string; end: string; fq: string; ma?: string; boll?: string }, signal?: AbortSignal): Promise<{ results: HistoryQuote[]; overlays?: HistoryOverlay[] }> {
+  return request(`/api/v1/history?${new URLSearchParams({ code, ...filters })}`, signal)
+}
+
+export function quotes(codes: string[], signal?: AbortSignal): Promise<{ results: SecurityQuote[]; missing: string[] }> {
+  return request(`/api/v1/quotes?${new URLSearchParams({ codes: codes.join(',') })}`, signal)
 }
 
 export function metal(begin: string, end: string, signal?: AbortSignal): Promise<MetalData> {

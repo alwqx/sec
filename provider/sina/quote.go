@@ -349,6 +349,9 @@ func QueryQuoteList(ctx context.Context, exCodes []string) ([]*SecurityQuote, er
 	}
 
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("quote list returned HTTP %d", resp.StatusCode)
+	}
 	err = adjustRespBodyByEncode(resp)
 	if err != nil {
 		return nil, err
@@ -369,17 +372,27 @@ func QueryQuoteList(ctx context.Context, exCodes []string) ([]*SecurityQuote, er
 func parseQuoteListBody(body string) ([]*SecurityQuote, error) {
 	lines := strings.Split(body, "\n")
 	res := make([]*SecurityQuote, 0, len(lines))
+	invalid := ""
 	for _, line := range lines {
 		if line == "" {
+			continue
+		}
+		// 不是行情行说明响应本身有问题，例如错误页。
+		if !strings.HasPrefix(line, "var hq_str_") {
+			invalid = line
 			continue
 		}
 		exCode, formatLine := formatQuoteListLine(line)
 		quote, err := parseSecQuote(exCode, formatLine)
 		if err != nil {
-			slog.Error("parseQuoteListBody error", "code", exCode, "error", err)
-			return nil, err
+			// 基金、退市证券等解析不了的行只跳过这一只，不影响其他证券。
+			slog.Warn("parseQuoteListBody skip line", "code", exCode, "error", err)
+			continue
 		}
 		res = append(res, quote)
+	}
+	if len(res) == 0 && invalid != "" {
+		return nil, fmt.Errorf("invalid quote list body: %.80s", invalid)
 	}
 
 	return res, nil

@@ -3,6 +3,7 @@ package strategy
 import (
 	"fmt"
 
+	"github.com/alwqx/sec/indicator"
 	"github.com/alwqx/sec/provider/eastmoney"
 	"github.com/spf13/cobra"
 )
@@ -50,20 +51,7 @@ func ComputeMA(quotes []*eastmoney.Quote, fastPeriod, slowPeriod int) (headers [
 // sma returns the simple moving average for a given period.
 // Values before the period length are 0 (insufficient data).
 func sma(prices []float64, period int) []float64 {
-	result := make([]float64, len(prices))
-	if period <= 0 || len(prices) < period {
-		return result
-	}
-	sum := 0.0
-	for i := 0; i < period-1; i++ {
-		sum += prices[i]
-	}
-	for i := period - 1; i < len(prices); i++ {
-		sum += prices[i]
-		result[i] = sum / float64(period)
-		sum -= prices[i-period+1]
-	}
-	return result
+	return indicator.SMA(prices, period)
 }
 
 func fv(v float64) string {

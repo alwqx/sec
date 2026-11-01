@@ -109,6 +109,8 @@ export interface HistoryQuote {
   turnover?: number // 成交额，币种与价格一致
 }
 
+export interface HistoryOverlay { label: string; kind: 'ma' | 'boll'; values: (number | null)[] }
+
 export interface BondDay {
   date: string
   yields: Record<string, number | null>

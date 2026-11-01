@@ -350,3 +350,15 @@ h1, h2, h3 { font-weight: 600; }
 
 .fx-views { margin-bottom: 16px; }
 .fx-inputs { margin-top: 16px; }
+
+.security-item-quote { display: flex; justify-content: space-between; gap: 8px; margin-top: 4px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.watch-quotes .section-toolbar { justify-content: space-between; margin-bottom: 12px; }
+.watch-quotes .text-link { border: 0; background: transparent; padding: 0; text-align: left; }
+.watch-quotes tr[aria-selected='true'] { background: var(--accent-soft); }
+.history-indicators { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 10px 0; font-size: 12px; }
+.history-indicators label { display: flex; align-items: center; gap: 4px; color: var(--muted); }
+.overlay-line { fill: none; stroke-width: 1.25; pointer-events: none; }
+.overlay-line.overlay-boll { stroke-dasharray: 4 3; }
+.overlay-ma5 { --overlay: #d97706; } .overlay-ma10 { --overlay: #2563eb; } .overlay-ma20 { --overlay: #9333ea; } .overlay-ma60 { --overlay: #0d9488; } .overlay-boll { --overlay: #64748b; }
+.overlay-line { stroke: var(--overlay); }
+.overlay-text { color: var(--overlay); }
