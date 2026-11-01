@@ -4,11 +4,11 @@ package main
 
 import (
 	"context"
-	"html"
 	"log/slog"
 	"net/http"
 	"net/url"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -79,9 +79,120 @@ func announcementURL(a *cninfo.Announcement) string {
 	return "https://www.cninfo.com.cn/new/disclosure/detail?" + values.Encode()
 }
 
+// announcementItem 转为页面使用的公告字段，标题和名称去掉高亮标签。
+func announcementItem(a *cninfo.Announcement) map[string]any {
+	date := ""
+	if a.Time > 0 {
+		date = time.UnixMilli(a.Time).In(cninfo.Beijing).Format("2006-01-02")
+	}
+	return map[string]any{
+		"id": a.ID, "title": cninfo.CleanTitle(a.Title),
+		"date": date, "code": a.SecCode, "name": cninfo.CleanTitle(a.SecName), "url": announcementURL(a),
+	}
+}
+
+const announcementPageSize = 30
+
+// handleInsiderAnnouncements 返回当前证券的增减持公告。两个关键字的结果合并后排序，再在这里分页。
+func (s *desktopServer) handleInsiderAnnouncements(w http.ResponseWriter, r *http.Request, page int) {
+	// 两个关键字可能各翻 10 页，比普通公告查询需要更长时间。
+	ctx, cancel := context.WithTimeout(r.Context(), time.Minute)
+	defer cancel()
+	code := companyCode(w, r)
+	if code == "" {
+		return
+	}
+	key := strings.TrimSpace(r.URL.Query().Get("key"))
+	if len(key) > 200 {
+		writeError(w, http.StatusBadRequest, "公告关键字过长")
+		return
+	}
+	org, _, err := cninfo.LookupOrgID(ctx, code)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, "证券公告信息获取失败，请稍后重试")
+		return
+	}
+	items, truncated, err := cninfo.QueryInsiderAnnouncements(ctx, code+","+org)
+	if err != nil {
+		if r.Context().Err() != nil {
+			return
+		}
+		slog.ErrorContext(ctx, "查询增减持公告失败", "code", code, "error", err)
+		writeError(w, http.StatusBadGateway, "公告获取失败，请稍后重试")
+		return
+	}
+	// 不区分大小写，空格分隔的词都要命中。
+	terms := strings.Fields(strings.ToLower(key))
+	matched := make([]*cninfo.Announcement, 0, len(items))
+	for _, item := range items {
+		title := strings.ToLower(cninfo.CleanTitle(item.Title))
+		if !slices.ContainsFunc(terms, func(term string) bool { return !strings.Contains(title, term) }) {
+			matched = append(matched, item)
+		}
+	}
+	begin := min((page-1)*announcementPageSize, len(matched))
+	end := min(begin+announcementPageSize, len(matched))
+	results := make([]map[string]any, 0, end-begin)
+	for _, item := range matched[begin:end] {
+		results = append(results, announcementItem(item))
+	}
+	writeJSON(w, map[string]any{"results": results, "total": len(matched), "has_more": end < len(matched), "truncated": truncated})
+}
+
+// handleIPOAnnouncements 按公告日期查询 IPO 相关公告。公告日期不是申购日或上市日。
+func (s *desktopServer) handleIPOAnnouncements(w http.ResponseWriter, r *http.Request) {
+	page := requestPage(w, r)
+	if page == 0 {
+		return
+	}
+	since, until := r.URL.Query().Get("since"), r.URL.Query().Get("until")
+	if err := eastmoney.ValidateIPODates(since, until); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	// CNINFO 只有起止日期都提供时才按日期筛选，这里补齐另一端。
+	if since != "" && until == "" {
+		until = time.Now().In(cninfo.Beijing).Format("2006-01-02")
+	}
+	if until != "" && since == "" {
+		since = "1990-01-01"
+	}
+	// 补齐后范围可能颠倒，例如开始日期晚于今天。
+	if err := eastmoney.ValidateIPODates(since, until); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
+	defer cancel()
+	response, err := cninfo.QueryAnnouncements(ctx, &cninfo.QueryRequest{Category: cninfo.CategoryIPO, PageNum: page, PageSize: announcementPageSize, StartDate: since, EndDate: until})
+	if err != nil {
+		if r.Context().Err() != nil {
+			return
+		}
+		slog.ErrorContext(ctx, "查询 IPO 公告失败", "error", err)
+		writeError(w, http.StatusBadGateway, "公告获取失败，请稍后重试")
+		return
+	}
+	if response == nil {
+		writeError(w, http.StatusBadGateway, "公告数据暂时不可用")
+		return
+	}
+	results := make([]map[string]any, 0, len(response.Data))
+	for _, a := range response.Data {
+		if a != nil && a.ExistFlag == 0 && a.InvalidationFlag == 0 {
+			results = append(results, announcementItem(a))
+		}
+	}
+	writeJSON(w, map[string]any{"results": results, "total": response.Total, "has_more": response.HasMore || page < response.TotalPages})
+}
+
 func (s *desktopServer) handleAnnouncements(w http.ResponseWriter, r *http.Request) {
 	page := requestPage(w, r)
 	if page == 0 {
+		return
+	}
+	if r.URL.Query().Get("type") == "insider" {
+		s.handleInsiderAnnouncements(w, r, page)
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
@@ -126,14 +237,7 @@ func (s *desktopServer) handleAnnouncements(w http.ResponseWriter, r *http.Reque
 		if a == nil || a.ExistFlag != 0 || a.InvalidationFlag != 0 {
 			continue
 		}
-		date := ""
-		if a.Time > 0 {
-			date = time.UnixMilli(a.Time).In(time.FixedZone("CST", 8*3600)).Format("2006-01-02")
-		}
-		results = append(results, map[string]any{
-			"id": a.ID, "title": html.UnescapeString(titleTags.ReplaceAllString(a.Title, "")),
-			"date": date, "code": a.SecCode, "name": html.UnescapeString(titleTags.ReplaceAllString(a.SecName, "")), "url": announcementURL(a),
-		})
+		results = append(results, announcementItem(a))
 	}
 	writeJSON(w, map[string]any{"results": results, "total": response.Total, "has_more": response.HasMore || page < response.TotalPages})
 }

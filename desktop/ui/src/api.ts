@@ -135,3 +135,7 @@ export function fxOptions(signal?: AbortSignal): Promise<{ cross_pairs: Record<s
 export function fxData(query: Record<string, string>, signal?: AbortSignal): Promise<FxDataset | FxSpread> {
   return request(`/api/v1/fx/data?${new URLSearchParams(query)}`, signal)
 }
+
+export function ipoAnnouncements(page: number, since: string, until: string, signal?: AbortSignal): Promise<PageResult<Announcement>> {
+  return request(`/api/v1/ipo/announcements?${new URLSearchParams({ page: String(page), since, until })}`, signal)
+}

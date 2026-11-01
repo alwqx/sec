@@ -362,3 +362,6 @@ h1, h2, h3 { font-weight: 600; }
 .overlay-ma5 { --overlay: #d97706; } .overlay-ma10 { --overlay: #2563eb; } .overlay-ma20 { --overlay: #9333ea; } .overlay-ma60 { --overlay: #0d9488; } .overlay-boll { --overlay: #64748b; }
 .overlay-line { stroke: var(--overlay); }
 .overlay-text { color: var(--overlay); }
+
+.ipo-announcements .ipo-announcement-title { white-space: normal; min-width: 280px; }
+.ipo-announcements .text-link { border: 0; background: transparent; padding: 0; text-align: left; }
