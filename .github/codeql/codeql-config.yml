@@ -1,0 +1,5 @@
+name: sec CodeQL config
+
+# 测试数据是上游网页和接口的原样快照，只被测试读取为文本，其中的脚本不会执行，也不进入发布产物。
+paths-ignore:
+  - "**/testdata/**"
