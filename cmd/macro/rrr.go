@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/alwqx/sec/provider/macrodata"
 	"github.com/alwqx/sec/provider/pbc"
 	"github.com/alwqx/sec/utils"
 	"github.com/olekukonko/tablewriter"
@@ -43,6 +44,11 @@ func newRRRCLI() *cobra.Command {
 		if err != nil {
 			return err
 		}
+		standard, _ := cmd.Flags().GetBool("standard-json")
+		if standard {
+			dataset, err := macrodata.RRR(&result)
+			return writeDataset(cmd, dataset, err)
+		}
 		asJSON, _ := cmd.Flags().GetBool("json")
 		if asJSON {
 			encoder := json.NewEncoder(cmd.OutOrStdout())
@@ -52,6 +58,7 @@ func newRRRCLI() *cobra.Command {
 		return printRRR(cmd.OutOrStdout(), result)
 	}}
 	addQueryFlags(command)
+	addStandardJSONFlag(command, "按统一宏观序列格式输出JSON，保留调整幅度区间和机构范围，不推算准备金率水平")
 	command.Flags().Lookup("begin").Usage = "开始生效日期 YYYYMMDD，默认20180101"
 	command.Flags().Lookup("end").Usage = "截至生效日期 YYYYMMDD，默认北京时间今天"
 	return command
