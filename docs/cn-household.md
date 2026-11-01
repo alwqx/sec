@@ -49,7 +49,7 @@ JSON 的 `raw_values` 按指标键保留接口原始 JSON 值，包含空字符�
 go test ./provider/nbs ./cmd/macro -run Household -count=1
 ```
 
-居民存款余额继续单列 TODO，后续从人民银行来源接入；不与人均累计收入、消费流量混为一项。
+居民存款余额见 [居民存款](cn-deposits.md)，来自人民银行；不与人均累计收入、消费流量混为一项。
 
 ## 官方参考
 

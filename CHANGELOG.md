@@ -6,6 +6,7 @@
 2. Replace the CodeQL default setup with a workflow and config file that exclude `testdata` directories, since saved upstream pages are only read as text by tests and raised false alerts for their external scripts
 3. Build the macOS Desktop frontend on Node 24 instead of Node 20 in the release workflow, and upgrade `actions/setup-node` from v4 to v7 so the action itself also runs on Node 24
 4. Pin the Ubuntu jobs in the CI, CodeQL and release workflows to `ubuntu-24.04` instead of `ubuntu-latest`
+5. Keep only open items in `TODO.md`, move the overview of implemented macro indicators to `docs/macro-coverage.md`, split the remaining reserve requirement history gaps into their own open item, and replace outdated TODO references in the docs
 
 ### v0.4.1
 
