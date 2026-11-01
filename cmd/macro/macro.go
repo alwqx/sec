@@ -51,6 +51,7 @@ func NewMacroCLI() *cobra.Command {
 	cn.AddCommand(newCNFiscalCLI())
 	cn.AddCommand(newCNTradeCLI())
 	cn.AddCommand(newCNServicesCLI())
+	applyCategoryGroups(cn, "cn")
 	root.AddCommand(cn)
 	us := &cobra.Command{Use: "us", Short: "美国宏观经济数据"}
 	us.AddCommand(newUSCPICLI("cpi"), newUSCPICLI("core-cpi"))
@@ -76,6 +77,7 @@ func NewMacroCLI() *cobra.Command {
 	us.AddCommand(newUSDebtCashCLI())
 	us.AddCommand(newUSAuctionsCLI())
 	us.AddCommand(newUSFiscalCLI())
+	applyCategoryGroups(us, "us")
 	root.AddCommand(us)
 	return root
 }

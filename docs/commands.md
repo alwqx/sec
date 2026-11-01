@@ -11,7 +11,7 @@
 | 自选与行情 | 个股命令 | 已有，部分功能待补齐 |
 | IPO | `ipo *` | 已有，缺 `ipo calendar` |
 | 公告中心 | `announcements`、`insider` | 已有，缺增减持 |
-| 宏观 | `macro *`、`bond`、`bond-history` | 规划；现有“美债收益率”菜单并入 |
+| 宏观 | `macro *`、`bond`、`bond-history` | 已有；原“美债收益率”菜单已并入 |
 | 汇率 | `fx *` | 规划 |
 | 黄金行情 | `metal`、`metal-history` | 已有 |
 | 设置 | `upgrade` | 已有 |
@@ -43,7 +43,7 @@
 
 ## 宏观
 
-全部为规划。页面先切换中国／美国（与 `macro cn`、`macro us` 一致），再按类别选择指标。
+全部已有。页面先切换中国／美国（与 `macro cn`、`macro us` 一致），再按类别选择指标；分类来自 `cmd/macro/catalog.go`，`--help` 与 Desktop 菜单共用。
 
 | 类别 | `macro cn` | `macro us` |
 | --- | --- | --- |
@@ -80,8 +80,8 @@
 | 命令 | 数据 | Desktop 位置 | 状态 |
 | --- | --- | --- | --- |
 | `metal`、`metal-history` | 黄金日行情与历史 | 黄金行情 | 已有 |
-| `bond`、`bond-history` | 美债收益率与历史，显示五个期限及 10 年期变动 | 美债收益率；规划并入宏观的利率与收益率 | 已有 |
-| `macro us treasury` | 美债收益率全部期限及统一导出 | 宏观 → 利率与收益率 | 规划 |
+| `bond`、`bond-history` | 美债收益率与历史，显示五个期限及 10 年期变动 | 宏观 → 美国 → 利率与收益率 → 美债收益率 | 已有 |
+| `macro us treasury` | 美债收益率全部期限及统一导出 | 宏观 → 美国 → 利率与收益率 → 美债收益率 | 已有 |
 
 ## 命令改名
 

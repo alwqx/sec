@@ -11,17 +11,17 @@ import IPOCalendar from './components/IPOCalendar'
 import Announcements from './components/Announcements'
 import Settings from './components/Settings'
 import Metal from './components/Metal'
-import Bond from './components/Bond'
+import Macro from './components/Macro'
 import secLogo from '../../assets/sec-logo.png'
 
-type Page = 'stocks' | 'ipo' | 'announcements' | 'metal' | 'bond' | 'settings'
+type Page = 'stocks' | 'ipo' | 'announcements' | 'macro' | 'metal' | 'settings'
 type Tab = 'overview' | 'company' | 'financials' | 'dividends' | 'announcements'
 const pages: { id: Page; title: string; icon: LucideIcon }[] = [
   { id: 'stocks', title: '自选与行情', icon: ChartCandlestick },
   { id: 'ipo', title: 'IPO', icon: FilePlusCorner },
   { id: 'announcements', title: '公告中心', icon: Newspaper },
+  { id: 'macro', title: '宏观', icon: Landmark },
   { id: 'metal', title: '黄金行情', icon: Coins },
-  { id: 'bond', title: '美债收益率', icon: Landmark },
   { id: 'settings', title: '设置', icon: SettingsIcon },
 ]
 const tabs: { id: Tab; title: string }[] = [
@@ -204,7 +204,7 @@ export default function App() {
             </> : <div className="welcome-state"><div className="welcome-symbol" aria-hidden="true">↗</div><h2>从一只证券开始研究</h2><p>搜索证券，或从自选列表中选择。<br />行情、公司资料、财报与公告都在这里。</p><div className="welcome-examples">试试 <button onClick={() => void onSearch('招商银行')}>招商银行</button><button onClick={() => void onSearch('腾讯控股')}>腾讯控股</button><button onClick={() => void onSearch('AAPL')}>AAPL</button></div></div>}
           </section>
         </div>}
-        {page === 'bond' && <Bond />}
+        {page === 'macro' && <Macro />}
         {page === 'metal' && <Metal />}
         {page === 'ipo' && <IPOCalendar onSelect={openIPO} />}
         {page === 'announcements' && <div className="global-announcements page-panel"><div className="scope-bar"><span>公告范围</span><button aria-pressed={announcementScope === 'latest' || !aShare} onClick={() => setAnnouncementScope('latest')}>最新披露</button><button disabled={!aShare} aria-pressed={announcementScope === 'selected' && !!aShare} onClick={() => setAnnouncementScope('selected')}>{selected ? selected.name : '当前证券'}</button></div><Announcements compact key={announcementScope === 'selected' && aShare ? selected!.ex_code : 'latest'} code={announcementScope === 'selected' && aShare ? selected!.ex_code : ''} /></div>}
