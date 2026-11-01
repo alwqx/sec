@@ -93,7 +93,7 @@ sec macro us participation --begin 202501 --end 202609 --json
 
 档案另存每月 `latest_observed_at`，数值与脚注未变化时仍更新最新观测时间，版本条数不增加；迟到的旧响应或旧缓存不会覆盖更新的观测。旧档案首次读取时，以已有最后版本时间初始化该字段，保留原有版本。已有档案的schema、系列、月份、数值和时间必须有效，`{}`、`null`或缺少必填信息均报错并保留原文件；仅文件不存在时创建新档案。
 
-官方[就业修订表](https://www.bls.gov/web/empsit/cesnaicsrev.htm)提供首次、第二次、第三次月度新增估计；[历史版本说明](https://www.bls.gov/web/empsit/cesvininfo.htm)列出岗位水平历史版本档案。两者尚未集成，`official_vintage_archive_available`为false，`published_at`为null。当前工作环境无法自动下载这些官方档案，因此完整历史修订数据保留在TODO第二批，不能用本机观测版本冒充。CLI输出中的“本机版本数”亦是观测记录条数，而非官方修订次数。
+官方[就业修订表](https://www.bls.gov/web/empsit/cesnaicsrev.htm)提供首次、第二次、第三次月度新增估计；[历史版本说明](https://www.bls.gov/web/empsit/cesvininfo.htm)列出岗位水平历史版本档案。两者尚未集成，`official_vintage_archive_available`为false，`published_at`为null。当前工作环境无法自动下载这些官方档案，因此完整历史修订数据仍在TODO中，不能用本机观测版本冒充。CLI输出中的“本机版本数”亦是观测记录条数，而非官方修订次数。
 
 本地测试全部使用HTTP模拟。`provider/bls/testdata/cpi-2024-2026.json`、`cpi-1913-1914.json` 为2026-10-27从官方v1接口保存的原始响应，四条系列如上，分别请求2024—2026年和1913—1914年。覆盖季调/非季调及核心口径、真实缺失脚注、不跨缺口、年平均过滤、十年分批边界、缓存/刷新/取消/恢复、配额/部分失败及命令输出；不会因运行测试消耗BLS查询额度。
 
