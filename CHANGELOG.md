@@ -1,5 +1,9 @@
 ## sec change log
 
+### v0.4.2
+
+1. Upgrade the Desktop UI dev dependency Vite from 5.4 to 6.4 and esbuild from 0.21 to 0.25 to resolve open Dependabot alerts on the dev server, and point `package-lock.json` at the official npm registry instead of a mirror so `npm ci` works with npm 12
+
 ### v0.4.1
 
 1. Unify CLI and Desktop watchlists through a shared store with cross-process locks, atomic mutations, legacy-list merging and backups; separate Desktop settings writes from watchlist changes, refresh shared selections on return/focus, document shared strategy/valuation extraction TODOs, and isolate the JSON utility test temporary directory to prevent deleting other build artifacts
