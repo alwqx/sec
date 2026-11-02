@@ -286,8 +286,15 @@ func (s *desktopServer) handleFinancials(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, map[string]any{"columns": columns, "results": results})
 }
 
-// handleHistory 按日期范围和复权方式返回日行情，默认最近三个月、不复权。
-func (s *desktopServer) handleHistory(w http.ResponseWriter, r *http.Request) {
+// historyQuery 是走势和技术分析共用的证券、日期和复权参数。
+type historyQuery struct {
+	symbol     string
+	market     int
+	begin, end time.Time
+	fqt        eastmoney.FuQuanType
+}
+
+func parseHistoryQuery(w http.ResponseWriter, r *http.Request) (historyQuery, bool) {
 	code := strings.ToUpper(strings.TrimSpace(r.URL.Query().Get("code")))
 	market := -1
 	var symbol string
@@ -303,7 +310,7 @@ func (s *desktopServer) handleHistory(w http.ResponseWriter, r *http.Request) {
 	}
 	if market < 0 {
 		writeError(w, http.StatusBadRequest, "走势图暂支持沪深证券与港股")
-		return
+		return historyQuery{}, false
 	}
 	now := time.Now().In(time.FixedZone("CST", 8*3600))
 	query := r.URL.Query()
@@ -314,7 +321,7 @@ func (s *desktopServer) handleHistory(w http.ResponseWriter, r *http.Request) {
 	endTime, err := time.Parse("2006-01-02", end)
 	if err != nil {
 		writeError(w, 400, "结束日期格式无效，请使用 YYYY-MM-DD")
-		return
+		return historyQuery{}, false
 	}
 	begin := query.Get("begin")
 	if begin == "" {
@@ -323,11 +330,11 @@ func (s *desktopServer) handleHistory(w http.ResponseWriter, r *http.Request) {
 	beginTime, err := time.Parse("2006-01-02", begin)
 	if err != nil {
 		writeError(w, 400, "开始日期格式无效，请使用 YYYY-MM-DD")
-		return
+		return historyQuery{}, false
 	}
 	if beginTime.After(endTime) || beginTime.Year() < 1990 || end > now.Format("2006-01-02") || endTime.After(beginTime.AddDate(5, 0, 0)) {
 		writeError(w, 400, "日期范围须在 1990 年至今日之间，开始不晚于结束，单次最多 5 年")
-		return
+		return historyQuery{}, false
 	}
 	fq := query.Get("fq")
 	fqt := eastmoney.QuoteFQTDefault
@@ -339,8 +346,19 @@ func (s *desktopServer) handleHistory(w http.ResponseWriter, r *http.Request) {
 		fqt = eastmoney.QuoteFQTPost
 	default:
 		writeError(w, 400, "复权方式必须为 bfq、qfq 或 hfq")
+		return historyQuery{}, false
+	}
+	return historyQuery{symbol, market, beginTime, endTime, fqt}, true
+}
+
+// handleHistory 按日期范围和复权方式返回日行情，默认最近三个月、不复权。
+func (s *desktopServer) handleHistory(w http.ResponseWriter, r *http.Request) {
+	history, ok := parseHistoryQuery(w, r)
+	if !ok {
 		return
 	}
+	query := r.URL.Query()
+	beginTime, endTime := history.begin, history.end
 	specs, err := parseOverlays(query.Get("ma"), query.Get("boll"))
 	if err != nil {
 		writeError(w, 400, err.Error())
@@ -349,7 +367,7 @@ func (s *desktopServer) handleHistory(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
 	items, err := eastmoney.GetQuoteHistory(ctx, &eastmoney.GetQuoteHistoryReq{
-		Code: symbol, MarketCode: market, Begin: warmupBegin(beginTime, specs).Format("20060102"), End: endTime.Format("20060102"), FQT: fqt,
+		Code: history.symbol, MarketCode: history.market, Begin: warmupBegin(beginTime, specs).Format("20060102"), End: endTime.Format("20060102"), FQT: history.fqt,
 	})
 	if err != nil {
 		slog.ErrorContext(ctx, "查询历史行情失败", "error", err)

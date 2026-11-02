@@ -184,7 +184,7 @@ func TestHistoryWithoutOverlaysKeepsResponse(t *testing.T) {
 }
 
 func TestHistoryRejectsInvalidOverlays(t *testing.T) {
-	for _, query := range []string{"ma=0", "ma=abc", "ma=251", "ma=1,2,3,4,5,6,7", "boll=20", "boll=20,0", "boll=20,11", "boll=0,2"} {
+	for _, query := range []string{"ma=0", "ma=abc", "ma=251", "ma=1,2,3,4,5,6,7", "boll=20", "boll=20,0", "boll=20,11", "boll=20,NaN", "boll=0,2"} {
 		rr := macroRequest(t, "/api/v1/history?code=SH600036&begin=2026-01-01&end=2026-01-02&"+query)
 		require.Equal(t, http.StatusBadRequest, rr.Code, query)
 	}

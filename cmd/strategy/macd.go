@@ -3,6 +3,7 @@ package strategy
 import (
 	"fmt"
 
+	"github.com/alwqx/sec/indicator"
 	"github.com/alwqx/sec/provider/eastmoney"
 	"github.com/spf13/cobra"
 )
@@ -19,73 +20,16 @@ func ComputeMACD(quotes []*eastmoney.Quote, fast, slow, signal int) (headers []s
 		return nil, nil, nil
 	}
 
-	prices := make([]float64, len(quotes))
-	dates := make([]string, len(quotes))
-	for i, q := range quotes {
-		prices[i] = q.Close
-		dates[i] = q.Date.Format("2006-01-02")
-	}
-
-	emaFast := ema(prices, fast)
-	emaSlow := ema(prices, slow)
-
-	// MACD line = EMA(fast) - EMA(slow)
-	macdLine := make([]float64, len(prices))
-	for i := range prices {
-		if emaFast[i] > 0 && emaSlow[i] > 0 {
-			macdLine[i] = emaFast[i] - emaSlow[i]
-		}
-	}
-
-	signalLine := ema(macdLine, signal)
-	histogram := make([]float64, len(prices))
-	for i := range prices {
-		if macdLine[i] != 0 || signalLine[i] != 0 {
-			histogram[i] = (macdLine[i] - signalLine[i]) * 2 // ×2 for visibility
-		}
-	}
+	prices, dates := strategyPrices(quotes)
+	macdLine, signalLine, histogram := indicator.MACD(prices, fast, slow, signal)
+	signals, labels := toSignals(quotes, prices, indicator.MACDSignals(macdLine, signalLine, indicator.MACDStart(fast, slow, signal)), "☍ 金叉买入", "☍ 死叉卖出")
 
 	headers = []string{"日期", "收盘", "MACD", "信号线", "柱", "信号"}
 	data = make([][]string, len(prices))
-	var prevMACD, prevSignal float64
-
 	for i := range prices {
-		m, s := macdLine[i], signalLine[i]
-		sig := "-"
-		if i > 0 && prevMACD != 0 && m != 0 {
-			if prevMACD <= prevSignal && m > s {
-				sig = "☍ 金叉买入"
-				signals = append(signals, Signal{Date: quotes[i].Date, Type: "buy", Price: prices[i], Reason: "MACD金叉"})
-			} else if prevMACD >= prevSignal && m < s {
-				sig = "☍ 死叉卖出"
-				signals = append(signals, Signal{Date: quotes[i].Date, Type: "sell", Price: prices[i], Reason: "MACD死叉"})
-			}
-		}
-		data[i] = []string{dates[i], fmt.Sprintf("%.2f", prices[i]), fv2(m), fv2(s), fv2(histogram[i]), sig}
-		prevMACD, prevSignal = m, s
+		data[i] = []string{dates[i], fmt.Sprintf("%.2f", prices[i]), fv2(macdLine[i]), fv2(signalLine[i]), fv2(histogram[i]), labels[i]}
 	}
-	return
-}
-
-// ema returns the exponential moving average for a given period.
-func ema(prices []float64, period int) []float64 {
-	result := make([]float64, len(prices))
-	if period <= 0 || len(prices) < period {
-		return result
-	}
-	k := 2.0 / float64(period+1)
-
-	// Seed with SMA
-	sum := 0.0
-	for i := 0; i < period && i < len(prices); i++ {
-		sum += prices[i]
-	}
-	result[period-1] = sum / float64(period)
-
-	for i := period; i < len(prices); i++ {
-		result[i] = prices[i]*k + result[i-1]*(1-k)
-	}
-	return result
+	return headers, data, signals
 }
 
 func fv2(v float64) string {

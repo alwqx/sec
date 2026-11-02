@@ -3,6 +3,7 @@ package strategy
 import (
 	"fmt"
 
+	"github.com/alwqx/sec/indicator"
 	"github.com/alwqx/sec/provider/eastmoney"
 	"github.com/spf13/cobra"
 )
@@ -15,77 +16,20 @@ func ComputeRSI(quotes []*eastmoney.Quote, period int, overbought, oversold floa
 		return nil, nil, nil
 	}
 
-	prices := make([]float64, len(quotes))
-	dates := make([]string, len(quotes))
-	for i, q := range quotes {
-		prices[i] = q.Close
-		dates[i] = q.Date.Format("2006-01-02")
-	}
-
-	// Calculate RSI
-	gains := make([]float64, len(prices))
-	losses := make([]float64, len(prices))
-	for i := 1; i < len(prices); i++ {
-		diff := prices[i] - prices[i-1]
-		if diff > 0 {
-			gains[i] = diff
-		} else {
-			losses[i] = -diff
-		}
-	}
-
-	// Initial average
-	avgGain := 0.0
-	avgLoss := 0.0
-	for i := 1; i <= period; i++ {
-		avgGain += gains[i]
-		avgLoss += losses[i]
-	}
-	avgGain /= float64(period)
-	avgLoss /= float64(period)
-
-	rsiValues := make([]float64, len(prices))
-	if avgLoss == 0 {
-		rsiValues[period] = 100
-	} else {
-		rsiValues[period] = 100 - 100/(1+avgGain/avgLoss)
-	}
-
-	// Wilder's smoothing for subsequent values
-	for i := period + 1; i < len(prices); i++ {
-		avgGain = (avgGain*float64(period-1) + gains[i]) / float64(period)
-		avgLoss = (avgLoss*float64(period-1) + losses[i]) / float64(period)
-		if avgLoss == 0 {
-			rsiValues[i] = 100
-		} else {
-			rsiValues[i] = 100 - 100/(1+avgGain/avgLoss)
-		}
-	}
+	prices, dates := strategyPrices(quotes)
+	rsiValues := indicator.RSI(prices, period)
+	signals, labels := toSignals(quotes, prices, indicator.RSISignals(rsiValues, period, overbought, oversold), "☍ 超卖买入", "☍ 超买卖出")
 
 	headers = []string{"日期", "收盘", "RSI", "信号"}
 	data = make([][]string, len(prices))
-	var prevRSI float64
-
 	for i := range prices {
-		r := rsiValues[i]
-		sig := "-"
-		if i > 0 && r > 0 && prevRSI > 0 {
-			if prevRSI < oversold && r >= oversold {
-				sig = "☍ 超卖买入"
-				signals = append(signals, Signal{Date: quotes[i].Date, Type: "buy", Price: prices[i], Reason: fmt.Sprintf("RSI %.0f回升", r)})
-			} else if prevRSI > overbought && r <= overbought {
-				sig = "☍ 超买卖出"
-				signals = append(signals, Signal{Date: quotes[i].Date, Type: "sell", Price: prices[i], Reason: fmt.Sprintf("RSI %.0f回落", r)})
-			}
-		}
 		rsiStr := "-"
-		if r > 0 {
-			rsiStr = fmt.Sprintf("%.1f", r)
+		if i >= period {
+			rsiStr = fmt.Sprintf("%.1f", rsiValues[i])
 		}
-		data[i] = []string{dates[i], fmt.Sprintf("%.2f", prices[i]), rsiStr, sig}
-		prevRSI = r
+		data[i] = []string{dates[i], fmt.Sprintf("%.2f", prices[i]), rsiStr, labels[i]}
 	}
-	return
+	return headers, data, signals
 }
 
 func NewRSICLI() *cobra.Command {

@@ -4,6 +4,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -64,7 +65,7 @@ func parseOverlays(ma, boll string) ([]overlaySpec, error) {
 			return nil, err
 		}
 		k, err := strconv.ParseFloat(strings.TrimSpace(parts[1]), 64)
-		if err != nil || k <= 0 || k > 10 {
+		if err != nil || math.IsNaN(k) || k <= 0 || k > 10 {
 			return nil, fmt.Errorf("布林带倍数须大于 0 且不超过 10")
 		}
 		specs = append(specs, overlaySpec{period: period, k: k})
@@ -85,24 +86,28 @@ func warmupBegin(begin time.Time, specs []overlaySpec) time.Time {
 	return begin.AddDate(0, 0, -(longest*2 + 15))
 }
 
+// nullBefore 返回下标 first 起的序列，start 之前窗口不足的位置为 null。
+// 0 和负数可能是有效值，所以按下标判断。
+func nullBefore(values []float64, start, first int) []*float64 {
+	result := make([]*float64, 0, len(values)-first)
+	for i := first; i < len(values); i++ {
+		if i < start {
+			result = append(result, nil)
+			continue
+		}
+		value := values[i]
+		result = append(result, &value)
+	}
+	return result
+}
+
 // computeOverlays 用含预热的完整数据计算指标，只返回 first 之后的部分。
 func computeOverlays(quotes []*eastmoney.Quote, first int, specs []overlaySpec) []overlay {
 	closes := make([]float64, len(quotes))
 	for i, quote := range quotes {
 		closes[i] = quote.Close
 	}
-	trim := func(values []float64, period int) []*float64 {
-		result := make([]*float64, 0, len(values)-first)
-		for i := first; i < len(values); i++ {
-			if i < period-1 {
-				result = append(result, nil)
-				continue
-			}
-			value := values[i]
-			result = append(result, &value)
-		}
-		return result
-	}
+	trim := func(values []float64, period int) []*float64 { return nullBefore(values, period-1, first) }
 	overlays := []overlay{}
 	for _, spec := range specs {
 		if spec.k == 0 {

@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alwqx/sec/indicator"
 	"github.com/alwqx/sec/provider/eastmoney"
 	"github.com/stretchr/testify/require"
 )
@@ -24,7 +25,7 @@ func makeQuotes(prices []float64) []*eastmoney.Quote {
 
 func TestSMA(t *testing.T) {
 	prices := []float64{10, 12, 14, 16, 18}
-	result := sma(prices, 3)
+	result := indicator.SMA(prices, 3)
 	// MA3: [0, 0, 12, 14, 16]
 	require.Equal(t, 0.0, result[0])
 	require.Equal(t, 0.0, result[1])
@@ -34,7 +35,7 @@ func TestSMA(t *testing.T) {
 }
 
 func TestSMAInsufficientData(t *testing.T) {
-	result := sma([]float64{10, 20}, 5)
+	result := indicator.SMA([]float64{10, 20}, 5)
 	for _, v := range result {
 		require.Equal(t, 0.0, v)
 	}
@@ -45,7 +46,7 @@ func TestEMA(t *testing.T) {
 	for i := range prices {
 		prices[i] = 10.0
 	}
-	result := ema(prices, 10)
+	result := indicator.EMA(prices, 10)
 	require.InDelta(t, 10.0, result[9], 0.01)  // SMA seed
 	require.InDelta(t, 10.0, result[29], 0.01) // stays flat with constant price
 }

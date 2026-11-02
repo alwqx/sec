@@ -8,7 +8,7 @@
 
 | 一级菜单 | 对应命令 | 状态 |
 | --- | --- | --- |
-| 自选与行情 | 个股命令 | 已有，缺估值和技术分析 |
+| 自选与行情 | 个股命令 | 已有，缺完整估值 |
 | IPO | `ipo *` | 已有 |
 | 公告中心 | `announcements`、`insider` | 已有 |
 | 宏观 | `macro *`、`bond`、`bond-history` | 已有；原“美债收益率”菜单已并入 |
@@ -29,7 +29,7 @@
 | `financials` | 资产负债表、利润表、现金流量表 | 自选与行情 → 财报 | 已有 |
 | `annual-report` | 年报 PDF 下载 | 自选与行情 → 财报 | 已有，Desktop 另含半年报和季报 |
 | `valuation` | 估值指标与 DCF | 自选与行情 | 部分：只有 PE、PB |
-| `strategy ma / macd / rsi / boll` | 技术分析信号（计算） | 自选与行情 | 规划 |
+| `strategy ma / macd / rsi / boll` | 技术分析信号（计算） | 自选与行情 → 技术分析 | 已有；默认前复权，`sec strategy` 不复权 |
 
 ## 公告与 IPO
 

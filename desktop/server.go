@@ -48,6 +48,7 @@ func (s *desktopServer) Handler() http.Handler {
 	mux.Handle("GET /api/v1/fx/options", s.withAuth(http.HandlerFunc(s.handleFXOptions)))
 	mux.Handle("GET /api/v1/fx/data", s.withAuth(http.HandlerFunc(s.handleFXData)))
 	mux.Handle("GET /api/v1/history", s.withAuth(http.HandlerFunc(s.handleHistory)))
+	mux.Handle("GET /api/v1/strategy", s.withAuth(http.HandlerFunc(s.handleStrategy)))
 	mux.Handle("GET /api/v1/ipo/prospectuses", s.withAuth(http.HandlerFunc(s.handleProspectuses)))
 	mux.Handle("POST /api/v1/ipo/prospectuses/download", s.withAuth(http.HandlerFunc(s.handleProspectusDownload)))
 	mux.Handle("GET /api/v1/ipo/announcements", s.withAuth(http.HandlerFunc(s.handleIPOAnnouncements)))

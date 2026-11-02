@@ -16,42 +16,17 @@ func ComputeMA(quotes []*eastmoney.Quote, fastPeriod, slowPeriod int) (headers [
 		return nil, nil, nil
 	}
 
-	prices := make([]float64, len(quotes))
-	dates := make([]string, len(quotes))
-	for i, q := range quotes {
-		prices[i] = q.Close
-		dates[i] = q.Date.Format("2006-01-02")
-	}
-
-	fastMA := sma(prices, fastPeriod)
-	slowMA := sma(prices, slowPeriod)
+	prices, dates := strategyPrices(quotes)
+	fastMA := indicator.SMA(prices, fastPeriod)
+	slowMA := indicator.SMA(prices, slowPeriod)
+	signals, labels := toSignals(quotes, prices, indicator.MASignals(fastMA, slowMA, max(fastPeriod, slowPeriod)-1), "☍ 金叉买入", "☍ 死叉卖出")
 
 	headers = []string{"日期", "收盘", fmt.Sprintf("MA%d", fastPeriod), fmt.Sprintf("MA%d", slowPeriod), "信号"}
 	data = make([][]string, len(prices))
-	var prevFast, prevSlow float64
-
 	for i := range prices {
-		f, s := fastMA[i], slowMA[i]
-		sig := "-"
-		if i > 0 && prevFast > 0 && prevSlow > 0 && f > 0 && s > 0 {
-			if prevFast <= prevSlow && f > s {
-				sig = "☍ 金叉买入"
-				signals = append(signals, Signal{Date: quotes[i].Date, Type: "buy", Price: prices[i], Reason: "金叉"})
-			} else if prevFast >= prevSlow && f < s {
-				sig = "☍ 死叉卖出"
-				signals = append(signals, Signal{Date: quotes[i].Date, Type: "sell", Price: prices[i], Reason: "死叉"})
-			}
-		}
-		data[i] = []string{dates[i], fmt.Sprintf("%.2f", prices[i]), fv(f), fv(s), sig}
-		prevFast, prevSlow = f, s
+		data[i] = []string{dates[i], fmt.Sprintf("%.2f", prices[i]), fv(fastMA[i]), fv(slowMA[i]), labels[i]}
 	}
-	return
-}
-
-// sma returns the simple moving average for a given period.
-// Values before the period length are 0 (insufficient data).
-func sma(prices []float64, period int) []float64 {
-	return indicator.SMA(prices, period)
+	return headers, data, signals
 }
 
 func fv(v float64) string {

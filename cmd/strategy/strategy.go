@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/alwqx/sec/indicator"
 	"github.com/alwqx/sec/provider/eastmoney"
 	"github.com/alwqx/sec/provider/sina"
 	"github.com/olekukonko/tablewriter"
@@ -18,6 +19,33 @@ type Signal struct {
 	Type   string // "buy", "sell", "hold"
 	Price  float64
 	Reason string
+}
+
+func strategyPrices(quotes []*eastmoney.Quote) ([]float64, []string) {
+	prices := make([]float64, len(quotes))
+	dates := make([]string, len(quotes))
+	for i, q := range quotes {
+		prices[i] = q.Close
+		dates[i] = q.Date.Format("2006-01-02")
+	}
+	return prices, dates
+}
+
+// toSignals 转为带日期和价格的信号，并返回每个位置在表格里显示的文字。
+func toSignals(quotes []*eastmoney.Quote, prices []float64, items []indicator.Signal, buyLabel, sellLabel string) ([]Signal, []string) {
+	signals := make([]Signal, 0, len(items))
+	labels := make([]string, len(quotes))
+	for i := range labels {
+		labels[i] = "-"
+	}
+	for _, item := range items {
+		signals = append(signals, Signal{Date: quotes[item.Index].Date, Type: item.Type, Price: prices[item.Index], Reason: item.Reason})
+		labels[item.Index] = buyLabel
+		if item.Type == indicator.Sell {
+			labels[item.Index] = sellLabel
+		}
+	}
+	return signals, labels
 }
 
 // display shows the last N rows of a strategy result table.

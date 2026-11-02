@@ -365,3 +365,17 @@ h1, h2, h3 { font-weight: 600; }
 
 .ipo-announcements .ipo-announcement-title { white-space: normal; min-width: 280px; }
 .ipo-announcements .text-link { border: 0; background: transparent; padding: 0; text-align: left; }
+
+.strategy-page .section-toolbar { justify-content: space-between; margin-bottom: 12px; }
+.strategy-form { justify-content: flex-start !important; }
+.strategy-form input { width: 64px; }
+.strategy-form .history-shortcuts { margin: 0 0 0 auto; }
+.strategy-close { fill: none; stroke: var(--muted); stroke-width: 1.25; }
+.strategy-line { fill: none; stroke-width: 1.25; stroke: var(--strategy-line); }
+.strategy-line-0 { --strategy-line: #d97706; } .strategy-line-1 { --strategy-line: #2563eb; } .strategy-line-2 { --strategy-line: #9333ea; }
+.strategy-level { stroke: var(--muted); stroke-dasharray: 4 3; }
+.strategy-buy, .strategy-bar-up { fill: var(--up); } .strategy-sell, .strategy-bar-down { fill: var(--down); }
+.strategy-bar-up, .strategy-bar-down { opacity: .55; }
+.strategy-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin: 6px 0 14px; }
+.strategy-swatch { color: var(--strategy-line); }
+.strategy-signals { max-height: 300px; }

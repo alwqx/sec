@@ -210,3 +210,7 @@ export interface FxSpread {
   provider: string; as_of: string; is_derived: boolean; formula: string; inputs: FxObservation[] | null; alignment: FxAlignment; notes?: string[]
   difference_rmb_per_usd: number | null; pips: number | null; relative_percent: number | null; relative_bps: number | null; implied_cnh_cny: number | null
 }
+
+export interface StrategySeries { label: string; panel: 'price' | 'indicator'; style: 'line' | 'bar'; values: (number | null)[] }
+export interface StrategySignal { date: string; type: 'buy' | 'sell'; price: number; reason: string }
+export interface StrategyResult { params: Record<string, number>; levels: number[] | null; dates: string[]; closes: number[]; series: StrategySeries[]; signals: StrategySignal[]; required: number; insufficient: boolean }
