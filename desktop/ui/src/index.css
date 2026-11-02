@@ -379,3 +379,9 @@ h1, h2, h3 { font-weight: 600; }
 .strategy-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin: 6px 0 14px; }
 .strategy-swatch { color: var(--strategy-line); }
 .strategy-signals { max-height: 300px; }
+.valuation-page { display: grid; gap: 18px; }
+.valuation-page > section { min-width: 0; }
+.valuation-page .section-toolbar { justify-content: space-between; margin-bottom: 12px; }
+.valuation-page .strategy-form input { width: 72px; }
+.valuation-annuals { max-height: 300px; }
+.valuation-dot { fill: #d97706; }

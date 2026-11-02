@@ -6,11 +6,10 @@ import ResourceState from './ResourceState'
 import AnnualReports from './AnnualReports'
 import SavedDownload from './SavedDownload'
 
-function amount(value: unknown, perShare: boolean) {
+function amount(value: unknown) {
   if (value === null || value === undefined || value === '') return '—'
   const n = Number(value)
   if (!Number.isFinite(n)) return '—'
-  if (perShare) return n.toFixed(2)
   return (n / 1e8).toLocaleString('zh-CN', { maximumFractionDigits: 2 })
 }
 
@@ -50,11 +49,11 @@ function FinancialStatements({ security }: { security: BasicSecurity }) {
     <p className="data-note">按当前报表类型与报告期重新获取并导出全部原始字段，最多 50 期；导出数值保持原始单位，不按亿元缩放。文件保存到设置中的下载目录（默认 ~/Downloads），同名文件自动编号。</p>
     {exportError && <p className="error" role="alert">{exportError}</p>}
     {saved && <SavedDownload file={saved} />}
-    <p className="data-note">金额单位：亿元；每股收益单位：元/股。展示数据源最近最多 50 期主要科目。</p>
+    <p className="data-note">金额单位：亿元。展示数据源最近最多 50 期主要科目。</p>
     <ResourceState {...resource} retry={resource.reload} />
     {resource.data && (resource.data.results.length === 0 ? <div className="empty-state">暂无财报数据</div> : <div className="table-scroll"><table className="data-table financial-table">
       <thead><tr><th>科目</th>{resource.data.results.map((item, i) => <th key={`${item.date}-${i}`}>{item.date.slice(0, 10)}</th>)}</tr></thead>
-      <tbody>{resource.data.columns.map(col => <tr key={col.key}><th>{col.label}</th>{resource.data!.results.map((item, i) => <td key={`${item.date}-${i}`}>{amount(item.fields[col.key], col.key === 'BASIC_EPS')}</td>)}</tr>)}</tbody>
+      <tbody>{resource.data.columns.map(col => <tr key={col.key}><th>{col.label}</th>{resource.data!.results.map((item, i) => <td key={`${item.date}-${i}`}>{amount(item.fields[col.key])}</td>)}</tr>)}</tbody>
     </table></div>)}
   </section>
 }

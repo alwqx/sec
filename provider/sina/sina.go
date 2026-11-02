@@ -337,6 +337,7 @@ type sinaPartProfile struct {
 	TradeCap float64 // 流通股本
 	Profit   float64 // 净利润
 	Category string  // 行业分类
+	BShare   bool    // 是否 B 股
 }
 
 func parseInfoPartProfile(exCode, line string) (*sinaPartProfile, error) {
@@ -361,7 +362,7 @@ func parseInfoPartProfileOfAstock(line string) (*sinaPartProfile, error) {
 	}
 
 	var err error
-	partProfile := sinaPartProfile{}
+	partProfile := sinaPartProfile{BShare: items[0] == "B"}
 	partProfile.VPS, err = strconv.ParseFloat(items[5], 64)
 	if err != nil {
 		return nil, err
@@ -374,7 +375,8 @@ func parseInfoPartProfileOfAstock(line string) (*sinaPartProfile, error) {
 	if err != nil {
 		return nil, err
 	}
-	partProfile.Profit, err = strconv.ParseFloat(items[18], 64)
+	// 13 是近四个季度净利润（亿元），18 只是最新报告期的累计值。
+	partProfile.Profit, err = strconv.ParseFloat(items[13], 64)
 	if err != nil {
 		return nil, err
 	}
