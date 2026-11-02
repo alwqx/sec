@@ -8,6 +8,7 @@
 package watch
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -57,13 +58,15 @@ func NewWatchCLI() *cobra.Command {
 
 // quoteRow Build quote request
 type quoteRow struct {
-	item   WatchItem
-	price  float64
-	chg    float64
-	chgPct float64
-	high   float64
-	low    float64
-	vol    float64
+	priceIsYClose bool
+	hasChange     bool
+	item          WatchItem
+	price         float64
+	chg           float64
+	chgPct        float64
+	high          float64
+	low           float64
+	vol           float64
 }
 
 func runWatchShow(cmd *cobra.Command, args []string) error {
@@ -102,9 +105,11 @@ func runWatchShow(cmd *cobra.Command, args []string) error {
 	for _, item := range items {
 		r := quoteRow{item: item}
 		if q, ok := quoteMap[item.ExCode]; ok {
-			r.price = q.Current
-			r.chg = q.Current - q.YClose
-			if q.YClose > 0 {
+			// 开盘前当前价是 0，显示昨收，不计算涨跌。
+			r.price, r.priceIsYClose = q.EffectivePrice()
+			if q.Current > 0 && q.YClose > 0 {
+				r.hasChange = true
+				r.chg = q.Current - q.YClose
 				r.chgPct = r.chg / q.YClose * 100
 			}
 			r.high = q.High
@@ -119,6 +124,21 @@ func runWatchShow(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+func (r quoteRow) priceText() string {
+	if r.priceIsYClose {
+		return fmt.Sprintf("%.2f（昨收）", r.price)
+	}
+	return changeText("%.2f", r.price, r.price > 0)
+}
+
+// changeText 在数值可用时按 format 格式化，否则显示 —，不把缺失显示成 0。
+func changeText(format string, value float64, known bool) string {
+	if !known {
+		return "—"
+	}
+	return fmt.Sprintf(format, value)
+}
+
 func printWatchQuotes(out io.Writer, rows []quoteRow) {
 	fmt.Fprintf(out, "\n自选组合 (%d 只)\n\n", len(rows))
 
@@ -130,11 +150,11 @@ func printWatchQuotes(out io.Writer, rows []quoteRow) {
 		row := []string{
 			r.item.ExCode,
 			r.item.Name,
-			fmt.Sprintf("%.2f", r.price),
-			fmt.Sprintf("%+.2f%%", r.chgPct),
-			fmt.Sprintf("%+.2f", r.chg),
-			fmt.Sprintf("%.2f", r.high),
-			fmt.Sprintf("%.2f", r.low),
+			r.priceText(),
+			changeText("%+.2f%%", r.chgPct, r.hasChange),
+			changeText("%+.2f", r.chg, r.hasChange),
+			changeText("%.2f", r.high, r.high > 0),
+			changeText("%.2f", r.low, r.low > 0),
 		}
 		data = append(data, row)
 
@@ -178,8 +198,14 @@ func runWatchAdd(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	added := 0
+	var failures []error
 	for _, key := range args {
-		secs := sina.Search(cmd.Context(), strings.TrimSpace(key))
+		secs, err := sina.Search(cmd.Context(), strings.TrimSpace(key))
+		if err != nil {
+			fmt.Fprintf(cmd.OutOrStdout(), "  %s 搜索失败\n", key)
+			failures = append(failures, fmt.Errorf("搜索 %s 失败: %w", key, err))
+			continue
+		}
 		if len(secs) == 0 {
 			fmt.Fprintf(cmd.OutOrStdout(), "  %s 未找到\n", key)
 			continue
@@ -197,7 +223,7 @@ func runWatchAdd(cmd *cobra.Command, args []string) error {
 		}
 	}
 	fmt.Fprintf(cmd.OutOrStdout(), "\n已添加 %d 只，共 %d 只\n", added, len(items))
-	return nil
+	return errors.Join(failures...)
 }
 
 func runWatchRemove(cmd *cobra.Command, args []string) error {

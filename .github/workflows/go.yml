@@ -18,5 +18,42 @@ jobs:
           cache: true
         id: go
 
+      - name: Check formatting
+        run: test -z "$(gofmt -l .)"
+
+      - name: Vet
+        run: go vet ./...
+
       - name: Test
         run: go test -v ./...
+
+  # desktop 包只在 windows 和 darwin 上编译，Linux 上的 go test ./... 不会检查它。
+  desktop:
+    name: Desktop
+    runs-on: macos-latest
+    steps:
+      - name: Check out source code
+        uses: actions/checkout@v6
+
+      - name: Set up Go Env
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: desktop/ui/package-lock.json
+
+      - name: Build frontend
+        working-directory: desktop/ui
+        run: npm ci && npm run build
+
+      - name: Vet
+        run: go vet ./desktop
+
+      - name: Test
+        run: go test -v ./desktop

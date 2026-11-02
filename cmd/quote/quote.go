@@ -87,7 +87,14 @@ func quoteMultiSec(ctx context.Context, keys []string) error {
 		keys = keys[:5]
 	}
 	// 1. search security
-	secs := sina.MultiSearch(ctx, keys)
+	secs, err := sina.MultiSearch(ctx, keys)
+	if err != nil {
+		// 按 Ctrl-C 取消不是失败。
+		if ctx.Err() != nil {
+			return nil
+		}
+		return fmt.Errorf("搜索证券失败: %w", err)
+	}
 	if len(secs) == 0 {
 		slog.WarnContext(ctx, "no result", "keys", keys)
 		return nil
@@ -128,7 +135,14 @@ func quoteMultiSecRealtime(ctx context.Context, keys []string) error {
 		keys = keys[:5]
 	}
 	// 1. search security
-	secs := sina.MultiSearch(ctx, keys)
+	secs, err := sina.MultiSearch(ctx, keys)
+	if err != nil {
+		// 按 Ctrl-C 取消不是失败。
+		if ctx.Err() != nil {
+			return nil
+		}
+		return fmt.Errorf("搜索证券失败: %w", err)
+	}
 	if len(secs) == 0 {
 		slog.WarnContext(ctx, "no result", "keys", keys)
 		return nil
@@ -169,6 +183,23 @@ func quoteMultiSecRealtime(ctx context.Context, keys []string) error {
 	}
 }
 
+// currentText 返回当前价格和涨跌的文字及涨跌幅。没有成交价时显示昨收，不计算涨跌。
+func currentText(quote *sina.SecurityQuote) (string, float64) {
+	price, isYClose := quote.EffectivePrice()
+	if price == 0 {
+		return "—", 0
+	}
+	if isYClose {
+		return fmt.Sprintf("%-.5g（昨收，当前无成交价）", price), 0
+	}
+	if quote.YClose <= 0 {
+		return fmt.Sprintf("%-.5g", price), 0
+	}
+	diffPrice := price - quote.YClose
+	rate := diffPrice / quote.YClose * 100.0
+	return fmt.Sprintf("%-.5g %-.5g %-.2g%s", price, diffPrice, rate, "%"), rate
+}
+
 // printQuote 打印 quote 信息
 func printQuote(quotes []*sina.SecurityQuote) {
 	if len(quotes) == 0 {
@@ -180,10 +211,7 @@ func printQuote(quotes []*sina.SecurityQuote) {
 
 	data := make([][]string, 0, len(quotes))
 	for _, quote := range quotes {
-		// 计算涨跌
-		diffPrice := quote.Current - quote.YClose
-		rate := diffPrice / quote.YClose * 100.0
-		curWithRate := fmt.Sprintf("%-.5g %-.5g %-.2g%s", quote.Current, diffPrice, rate, "%")
+		curWithRate, rate := currentText(quote)
 
 		row := []string{
 			fmt.Sprintf("%s %s", quote.TradeDate, quote.Time),

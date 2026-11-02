@@ -116,6 +116,9 @@ func QuerySecQuote(ctx context.Context, exCode string) (*SecurityQuote, error) {
 	}
 
 	defer resp.Body.Close()
+	if err := utils.CheckStatus(resp); err != nil {
+		return nil, err
+	}
 	err = adjustRespBodyByEncode(resp)
 	if err != nil {
 		return nil, err
@@ -349,8 +352,8 @@ func QueryQuoteList(ctx context.Context, exCodes []string) ([]*SecurityQuote, er
 	}
 
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("quote list returned HTTP %d", resp.StatusCode)
+	if err := utils.CheckStatus(resp); err != nil {
+		return nil, err
 	}
 	err = adjustRespBodyByEncode(resp)
 	if err != nil {

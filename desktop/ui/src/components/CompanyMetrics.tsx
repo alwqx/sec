@@ -49,7 +49,7 @@ export default function CompanyMetrics({ security, refreshSeconds }: { security:
         <div><dt>总市值</dt><dd>{money(data.market_cap)}</dd></div>
         <div><dt>流通市值</dt><dd>{money(data.float_market_cap)}</dd></div>
       </dl>
-      <p className="data-note">指标快照：{data.trade_date || '日期未知'} {data.time} · 市值币种：人民币{refreshSeconds ? ` · 每 ${refreshSeconds} 秒刷新` : ''}<br />计算口径与 CLI info 一致；缺失值、不适用的 PE 及无法计算的指标显示“—”。</p>
+      <p className="data-note">指标快照：{data.trade_date || '日期未知'} {data.time} · 市值币种：人民币{data.price_is_yclose ? ' · 当前无成交价，指标按昨收计算' : ''}{refreshSeconds ? ` · 每 ${refreshSeconds} 秒刷新` : ''}<br />计算口径与 CLI info 一致；缺失值、不适用的 PE 及无法计算的指标显示“—”。</p>
     </>}
   </section>
 }

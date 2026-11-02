@@ -273,7 +273,10 @@ func newProspectusCmd() *cobra.Command {
 
 // resolveStock 将用户输入（代码或名称）解析为标准 A 股代码 + cninfo orgId + 证券简称。
 func resolveStock(ctx context.Context, input string) (code, orgID, name string, err error) {
-	secs := sina.Search(ctx, input)
+	secs, searchErr := sina.Search(ctx, input)
+	if searchErr != nil {
+		slog.WarnContext(ctx, "搜索证券失败，尝试按代码处理", "input", input, "error", searchErr)
+	}
 	sec := firstAShare(secs)
 	if sec != nil {
 		code = sec.Code
@@ -297,6 +300,10 @@ func resolveStock(ctx context.Context, input string) (code, orgID, name string, 
 
 	// sina 没搜到 A 股，尝试把用户输入当作 A 股代码
 	code = sanitizeCode(input)
+	if !isACode(code) && searchErr != nil {
+		err = fmt.Errorf("搜索证券失败: %w", searchErr)
+		return
+	}
 	if !isACode(code) {
 		err = fmt.Errorf("未找到 %s 对应的 A 股代码，请确认代码无误", input)
 		return

@@ -43,3 +43,40 @@ func TestCLIUsesSharedStore(t *testing.T) {
 	require.Equal(t, types.ExChangeSse, items[0].Exchange)
 	require.True(t, gock.IsDone())
 }
+
+func TestPrintWatchQuotesMissingValues(t *testing.T) {
+	var out bytes.Buffer
+	printWatchQuotes(&out, []quoteRow{
+		{item: WatchItem{ExCode: "SH600036", Name: "招商银行"}, price: 43.55, priceIsYClose: true},
+		{item: WatchItem{ExCode: "SZ000001", Name: "平安银行"}},
+		{item: WatchItem{ExCode: "SH600519", Name: "贵州茅台"}, price: 11.5, hasChange: true, chg: 1.25, chgPct: 9.5, high: 12.5, low: 9.5},
+	})
+	text := out.String()
+	require.Contains(t, text, "43.55（昨收）")
+	require.NotContains(t, text, "-100")
+	require.NotContains(t, text, "0.00", "缺失不能显示成 0")
+	require.Contains(t, text, "+9.50%")
+}
+
+func TestWatchAddContinuesAfterSearchFailure(t *testing.T) {
+	defer gock.Off()
+	store := watchlist.Store{Path: filepath.Join(t.TempDir(), "watchlist.json")}
+	previous := newWatchStore
+	newWatchStore = func() (watchlist.Store, error) { return store, nil }
+	defer func() { newWatchStore = previous }()
+	body := `var suggestvalue="招商银行,11,600036,sh600036,招商银行,,招商银行,99,1,ESG,,";`
+	gock.New("https://suggest3.sinajs.cn").Get("/suggest/").Reply(500)
+	gock.New("https://suggest3.sinajs.cn").Get("/suggest/").Reply(200).BodyString(body)
+
+	cmd := NewWatchCLI()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetArgs([]string{"add", "bad", "招商银行"})
+	cmd.SilenceErrors = true
+	cmd.SilenceUsage = true
+	err := cmd.ExecuteContext(context.Background())
+	require.ErrorContains(t, err, "搜索 bad 失败")
+	require.Contains(t, out.String(), "bad 搜索失败")
+	require.Contains(t, out.String(), "✓ SH600036")
+	require.Contains(t, out.String(), "已添加 1 只")
+}

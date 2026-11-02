@@ -150,8 +150,8 @@ func datacenterRows(ctx context.Context, report, columns, filter, sortColumn str
 		return nil, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("%s returned HTTP %d", report, resp.StatusCode)
+	if err := utils.CheckStatus(resp); err != nil {
+		return nil, err
 	}
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

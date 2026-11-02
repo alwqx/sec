@@ -73,6 +73,9 @@ func getOriginQuoteHistory(ctx context.Context, req *GetQuoteHistoryReq) (res *Q
 		return nil, err
 	}
 	defer resp.Body.Close()
+	if err := utils.CheckStatus(resp); err != nil {
+		return nil, err
+	}
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed read body", "error", err)

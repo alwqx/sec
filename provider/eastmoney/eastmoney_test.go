@@ -7,6 +7,7 @@ import (
 
 	"github.com/alwqx/sec/utils"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/h2non/gock.v1"
 )
 
 func TestMarketType_String(t *testing.T) {
@@ -125,4 +126,12 @@ func TestParseQuoteHistoryResp(t *testing.T) {
 	require.Nil(t, err)
 	require.NotNil(t, res)
 	require.EqualValues(t, 0, len(res))
+}
+
+// 上游返回错误状态时要报出状态码，不能把错误页当成 JSON 解析。
+func TestQuoteHistoryUpstreamStatus(t *testing.T) {
+	defer gock.Off()
+	gock.New("https://push2his.eastmoney.com").Get("/api/qt/stock/kline/get").Reply(503).BodyString("busy")
+	_, err := GetQuoteHistory(context.Background(), &GetQuoteHistoryReq{Code: "600036", MarketCode: 1})
+	require.ErrorContains(t, err, "HTTP 503")
 }

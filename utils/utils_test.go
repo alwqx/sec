@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
@@ -31,6 +32,31 @@ func TestMakeRequest(t *testing.T) {
 	body, err := io.ReadAll(resp.Body)
 	require.Nil(t, err)
 	require.Equal(t, "OK", string(body))
+}
+
+func TestMakeRequestKeepsUserAgent(t *testing.T) {
+	defer gock.Off()
+	version.Version = "test"
+	gock.New("http://abc.xyz").Get("/foo").MatchHeader("User-Agent", "^sec/test").MatchHeader("Referer", "http://r").Times(1).Reply(200)
+	headers := http.Header{"Referer": []string{"http://r"}}
+	resp, err := MakeRequest(context.Background(), http.MethodGet, "http://abc.xyz/foo", headers, nil, 0)
+	require.NoError(t, err)
+	resp.Body.Close()
+	require.Empty(t, headers.Get("User-Agent"), "不修改调用方的请求头")
+
+	gock.New("http://abc.xyz").Get("/bar").MatchHeader("User-Agent", "^custom$").Reply(200)
+	headers.Set("User-Agent", "custom")
+	resp, err = MakeRequest(context.Background(), http.MethodGet, "http://abc.xyz/bar", headers, nil, 0)
+	require.NoError(t, err, "调用方指定时用调用方的")
+	resp.Body.Close()
+}
+
+func TestCheckStatus(t *testing.T) {
+	require.NoError(t, CheckStatus(&http.Response{StatusCode: 200}))
+	require.ErrorContains(t, CheckStatus(&http.Response{StatusCode: 503}), "HTTP 503")
+	reqURL, err := url.Parse("https://a.example/x")
+	require.NoError(t, err)
+	require.EqualError(t, CheckStatus(&http.Response{StatusCode: 404, Request: &http.Request{URL: reqURL}}), "a.example 返回 HTTP 404")
 }
 
 func TestWriteJson(t *testing.T) {
