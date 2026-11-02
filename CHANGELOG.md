@@ -1,5 +1,12 @@
 ## sec change log
 
+### v0.4.3
+
+1. Report search failures instead of treating them as no results: `sina.Search` and `MultiSearch` now return errors, CLI commands fail with a non-zero exit code, and Desktop search shows an error. Unrecognized responses and failures mixed with no matches also count as failures, and `sec watch add` continues with the remaining keywords before reporting them
+2. Check HTTP status for K-line, all Sina and gold requests, keep the default User-Agent when custom headers are passed, escape search keywords, and fix `MultiSearch` hanging when given more than 8 keywords
+3. Use the previous close for PE, PB and market cap when there is no current price, such as before the market opens, and label it in `sec info`, `sec kline` and Desktop metrics. `sec quote` and `sec watch` show the previous close without a change instead of a -100% drop, and `sec watch` shows `—` for missing values
+4. Run `gofmt` and `go vet` in CI, and add a macOS job that builds the Desktop frontend and vets and tests the `desktop` package
+
 ### v0.4.2
 
 1. Upgrade the Desktop UI dev dependency Vite from 5.4 to 6.4 and esbuild from 0.21 to 0.25 to resolve open Dependabot alerts on the dev server, and point `package-lock.json` at the official npm registry instead of a mirror so `npm ci` works with npm 12

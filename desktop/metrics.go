@@ -37,6 +37,6 @@ func (s *desktopServer) handleMetrics(w http.ResponseWriter, r *http.Request) {
 		"code": code, "industry": strings.TrimSpace(metrics.Category), "pe_ttm": validMetric(metrics.PeTTM, false),
 		"pb": validMetric(metrics.PB, true), "market_cap": validMetric(metrics.MarketCap, false),
 		"float_market_cap": validMetric(metrics.TradedMarketCap, false), "currency": "CNY",
-		"trade_date": metrics.TradeDate, "time": metrics.Time,
+		"trade_date": metrics.TradeDate, "time": metrics.Time, "price_is_yclose": metrics.PriceIsYClose,
 	})
 }

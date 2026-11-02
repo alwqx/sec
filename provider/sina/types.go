@@ -1,6 +1,10 @@
 package sina
 
-import "github.com/alwqx/sec/types"
+import (
+	"fmt"
+
+	"github.com/alwqx/sec/types"
+)
 
 // BasicSecurity 基本证券信息
 type BasicSecurity struct {
@@ -39,7 +43,8 @@ type CorpProfile struct {
 	RegisterAddress string  // 注册地址
 	BusinessAddress string  // 办公地址
 	MainBusiness    string  // 主营业务
-	Current         float64 // 当前价格
+	Current         float64 // 当前价格，没有成交价时是昨收
+	PriceIsYClose   bool    // Current 是否为昨收
 	PB              float64 // 市净率
 	PeTTM           float64 // 市盈率TTM
 	MarketCap       float64 // 总市值
@@ -62,6 +67,17 @@ type SecurityQuote struct {
 	Time      string  `json:"time"`     // 交易日期 "2023-06-02"
 }
 
+// EffectivePrice 返回可用的价格。没有成交价（如开盘前）时用昨收，并把第二个返回值设为 true；都没有时返回 0。
+func (q *SecurityQuote) EffectivePrice() (float64, bool) {
+	if q.Current > 0 {
+		return q.Current, false
+	}
+	if q.YClose > 0 {
+		return q.YClose, true
+	}
+	return 0, false
+}
+
 // 分红送转信息
 type Dividend struct {
 	PublicDate     string  // 公告日期
@@ -70,4 +86,12 @@ type Dividend struct {
 	Shares         float64 // 送股数量
 	AddShares      float64 // 转增股票数量
 	Bonus          float64 // 红利
+}
+
+// PriceText 返回当前价格的文字，用昨收时加以说明。
+func (p *CorpProfile) PriceText() string {
+	if p.PriceIsYClose {
+		return fmt.Sprintf("%.2f（昨收，当前无成交价）", p.Current)
+	}
+	return fmt.Sprintf("%.2f", p.Current)
 }

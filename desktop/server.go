@@ -148,7 +148,14 @@ func (s *desktopServer) handleSearch(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "缺少 key 参数")
 		return
 	}
-	results := sina.Search(r.Context(), key)
+	results, err := sina.Search(r.Context(), key)
+	if err != nil {
+		if r.Context().Err() == nil {
+			slog.ErrorContext(r.Context(), "搜索证券失败", "error", err)
+			writeError(w, http.StatusBadGateway, "搜索失败，请稍后重试")
+		}
+		return
+	}
 	if results == nil {
 		results = []*sina.BasicSecurity{}
 	}

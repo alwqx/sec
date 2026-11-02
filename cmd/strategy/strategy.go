@@ -109,7 +109,10 @@ func displayTable(cmd *cobra.Command, headers []string, data [][]string, signals
 
 // fetchOHLCV searches the stock and returns daily OHLCV data.
 func fetchOHLCV(cmd *cobra.Command, code string, days int) (string, string, []*eastmoney.Quote, error) {
-	secs := sina.Search(cmd.Context(), code)
+	secs, err := sina.Search(cmd.Context(), code)
+	if err != nil {
+		return "", "", nil, fmt.Errorf("搜索证券失败: %w", err)
+	}
 	if len(secs) == 0 {
 		return "", "", nil, fmt.Errorf("未找到证券: %s", code)
 	}

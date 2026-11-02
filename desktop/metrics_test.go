@@ -35,8 +35,17 @@ func TestMetricsEndpoint(t *testing.T) {
 	rr := httptest.NewRecorder()
 	(&desktopServer{dev: true}).Handler().ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/api/v1/metrics?code=sh600036", nil))
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
-	require.JSONEq(t, `{"code":"SH600036","industry":"银行","pe_ttm":5,"pb":2,"market_cap":1000000000,"float_market_cap":500000000,"currency":"CNY","trade_date":"2026-10-23","time":"15:00:00"}`, rr.Body.String())
+	require.JSONEq(t, `{"code":"SH600036","industry":"银行","pe_ttm":5,"pb":2,"market_cap":1000000000,"float_market_cap":500000000,"currency":"CNY","trade_date":"2026-10-23","time":"15:00:00","price_is_yclose":false}`, rr.Body.String())
 	require.True(t, gock.IsDone()) // 不请求公司资料页面，核心指标单独加载。
+}
+
+func TestSearchUpstreamFailureIsNotEmptyResult(t *testing.T) {
+	defer gock.Off()
+	gock.New("https://suggest3.sinajs.cn").Get("/suggest/").Reply(500)
+	rr := httptest.NewRecorder()
+	(&desktopServer{dev: true}).Handler().ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/api/v1/search?key=abc", nil))
+	require.Equal(t, http.StatusBadGateway, rr.Code)
+	require.Contains(t, rr.Body.String(), "搜索失败")
 }
 
 func TestMetricsUnknownValues(t *testing.T) {
@@ -45,7 +54,7 @@ func TestMetricsUnknownValues(t *testing.T) {
 	rr := httptest.NewRecorder()
 	(&desktopServer{dev: true}).Handler().ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/api/v1/metrics?code=SH600036", nil))
 	require.Equal(t, http.StatusOK, rr.Code)
-	require.JSONEq(t, `{"code":"SH600036","industry":"银行","pe_ttm":null,"pb":null,"market_cap":null,"float_market_cap":null,"currency":"CNY","trade_date":"2026-10-23","time":"15:00:00"}`, rr.Body.String())
+	require.JSONEq(t, `{"code":"SH600036","industry":"银行","pe_ttm":null,"pb":null,"market_cap":null,"float_market_cap":null,"currency":"CNY","trade_date":"2026-10-23","time":"15:00:00","price_is_yclose":false}`, rr.Body.String())
 	require.Nil(t, validMetric(math.Inf(1), false))
 	require.Nil(t, validMetric(math.NaN(), true))
 }

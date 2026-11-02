@@ -128,6 +128,7 @@ export interface BondData {
 }
 
 export interface CompanyMetrics {
+  price_is_yclose: boolean
   code: string
   industry: string
   pe_ttm: number | null

@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -31,65 +32,80 @@ func defaultHTTPHeaders() http.Header {
 	return headers
 }
 
-// Search 根据关键字查询证券信息
-func Search(ctx context.Context, key string) []*BasicSecurity {
-	reqUrl := fmt.Sprintf("https://suggest3.sinajs.cn/suggest/type=11,12,15,21,22,23,24,25,26,31,33,41&key=%s", key)
+// Search 根据关键字查询证券信息。没有匹配时返回空列表和 nil，请求失败时返回错误。
+func Search(ctx context.Context, key string) ([]*BasicSecurity, error) {
+	// 这个接口的参数写在路径里，& 和 = 也必须转义；空格用 %20，不用查询串的 +。
+	reqUrl := "https://suggest3.sinajs.cn/suggest/type=11,12,15,21,22,23,24,25,26,31,33,41&key=" + strings.ReplaceAll(url.QueryEscape(key), "+", "%20")
 	resp, err := utils.MakeRequest(ctx, http.MethodGet, reqUrl, defaultHTTPHeaders(), nil, 0)
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	defer resp.Body.Close()
-	err = adjustRespBodyByEncode(resp)
-	if err != nil {
-		slog.ErrorContext(ctx, "adjust body encode failed", "error", err)
-		return nil
+	if err := utils.CheckStatus(resp); err != nil {
+		return nil, err
 	}
-
-	var resBytes []byte
-	resBytes, err = io.ReadAll(resp.Body)
-	if err != nil {
-		slog.ErrorContext(ctx, "read body failed", "url", reqUrl, "error", err)
-		return nil
+	if err := adjustRespBodyByEncode(resp); err != nil {
+		return nil, err
 	}
-
-	return parseBasicSecurity(string(resBytes))
+	resBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	// 防火墙等可能用 200 返回其他页面，不能当成没有匹配。
+	if !strings.Contains(string(resBytes), "var suggestvalue=") {
+		return nil, errors.New("搜索接口返回了无法识别的内容")
+	}
+	return parseBasicSecurity(string(resBytes)), nil
 }
 
-// MultiSearch 根据关键字查询多个证券信息
-// 最多支持 MAX_KEY_NUM 条证券信息查询
-func MultiSearch(ctx context.Context, keys []string) []*BasicSecurity {
-	num := len(keys)
-	if num == 0 {
-		return nil
+// MultiSearch 根据关键字查询多个证券信息，每个关键字取第一条结果。
+// 最多支持 MAX_KEY_NUM 条证券信息查询。有结果时部分失败只记录日志；没有结果且有失败时返回错误。
+func MultiSearch(ctx context.Context, keys []string) ([]*BasicSecurity, error) {
+	if len(keys) == 0 {
+		return nil, nil
 	}
-	if num > MAX_KEY_NUM {
+	if len(keys) > MAX_KEY_NUM {
 		slog.DebugContext(ctx, "keys num exceed", "max num", MAX_KEY_NUM)
 		keys = keys[:MAX_KEY_NUM]
 	}
 
-	res := make([]*BasicSecurity, 0, num)
-	ch := make(chan *BasicSecurity, num)
+	type result struct {
+		sec *BasicSecurity
+		err error
+	}
+	res := make([]*BasicSecurity, 0, len(keys))
+	ch := make(chan result, len(keys))
 	for _, key := range keys {
 		go func(code string) {
-			secs := Search(ctx, code)
-			if len(secs) >= 1 {
-				slog.DebugContext(ctx, "MultiSearch results", "code", code, "secs", secs)
-				ch <- secs[0]
-			} else {
-				ch <- nil
+			secs, err := Search(ctx, code)
+			if err != nil {
+				slog.WarnContext(ctx, "MultiSearch failed", "code", code, "error", err)
+				ch <- result{err: err}
+				return
 			}
+			if len(secs) == 0 {
+				ch <- result{}
+				return
+			}
+			slog.DebugContext(ctx, "MultiSearch results", "code", code, "secs", secs)
+			ch <- result{sec: secs[0]}
 		}(key)
 	}
 
-	for range num {
+	var failures []error
+	for range keys {
 		item := <-ch
-		if item == nil {
-			continue
+		if item.err != nil {
+			failures = append(failures, item.err)
 		}
-		res = append(res, item)
+		if item.sec != nil {
+			res = append(res, item.sec)
+		}
 	}
-
-	return res
+	if len(res) == 0 && len(failures) > 0 {
+		return nil, errors.Join(failures...)
+	}
+	return res, nil
 }
 
 // Profile 根据证券代码获取证券的基本信息，exCode SH600036
@@ -138,7 +154,8 @@ func Profile(ctx context.Context, opts *types.InfoOptions) (*CorpProfile, error)
 		RegisterAddress: corp.RegisterAddress,
 		BusinessAddress: corp.BusinessAddress,
 		MainBusiness:    corp.MainBusiness,
-		Current:         quote.Current,
+		Current:         metrics.Price,
+		PriceIsYClose:   metrics.PriceIsYClose,
 		Category:        metrics.Category,
 		MarketCap:       metrics.MarketCap,
 		TradedMarketCap: metrics.TradedMarketCap,
@@ -161,6 +178,9 @@ func QueryDividends(ctx context.Context, code string) ([]Dividend, error) {
 	}
 
 	defer resp.Body.Close()
+	if err := utils.CheckStatus(resp); err != nil {
+		return nil, err
+	}
 	err = adjustRespBodyByEncode(resp)
 	if err != nil {
 		return nil, err
@@ -184,6 +204,9 @@ func QueryBasicCorp(ctx context.Context, exCode string) (*BasicCorp, error) {
 	}
 
 	defer resp.Body.Close()
+	if err := utils.CheckStatus(resp); err != nil {
+		return nil, err
+	}
 	err = adjustRespBodyByEncode(resp)
 	if err != nil {
 		return nil, err
@@ -213,6 +236,9 @@ func Info(ctx context.Context, exCode string) (*SecurityQuote, *sinaPartProfile,
 	}
 
 	defer resp.Body.Close()
+	if err := utils.CheckStatus(resp); err != nil {
+		return nil, nil, err
+	}
 	err = adjustRespBodyByEncode(resp)
 	if err != nil {
 		return nil, nil, err

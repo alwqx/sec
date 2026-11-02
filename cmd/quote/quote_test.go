@@ -1,12 +1,14 @@
 package quote
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"testing"
 
 	"github.com/alwqx/sec/provider/sina"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/h2non/gock.v1"
 )
 
 func TestPrintQuote(t *testing.T) {
@@ -99,4 +101,39 @@ func TestPrintQuote(t *testing.T) {
 	err := json.Unmarshal([]byte(str), &quotes)
 	require.Nil(t, err)
 	printQuote(quotes)
+}
+
+func TestCurrentText(t *testing.T) {
+	text, rate := currentText(&sina.SecurityQuote{Current: 11, YClose: 10})
+	require.Equal(t, "11 1 10%", text)
+	require.Equal(t, 10.0, rate)
+
+	// 开盘前当前价是 0，不能算出 -100%。
+	text, rate = currentText(&sina.SecurityQuote{YClose: 10})
+	require.Contains(t, text, "昨收")
+	require.NotContains(t, text, "-100")
+	require.Zero(t, rate)
+
+	text, rate = currentText(&sina.SecurityQuote{Current: 11})
+	require.Equal(t, "11", text, "昨收缺失时不算涨跌")
+	require.Zero(t, rate)
+
+	text, _ = currentText(&sina.SecurityQuote{})
+	require.Equal(t, "—", text)
+}
+
+// 按 Ctrl-C 取消初始搜索时正常退出，不报错。
+func TestCanceledSearchIsNotAnError(t *testing.T) {
+	defer gock.Off()
+	gock.New("https://suggest3.sinajs.cn").Get("/suggest/").Persist().Reply(200).BodyString(`var suggestvalue="";`)
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	require.NoError(t, quoteMultiSec(ctx, []string{"a"}))
+	require.NoError(t, quoteMultiSecRealtime(ctx, []string{"a"}))
+}
+
+func TestSearchFailureIsAnError(t *testing.T) {
+	defer gock.Off()
+	gock.New("https://suggest3.sinajs.cn").Get("/suggest/").Persist().Reply(500)
+	require.ErrorContains(t, quoteMultiSec(context.Background(), []string{"a"}), "搜索证券失败")
 }

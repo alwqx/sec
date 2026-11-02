@@ -27,7 +27,10 @@ func NewInsiderCLI() *cobra.Command {
 
 func runInsider(cmd *cobra.Command, args []string) error {
 	key := args[0]
-	secs := sina.Search(cmd.Context(), key)
+	secs, err := sina.Search(cmd.Context(), key)
+	if err != nil {
+		return fmt.Errorf("搜索证券失败: %w", err)
+	}
 	if len(secs) == 0 {
 		fmt.Fprintf(cmd.OutOrStdout(), "未找到证券: %s\n", key)
 		return nil

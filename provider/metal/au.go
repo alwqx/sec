@@ -51,6 +51,9 @@ func getAllDailyQuote(ctx context.Context) (*dailyHQResp, error) {
 	}
 
 	defer resp.Body.Close()
+	if err := utils.CheckStatus(resp); err != nil {
+		return nil, err
+	}
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err

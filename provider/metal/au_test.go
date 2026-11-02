@@ -152,3 +152,10 @@ func TestQueryAu999(t *testing.T) {
 	require.NotNil(t, resp)
 	require.EqualValues(t, 1, len(resp.Data))
 }
+
+func TestDailyQuoteUpstreamStatus(t *testing.T) {
+	defer gock.Off()
+	gock.New("https://www.sge.com.cn").Get("/graph/Dailyhq").Reply(502).BodyString("<html>")
+	_, err := getAllDailyQuote(context.Background())
+	require.ErrorContains(t, err, "HTTP 502")
+}

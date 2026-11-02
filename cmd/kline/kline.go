@@ -47,7 +47,10 @@ func NewKLineCLI() *cobra.Command {
 // KLineHandler is the handler for sec kline command.
 func KLineHandler(cmd *cobra.Command, args []string) error {
 	key := args[0]
-	secs := sina.Search(cmd.Context(), key)
+	secs, err := sina.Search(cmd.Context(), key)
+	if err != nil {
+		return fmt.Errorf("搜索证券失败: %w", err)
+	}
 	if len(secs) == 0 {
 		slog.Info("search no sec", "code", key)
 		return nil
@@ -129,9 +132,9 @@ func KLineHandler(cmd *cobra.Command, args []string) error {
 	}
 
 	// 打印基本信息
-	fmt.Fprintf(cmd.OutOrStdout(), "证券代码\t%s\n公司名称\t%s\n主营业务\t%s\n发行价格\t%.2f\n当前价格\t%.2f\n市净率PB\t%s\n市盈率TTM\t%s\n总市值  \t%s\n流通市值\t%s\n",
+	fmt.Fprintf(cmd.OutOrStdout(), "证券代码\t%s\n公司名称\t%s\n主营业务\t%s\n发行价格\t%.2f\n当前价格\t%s\n市净率PB\t%s\n市盈率TTM\t%s\n总市值  \t%s\n流通市值\t%s\n",
 		sec.ExCode, profile.Name, profile.MainBusiness,
-		profile.ListingPrice, profile.Current, utils.HumanRatio(profile.PB), utils.HumanRatio(profile.PeTTM),
+		profile.ListingPrice, profile.PriceText(), utils.HumanRatio(profile.PB), utils.HumanRatio(profile.PeTTM),
 		utils.HumanNum(profile.MarketCap), utils.HumanNum(profile.TradedMarketCap))
 
 	// 渲染蜡烛图

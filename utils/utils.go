@@ -80,9 +80,12 @@ func MakeRequest(ctx context.Context, method, reqURL string, headers http.Header
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("User-Agent", UserAgent())
+	// 调用方的请求头不能覆盖掉默认的 User-Agent。
 	if headers != nil {
-		req.Header = headers
+		req.Header = headers.Clone()
+	}
+	if req.Header.Get("User-Agent") == "" {
+		req.Header.Set("User-Agent", UserAgent())
 	}
 
 	var client *http.Client
@@ -97,6 +100,18 @@ func MakeRequest(ctx context.Context, method, reqURL string, headers http.Header
 	}
 
 	return resp, nil
+}
+
+// CheckStatus 在响应不是 200 时返回错误，避免把错误页当成数据解析。
+func CheckStatus(resp *http.Response) error {
+	if resp.StatusCode == http.StatusOK {
+		return nil
+	}
+	host := "上游"
+	if resp.Request != nil && resp.Request.URL != nil {
+		host = resp.Request.URL.Host
+	}
+	return fmt.Errorf("%s 返回 HTTP %d", host, resp.StatusCode)
 }
 
 // WriteJson 把数据结构转换成 json 格式写到文件中

@@ -42,7 +42,10 @@ func runAnnouncements(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("请提供证券代码，或使用 --latest 查看全市场公告")
 		}
 		key := args[0]
-		secs := sina.Search(cmd.Context(), key)
+		secs, err := sina.Search(cmd.Context(), key)
+		if err != nil {
+			return fmt.Errorf("搜索证券失败: %w", err)
+		}
 		if len(secs) == 0 {
 			fmt.Fprintf(cmd.OutOrStdout(), "未找到证券: %s\n", key)
 			return nil

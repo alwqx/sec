@@ -2,12 +2,16 @@ package sina
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/alwqx/sec/types"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/h2non/gock.v1"
 )
 
 func TestParseBasicSecuritys(t *testing.T) {
@@ -124,15 +128,88 @@ func TestParseDividend(t *testing.T) {
 	require.EqualValues(t, 0, res[23].AddShares)
 }
 
-func TestMultiSearch(t *testing.T) {
-	t.Skip("just test for dev/debug")
-	ctx := context.TODO()
-	// 1. empty
-	res := MultiSearch(ctx, nil)
-	require.Equal(t, 0, len(res))
+func searchURL() *gock.Request {
+	return gock.New("https://suggest3.sinajs.cn").Get("/suggest/")
+}
 
-	// 2. common
-	keys := []string{"lxjm", "lxzk"}
-	res = MultiSearch(ctx, keys)
-	require.Equal(t, len(keys), len(res))
+func TestSearch(t *testing.T) {
+	defer gock.Off()
+	body := `var suggestvalue="招商银行,11,600036,sh600036,招商银行,,招商银行,99,1,ESG,,";`
+	searchURL().Reply(200).BodyString(body)
+	secs, err := Search(context.Background(), "招商银行")
+	require.NoError(t, err)
+	require.Equal(t, "SH600036", secs[0].ExCode)
+
+	searchURL().Reply(200).BodyString(`var suggestvalue="";`)
+	secs, err = Search(context.Background(), "没有这只证券")
+	require.NoError(t, err, "没有匹配不是错误")
+	require.Empty(t, secs)
+
+	searchURL().Reply(503)
+	_, err = Search(context.Background(), "招商银行")
+	require.ErrorContains(t, err, "HTTP 503")
+
+	searchURL().Reply(200).BodyString("<html>验证页面</html>")
+	_, err = Search(context.Background(), "招商银行")
+	require.ErrorContains(t, err, "无法识别", "200 的异常页面不是没有匹配")
+
+	gock.New("https://suggest3.sinajs.cn").Get("/suggest/").ReplyError(errors.New("network down"))
+	_, err = Search(context.Background(), "招商银行")
+	require.Error(t, err, "网络失败不能当成没有结果")
+}
+
+// 关键字里的 & 和 = 不能变成新的参数。
+func TestSearchEscapesKeyword(t *testing.T) {
+	defer gock.Off()
+	for key, want := range map[string]string{"AT&T": "key=AT%26T", "a=b": "key=a%3Db", "a b": "key=a%20b", "a+b": "key=a%2Bb", "招商": "key=%E6%8B%9B%E5%95%86"} {
+		var got string
+		searchURL().AddMatcher(func(req *http.Request, _ *gock.Request) (bool, error) {
+			got = req.URL.EscapedPath()
+			return true, nil
+		}).Reply(200).BodyString(`var suggestvalue="";`)
+		_, err := Search(context.Background(), key)
+		require.NoError(t, err)
+		require.True(t, strings.HasSuffix(got, want), "%s -> %s", key, got)
+	}
+}
+
+func TestMultiSearch(t *testing.T) {
+	defer gock.Off()
+	res, err := MultiSearch(context.Background(), nil)
+	require.NoError(t, err)
+	require.Empty(t, res)
+
+	// 超过上限时只查前面的关键字，也不能一直等不存在的结果。
+	keys := make([]string, MAX_KEY_NUM+3)
+	for i := range keys {
+		keys[i] = fmt.Sprint(i)
+	}
+	searchURL().Times(MAX_KEY_NUM).Reply(200).BodyString(`var suggestvalue="招商银行,11,600036,sh600036,招商银行,,招商银行,99,1,ESG,,";`)
+	res, err = MultiSearch(context.Background(), keys)
+	require.NoError(t, err)
+	require.Len(t, res, MAX_KEY_NUM)
+
+	// 部分失败时返回成功的部分。
+	searchURL().Reply(200).BodyString(`var suggestvalue="招商银行,11,600036,sh600036,招商银行,,招商银行,99,1,ESG,,";`)
+	searchURL().Reply(500)
+	res, err = MultiSearch(context.Background(), []string{"a", "b"})
+	require.NoError(t, err)
+	require.Len(t, res, 1)
+
+	// 全部失败时返回错误。
+	searchURL().Times(2).Reply(500)
+	_, err = MultiSearch(context.Background(), []string{"a", "b"})
+	require.ErrorContains(t, err, "HTTP 500")
+
+	// 一个失败、一个没有匹配时也没有结果，不能当成查无结果。
+	searchURL().Reply(200).BodyString(`var suggestvalue="";`)
+	searchURL().Reply(500)
+	_, err = MultiSearch(context.Background(), []string{"a", "b"})
+	require.ErrorContains(t, err, "HTTP 500")
+
+	// 都没有匹配才是空结果。
+	searchURL().Times(2).Reply(200).BodyString(`var suggestvalue="";`)
+	res, err = MultiSearch(context.Background(), []string{"a", "b"})
+	require.NoError(t, err)
+	require.Empty(t, res)
 }

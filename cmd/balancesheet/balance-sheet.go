@@ -45,7 +45,10 @@ type result struct {
 func BalanceSheetHandler(cmd *cobra.Command, args []string) error {
 
 	key := args[0]
-	secs := sina.Search(cmd.Context(), key)
+	secs, err := sina.Search(cmd.Context(), key)
+	if err != nil {
+		return fmt.Errorf("搜索证券失败: %w", err)
+	}
 	if len(secs) == 0 {
 		slog.Info("search no sec", "code", key)
 		return nil
