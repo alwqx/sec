@@ -59,6 +59,7 @@ func NewCLI() *cobra.Command {
 		RunE:    SearchHandler,
 	}
 	searchCmd.Flags().BoolP("debug", "D", false, "Enable debug mode")
+	searchCmd.Flags().Bool("json", false, "Output JSON")
 
 	infoCmd := &cobra.Command{
 		Use:     "info",
@@ -69,6 +70,7 @@ func NewCLI() *cobra.Command {
 	}
 	infoCmd.Flags().BoolP("debug", "D", false, "Enable debug mode")
 	infoCmd.Flags().BoolP("dividends", "d", false, "show dividend info")
+	infoCmd.Flags().Bool("json", false, "Output JSON")
 
 	rootCmd.AddCommand(
 		searchCmd, infoCmd,
@@ -112,6 +114,12 @@ func SearchHandler(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("搜索证券失败: %w", err)
 	}
+	if asJSON, _ := cmd.Flags().GetBool("json"); asJSON {
+		if secs == nil {
+			secs = []*sina.BasicSecurity{}
+		}
+		return utils.PrintJSON(cmd.OutOrStdout(), map[string]any{"results": secs})
+	}
 	printSecs(cmd.OutOrStdout(), secs)
 
 	return nil
@@ -131,7 +139,11 @@ func InfoHandler(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("搜索证券失败: %w", err)
 	}
+	asJSON, _ := cmd.Flags().GetBool("json")
 	if len(secs) == 0 {
+		if asJSON {
+			return fmt.Errorf("未找到证券: %s", args[0])
+		}
 		slog.Warn("no result", "code", args[0])
 		return nil
 	}
@@ -143,6 +155,10 @@ func InfoHandler(cmd *cobra.Command, args []string) error {
 	profile, err := sina.Profile(cmd.Context(), opts)
 	if err != nil {
 		return err
+	}
+
+	if asJSON {
+		return printInfoJSON(cmd, sec.ExCode, profile, opts)
 	}
 
 	fmt.Fprintf(cmd.OutOrStdout(), "证券代码\t%s\n简称历史\t%s\n公司名称\t%s\n上市日期\t%s\n发行价格\t%.2f\n行业分类\t%s\n主营业务\t%s\n办公地址\t%s\n公司网址\t%s\n当前价格\t%s\n市净率PB\t%s\n市盈率TTM\t%s\n总市值  \t%s\n流通市值\t%s\n",
@@ -161,6 +177,51 @@ func InfoHandler(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// infoRow 是 sec info 的 --json 输出，不可用的指标是 null。
+type infoRow struct {
+	ExCode          string          `json:"ex_code"`
+	Name            string          `json:"name"`
+	HistoryName     string          `json:"history_name"`
+	ListingDate     string          `json:"listing_date"`
+	ListingPrice    *float64        `json:"listing_price"`
+	Category        string          `json:"category"`
+	MainBusiness    string          `json:"main_business"`
+	BusinessAddress string          `json:"business_address"`
+	RegisterAddress string          `json:"register_address"`
+	WebSite         string          `json:"website"`
+	Price           *float64        `json:"price"`
+	PriceIsYClose   bool            `json:"price_is_yclose"`
+	PB              *float64        `json:"pb"`
+	PETTM           *float64        `json:"pe_ttm"`
+	MarketCap       *float64        `json:"market_cap"`
+	TradedMarketCap *float64        `json:"traded_market_cap"`
+	Dividends       []sina.Dividend `json:"dividends,omitzero"` // 只有 -d 时输出，没有分红时是空数组
+}
+
+func nonZero(value float64) *float64 {
+	if value == 0 {
+		return nil
+	}
+	return &value
+}
+
+func printInfoJSON(cmd *cobra.Command, exCode string, profile *sina.CorpProfile, opts *types.InfoOptions) error {
+	row := infoRow{
+		ExCode: exCode, Name: profile.Name, HistoryName: profile.HistoryName, ListingDate: profile.ListingDate, ListingPrice: nonZero(profile.ListingPrice),
+		Category: profile.Category, MainBusiness: profile.MainBusiness, BusinessAddress: profile.BusinessAddress, RegisterAddress: profile.RegisterAddress, WebSite: profile.WebSite,
+		Price: nonZero(profile.Current), PriceIsYClose: profile.PriceIsYClose, PB: nonZero(profile.PB), PETTM: nonZero(profile.PeTTM),
+		MarketCap: nonZero(profile.MarketCap), TradedMarketCap: nonZero(profile.TradedMarketCap),
+	}
+	if opts.Dividend {
+		dividends, err := sina.QueryDividends(cmd.Context(), opts.Code)
+		if err != nil {
+			return fmt.Errorf("查询分红失败: %w", err)
+		}
+		row.Dividends = append([]sina.Dividend{}, dividends...)
+	}
+	return utils.PrintJSON(cmd.OutOrStdout(), row)
 }
 
 func printSecs(out io.Writer, secs []*sina.BasicSecurity) {

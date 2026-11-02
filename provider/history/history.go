@@ -1,4 +1,4 @@
-// Package history 提供日线行情，东方财富不可用时改用新浪备用数据。
+// Package history 提供 K 线行情，东方财富不可用时改用新浪备用数据。
 package history
 
 import (
@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"strings"
 	"time"
 
@@ -14,7 +15,7 @@ import (
 )
 
 // FallbackNote 说明备用数据和东方财富的差异。
-const FallbackNote = "东方财富行情暂不可用，已改用新浪备用数据：不复权，没有成交额和换手率，最多约 4 年；区间开头的指标可能缺少预热数据。"
+const FallbackNote = "东方财富行情暂不可用，已改用新浪备用数据：不复权，没有成交额和换手率，最多 1023 根 K 线；区间开头的指标可能缺少预热数据。"
 
 // ErrRangeNotCovered 表示备用数据覆盖不了请求的区间，重试没有用，需要缩短区间。
 var ErrRangeNotCovered = errors.New("备用数据覆盖不了请求的区间")
@@ -28,7 +29,7 @@ type Result struct {
 	Note   string
 }
 
-// Get 查询日线。东方财富失败时，沪深不复权行情改用新浪；备用数据覆盖不了请求区间时返回错误，不输出部分结果。
+// Get 查询 K 线。东方财富失败时，沪深不复权行情改用新浪；备用数据覆盖不了请求区间时返回错误，不输出部分结果。
 func Get(ctx context.Context, req *eastmoney.GetQuoteHistoryReq) (*Result, error) {
 	return GetFrom(ctx, req, req.Begin)
 }
@@ -51,7 +52,7 @@ func GetFrom(ctx context.Context, req *eastmoney.GetQuoteHistoryReq, required st
 		return nil, fmt.Errorf("%w: %w", ErrAdjustedUnavailable, err)
 	}
 	slog.WarnContext(ctx, "东方财富行情失败，改用新浪备用数据", "code", req.Code, "error", err)
-	bars, fallbackErr := sina.QueryDailyBars(ctx, symbol, sina.MaxDailyBars)
+	bars, fallbackErr := sina.QueryBars(ctx, symbol, sinaScale(req.Freq), sina.MaxBars)
 	if fallbackErr != nil {
 		return nil, fmt.Errorf("东方财富: %w；新浪备用: %w", err, fallbackErr)
 	}
@@ -64,6 +65,16 @@ func GetFrom(ctx context.Context, req *eastmoney.GetQuoteHistoryReq, required st
 		return nil, fmt.Errorf("东方财富: %w；新浪备用: %w", err, fallbackErr)
 	}
 	return &Result{Quotes: quotes, Note: FallbackNote}, nil
+}
+
+func sinaScale(freq eastmoney.Freq) int {
+	switch freq {
+	case eastmoney.FreqWeek:
+		return sina.ScaleWeek
+	case eastmoney.FreqMonth:
+		return sina.ScaleMonth
+	}
+	return sina.ScaleDay
 }
 
 func sinaSymbol(req *eastmoney.GetQuoteHistoryReq) (string, bool) {
@@ -81,9 +92,14 @@ func compactDate(date string) string {
 	return strings.ReplaceAll(date, "-", "")
 }
 
-func toQuotes(bars []*sina.DailyBar, req *eastmoney.GetQuoteHistoryReq, required string) ([]*eastmoney.Quote, error) {
+func round(value float64, digits int) float64 {
+	scale := math.Pow10(digits)
+	return math.Round(value*scale) / scale
+}
+
+func toQuotes(bars []*sina.Bar, req *eastmoney.GetQuoteHistoryReq, required string) ([]*eastmoney.Quote, error) {
 	// 取满上限时，更早的数据被截断了；不满上限说明已经到上市首日。
-	if len(bars) >= sina.MaxDailyBars && required != "" && compactDate(bars[0].Date) > compactDate(required) {
+	if len(bars) >= sina.MaxBars && required != "" && compactDate(bars[0].Date) > compactDate(required) {
 		return nil, fmt.Errorf("%w: 只有 %s 之后的数据，请求从 %s 开始", ErrRangeNotCovered, bars[0].Date, required)
 	}
 	quotes := make([]*eastmoney.Quote, 0, len(bars))
@@ -104,9 +120,10 @@ func toQuotes(bars []*sina.DailyBar, req *eastmoney.GetQuoteHistoryReq, required
 		if i > 0 && bars[i-1].Close > 0 {
 			quote.NoChange = false
 			previous := bars[i-1].Close
-			quote.Change = bar.Close - previous
-			quote.ChangeRate = quote.Change / previous * 100
-			quote.Amplitude = (bar.High - bar.Low) / previous * 100
+			// 和东方财富一样保留小数位，去掉浮点噪声。
+			quote.Change = round(bar.Close-previous, 3)
+			quote.ChangeRate = round((bar.Close-previous)/previous*100, 2)
+			quote.Amplitude = round((bar.High-bar.Low)/previous*100, 2)
 		}
 		quotes = append(quotes, quote)
 	}

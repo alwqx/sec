@@ -103,6 +103,10 @@ func TestLossCompany(t *testing.T) {
 	require.Nil(t, r.Graham)
 	require.False(t, r.DCF.Applicable)
 	require.Contains(t, r.DCF.Note, "亏损")
+	require.Nil(t, r.DCF.FairPrice)
+	require.Nil(t, r.DCF.PerShare)
+	require.Nil(t, r.DCF.Upside)
+	require.Nil(t, r.DCF.Value)
 }
 
 func TestGrowth(t *testing.T) {
@@ -174,14 +178,22 @@ func TestDCF(t *testing.T) {
 		pv += cash / math.Pow(1.08, float64(year))
 	}
 	terminal := cash * 1.03 / 0.05 / math.Pow(1.08, 5)
-	require.Equal(t, base, dcf.BaseCash)
-	require.InDelta(t, pv, dcf.GrowthPV, 1e-3)
-	require.InDelta(t, terminal, dcf.TerminalPV, 1e-3)
-	require.InDelta(t, (pv+terminal)/1e8, dcf.PerShare, 1e-6)
-	require.InDelta(t, dcf.PerShare*0.8, dcf.FairPrice, 1e-6)
-	require.InDelta(t, (dcf.FairPrice/50-1)*100, dcf.Upside, 1e-6)
-	require.InDelta(t, terminal/(pv+terminal)*100, dcf.TerminalShare, 1e-6)
+	require.Equal(t, base, *dcf.BaseCash)
+	require.InDelta(t, pv, *dcf.GrowthPV, 1e-3)
+	require.InDelta(t, terminal, *dcf.TerminalPV, 1e-3)
+	require.InDelta(t, (pv+terminal)/1e8, *dcf.PerShare, 1e-6)
+	require.InDelta(t, *dcf.PerShare*0.8, *dcf.FairPrice, 1e-6)
+	require.InDelta(t, (*dcf.FairPrice/50-1)*100, *dcf.Upside, 1e-6)
+	require.InDelta(t, terminal/(pv+terminal)*100, *dcf.TerminalShare, 1e-6)
 	require.Empty(t, dcf.Warning)
+}
+
+func TestDCFWithoutPriceHasNoUpside(t *testing.T) {
+	r := &Result{Shares: 1e8, ProfitTTM: num(5e8)}
+	dcf := computeDCF(r, DefaultDCFParams())
+	require.True(t, dcf.Applicable)
+	require.NotNil(t, dcf.FairPrice)
+	require.Nil(t, dcf.Upside, "没有收盘价时不能报 0%")
 }
 
 func TestDCFGrowthSource(t *testing.T) {
@@ -216,7 +228,7 @@ func TestDCFZeroGrowthIsNotAuto(t *testing.T) {
 	for year := 1; year <= 5; year++ {
 		pv += base / math.Pow(1.08, float64(year))
 	}
-	require.InDelta(t, pv, dcf.GrowthPV, 1e-3)
+	require.InDelta(t, pv, *dcf.GrowthPV, 1e-3)
 }
 
 func TestDCFFinancialWarning(t *testing.T) {

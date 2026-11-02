@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
-	"time"
 
 	"github.com/alwqx/sec/provider/cninfo"
 	"github.com/alwqx/sec/provider/sina"
+	"github.com/alwqx/sec/utils"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 )
@@ -26,10 +26,12 @@ func NewAnnouncementsCLI() *cobra.Command {
 	cmd.Flags().StringP("type", "t", "", "Filter by type: annual, halfyear, q1, q3")
 	cmd.Flags().Bool("latest", false, "Show latest market-wide announcements (no stock filter)")
 	cmd.Flags().IntP("page", "p", 1, "Page number")
+	cmd.Flags().Bool("json", false, "Output JSON")
 	return cmd
 }
 
 func runAnnouncements(cmd *cobra.Command, args []string) error {
+	asJSON, _ := cmd.Flags().GetBool("json")
 	var stockParam string
 	var secName string
 
@@ -47,6 +49,9 @@ func runAnnouncements(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("搜索证券失败: %w", err)
 		}
 		if len(secs) == 0 {
+			if asJSON {
+				return fmt.Errorf("未找到证券: %s", key)
+			}
 			fmt.Fprintf(cmd.OutOrStdout(), "未找到证券: %s\n", key)
 			return nil
 		}
@@ -94,6 +99,13 @@ func runAnnouncements(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("查询公告失败: %w", err)
 	}
 
+	if asJSON {
+		output := map[string]any{"page": page, "total": 0, "total_pages": 0, "results": []cninfo.Row{}}
+		if resp != nil {
+			output["total"], output["total_pages"], output["results"] = resp.Total, resp.TotalPages, cninfo.ToRows(resp.Data)
+		}
+		return utils.PrintJSON(cmd.OutOrStdout(), output)
+	}
 	if resp == nil || len(resp.Data) == 0 {
 		fmt.Fprintf(cmd.OutOrStdout(), "未找到公告\n")
 		return nil
@@ -117,12 +129,12 @@ func runAnnouncements(cmd *cobra.Command, args []string) error {
 			continue
 		}
 		title := a.Title
-		t := time.Unix(a.Time/1000, 0).Format("2006-01-02")
+		t := a.DateText()
 		typeName := a.TypeName
 		if typeName == "" {
 			typeName = "-"
 		}
-		size := formatSize(float64(a.AdjunctSize))
+		size := formatSize(a.SizeBytes())
 		data = append(data, []string{t, title, typeName, size})
 
 		style := make([]tablewriter.Colors, len(headers))

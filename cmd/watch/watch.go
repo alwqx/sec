@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/alwqx/sec/provider/sina"
+	"github.com/alwqx/sec/utils"
 	"github.com/alwqx/sec/watchlist"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
@@ -38,6 +39,7 @@ func NewWatchCLI() *cobra.Command {
 		RunE: runWatchShow,
 	}
 	cmd.Flags().BoolP("debug", "D", false, "Enable debug mode")
+	cmd.Flags().Bool("json", false, "Output JSON")
 
 	cmd.AddCommand(
 		&cobra.Command{
@@ -78,7 +80,11 @@ func runWatchShow(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("读取自选列表失败: %w", err)
 	}
+	asJSON, _ := cmd.Flags().GetBool("json")
 	if len(items) == 0 {
+		if asJSON {
+			return utils.PrintJSON(cmd.OutOrStdout(), map[string]any{"results": []watchJSONRow{}})
+		}
 		fmt.Fprintf(cmd.OutOrStdout(), "自选列表为空。使用 sec watch add <代码> 添加股票\n")
 		return nil
 	}
@@ -95,6 +101,9 @@ func runWatchShow(cmd *cobra.Command, args []string) error {
 	if len(exCodes) > 0 {
 		qlist, err := sina.QueryQuoteList(cmd.Context(), exCodes)
 		if err != nil {
+			if asJSON {
+				return fmt.Errorf("获取行情失败: %w", err)
+			}
 			slog.Warn("获取行情失败", "error", err)
 		}
 		for _, q := range qlist {
@@ -119,9 +128,46 @@ func runWatchShow(cmd *cobra.Command, args []string) error {
 		rows = append(rows, r)
 	}
 
+	if asJSON {
+		results := make([]watchJSONRow, 0, len(rows))
+		for _, r := range rows {
+			results = append(results, newWatchJSONRow(r))
+		}
+		return utils.PrintJSON(cmd.OutOrStdout(), map[string]any{"results": results})
+	}
+
 	// Display
 	printWatchQuotes(cmd.OutOrStdout(), rows)
 	return nil
+}
+
+// watchJSONRow 是 sec watch 的 --json 输出，不可用的值是 null。
+type watchJSONRow struct {
+	ExCode        string   `json:"ex_code"`
+	Name          string   `json:"name"`
+	Price         *float64 `json:"price"`
+	PriceIsYClose bool     `json:"price_is_yclose"`
+	Change        *float64 `json:"change"`
+	ChangePct     *float64 `json:"change_pct"`
+	High          *float64 `json:"high"`
+	Low           *float64 `json:"low"`
+}
+
+func newWatchJSONRow(r quoteRow) watchJSONRow {
+	row := watchJSONRow{ExCode: r.item.ExCode, Name: r.item.Name, PriceIsYClose: r.priceIsYClose}
+	if r.price > 0 {
+		row.Price = &r.price
+	}
+	if r.hasChange {
+		row.Change, row.ChangePct = &r.chg, &r.chgPct
+	}
+	if r.high > 0 {
+		row.High = &r.high
+	}
+	if r.low > 0 {
+		row.Low = &r.low
+	}
+	return row
 }
 
 func (r quoteRow) priceText() string {

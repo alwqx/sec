@@ -181,3 +181,23 @@ func parseOrZero(s string) float64 {
 	fmt.Sscanf(s, "%f", &v)
 	return v
 }
+
+func TestCheckPeriods(t *testing.T) {
+	require.NoError(t, checkPeriods(map[string]int{"fast": 1, "slow": 20}))
+	require.ErrorContains(t, checkPeriods(map[string]int{"period": 0}), "--period 必须大于 0")
+	require.ErrorContains(t, checkPeriods(map[string]int{"signal": -1}), "--signal 必须大于 0")
+}
+
+// 快线周期也可能比慢线长，数据量要按最长的周期判断，否则输出全是空值。
+func TestComputeRequiresLongestPeriod(t *testing.T) {
+	quotes := make([]*eastmoney.Quote, 60)
+	for i := range quotes {
+		quotes[i] = &eastmoney.Quote{Date: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC).AddDate(0, 0, i), Close: 10 + float64(i%7)}
+	}
+	headers, _, _ := ComputeMA(quotes, 61, 20)
+	require.Nil(t, headers)
+	headers, _, _ = ComputeMA(quotes, 60, 20)
+	require.NotNil(t, headers)
+	headers, _, _ = ComputeMACD(quotes, 55, 12, 9)
+	require.Nil(t, headers)
+}

@@ -33,6 +33,8 @@ func NewKLineCLI() *cobra.Command {
 	}
 	rootCmd.Flags().StringP("begin", "b", "", "Begin date 20260101")
 	rootCmd.Flags().StringP("end", "e", "", "End date 20260131")
+	rootCmd.Flags().String("freq", "day", "K-line frequency: day, week, month")
+	rootCmd.Flags().Bool("json", false, "Output K-line data as JSON instead of a chart")
 	rootCmd.Flags().StringP("fq", "f", "", "FuQuan type: bfq none, qfq front, hfq post")
 	rootCmd.Flags().IntP("height", "H", 20, "Chart height in rows")
 	rootCmd.Flags().Bool("half-block", false, "Use half-block chars for 2x resolution")
@@ -41,6 +43,8 @@ func NewKLineCLI() *cobra.Command {
 	// Indicator overlays
 	rootCmd.Flags().String("ma", "", "MA periods, comma-separated (e.g. 5,20,60)")
 	rootCmd.Flags().String("boll", "", "Bollinger Bands: period,k (e.g. 20,2.0)")
+	rootCmd.MarkFlagsMutuallyExclusive("json", "ma")
+	rootCmd.MarkFlagsMutuallyExclusive("json", "boll")
 
 	return rootCmd
 }
@@ -53,6 +57,9 @@ func KLineHandler(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("搜索证券失败: %w", err)
 	}
 	if len(secs) == 0 {
+		if asJSON, _ := cmd.Flags().GetBool("json"); asJSON {
+			return fmt.Errorf("未找到证券: %s", key)
+		}
 		slog.Info("search no sec", "code", key)
 		return nil
 	}
@@ -92,9 +99,26 @@ func KLineHandler(cmd *cobra.Command, args []string) error {
 
 	beginStr, _ := cmd.Flags().GetString("begin")
 	endStr, _ := cmd.Flags().GetString("end")
-	req.Begin, req.End, err = utils.ParseBeginEnd(beginStr, endStr, 90, eastmoney.TimeYYMMDD, eastmoney.TimeYYMMDD)
+	freqText, _ := cmd.Flags().GetString("freq")
+	req.Freq, err = eastmoney.ParseFreq(freqText)
 	if err != nil {
 		return err
+	}
+	// 默认区间按周期放大，根数大致相同。
+	req.Begin, req.End, err = utils.ParseBeginEnd(beginStr, endStr, 90*req.Freq.BarDays(), eastmoney.TimeYYMMDD, eastmoney.TimeYYMMDD)
+	if err != nil {
+		return err
+	}
+
+	if asJSON, _ := cmd.Flags().GetBool("json"); asJSON {
+		result, err := history.Get(cmd.Context(), req)
+		if err != nil {
+			return err
+		}
+		if result.Note != "" {
+			fmt.Fprintln(cmd.ErrOrStderr(), result.Note)
+		}
+		return utils.PrintJSON(cmd.OutOrStdout(), history.NewOutput(sec.ExCode, sec.Name, req, result, result.Quotes))
 	}
 
 	var (

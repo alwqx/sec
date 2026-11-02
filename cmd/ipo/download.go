@@ -168,7 +168,7 @@ func runDownload(cmd *cobra.Command, args []string) error {
 
 		sizeStr := ""
 		if a.AdjunctSize > 0 {
-			sizeStr = fmt.Sprintf(" (%s)", utils.HumanByte(float64(a.AdjunctSize)))
+			sizeStr = fmt.Sprintf(" (%s)", utils.HumanByte(a.SizeBytes()))
 		}
 		fmt.Fprintf(out, "      完成%s\n", sizeStr)
 		downloaded++
@@ -213,7 +213,7 @@ func printDownloadList(out io.Writer, announcements []*cninfo.Announcement) {
 	for i, a := range announcements {
 		sizeStr := "-"
 		if a.AdjunctSize > 0 {
-			sizeStr = utils.HumanByte(float64(a.AdjunctSize))
+			sizeStr = utils.HumanByte(a.SizeBytes())
 		}
 		title := a.Title
 		if len([]rune(title)) > 60 {

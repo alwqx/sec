@@ -19,6 +19,7 @@ func NewMetalHistoryCLI() *cobra.Command {
 		RunE:    MetalHistoryHandler,
 	}
 	rootCmd.Flags().BoolP("debug", "D", false, "Enable debug mode")
+	rootCmd.Flags().Bool("json", false, "Output JSON")
 	rootCmd.Flags().StringP("begin", "b", "", "Begin date 20250101")
 	rootCmd.Flags().StringP("end", "e", "", "End date 20250131")
 
@@ -39,6 +40,9 @@ func MetalHistoryHandler(cmd *cobra.Command, args []string) error {
 	resp, err := metal.QueryAu999(cmd.Context(), req)
 	if err != nil {
 		return err
+	}
+	if asJSON, _ := cmd.Flags().GetBool("json"); asJSON {
+		return printDailyJSON(cmd, resp.Data)
 	}
 	printAu999History(cmd.OutOrStdout(), resp.Data)
 

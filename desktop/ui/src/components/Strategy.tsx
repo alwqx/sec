@@ -3,7 +3,7 @@ import { strategy } from '../api'
 import { useResource } from '../hooks/useResource'
 import type { StrategyResult } from '../types'
 import ResourceState from './ResourceState'
-import { marketToday, monthsAgo } from '../marketDate'
+import { frequencies, marketToday, monthsAgo, rangeLabel, type Frequency } from '../marketDate'
 
 const kinds = {
   ma: { title: '双均线', params: [['fast', '快线', '5'], ['slow', '慢线', '20']], rule: '快线上穿慢线为买入，下穿为卖出。' },
@@ -13,7 +13,6 @@ const kinds = {
 } as const
 type Kind = keyof typeof kinds
 const adjustments = { qfq: '前复权', bfq: '不复权', hfq: '后复权' }
-const ranges = [[3, '近 3 个月'], [6, '近 6 个月'], [12, '近 1 年'], [24, '近 2 年']] as const
 const lineClasses = ['strategy-line-0', 'strategy-line-1', 'strategy-line-2']
 
 function StrategyChart({ data, name }: { data: StrategyResult; name: string }) {
@@ -71,7 +70,7 @@ function StrategyChart({ data, name }: { data: StrategyResult; name: string }) {
   return <div className="history-chart" ref={container}>
     <div className="candle-detail"><time>{data.dates[current]}</time><span>收盘 {data.closes[current].toFixed(2)}</span>
       {data.series.map(item => <span key={item.label}>{item.label} {item.values[current]?.toFixed(2) ?? '—'}</span>)}</div>
-    <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} role="img" tabIndex={0} aria-label={`${name} 技术分析，${count} 个交易日；左右方向键选择交易日`} onKeyDown={selectKey} onPointerMove={selectPointer} onPointerDown={selectPointer} onPointerLeave={() => setSelected(null)}>
+    <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} role="img" tabIndex={0} aria-label={`${name} 技术分析，${count} 根 K 线；左右方向键选择交易日`} onKeyDown={selectKey} onPointerMove={selectPointer} onPointerDown={selectPointer} onPointerLeave={() => setSelected(null)}>
       {[0, .5, 1].map(t => { const value = price.low + (price.high - price.low) * t; return <g key={t}><line className="chart-grid" x1={left} x2={right} y1={price.y(value)} y2={price.y(value)} /><text x={left - 8} y={price.y(value) + 4} textAnchor="end">{value.toFixed(2)}</text></g> })}
       <path className="strategy-close" d={path(data.closes, price.y)} />
       {priceSeries.map((item, index) => <path key={item.label} className={`strategy-line ${lineClasses[index % 3]}`} d={path(item.values, price.y)} />)}
@@ -98,10 +97,11 @@ function defaultParams(kind: Kind) {
 function LoadedStrategy({ code }: { code: string }) {
   const [kind, setKind] = useState<Kind>('ma')
   const [fq, setFq] = useState<keyof typeof adjustments>('qfq')
+  const [freq, setFreq] = useState<Frequency>('day')
   const [range, setRange] = useState(() => ({ begin: monthsAgo(12), end: marketToday() }))
   const [draft, setDraft] = useState(() => defaultParams('ma'))
   const [params, setParams] = useState(draft)
-  const load = useCallback((signal: AbortSignal) => strategy({ code, kind, fq, ...range, ...params }, signal), [code, kind, fq, range, params])
+  const load = useCallback((signal: AbortSignal) => strategy({ code, kind, fq, freq, ...range, ...params }, signal), [code, kind, fq, freq, range, params])
   const resource = useResource(load)
   const data = resource.data
   const signals = useMemo(() => [...(data?.signals ?? [])].reverse(), [data])
@@ -111,21 +111,28 @@ function LoadedStrategy({ code }: { code: string }) {
     setDraft(values)
     setParams(values)
   }
+  // 日线默认近 1 年；周线和月线的 K 线少，看得更长。
+  const changeFreq = (next: Frequency) => {
+    if (next === freq) return
+    setFreq(next)
+    setRange({ begin: monthsAgo(next === 'day' ? 12 : frequencies[next].months), end: marketToday() })
+  }
   const submit = (event: FormEvent) => { event.preventDefault(); setParams({ ...draft }) }
   const buys = signals.filter(item => item.type === 'buy').length
   return <div className="strategy-page">
     <div className="section-toolbar"><div className="segmented" role="group" aria-label="策略">{(Object.keys(kinds) as Kind[]).map(item => <button key={item} aria-pressed={kind === item} onClick={() => changeKind(item)}>{kinds[item].title}</button>)}</div>
+      <div className="segmented" role="group" aria-label="K 线周期">{(Object.keys(frequencies) as Frequency[]).map(item => <button key={item} aria-pressed={freq === item} onClick={() => changeFreq(item)}>{frequencies[item].title}</button>)}</div>
       <label>复权<select aria-label="复权方式" value={fq} onChange={event => setFq(event.target.value as keyof typeof adjustments)}>{Object.entries(adjustments).map(([value, title]) => <option key={value} value={value}>{title}</option>)}</select></label></div>
     <form className="section-toolbar strategy-form" onSubmit={submit}>
       {kinds[kind].params.map(([name, label]) => <label key={name}>{label}<input aria-label={label} inputMode="decimal" value={draft[name] ?? ''} onChange={event => setDraft({ ...draft, [name]: event.target.value })} /></label>)}
       <button type="submit">应用</button>
-      <div className="history-shortcuts">{ranges.map(([months, label]) => <button key={months} type="button" onClick={() => setRange({ begin: monthsAgo(months), end: marketToday() })}>{label}</button>)}</div>
+      <div className="history-shortcuts">{frequencies[freq].ranges.map(months => <button key={months} type="button" onClick={() => setRange({ begin: monthsAgo(months), end: marketToday() })}>{rangeLabel(months)}</button>)}</div>
     </form>
-    <p className="data-note">{range.begin} 至 {range.end} · {adjustments[fq]} · {kinds[kind].rule}</p>
+    <p className="data-note">{range.begin} 至 {range.end} · {frequencies[freq].title} · {adjustments[fq]} · {kinds[kind].rule}</p>
     <ResourceState {...resource} retry={resource.reload} />
     {data?.source_note && <p className="data-note">{data.source_note}</p>}
-    {data && (data.insufficient ? <div className="empty-state">数据不足：至少需要 {data.required} 个交易日。</div> : data.dates.length === 0 ? <div className="empty-state">所选区间没有交易记录。</div> : <>
-      <StrategyChart key={`${kind}-${data.dates.length}`} data={data} name={code} />
+    {data && (data.insufficient ? <div className="empty-state">数据不足：至少需要 {data.required} 根 K 线。</div> : data.dates.length === 0 ? <div className="empty-state">所选区间没有交易记录。</div> : <>
+      <StrategyChart key={`${kind}-${freq}-${data.dates.length}`} data={data} name={code} />
       <div className="section-caption"><span>信号 {signals.length} 个（买入 {buys} · 卖出 {signals.length - buys}）</span></div>
       {signals.length ? <div className="table-scroll strategy-signals"><table className="data-table"><thead><tr><th>日期</th><th>信号</th><th>收盘价</th><th>原因</th></tr></thead>
         <tbody>{signals.map(item => <tr key={item.date}><td>{item.date}</td><td className={item.type === 'buy' ? 'up' : 'down'}>{item.type === 'buy' ? '买入' : '卖出'}</td><td>{item.price.toFixed(2)}</td><td>{item.reason}</td></tr>)}</tbody></table></div> : <div className="empty-state">所选区间没有触发信号。</div>}

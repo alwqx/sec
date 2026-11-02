@@ -51,16 +51,29 @@ func runRSI(cmd *cobra.Command, args []string) error {
 	period, _ := cmd.Flags().GetInt("period")
 	overbought, _ := cmd.Flags().GetFloat64("overbought")
 	oversold, _ := cmd.Flags().GetFloat64("oversold")
+	if err := checkPeriods(map[string]int{"period": period}); err != nil {
+		return err
+	}
 
-	exCode, name, quotes, err := fetchOHLCV(cmd, args[0], 250)
+	exCode, name, quotes, note, err := fetchOHLCV(cmd, args[0], 250)
 	if err != nil {
 		return err
 	}
 
 	headers, data, signals := ComputeRSI(quotes, period, overbought, oversold)
 	if headers == nil {
-		fmt.Fprintf(cmd.OutOrStdout(), "数据不足（需要至少 %d 个交易日）\n", period+1)
+		if wantJSON(cmd) {
+			return fmt.Errorf("数据不足（需要至少 %d 根 K 线）", period+1)
+		}
+		fmt.Fprintf(cmd.OutOrStdout(), "数据不足（需要至少 %d 根 K 线）\n", period+1)
 		return nil
+	}
+
+	if wantJSON(cmd) {
+		prices, _ := strategyPrices(quotes)
+		return printJSON(cmd, exCode, name, "rsi", map[string]any{"period": period, "overbought": overbought, "oversold": oversold}, note, quotes, []jsonSeries{
+			{"rsi", indicator.RSI(prices, period), period},
+		}, signals)
 	}
 
 	fmt.Fprintf(cmd.OutOrStdout(), "\n证券代码: %s  证券名称: %s  策略: RSI(%d)\n\n", exCode, name, period)

@@ -32,6 +32,8 @@ func NewBalanceSheetCLI() *cobra.Command {
 	cmd.Flags().StringP("type", "t", "", "Report type: balance, income, cashflow")
 	cmd.Flags().StringP("period", "p", "annual", "Period filter: annual, halfyear, q1, q3")
 	cmd.Flags().StringP("output", "o", "", "Export to file (.csv or .json)")
+	cmd.Flags().Bool("json", false, "Output JSON to stdout, with all raw fields")
+	cmd.MarkFlagsMutuallyExclusive("output", "json")
 
 	return cmd
 }
@@ -49,7 +51,11 @@ func BalanceSheetHandler(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("搜索证券失败: %w", err)
 	}
+	asJSON, _ := cmd.Flags().GetBool("json")
 	if len(secs) == 0 {
+		if asJSON {
+			return fmt.Errorf("未找到证券: %s", key)
+		}
 		slog.Info("search no sec", "code", key)
 		return nil
 	}
@@ -97,6 +103,9 @@ func BalanceSheetHandler(cmd *cobra.Command, args []string) error {
 				Period:     periodFilter,
 			})
 			if err != nil {
+				if asJSON {
+					return fmt.Errorf("获取%s失败: %w", rt.DisplayName(), err)
+				}
 				slog.Warn("failed fetch report", "type", rt.DisplayName(), "error", err)
 				continue
 			}
@@ -107,6 +116,10 @@ func BalanceSheetHandler(cmd *cobra.Command, args []string) error {
 	// 上游查询为空时返回空列表；没有任何数据时不能写出空报告，也不能当成成功。
 	if !hasReports(results) {
 		return fmt.Errorf("%s 没有符合条件的财报数据", sec.ExCode)
+	}
+
+	if asJSON {
+		return utils.PrintJSON(cmd.OutOrStdout(), map[string]any{"ex_code": sec.ExCode, "name": sec.Name, "results": exportItems(results)})
 	}
 
 	// Check output flag
@@ -272,16 +285,25 @@ func exportCSV(results []result, path string) error {
 	return nil
 }
 
+type exportItem struct {
+	ReportType   string                 `json:"report_type"`
+	ReportDate   string                 `json:"report_date"`
+	SecurityCode string                 `json:"security_code"`
+	SecurityName string                 `json:"security_name"`
+	PeriodCode   string                 `json:"period_code"`
+	Fields       map[string]interface{} `json:"fields"`
+}
+
 func exportJSON(results []result, path string) error {
-	type exportItem struct {
-		ReportType   string                 `json:"report_type"`
-		ReportDate   string                 `json:"report_date"`
-		SecurityCode string                 `json:"security_code"`
-		SecurityName string                 `json:"security_name"`
-		PeriodCode   string                 `json:"period_code"`
-		Fields       map[string]interface{} `json:"fields"`
+	data, err := json.MarshalIndent(exportItems(results), "", "  ")
+	if err != nil {
+		return err
 	}
 
+	return os.WriteFile(path, data, 0644)
+}
+
+func exportItems(results []result) []exportItem {
 	all := make([]exportItem, 0)
 	for _, r := range results {
 		for _, item := range r.items {
@@ -295,13 +317,7 @@ func exportJSON(results []result, path string) error {
 			})
 		}
 	}
-
-	data, err := json.MarshalIndent(all, "", "  ")
-	if err != nil {
-		return err
-	}
-
-	return os.WriteFile(path, data, 0644)
+	return all
 }
 
 func csvField(v interface{}) string {

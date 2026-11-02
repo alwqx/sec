@@ -67,7 +67,7 @@ func TestAnnouncementsSanitizeTitlesNamesAndLinks(t *testing.T) {
 	require.Contains(t, rr.Body.String(), `"has_more":true`)
 	require.True(t, gock.IsDone())
 	for _, unsafe := range []string{"javascript:alert(1)", "https://evil.example/a.pdf", "//evil.example/a.pdf"} {
-		require.Contains(t, announcementURL(&cninfo.Announcement{ID: "a1", AdjunctURL: unsafe}), "https://www.cninfo.com.cn/new/disclosure/detail?")
+		require.Contains(t, cninfo.AnnouncementURL(&cninfo.Announcement{ID: "a1", AdjunctURL: unsafe}), "https://www.cninfo.com.cn/new/disclosure/detail?")
 	}
 }
 

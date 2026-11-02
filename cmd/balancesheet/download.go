@@ -121,8 +121,8 @@ func BalanceSheetDownloadHandler(cmd *cobra.Command, args []string) error {
 	summaryHeaders := []string{"公告标题", "公告日期", "文件大小"}
 	summaryData := make([][]string, 0, len(validPDFs))
 	for _, a := range validPDFs {
-		t := time.Unix(a.Time/1000, 0).Format("2006-01-02")
-		size := utils.HumanByte(float64(a.AdjunctSize))
+		t := a.DateText()
+		size := utils.HumanByte(a.SizeBytes())
 		summaryData = append(summaryData, []string{a.Title, t, size})
 	}
 	renderTable(cmd, summaryHeaders, summaryData)
@@ -141,7 +141,7 @@ func BalanceSheetDownloadHandler(cmd *cobra.Command, args []string) error {
 			fmt.Fprintf(cmd.OutOrStdout(), " ... 失败: %v\n", err)
 			continue
 		}
-		fmt.Fprintf(cmd.OutOrStdout(), " ... 完成 (%s)\n", utils.HumanByte(float64(a.AdjunctSize)))
+		fmt.Fprintf(cmd.OutOrStdout(), " ... 完成 (%s)\n", utils.HumanByte(a.SizeBytes()))
 	}
 
 	fmt.Fprintln(cmd.OutOrStdout())

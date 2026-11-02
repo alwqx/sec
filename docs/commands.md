@@ -4,6 +4,26 @@
 
 一共 86 个取数命令：个股 11 个、IPO 4 个、宏观 61 个、汇率 6 个、黄金 2 个、美债 2 个。`strategy` 基于已有行情计算，`upgrade` 和 `watch add/remove` 不取数，都不计入。
 
+## 脚本调用
+
+个股、IPO、公告、黄金和美债的只读命令都支持 `--json`，`macro` 和 `fx` 的 JSON 选项见各自文档。约定：
+
+- 输出到 stdout，字段名是 snake_case，列表放在 `results` 里，没有结果时是空数组。
+- 上游缺失或不适用的值是 `null`，不是 0。
+- 失败时 stdout 为空，错误写到 stderr，退出码非 0。找不到证券也算失败。
+- 不输出部分结果：`sec quote --json` 有任何一只证券查不到、超过 5 只，或 `sec financials --json` 不带 `--type` 时任何一类报表失败，都按失败处理。
+- 日期都是 `YYYY-MM-DD`。
+- 涨跌幅、换手率、振幅的单位都是 %；K 线的 `volume` 单位是股或份，`amount` 是成交额。
+- 备用数据的提示写到 stderr，并放在 `source_note`，不影响解析。
+
+```shell
+sec valuation 600036 --json          # 完整估值，不受 --method 影响
+sec strategy macd 600036 --json      # 全部日期，不像表格只显示最后 20 行
+sec quote-history 600036 --freq week --json
+```
+
+`sec quote -r` 和 `sec kline --ma`、`--boll` 不能和 `--json` 同时使用。`sec kline`、`sec quote-history`、`sec strategy` 用 `--freq day|week|month` 选择周期，周线和月线的日期是该周期最后一个交易日。`sec strategy` 的周期参数必须大于 0，K 线少于最长周期时报数据不足。
+
 ## Desktop 菜单
 
 | 一级菜单 | 对应命令 | 状态 |

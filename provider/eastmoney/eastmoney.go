@@ -54,7 +54,7 @@ func getOriginQuoteHistory(ctx context.Context, req *GetQuoteHistoryReq) (res *Q
 	values.Add("fields1", "f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13")
 	values.Add("fields2", "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61")
 	values.Add("rtntype", "6")
-	values.Add("klt", "101")
+	values.Add("klt", req.Freq.klt())
 	switch req.FQT {
 	case QuoteFQTDefault:
 		values.Add("fqt", "0")

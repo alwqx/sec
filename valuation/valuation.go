@@ -120,19 +120,20 @@ type Signal struct {
 
 // DCF 是折现结果，Params.Growth 是实际使用的增长率。不适用时只有 Note 和 Params。
 type DCF struct {
-	Applicable    bool      `json:"applicable"`
-	Note          string    `json:"note"`
-	Warning       string    `json:"warning"`
-	Params        DCFParams `json:"params"`
-	GrowthSource  string    `json:"growth_source"`
-	BaseCash      float64   `json:"base_cash"`
-	GrowthPV      float64   `json:"growth_pv"`
-	TerminalPV    float64   `json:"terminal_pv"`
-	TerminalShare float64   `json:"terminal_share"` // 终值现值占比，单位 %
-	Value         float64   `json:"value"`
-	PerShare      float64   `json:"per_share"`
-	FairPrice     float64   `json:"fair_price"`
-	Upside        float64   `json:"upside"` // 单位 %
+	Applicable   bool      `json:"applicable"`
+	Note         string    `json:"note"`
+	Warning      string    `json:"warning"`
+	Params       DCFParams `json:"params"`
+	GrowthSource string    `json:"growth_source"`
+	// 以下数值在 DCF 不适用时为 nil；Upside 在没有收盘价时也为 nil。
+	BaseCash      *float64 `json:"base_cash"`
+	GrowthPV      *float64 `json:"growth_pv"`
+	TerminalPV    *float64 `json:"terminal_pv"`
+	TerminalShare *float64 `json:"terminal_share"` // 终值现值占比，单位 %
+	Value         *float64 `json:"value"`
+	PerShare      *float64 `json:"per_share"`
+	FairPrice     *float64 `json:"fair_price"`
+	Upside        *float64 `json:"upside"` // 单位 %
 }
 
 // Result 是一只证券的完整估值。无法计算的指标为 nil，不用 0 表示。
@@ -370,20 +371,23 @@ func computeDCF(r *Result, params DCFParams) DCF {
 	dcf.Params.Growth = ptr(growth)
 	wacc := dcf.Params.WACC / 100
 	cash := *r.ProfitTTM * dcfCashRatio
-	dcf.BaseCash = cash
+	dcf.BaseCash = ptr(cash)
+	growthPV := 0.0
 	for year := 1; year <= dcfYears; year++ {
 		cash *= 1 + growth/100
-		dcf.GrowthPV += cash / math.Pow(1+wacc, float64(year))
+		growthPV += cash / math.Pow(1+wacc, float64(year))
 	}
 	terminal := cash * (1 + dcf.Params.TerminalGrowth/100) / (wacc - dcf.Params.TerminalGrowth/100)
-	dcf.TerminalPV = terminal / math.Pow(1+wacc, dcfYears)
-	dcf.Value = dcf.GrowthPV + dcf.TerminalPV
-	dcf.TerminalShare = dcf.TerminalPV / dcf.Value * 100
-	dcf.PerShare = dcf.Value / r.Shares
-	dcf.FairPrice = dcf.PerShare * (1 - dcf.Params.MarginOfSafety/100)
+	terminalPV := terminal / math.Pow(1+wacc, dcfYears)
+	value := growthPV + terminalPV
+	perShare := value / r.Shares
+	fairPrice := perShare * (1 - dcf.Params.MarginOfSafety/100)
+	dcf.GrowthPV, dcf.TerminalPV, dcf.Value = ptr(growthPV), ptr(terminalPV), ptr(value)
+	dcf.TerminalShare = ptr(terminalPV / value * 100)
+	dcf.PerShare, dcf.FairPrice = ptr(perShare), ptr(fairPrice)
 	dcf.Applicable = true
 	if r.Price > 0 {
-		dcf.Upside = (dcf.FairPrice/r.Price - 1) * 100
+		dcf.Upside = ptr((fairPrice/r.Price - 1) * 100)
 	}
 	return dcf
 }

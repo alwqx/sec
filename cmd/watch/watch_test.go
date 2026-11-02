@@ -80,3 +80,12 @@ func TestWatchAddContinuesAfterSearchFailure(t *testing.T) {
 	require.Contains(t, out.String(), "✓ SH600036")
 	require.Contains(t, out.String(), "已添加 1 只")
 }
+
+func TestWatchJSONRowUsesNullForMissingValues(t *testing.T) {
+	row := newWatchJSONRow(quoteRow{item: WatchItem{ExCode: "SH600036", Name: "招商银行"}, price: 43.55, priceIsYClose: true})
+	require.Equal(t, 43.55, *row.Price)
+	require.True(t, row.PriceIsYClose)
+	require.Nil(t, row.Change)
+	require.Nil(t, row.High)
+	require.Nil(t, newWatchJSONRow(quoteRow{}).Price)
+}

@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alwqx/sec/provider/eastmoney"
 	"github.com/alwqx/sec/provider/sina"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/h2non/gock.v1"
@@ -211,7 +212,7 @@ func TestAdjustedHistoryFailureSuggestsUnadjusted(t *testing.T) {
 }
 
 func fullSinaBars(start time.Time) string {
-	rows := make([]string, sina.MaxDailyBars)
+	rows := make([]string, sina.MaxBars)
 	for i := range rows {
 		rows[i] = fmt.Sprintf(`{"day":"%s","open":"10","high":"11","low":"9","close":"10","volume":"1000"}`, start.AddDate(0, 0, i).Format("2006-01-02"))
 	}
@@ -238,4 +239,34 @@ func TestFallbackRangeNotCoveredSuggestsShortening(t *testing.T) {
 	rr := macroRequest(t, "/api/v1/history?code=SH600036&begin=2021-01-01&end=2026-01-01&fq=bfq")
 	require.Equal(t, http.StatusBadGateway, rr.Code)
 	require.Contains(t, rr.Body.String(), "请缩短查询区间")
+}
+
+func TestFreqParameter(t *testing.T) {
+	defer gock.Off()
+	body := `{"data":{"code":"600036","market":1,"name":"A","klines":["2026-10-30,1,2,3,0.5,100,1000,0,0,0,0"]}}`
+	for _, tc := range []struct{ freq, klt string }{{"", "101"}, {"day", "101"}, {"week", "102"}, {"month", "103"}} {
+		gock.New("https://push2his.eastmoney.com").Get("/api/qt/stock/kline/get").MatchParam("klt", tc.klt).Reply(200).BodyString(body)
+		rr := macroRequest(t, "/api/v1/history?code=SH600036&begin=2026-10-01&end=2026-10-31&freq="+tc.freq)
+		require.Equal(t, http.StatusOK, rr.Code, tc.freq)
+		gock.New("https://push2his.eastmoney.com").Get("/api/qt/stock/kline/get").MatchParam("klt", tc.klt).Reply(200).BodyString(body)
+		rr = macroRequest(t, "/api/v1/strategy?code=SH600036&kind=ma&begin=2026-10-01&end=2026-10-31&freq="+tc.freq)
+		require.Equal(t, http.StatusOK, rr.Code, tc.freq)
+	}
+	require.False(t, gock.IsPending())
+	for _, query := range []string{"freq=year", "freq=day&begin=2015-01-01&end=2026-10-31", "freq=week&begin=2000-01-01&end=2026-10-31"} {
+		rr := macroRequest(t, "/api/v1/history?code=SH600036&"+query)
+		require.Equal(t, http.StatusBadRequest, rr.Code, query)
+	}
+	gock.New("https://push2his.eastmoney.com").Get("/api/qt/stock/kline/get").MatchParam("klt", "103").Reply(200).BodyString(body)
+	rr := macroRequest(t, "/api/v1/history?code=SH600036&freq=month&begin=2000-01-01&end=2026-10-31")
+	require.Equal(t, http.StatusOK, rr.Code, "月线可以看更长")
+}
+
+// 周线和月线的预热按周期换算成自然日。
+func TestWarmupScalesWithFreq(t *testing.T) {
+	begin := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	specs := []overlaySpec{{period: 10}}
+	require.Equal(t, begin.AddDate(0, 0, -35), warmupBegin(begin, specs, eastmoney.FreqDay))
+	require.Equal(t, begin.AddDate(0, 0, -245), warmupBegin(begin, specs, eastmoney.FreqWeek))
+	require.Equal(t, begin.AddDate(0, 0, -1085), warmupBegin(begin, specs, eastmoney.FreqMonth))
 }

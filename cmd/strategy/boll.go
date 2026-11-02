@@ -50,16 +50,32 @@ func NewBollCLI() *cobra.Command {
 func runBoll(cmd *cobra.Command, args []string) error {
 	period, _ := cmd.Flags().GetInt("period")
 	k, _ := cmd.Flags().GetFloat64("k")
+	if err := checkPeriods(map[string]int{"period": period}); err != nil {
+		return err
+	}
 
-	exCode, name, quotes, err := fetchOHLCV(cmd, args[0], 250)
+	exCode, name, quotes, note, err := fetchOHLCV(cmd, args[0], 250)
 	if err != nil {
 		return err
 	}
 
 	headers, data, signals := ComputeBollinger(quotes, period, k)
 	if headers == nil {
-		fmt.Fprintf(cmd.OutOrStdout(), "数据不足（需要至少 %d 个交易日）\n", period)
+		if wantJSON(cmd) {
+			return fmt.Errorf("数据不足（需要至少 %d 根 K 线）", period)
+		}
+		fmt.Fprintf(cmd.OutOrStdout(), "数据不足（需要至少 %d 根 K 线）\n", period)
 		return nil
+	}
+
+	if wantJSON(cmd) {
+		prices, _ := strategyPrices(quotes)
+		middle, upper, lower := indicator.Bollinger(prices, period, k)
+		return printJSON(cmd, exCode, name, "boll", map[string]any{"period": period, "k": k}, note, quotes, []jsonSeries{
+			{"lower", lower, period - 1},
+			{"middle", middle, period - 1},
+			{"upper", upper, period - 1},
+		}, signals)
 	}
 
 	fmt.Fprintf(cmd.OutOrStdout(), "\n证券代码: %s  证券名称: %s  策略: 布林带(%d,%.1f)\n\n", exCode, name, period, k)

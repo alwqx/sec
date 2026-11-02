@@ -124,12 +124,12 @@ function DCFResult({ data, loading, error, retry }: { data: ValuationResult; loa
   if (!dcf.applicable) return <div className="empty-state">{dcf.note}</div>
   return <>
     <dl className="quote-grid metrics-grid">
-      <div><dt>每股价值</dt><dd>{dcf.per_share.toFixed(2)}</dd></div>
-      <div><dt>扣除安全边际后</dt><dd>{dcf.fair_price.toFixed(2)}</dd></div>
-      <div><dt>相对收盘价</dt><dd>{signed(dcf.upside)}</dd></div>
+      <div><dt>每股价值</dt><dd>{fixed(dcf.per_share)}</dd></div>
+      <div><dt>扣除安全边际后</dt><dd>{fixed(dcf.fair_price)}</dd></div>
+      <div><dt>相对收盘价</dt><dd>{dcf.upside === null ? '—' : signed(dcf.upside)}</dd></div>
       <div><dt>当前现金流（净利润 × 70%）</dt><dd>{money(dcf.base_cash)}</dd></div>
       <div><dt>增长期现值</dt><dd>{money(dcf.growth_pv)}</dd></div>
-      <div><dt>终值现值（占 {dcf.terminal_share.toFixed(0)}%）</dt><dd>{money(dcf.terminal_pv)}</dd></div>
+      <div><dt>终值现值（占 {dcf.terminal_share?.toFixed(0) ?? '—'}%）</dt><dd>{money(dcf.terminal_pv)}</dd></div>
     </dl>
     <p className="data-note">增长率 {percent(dcf.params.growth)}：{dcf.growth_source}。永续增长率 {percent(dcf.params.terminal_growth)}，折现率 {percent(dcf.params.wacc)}，安全边际 {percent(dcf.params.margin_of_safety)}。</p>
   </>

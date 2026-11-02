@@ -31,9 +31,11 @@ func NewQuoteHistoryCLI() *cobra.Command {
 	}
 	rootCmd.Flags().BoolP("debug", "D", false, "Enable debug mode")
 	rootCmd.Flags().BoolP("realtime", "r", false, "Realtime update quote info")
+	rootCmd.Flags().Bool("json", false, "Output JSON")
 	rootCmd.Flags().BoolP("desc", "d", false, "Order by date in descending order")
 	rootCmd.Flags().StringP("begin", "b", "", "Begin date 20250101")
 	rootCmd.Flags().StringP("end", "e", "", "End date 20250131")
+	rootCmd.Flags().String("freq", "day", "K-line frequency: day, week, month")
 	rootCmd.Flags().StringP("fq", "f", "", "FuQuan type choice: bfq none, qfq front, hfq post")
 
 	return rootCmd
@@ -48,8 +50,12 @@ func QuoteHistoryHandler(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("搜索证券失败: %w", err)
 	}
+	asJSON, _ := cmd.Flags().GetBool("json")
 	num := len(secs)
 	if num == 0 {
+		if asJSON {
+			return fmt.Errorf("未找到证券: %s", key)
+		}
 		slog.Info("search no sec", "code", key)
 		return nil
 	}
@@ -92,7 +98,13 @@ func QuoteHistoryHandler(cmd *cobra.Command, args []string) error {
 
 	beginStr, _ := cmd.Flags().GetString("begin")
 	endStr, _ := cmd.Flags().GetString("end")
-	req.Begin, req.End, err = utils.ParseBeginEnd(beginStr, endStr, 30, eastmoney.TimeYYMMDD, eastmoney.TimeYYMMDD)
+	freqText, _ := cmd.Flags().GetString("freq")
+	req.Freq, err = eastmoney.ParseFreq(freqText)
+	if err != nil {
+		return err
+	}
+	// 默认区间按周期放大，根数大致相同。
+	req.Begin, req.End, err = utils.ParseBeginEnd(beginStr, endStr, 30*req.Freq.BarDays(), eastmoney.TimeYYMMDD, eastmoney.TimeYYMMDD)
 	if err != nil {
 		return err
 	}
@@ -121,6 +133,9 @@ func QuoteHistoryHandler(cmd *cobra.Command, args []string) error {
 		})
 	}
 
+	if asJSON {
+		return utils.PrintJSON(cmd.OutOrStdout(), history.NewOutput(sec.ExCode, sec.Name, req, result, quotes))
+	}
 	printQuoteHistory(cmd.OutOrStdout(), quotes)
 
 	return nil

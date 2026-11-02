@@ -2,6 +2,7 @@ package eastmoney
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -56,6 +57,7 @@ type GetQuoteHistoryReq struct {
 	Code       string
 	MarketCode int        // 市场 1 上证，2 深证
 	FQT        FuQuanType // 复权类型 0不复权 1前复权 2后复权，默认不复权
+	Freq       Freq       // K 线周期，默认日线
 	Begin      string     // 开始时间 19000101 格式
 	End        string     // 结束时间 20500101 格式
 }
@@ -98,4 +100,59 @@ type KLineQuote struct {
 	ChangeRate float64 // 涨跌幅
 	Change     float64 // 涨跌额
 	Velocity   float64 // TurnOver Rate 换手率
+}
+
+// Freq 是 K 线周期。
+type Freq string
+
+const (
+	FreqDay   Freq = "day"
+	FreqWeek  Freq = "week"
+	FreqMonth Freq = "month"
+)
+
+// ParseFreq 解析周期，空字符串是日线。
+func ParseFreq(text string) (Freq, error) {
+	switch strings.ToLower(strings.TrimSpace(text)) {
+	case "", "d", "day":
+		return FreqDay, nil
+	case "w", "week":
+		return FreqWeek, nil
+	case "m", "month":
+		return FreqMonth, nil
+	}
+	return FreqDay, fmt.Errorf("不支持的周期 %s，可选 day、week、month", text)
+}
+
+// BarDays 返回一根 K 线大约跨越的自然日数，用来换算查询区间。
+func (f Freq) BarDays() int {
+	switch f {
+	case FreqWeek:
+		return 7
+	case FreqMonth:
+		return 31
+	}
+	return 1
+}
+
+// Label 返回周期的中文名称。
+func (f Freq) Label() string {
+	switch f {
+	case FreqWeek:
+		return "周"
+	case FreqMonth:
+		return "月"
+	}
+	return "日"
+}
+
+// klt 返回东方财富接口的周期参数。
+func (f Freq) klt() string {
+	switch f {
+	case FreqWeek:
+		return "102"
+	case FreqMonth:
+		return "103"
+	}
+	return "101"
 }
