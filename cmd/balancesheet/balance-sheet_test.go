@@ -61,18 +61,6 @@ func TestFormatFieldValue(t *testing.T) {
 			want:     "2024-12-31",
 		},
 		{
-			name:     "basic EPS",
-			apiField: "BASIC_EPS",
-			value:    5.66,
-			want:     "5.66",
-		},
-		{
-			name:     "diluted EPS",
-			apiField: "DILUTED_EPS",
-			value:    3.14159,
-			want:     "3.14",
-		},
-		{
 			name:     "large number uses HumanNum",
 			apiField: "TOTAL_ASSETS",
 			value:    337377000000.0,
@@ -206,9 +194,7 @@ func TestPrintDetailed(t *testing.T) {
 		require.Contains(t, out, "营业总收入")
 		require.Contains(t, out, "营业利润")
 		require.Contains(t, out, "归属母公司净利润")
-		require.Contains(t, out, "基本每股收益")
 		require.Contains(t, out, "3373.77亿")
-		require.Contains(t, out, "5.66")
 		require.Contains(t, out, "2024-12-31")
 	})
 
@@ -285,4 +271,10 @@ func TestPrintDetailed(t *testing.T) {
 		require.Contains(t, out, "2024-12-31")
 		require.Contains(t, out, "2023-12-31")
 	})
+}
+
+func TestHasReports(t *testing.T) {
+	require.False(t, hasReports(nil))
+	require.False(t, hasReports([]result{{rt: eastmoney.ReportIncome}}))
+	require.True(t, hasReports([]result{{rt: eastmoney.ReportBalance}, {rt: eastmoney.ReportIncome, items: []*eastmoney.FinancialReportItem{{}}}}))
 }

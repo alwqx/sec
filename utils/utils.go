@@ -168,3 +168,11 @@ func HumanNum(cap float64) (res string) {
 	}
 	return
 }
+
+// HumanRatio 格式化估值倍数，0 表示不可用，显示为 -。
+func HumanRatio(value float64) string {
+	if value == 0 {
+		return "-"
+	}
+	return fmt.Sprintf("%.2f", value)
+}

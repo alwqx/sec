@@ -214,3 +214,21 @@ export interface FxSpread {
 export interface StrategySeries { label: string; panel: 'price' | 'indicator'; style: 'line' | 'bar'; values: (number | null)[] }
 export interface StrategySignal { date: string; type: 'buy' | 'sell'; price: number; reason: string }
 export interface StrategyResult { params: Record<string, number>; levels: number[] | null; dates: string[]; closes: number[]; series: StrategySeries[]; signals: StrategySignal[]; required: number; insufficient: boolean }
+
+export interface ValuationHistory { since: string; samples: number; min: number; median: number; max: number; percentile: number | null; short: boolean }
+export interface ValuationScenario { label: string; multiple: number; price: number; change: number }
+export interface ValuationMultiple { current: number | null; raw: number | null; history: ValuationHistory | null; series: (number | null)[]; scenarios: ValuationScenario[] }
+export interface ValuationAnnual { year: string; eps: number | null; bps: number | null; roe: number | null; revenue: number | null; profit: number | null }
+export interface ValuationDCF {
+  applicable: boolean; note: string; warning: string; growth_source: string
+  params: { growth: number | null; terminal_growth: number; wacc: number; margin_of_safety: number }
+  base_cash: number; growth_pv: number; terminal_pv: number; terminal_share: number; value: number; per_share: number; fair_price: number; upside: number
+}
+export interface ValuationResult {
+  code: string; name: string; industry: string; trade_date: string; price: number; market_cap: number; shares: number
+  pe: ValuationMultiple; pb: ValuationMultiple; ps: ValuationMultiple; dates: string[]
+  eps: number | null; bvps: number | null; profit_ttm: number | null; revenue_ttm: number | null; roe: number | null; roe_year: string
+  growth: { rate: number | null; from_year: string; to_year: string; note: string }
+  peg: number | null; graham: number | null; graham_margin: number | null
+  annuals: ValuationAnnual[]; dcf: ValuationDCF; signals: { name: string; level: 'low' | 'neutral' | 'high'; rule: string }[]; assessment: string; disclaimer: string
+}

@@ -2,15 +2,8 @@ package eastmoney
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
-	"log/slog"
-	"net/http"
-	"net/url"
 	"strings"
-
-	"github.com/alwqx/sec/utils"
 )
 
 const datacenterAPIBase = "https://datacenter-web.eastmoney.com/api/data/v1/get"
@@ -135,7 +128,6 @@ func KeyFields(rt FinancialReportType) []keyField {
 			{"TOTAL_PROFIT", "利润总额"},
 			{"INCOME_TAX", "所得税"},
 			{"PARENT_NETPROFIT", "归属母公司净利润"},
-			{"BASIC_EPS", "基本每股收益"},
 		}
 	case ReportCashFlow:
 		return []keyField{
@@ -169,54 +161,13 @@ func GetFinancialReport(ctx context.Context, req *GetFinancialReportReq) ([]*Fin
 		sb.WriteString(fmt.Sprintf(`(DATE_TYPE_CODE="%s")`, req.Period))
 	}
 
-	params := url.Values{}
-	params.Set("reportName", string(req.ReportType))
-	params.Set("columns", "ALL")
-	params.Set("filter", sb.String())
-	params.Set("sortColumns", "REPORT_DATE")
-	params.Set("sortTypes", "-1")
-	params.Set("pageSize", "50")
-	params.Set("pageNumber", "1")
-
-	reqURL := fmt.Sprintf("%s?%s", datacenterAPIBase, params.Encode())
-	slog.DebugContext(ctx, "GetFinancialReport", "reqURL", reqURL)
-
-	resp, err := utils.MakeRequest(ctx, http.MethodGet, reqURL, nil, nil, 0)
-	if err != nil {
-		slog.ErrorContext(ctx, "failed request", "url", reqURL, "error", err)
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
+	rows, err := datacenterRows(ctx, string(req.ReportType), "ALL", sb.String(), "REPORT_DATE", 50)
 	if err != nil {
 		return nil, err
 	}
 
-	jsonData, err := stripJSONP(body)
-	if err != nil {
-		return nil, fmt.Errorf("strip JSONP: %w", err)
-	}
-
-	var apiResp finReportResponse
-	if err := json.Unmarshal(jsonData, &apiResp); err != nil {
-		return nil, fmt.Errorf("unmarshal response: %w", err)
-	}
-
-	if !apiResp.Success {
-		msg := apiResp.Message
-		if msg == "" {
-			msg = "unknown error"
-		}
-		return nil, fmt.Errorf("API error: %s", msg)
-	}
-
-	if apiResp.Result == nil {
-		return nil, nil
-	}
-
-	items := make([]*FinancialReportItem, 0, len(apiResp.Result.Data))
-	for _, d := range apiResp.Result.Data {
+	items := make([]*FinancialReportItem, 0, len(rows))
+	for _, d := range rows {
 		item := &FinancialReportItem{Fields: d}
 		if v, ok := d["REPORT_DATE"].(string); ok {
 			item.ReportDate = v
@@ -238,6 +189,7 @@ func GetFinancialReport(ctx context.Context, req *GetFinancialReportReq) ([]*Fin
 
 // finReportResponse is the API response envelope.
 type finReportResponse struct {
+	Code    int              `json:"code"`
 	Success bool             `json:"success"`
 	Message string           `json:"message"`
 	Result  *finReportResult `json:"result"`

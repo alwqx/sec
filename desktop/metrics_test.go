@@ -25,7 +25,7 @@ func metricsBody(vps, cap, floatCap, profit string) string {
 	for i := range profile {
 		profile[i] = "0"
 	}
-	profile[5], profile[7], profile[8], profile[18], profile[34] = vps, cap, floatCap, profit, "银行"
+	profile[5], profile[7], profile[8], profile[13], profile[34] = vps, cap, floatCap, profit, "银行"
 	return fmt.Sprintf("var hq_str_sh600036=\"%s\";\nvar hq_str_sh600036_i=\"%s\";", strings.Join(quote, ","), strings.Join(profile, ","))
 }
 

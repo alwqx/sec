@@ -14,12 +14,13 @@ import Metal from './components/Metal'
 import WatchQuotes, { type CompareState } from './components/WatchQuotes'
 import { useQuotes } from './hooks/useQuotes'
 import Strategy from './components/Strategy'
+import Valuation from './components/Valuation'
 import Macro from './components/Macro'
 import Fx from './components/Fx'
 import secLogo from '../../assets/sec-logo.png'
 
 type Page = 'stocks' | 'ipo' | 'announcements' | 'macro' | 'fx' | 'metal' | 'settings'
-type Tab = 'overview' | 'company' | 'financials' | 'dividends' | 'announcements' | 'technical' | 'quotes'
+type Tab = 'overview' | 'company' | 'financials' | 'dividends' | 'announcements' | 'technical' | 'valuation' | 'quotes'
 const pages: { id: Page; title: string; icon: LucideIcon }[] = [
   { id: 'stocks', title: '自选与行情', icon: ChartCandlestick },
   { id: 'ipo', title: 'IPO', icon: FilePlusCorner },
@@ -31,7 +32,7 @@ const pages: { id: Page; title: string; icon: LucideIcon }[] = [
 ]
 const tabs: { id: Tab; title: string }[] = [
   { id: 'overview', title: '概览' }, { id: 'company', title: '公司' }, { id: 'financials', title: '财报' },
-  { id: 'dividends', title: '分红' }, { id: 'announcements', title: '公告' }, { id: 'technical', title: '技术分析' }, { id: 'quotes', title: '自选行情' },
+  { id: 'dividends', title: '分红' }, { id: 'announcements', title: '公告' }, { id: 'technical', title: '技术分析' }, { id: 'valuation', title: '估值' }, { id: 'quotes', title: '自选行情' },
 ]
 const initialWorkspace: WorkspaceState = { watchlist: [], settings: { refresh_seconds: 5, theme: 'dark', download_directory: '' } }
 
@@ -210,6 +211,7 @@ export default function App() {
                   : tab === 'technical' ? <Strategy code={selected.ex_code} />
                   : tab === 'quotes' ? <WatchQuotes items={workspace.watchlist} state={watchQuotes} selected={selected} onSelect={onSelect} compare={compare} onCompare={setCompare} />
                   : !aShare ? <div className="empty-state">此栏目暂仅支持沪深北 A 股，当前证券可在概览中查看行情。</div>
+                  : tab === 'valuation' ? <Valuation code={selected.ex_code} />
                   : tab === 'financials' ? <Financials security={selected} />
                   : tab === 'announcements' ? <Announcements code={selected.ex_code} compact />
                   : <SecurityDetails security={selected} tab={tab} />}

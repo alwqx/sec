@@ -1,16 +1,10 @@
 import { useEffect, useState } from 'react'
 import { companyMetrics } from '../api'
 import type { BasicSecurity, CompanyMetrics as Metrics } from '../types'
+import { money } from '../format'
 
 function ratio(value: number | null) {
   return value === null ? '—' : value.toFixed(2)
-}
-function capital(value: number | null) {
-  if (value === null) return '—'
-  if (value >= 1e12) return `${(value / 1e12).toFixed(2)} 万亿元`
-  if (value >= 1e8) return `${(value / 1e8).toFixed(2)} 亿元`
-  if (value >= 1e4) return `${(value / 1e4).toFixed(2)} 万元`
-  return `${value.toFixed(2)} 元`
 }
 
 export default function CompanyMetrics({ security, refreshSeconds }: { security: BasicSecurity; refreshSeconds?: number }) {
@@ -52,8 +46,8 @@ export default function CompanyMetrics({ security, refreshSeconds }: { security:
         <div><dt>行业</dt><dd>{data.industry || '—'}</dd></div>
         <div><dt>市盈率 PE（TTM）</dt><dd>{ratio(data.pe_ttm)}</dd></div>
         <div><dt>市净率 PB</dt><dd>{ratio(data.pb)}</dd></div>
-        <div><dt>总市值</dt><dd>{capital(data.market_cap)}</dd></div>
-        <div><dt>流通市值</dt><dd>{capital(data.float_market_cap)}</dd></div>
+        <div><dt>总市值</dt><dd>{money(data.market_cap)}</dd></div>
+        <div><dt>流通市值</dt><dd>{money(data.float_market_cap)}</dd></div>
       </dl>
       <p className="data-note">指标快照：{data.trade_date || '日期未知'} {data.time} · 市值币种：人民币{refreshSeconds ? ` · 每 ${refreshSeconds} 秒刷新` : ''}<br />计算口径与 CLI info 一致；缺失值、不适用的 PE 及无法计算的指标显示“—”。</p>
     </>}

@@ -145,8 +145,6 @@ Go 侧处理：正则 `/jQuery.*?\((.*)\);?$/s` 提取中间 JSON，再 `json.Un
 | `SALE_EXPENSE`              | 销售费用         | Selling Expenses        |
 | `MANAGE_EXPENSE`            | 管理费用         | Administrative Expenses |
 | `RESEARCH_EXPENSE`          | 研发费用         | R&D Expenses            |
-| `BASIC_EPS`                 | 基本每股收益     | Basic EPS               |
-| `DILUTED_EPS`               | 稀释每股收益     | Diluted EPS             |
 
 ### 现金流量表 (RPT_DMSK_FN_CASHFLOW)
 

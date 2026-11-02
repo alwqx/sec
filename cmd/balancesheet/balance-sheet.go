@@ -101,6 +101,11 @@ func BalanceSheetHandler(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// 上游查询为空时返回空列表；没有任何数据时不能写出空报告，也不能当成成功。
+	if !hasReports(results) {
+		return fmt.Errorf("%s 没有符合条件的财报数据", sec.ExCode)
+	}
+
 	// Check output flag
 	outputPath, _ := cmd.Flags().GetString("output")
 	if outputPath != "" {
@@ -322,10 +327,6 @@ func formatFieldValue(apiField string, v interface{}) string {
 		if s, ok := v.(string); ok {
 			return formatDate(s)
 		}
-	case "BASIC_EPS", "DILUTED_EPS":
-		if n, ok := v.(float64); ok {
-			return fmt.Sprintf("%.2f", n)
-		}
 	default:
 		if n, ok := v.(float64); ok {
 			return utils.HumanNum(n)
@@ -336,4 +337,13 @@ func formatFieldValue(apiField string, v interface{}) string {
 		return s
 	}
 	return fmt.Sprintf("%v", v)
+}
+
+func hasReports(results []result) bool {
+	for _, item := range results {
+		if len(item.items) > 0 {
+			return true
+		}
+	}
+	return false
 }

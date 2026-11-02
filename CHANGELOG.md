@@ -27,6 +27,11 @@
 23. Seed the `sec strategy macd` signal line from the first valid MACD value instead of leading zeros, and emit no MACD signals before the signal line is valid; early signal line values and signals can change
 24. Report RSI as a neutral 50 instead of 100 when prices are completely flat over the window
 25. Reject `NaN` for Desktop strategy and Bollinger overlay parameters with a validation error instead of an empty response
+26. Add a Desktop valuation tab for A-shares with PE, PB and PS history and percentiles, PEG, ROE, Graham number, a rule summary and an adjustable DCF, sharing a new `valuation` package with `sec valuation`
+27. Rework `sec valuation` on East Money daily valuation and performance reports, since financial statements no longer return EPS: historical PE now uses real daily values rather than the current price over past EPS, PB is judged by its own history rather than fixed levels, and growth is a 5-year CAGR that uses actual year spans and does not skip loss years. `sec valuation` now covers A-shares only: HK and US securities and indexes report that they are not supported, and a bare code shared by an index and a stock, such as `000001`, resolves to the stock
+28. Guard the DCF against invalid parameters and loss-making companies, warn for financial companies, and show where the growth rate comes from. Omitting the growth rate uses the historical CAGR, including a negative one, limited to ±15%; `--growth-rate 0` now means zero growth, and `--wacc` defaults to 8 and rejects 0. An unknown `--method` now fails instead of showing the overview
+29. Fix the A-share PE (TTM) in `sec info`, `sec kline` and Desktop metrics, which used cumulative profit of the latest report instead of the last four quarters; show `-` instead of an incorrect PE and PB for HK securities, and instead of an incorrect PE, PB and market cap for B-shares, because their prices and reported figures can use different currencies
+30. Remove the always empty basic EPS row from `sec financials` and Desktop financials. `sec financials` still fails when no report has data, and Desktop financials shows an empty state rather than an upstream error
 
 ### v0.4.1
 

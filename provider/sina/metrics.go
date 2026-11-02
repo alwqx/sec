@@ -3,6 +3,8 @@ package sina
 import (
 	"context"
 	"strings"
+
+	"github.com/alwqx/sec/types"
 )
 
 // CoreMetrics 公司核心指标，计算口径与 CLI info 共用。
@@ -21,11 +23,16 @@ func calculateCoreMetrics(exCode string, quote *SecurityQuote, profile *sinaPart
 	if strings.HasPrefix(strings.ToUpper(exCode), "HK") {
 		factor = 1
 	}
-	metrics := &CoreMetrics{
-		Category:        profile.Category,
-		MarketCap:       quote.Current * profile.Cap * factor,
-		TradedMarketCap: quote.Current * profile.TradeCap * factor,
-		TradeDate:       quote.TradeDate, Time: quote.Time,
+	metrics := &CoreMetrics{Category: profile.Category, TradeDate: quote.TradeDate, Time: quote.Time}
+	// B 股股价是美元或港元，每股净资产和利润是人民币，股本还包含 A 股，这些指标都没有意义。
+	if profile.BShare {
+		return metrics
+	}
+	metrics.MarketCap = quote.Current * profile.Cap * factor
+	metrics.TradedMarketCap = quote.Current * profile.TradeCap * factor
+	// 港股接口只有最新报告期利润，算不出 TTM；每股净资产的币种未标明，可能和港元股价不同。
+	if types.IsHCode(exCode) {
+		return metrics
 	}
 	if profile.VPS != 0 {
 		metrics.PB = quote.Current / profile.VPS
