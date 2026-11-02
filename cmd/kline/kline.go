@@ -10,6 +10,7 @@ import (
 
 	"github.com/alwqx/sec/indicator"
 	"github.com/alwqx/sec/provider/eastmoney"
+	"github.com/alwqx/sec/provider/history"
 	"github.com/alwqx/sec/provider/sina"
 	"github.com/alwqx/sec/render"
 	"github.com/alwqx/sec/types"
@@ -97,7 +98,7 @@ func KLineHandler(cmd *cobra.Command, args []string) error {
 	}
 
 	var (
-		quotes     []*eastmoney.Quote
+		result     *history.Result
 		profile    *sina.CorpProfile
 		err1, err2 error
 		wg         sync.WaitGroup
@@ -113,7 +114,7 @@ func KLineHandler(cmd *cobra.Command, args []string) error {
 	}()
 	go func() {
 		defer wg.Done()
-		quotes, err2 = eastmoney.GetQuoteHistory(cmd.Context(), req)
+		result, err2 = history.Get(cmd.Context(), req)
 	}()
 	wg.Wait()
 
@@ -125,6 +126,10 @@ func KLineHandler(cmd *cobra.Command, args []string) error {
 	if err2 != nil {
 		slog.Error("failed GetQuoteHistory", "code", req.Code, "error", err2)
 		return err2
+	}
+	quotes := result.Quotes
+	if result.Note != "" {
+		fmt.Fprintln(cmd.ErrOrStderr(), result.Note)
 	}
 	if len(quotes) == 0 {
 		slog.Info("no quote data", "code", req.Code)

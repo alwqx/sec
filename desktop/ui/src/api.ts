@@ -55,7 +55,7 @@ export function financials(code: string, report: string, period: string, signal?
   return request(`/api/v1/financials?${new URLSearchParams({ code, report, period })}`, signal)
 }
 
-export function history(code: string, filters: { begin: string; end: string; fq: string; ma?: string; boll?: string }, signal?: AbortSignal): Promise<{ results: HistoryQuote[]; overlays?: HistoryOverlay[] }> {
+export function history(code: string, filters: { begin: string; end: string; fq: string; ma?: string; boll?: string }, signal?: AbortSignal): Promise<{ results: HistoryQuote[]; overlays?: HistoryOverlay[]; source_note?: string }> {
   return request(`/api/v1/history?${new URLSearchParams({ code, ...filters })}`, signal)
 }
 

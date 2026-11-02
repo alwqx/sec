@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/alwqx/sec/provider/eastmoney"
+	"github.com/alwqx/sec/provider/history"
 	"github.com/alwqx/sec/provider/sina"
 	"github.com/alwqx/sec/types"
 	"github.com/alwqx/sec/utils"
@@ -96,10 +97,17 @@ func QuoteHistoryHandler(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	quotes, err := eastmoney.GetQuoteHistory(cmd.Context(), req)
+	result, err := history.Get(cmd.Context(), req)
 	if err != nil {
 		slog.Error("failed QuoteHistoryHandler", "code", req.Code, "error", err)
 		return err
+	}
+	quotes := result.Quotes
+	if result.Note != "" {
+		fmt.Fprintln(cmd.ErrOrStderr(), result.Note)
+		for _, quote := range quotes {
+			quote.Name = sec.Name
+		}
 	}
 
 	// 判断是否重新排序
@@ -118,6 +126,36 @@ func QuoteHistoryHandler(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+// 没有前一日收盘价时涨跌和振幅未知，不能显示成 0。
+func closeText(quote *eastmoney.Quote) string {
+	if quote.NoChange {
+		return fmt.Sprintf("%-.5g", quote.Close)
+	}
+	return fmt.Sprintf("%-.5g %-.5g %-.2g%s", quote.Close, quote.Change, quote.ChangeRate, "%")
+}
+
+func amplitudeText(quote *eastmoney.Quote) string {
+	if quote.NoChange {
+		return "-"
+	}
+	return strconv.FormatFloat(quote.Amplitude, 'g', -1, 64)
+}
+
+// 备用数据没有成交额和换手率，不能显示成 0。
+func turnoverText(quote *eastmoney.Quote) string {
+	if quote.NoTurnover {
+		return "-"
+	}
+	return utils.HumanNum(float64(quote.TurnOver))
+}
+
+func velocityText(quote *eastmoney.Quote) string {
+	if quote.NoTurnover {
+		return "-"
+	}
+	return strconv.FormatFloat(quote.Velocity, 'g', -1, 64)
+}
+
 // printQuote 打印 quote 信息
 func printQuoteHistory(out io.Writer, quotes []*eastmoney.Quote) {
 	if len(quotes) == 0 {
@@ -129,7 +167,7 @@ func printQuoteHistory(out io.Writer, quotes []*eastmoney.Quote) {
 
 	data := make([][]string, 0, len(quotes))
 	for _, quote := range quotes {
-		combineClose := fmt.Sprintf("%-.5g %-.5g %-.2g%s", quote.Close, quote.Change, quote.ChangeRate, "%")
+		combineClose := closeText(quote)
 		row := []string{
 			utils.TimeYYMMDDString(quote.Date),
 			quote.Name,
@@ -137,10 +175,10 @@ func printQuoteHistory(out io.Writer, quotes []*eastmoney.Quote) {
 			strconv.FormatFloat(quote.Open, 'g', -1, 64),
 			strconv.FormatFloat(quote.High, 'g', -1, 64),
 			strconv.FormatFloat(quote.Low, 'g', -1, 64),
-			utils.HumanNum(float64(quote.TurnOver)),
+			turnoverText(quote),
 			utils.HumanNum(float64(quote.Volume)),
-			strconv.FormatFloat(quote.Amplitude, 'g', -1, 64),
-			strconv.FormatFloat(quote.Velocity, 'g', -1, 64),
+			amplitudeText(quote),
+			velocityText(quote),
 			quote.Market.String() + quote.Code,
 		}
 

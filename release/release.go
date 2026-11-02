@@ -21,6 +21,7 @@ type Asset struct {
 	Name               string `json:"name"`
 	BrowserDownloadURL string `json:"browser_download_url"`
 	Size               int64  `json:"size"`
+	Digest             string `json:"digest"` // GitHub 计算的校验值，如 sha256:abc...
 }
 type Info struct {
 	TagName string  `json:"tag_name"`

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react'
 import type { HistoryOverlay, HistoryQuote } from '../types'
 
-function compactNumber(value: number | undefined) {
-  if (value === undefined || !Number.isFinite(value)) return '—'
+function compactNumber(value: number | null | undefined) {
+  if (value === undefined || value === null || !Number.isFinite(value)) return '—'
   if (Math.abs(value) >= 1e8) return `${(value / 1e8).toFixed(2)} 亿`
   if (Math.abs(value) >= 1e4) return `${(value / 1e4).toFixed(2)} 万`
   return value.toLocaleString('zh-CN', { maximumFractionDigits: 2 })

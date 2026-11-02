@@ -8,6 +8,7 @@ import (
 
 	"github.com/alwqx/sec/indicator"
 	"github.com/alwqx/sec/provider/eastmoney"
+	"github.com/alwqx/sec/provider/history"
 	"github.com/alwqx/sec/provider/sina"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
@@ -133,11 +134,14 @@ func fetchOHLCV(cmd *cobra.Command, code string, days int) (string, string, []*e
 	req.Begin = begin.Format(eastmoney.TimeYYMMDD)
 	req.End = end.Format(eastmoney.TimeYYMMDD)
 
-	quotes, err := eastmoney.GetQuoteHistory(cmd.Context(), req)
+	result, err := history.Get(cmd.Context(), req)
 	if err != nil {
 		return "", "", nil, err
 	}
-	return sec.ExCode, sec.Name, quotes, nil
+	if result.Note != "" {
+		fmt.Fprintln(cmd.ErrOrStderr(), result.Note)
+	}
+	return sec.ExCode, sec.Name, result.Quotes, nil
 }
 
 // NewStrategyCLI returns the parent strategy command with subcommands.

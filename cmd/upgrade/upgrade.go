@@ -5,6 +5,8 @@ import (
 	"archive/zip"
 	"compress/gzip"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -13,6 +15,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"time"
@@ -37,19 +40,21 @@ func NewUpgradeCLI() *cobra.Command {
 		RunE:  UpgradeHandler,
 	}
 	rootCmd.Flags().BoolP("debug", "D", false, "Enable debug mode")
+	rootCmd.Flags().Bool("force", false, "Replace this binary even if it is a development build or newer than the latest release")
 
 	return rootCmd
 }
 
 // UpgradeHandler 自动升级到最新版本
 func UpgradeHandler(cmd *cobra.Command, args []string) error {
+	out := cmd.OutOrStdout()
 	currentVersion := version.Version
 	if currentVersion == "" {
 		currentVersion = "(dev)"
 	}
 
-	fmt.Printf("Current version: %s\n", currentVersion)
-	fmt.Println("Checking latest release...")
+	fmt.Fprintf(out, "Current version: %s\n", currentVersion)
+	fmt.Fprintln(out, "Checking latest release...")
 
 	release, err := fetchLatestRelease(cmd.Context())
 	if err != nil {
@@ -57,10 +62,15 @@ func UpgradeHandler(cmd *cobra.Command, args []string) error {
 	}
 
 	latestVersion := release.TagName
-	fmt.Printf("Latest  version: %s\n", latestVersion)
+	fmt.Fprintf(out, "Latest  version: %s\n", latestVersion)
 
-	if currentVersion == latestVersion {
-		fmt.Println("Already up to date.")
+	force, _ := cmd.Flags().GetBool("force")
+	proceed, err := shouldUpgrade(currentVersion, latestVersion, force)
+	if err != nil {
+		return err
+	}
+	if !proceed {
+		fmt.Fprintln(out, "Already up to date.")
 		return nil
 	}
 
@@ -70,7 +80,7 @@ func UpgradeHandler(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	fmt.Printf("Downloading %s (%s)...\n", asset.Name, utils.HumanByte(float64(asset.Size)))
+	fmt.Fprintf(out, "Downloading %s (%s)...\n", asset.Name, utils.HumanByte(float64(asset.Size)))
 
 	// 获取当前二进制路径
 	execPath, err := os.Executable()
@@ -86,6 +96,48 @@ func UpgradeHandler(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to upgrade: %w", err)
 	}
 
+	return nil
+}
+
+// gitDescribe 匹配 git describe 的版本，如 v0.4.3-2-gabc。它是标签之后的开发版本，按语义版本却会排在标签之前。
+var gitDescribe = regexp.MustCompile(`-[0-9]+-g[0-9a-f]+$`)
+
+// ErrNeedForce 表示需要 --force 才能替换，当前程序没有被改动。
+var ErrNeedForce = errors.New("未升级")
+
+// shouldUpgrade 判断是否替换当前程序。只升不降；开发版本无法比较，需要 force。
+// 已是最新时返回 false 和 nil，拒绝替换时返回错误。
+func shouldUpgrade(current, latest string, force bool) (bool, error) {
+	if current == latest {
+		return false, nil
+	}
+	if force {
+		return true, nil
+	}
+	if gitDescribe.MatchString(current) {
+		return false, fmt.Errorf("%w：当前是开发版本 %s；要替换为 %s 请使用 --force", ErrNeedForce, current, latest)
+	}
+	order, known := release.Compare(current, latest)
+	switch {
+	case !known:
+		return false, fmt.Errorf("%w：无法比较当前版本 %s 和最新版本 %s，开发版本也是这种情况；要替换请使用 --force", ErrNeedForce, current, latest)
+	case order < 0:
+		return true, nil
+	case order > 0:
+		return false, fmt.Errorf("%w：当前版本 %s 比最新版本 %s 更新；要降级请使用 --force", ErrNeedForce, current, latest)
+	}
+	return false, nil
+}
+
+// verifyDigest 校验下载内容。digest 是 GitHub 对 Release 文件计算的 sha256，没有校验值时拒绝安装。
+func verifyDigest(digest string, sum []byte) error {
+	want, ok := strings.CutPrefix(digest, "sha256:")
+	if !ok || want == "" {
+		return fmt.Errorf("Release 文件没有 sha256 校验值（%q），拒绝安装", digest)
+	}
+	if got := hex.EncodeToString(sum); !strings.EqualFold(got, want) {
+		return fmt.Errorf("sha256 校验失败，文件可能已损坏或被篡改：期望 %s，实际 %s", want, got)
+	}
 	return nil
 }
 
@@ -151,8 +203,12 @@ func downloadAndReplace(ctx context.Context, a *asset, execPath string) error {
 		return fmt.Errorf("download returned status %d", resp.StatusCode)
 	}
 
-	_, err = io.Copy(tmpFile, resp.Body)
-	if err != nil {
+	hash := sha256.New()
+	if _, err = io.Copy(io.MultiWriter(tmpFile, hash), resp.Body); err != nil {
+		return err
+	}
+	// 校验通过后才解压，更不会替换当前程序。
+	if err := verifyDigest(a.Digest, hash.Sum(nil)); err != nil {
 		return err
 	}
 
@@ -258,49 +314,32 @@ func replaceBinary(execPath string, data []byte) error {
 		return replaceBinaryWindows(execPath, data)
 	}
 
-	// 将新二进制写入系统临时目录
-	tmpFile, err := os.CreateTemp("", ".sec-new-*")
+	// 写到目标目录，同一文件系统上 rename 才是原子的。不回退到覆盖写入：写一半失败会留下损坏的程序。
+	dir := filepath.Dir(execPath)
+	tmpFile, err := os.CreateTemp(dir, ".sec-new-*")
 	if err != nil {
-		return err
+		return fmt.Errorf("无法写入 %s，请用有权限的用户运行，或手动下载: %w", dir, err)
 	}
-	defer func() {
-		closeErr := tmpFile.Close()
-		if closeErr != nil {
-			slog.Error("replaceBinary failed to close tmpFile", "error", closeErr)
-		}
-	}()
-
 	tmpPath := tmpFile.Name()
-	removeTmp := true // true defer 中删除 tmpPath
-	defer func() {
-		if !removeTmp {
-			return
-		}
-		removeErr := os.Remove(tmpPath)
-		if removeErr != nil {
-			slog.Error("replaceBinary failed to remove tmpPath", "tmpPath", tmpPath, "error", removeErr)
-		}
-	}()
+	defer os.Remove(tmpPath) // rename 成功后文件已不在原路径，这里只清理失败的情况
 
-	n, err := tmpFile.Write(data)
-	if err != nil {
+	if _, err := tmpFile.Write(data); err != nil {
+		tmpFile.Close()
 		return err
 	}
-	if n != len(data) {
-		return fmt.Errorf("short write: wrote %d of %d bytes", n, len(data))
+	if err := tmpFile.Sync(); err != nil {
+		tmpFile.Close()
+		return err
 	}
-
+	if err := tmpFile.Close(); err != nil {
+		return err
+	}
 	if err := os.Chmod(tmpPath, 0o755); err != nil {
 		return err
 	}
-	// os.Rename 在同设备上是原子的，跨设备时回退到 copy
 	if err := os.Rename(tmpPath, execPath); err != nil {
-		return copyFile(tmpPath, execPath)
+		return fmt.Errorf("替换 %s 失败，当前程序没有改动，请用有权限的用户运行，或手动下载: %w", execPath, err)
 	}
-	// os.Rename 执行成功，tmpPath 已经被 mv 到 execPath
-	// tmpPath 不存在，defer 中不再执行删除目录操作
-	removeTmp = false
-
 	return nil
 }
 
@@ -337,25 +376,4 @@ func replaceBinaryWindows(execPath string, data []byte) error {
 	}
 
 	return nil
-}
-
-// copyFile 复制文件内容
-func copyFile(src, dst string) error {
-	srcFile, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer srcFile.Close()
-
-	dstFile, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o755)
-	if err != nil {
-		return err
-	}
-
-	if _, err = io.Copy(dstFile, srcFile); err != nil {
-		dstFile.Close()
-		return err
-	}
-
-	return dstFile.Close()
 }
