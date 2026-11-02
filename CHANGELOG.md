@@ -6,6 +6,8 @@
 2. Check HTTP status for K-line, all Sina and gold requests, keep the default User-Agent when custom headers are passed, escape search keywords, and fix `MultiSearch` hanging when given more than 8 keywords
 3. Use the previous close for PE, PB and market cap when there is no current price, such as before the market opens, and label it in `sec info`, `sec kline` and Desktop metrics. `sec quote` and `sec watch` show the previous close without a change instead of a -100% drop, and `sec watch` shows `—` for missing values
 4. Run `gofmt` and `go vet` in CI, and add a macOS job that builds the Desktop frontend and vets and tests the `desktop` package
+5. Fall back to Sina daily bars when East Money K-line requests fail, for unadjusted A-share history in `sec kline`, `sec quote-history`, `sec strategy` and Desktop. The fallback is labeled, has no turnover or turnover rate, and fails rather than returning part of a range older than about 4 years or reporting an empty result; warmup data is best effort, and adjusted and HK history have no fallback
+6. Verify `sec upgrade` downloads against the sha256 digest from the GitHub release API and refuse to install on a mismatch or a missing digest. It no longer downgrades or overwrites development builds without the new `--force` flag and exits non-zero when it refuses. Replacement is now atomic: it writes the new binary next to the target and never overwrites it in place, so a binary in a directory the user cannot write to can no longer be upgraded
 
 ### v0.4.2
 

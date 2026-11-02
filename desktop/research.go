@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/alwqx/sec/provider/cninfo"
 	"github.com/alwqx/sec/provider/eastmoney"
+	quotehistory "github.com/alwqx/sec/provider/history"
 )
 
 func requestPage(w http.ResponseWriter, r *http.Request) int {
@@ -351,31 +353,49 @@ func parseHistoryQuery(w http.ResponseWriter, r *http.Request) (historyQuery, bo
 	return historyQuery{symbol, market, beginTime, endTime, fqt}, true
 }
 
+// historyErrorMessage 在只有复权行情失败时提示可以切换，备用数据源只有不复权行情。
+func historyErrorMessage(err error) string {
+	if errors.Is(err, quotehistory.ErrAdjustedUnavailable) {
+		return "复权行情暂时获取失败，可切换为不复权"
+	}
+	if errors.Is(err, quotehistory.ErrRangeNotCovered) {
+		return "东方财富行情暂不可用，备用数据只有最近约 4 年，请缩短查询区间"
+	}
+	return "历史行情获取失败，请稍后重试"
+}
+
+// turnoverValue 在数据源没有成交额时返回 null，不返回 0。
+func turnoverValue(item *eastmoney.Quote) any {
+	if item.NoTurnover {
+		return nil
+	}
+	return item.TurnOver
+}
+
 // handleHistory 按日期范围和复权方式返回日行情，默认最近三个月、不复权。
 func (s *desktopServer) handleHistory(w http.ResponseWriter, r *http.Request) {
-	history, ok := parseHistoryQuery(w, r)
+	query, ok := parseHistoryQuery(w, r)
 	if !ok {
 		return
 	}
-	query := r.URL.Query()
-	beginTime, endTime := history.begin, history.end
-	specs, err := parseOverlays(query.Get("ma"), query.Get("boll"))
+	beginTime, endTime := query.begin, query.end
+	specs, err := parseOverlays(r.URL.Query().Get("ma"), r.URL.Query().Get("boll"))
 	if err != nil {
 		writeError(w, 400, err.Error())
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
-	items, err := eastmoney.GetQuoteHistory(ctx, &eastmoney.GetQuoteHistoryReq{
-		Code: history.symbol, MarketCode: history.market, Begin: warmupBegin(beginTime, specs).Format("20060102"), End: endTime.Format("20060102"), FQT: history.fqt,
-	})
+	fetched, err := quotehistory.GetFrom(ctx, &eastmoney.GetQuoteHistoryReq{
+		Code: query.symbol, MarketCode: query.market, Begin: warmupBegin(beginTime, specs).Format("20060102"), End: endTime.Format("20060102"), FQT: query.fqt,
+	}, beginTime.Format("20060102"))
 	if err != nil {
 		slog.ErrorContext(ctx, "查询历史行情失败", "error", err)
-		writeError(w, http.StatusBadGateway, "历史行情获取失败，请稍后重试")
+		writeError(w, http.StatusBadGateway, historyErrorMessage(err))
 		return
 	}
-	quotes := make([]*eastmoney.Quote, 0, len(items))
-	for _, item := range items {
+	quotes := make([]*eastmoney.Quote, 0, len(fetched.Quotes))
+	for _, item := range fetched.Quotes {
 		if item != nil {
 			quotes = append(quotes, item)
 		}
@@ -388,10 +408,13 @@ func (s *desktopServer) handleHistory(w http.ResponseWriter, r *http.Request) {
 		results = append(results, map[string]any{
 			"date": item.Date.Format("2006-01-02"), "open": item.Open, "close": item.Close,
 			"high": item.High, "low": item.Low,
-			"volume": item.Volume, "turnover": item.TurnOver,
+			"volume": item.Volume, "turnover": turnoverValue(item),
 		})
 	}
 	response := map[string]any{"results": results}
+	if fetched.Note != "" {
+		response["source_note"] = fetched.Note
+	}
 	if len(specs) > 0 {
 		response["overlays"] = computeOverlays(quotes, first, specs)
 	}

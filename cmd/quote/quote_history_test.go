@@ -1,6 +1,7 @@
 package quote
 
 import (
+	"github.com/stretchr/testify/require"
 	"os"
 	"testing"
 	"time"
@@ -47,4 +48,20 @@ func TestPrintQuoteHistory(t *testing.T) {
 	}
 
 	printQuoteHistory(os.Stdout, []*eastmoney.Quote{quote1, quote2})
+}
+
+func TestFallbackQuoteHidesMissingTurnover(t *testing.T) {
+	quote := &eastmoney.Quote{NoTurnover: true}
+	require.Equal(t, "-", turnoverText(quote))
+	require.Equal(t, "-", velocityText(quote))
+	quote = &eastmoney.Quote{TurnOver: 100000000, Velocity: 1.5}
+	require.NotEqual(t, "-", turnoverText(quote))
+	require.Equal(t, "1.5", velocityText(quote))
+
+	quote = &eastmoney.Quote{Close: 11, NoChange: true}
+	require.Equal(t, "11", closeText(quote))
+	require.Equal(t, "-", amplitudeText(quote))
+	quote = &eastmoney.Quote{Close: 11, Change: 1, ChangeRate: 10, Amplitude: 2}
+	require.Equal(t, "11 1 10%", closeText(quote))
+	require.Equal(t, "2", amplitudeText(quote))
 }

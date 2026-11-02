@@ -107,7 +107,7 @@ export interface HistoryQuote {
   high: number
   low: number
   volume?: number // 股/份；沪深成交量已由 provider 从手转换
-  turnover?: number // 成交额，币种与价格一致
+  turnover?: number | null // 成交额，币种与价格一致；备用数据源没有时为 null
 }
 
 export interface HistoryOverlay { label: string; kind: 'ma' | 'boll'; values: (number | null)[] }
@@ -214,7 +214,7 @@ export interface FxSpread {
 
 export interface StrategySeries { label: string; panel: 'price' | 'indicator'; style: 'line' | 'bar'; values: (number | null)[] }
 export interface StrategySignal { date: string; type: 'buy' | 'sell'; price: number; reason: string }
-export interface StrategyResult { params: Record<string, number>; levels: number[] | null; dates: string[]; closes: number[]; series: StrategySeries[]; signals: StrategySignal[]; required: number; insufficient: boolean }
+export interface StrategyResult { source_note?: string; params: Record<string, number>; levels: number[] | null; dates: string[]; closes: number[]; series: StrategySeries[]; signals: StrategySignal[]; required: number; insufficient: boolean }
 
 export interface ValuationHistory { since: string; samples: number; min: number; median: number; max: number; percentile: number | null; short: boolean }
 export interface ValuationScenario { label: string; multiple: number; price: number; change: number }

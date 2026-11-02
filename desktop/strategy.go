@@ -15,6 +15,7 @@ import (
 
 	"github.com/alwqx/sec/indicator"
 	"github.com/alwqx/sec/provider/eastmoney"
+	quotehistory "github.com/alwqx/sec/provider/history"
 )
 
 type strategySeries struct {
@@ -172,19 +173,19 @@ func (s *desktopServer) handleStrategy(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	// EMA 和 RSI 依赖起点。至少多取一年、长周期按周期放大，同一天的值基本不随查询区间变化；预热数据不进入结果。
 	warmup := history.begin.AddDate(0, 0, -max(365, plan.required*8))
-	items, err := eastmoney.GetQuoteHistory(ctx, &eastmoney.GetQuoteHistoryReq{
+	fetched, err := quotehistory.GetFrom(ctx, &eastmoney.GetQuoteHistoryReq{
 		Code: history.symbol, MarketCode: history.market, Begin: warmup.Format("20060102"), End: history.end.Format("20060102"), FQT: history.fqt,
-	})
+	}, history.begin.Format("20060102"))
 	if err != nil {
 		if r.Context().Err() != nil {
 			return
 		}
 		slog.ErrorContext(ctx, "查询技术分析行情失败", "error", err)
-		writeError(w, http.StatusBadGateway, "历史行情获取失败，请稍后重试")
+		writeError(w, http.StatusBadGateway, historyErrorMessage(err))
 		return
 	}
-	quotes := make([]*eastmoney.Quote, 0, len(items))
-	for _, item := range items {
+	quotes := make([]*eastmoney.Quote, 0, len(fetched.Quotes))
+	for _, item := range fetched.Quotes {
 		if item != nil {
 			quotes = append(quotes, item)
 		}
@@ -208,6 +209,6 @@ func (s *desktopServer) handleStrategy(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, map[string]any{
 		"params": plan.params, "levels": plan.levels, "dates": dates, "closes": closes[first:], "series": series, "signals": signals,
-		"required": plan.required, "insufficient": len(quotes) < plan.required,
+		"required": plan.required, "insufficient": len(quotes) < plan.required, "source_note": fetched.Note,
 	})
 }

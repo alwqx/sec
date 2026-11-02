@@ -123,6 +123,7 @@ function LoadedStrategy({ code }: { code: string }) {
     </form>
     <p className="data-note">{range.begin} 至 {range.end} · {adjustments[fq]} · {kinds[kind].rule}</p>
     <ResourceState {...resource} retry={resource.reload} />
+    {data?.source_note && <p className="data-note">{data.source_note}</p>}
     {data && (data.insufficient ? <div className="empty-state">数据不足：至少需要 {data.required} 个交易日。</div> : data.dates.length === 0 ? <div className="empty-state">所选区间没有交易记录。</div> : <>
       <StrategyChart key={`${kind}-${data.dates.length}`} data={data} name={code} />
       <div className="section-caption"><span>信号 {signals.length} 个（买入 {buys} · 卖出 {signals.length - buys}）</span></div>

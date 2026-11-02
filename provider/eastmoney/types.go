@@ -48,6 +48,8 @@ type Quote struct {
 	Change     float64    `json:"change"`      // 涨跌额
 	Velocity   float64    `json:"velocity"`    // TurnOver Rate 换手率
 	Fqt        int        `json:"fqt"`         // 复权类型
+	NoTurnover bool       `json:"-"`           // 数据源没有成交额和换手率，不能把 0 当成真实值
+	NoChange   bool       `json:"-"`           // 没有前一日收盘价，涨跌和振幅未知，不能把 0 当成真实值
 }
 
 type GetQuoteHistoryReq struct {

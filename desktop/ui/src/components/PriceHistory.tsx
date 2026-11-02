@@ -62,6 +62,7 @@ function LoadedHistory({ code }: { code: string }) {
     <p className="data-note">{filters.begin} 至 {filters.end} · {adjustments[filters.fq]} · 日 K 线；休市日无记录。前复权／后复权仅影响历史行情，实时行情仍为实际报价。</p>
     <div className="history-indicators" role="group" aria-label="技术指标"><span className="data-note">指标</span>{[...maPeriods.map(period => `MA${period}`), 'BOLL'].map(name => <label key={name}><input type="checkbox" checked={shown.includes(name)} onChange={() => toggle(name)} />{name === 'BOLL' ? 'BOLL(20,2)' : name}</label>)}</div>
     <ResourceState {...resource} retry={resource.reload} />
+    {resource.data?.source_note && <p className="data-note">{resource.data.source_note}</p>}
     {resource.data && (values.length ? <CandlestickChart key={`${code}-${filters.begin}-${filters.end}-${filters.fq}`} data={values} overlays={overlays} name={code} showVolume unit={code.startsWith('HK') ? '港元' : '元'} /> : <p className="data-note">所选区间暂无历史行情</p>)}
   </div>
 }

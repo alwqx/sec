@@ -9,7 +9,9 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/alwqx/sec/provider/sina"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/h2non/gock.v1"
 )
@@ -163,4 +165,77 @@ func TestStrategyRejectsInvalidParams(t *testing.T) {
 	}
 	rr := macroRequest(t, "/api/v1/strategy?code=BJ920025")
 	require.Equal(t, http.StatusBadRequest, rr.Code)
+}
+
+func mockSinaBars() {
+	gock.New("https://money.finance.sina.com.cn").Get("/quotes_service").Reply(200).BodyString(`[
+		{"day":"2026-01-02","open":"10","high":"11","low":"9","close":"10","volume":"1000"},
+		{"day":"2026-01-03","open":"10","high":"12","low":"10","close":"11","volume":"2000"}]`)
+}
+
+func TestHistoryFallbackIsLabeledAndHasNoTurnover(t *testing.T) {
+	defer gock.Off()
+	gock.New("https://push2his.eastmoney.com").Get("/api/qt/stock/kline/get").Reply(503)
+	mockSinaBars()
+	rr := macroRequest(t, "/api/v1/history?code=SH600036&begin=2026-01-01&end=2026-01-31")
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	var data struct {
+		SourceNote string           `json:"source_note"`
+		Results    []map[string]any `json:"results"`
+	}
+	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &data))
+	require.Contains(t, data.SourceNote, "新浪备用数据")
+	require.Len(t, data.Results, 2)
+	require.Nil(t, data.Results[0]["turnover"], "没有成交额时是 null，不是 0")
+	require.Equal(t, 2000.0, data.Results[1]["volume"])
+}
+
+func TestStrategyFallback(t *testing.T) {
+	defer gock.Off()
+	gock.New("https://push2his.eastmoney.com").Get("/api/qt/stock/kline/get").Reply(503)
+	mockSinaBars()
+	rr := macroRequest(t, "/api/v1/strategy?code=SH600036&kind=ma&fast=1&slow=2&begin=2026-01-01&end=2026-01-31&fq=bfq")
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	require.Contains(t, rr.Body.String(), "新浪备用数据")
+	require.Contains(t, rr.Body.String(), "2026-01-03")
+}
+
+func TestAdjustedHistoryFailureSuggestsUnadjusted(t *testing.T) {
+	defer gock.Off()
+	gock.New("https://push2his.eastmoney.com").Get("/api/qt/stock/kline/get").Times(2).Reply(503)
+	for _, path := range []string{"/api/v1/history", "/api/v1/strategy"} {
+		rr := macroRequest(t, path+"?code=SH600036&begin=2026-01-01&end=2026-01-31&fq=qfq")
+		require.Equal(t, http.StatusBadGateway, rr.Code, path)
+		require.Contains(t, rr.Body.String(), "可切换为不复权", path)
+	}
+}
+
+func fullSinaBars(start time.Time) string {
+	rows := make([]string, sina.MaxDailyBars)
+	for i := range rows {
+		rows[i] = fmt.Sprintf(`{"day":"%s","open":"10","high":"11","low":"9","close":"10","volume":"1000"}`, start.AddDate(0, 0, i).Format("2006-01-02"))
+	}
+	return "[" + strings.Join(rows, ",") + "]"
+}
+
+// 预热超出备用数据范围时，可见区间有数据就可以返回。
+func TestFallbackWarmupIsBestEffort(t *testing.T) {
+	defer gock.Off()
+	body := fullSinaBars(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
+	for _, path := range []string{"/api/v1/strategy?kind=ma&fast=2&slow=3&fq=bfq", "/api/v1/history?ma=5&fq=bfq"} {
+		gock.New("https://push2his.eastmoney.com").Get("/api/qt/stock/kline/get").Reply(503)
+		gock.New("https://money.finance.sina.com.cn").Get("/quotes_service").Reply(200).BodyString(body)
+		rr := macroRequest(t, path+"&code=SH600036&begin=2024-02-01&end=2026-01-01")
+		require.Equal(t, http.StatusOK, rr.Code, path+rr.Body.String())
+		require.Contains(t, rr.Body.String(), "新浪备用数据", path)
+	}
+}
+
+func TestFallbackRangeNotCoveredSuggestsShortening(t *testing.T) {
+	defer gock.Off()
+	gock.New("https://push2his.eastmoney.com").Get("/api/qt/stock/kline/get").Reply(503)
+	gock.New("https://money.finance.sina.com.cn").Get("/quotes_service").Reply(200).BodyString(fullSinaBars(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)))
+	rr := macroRequest(t, "/api/v1/history?code=SH600036&begin=2021-01-01&end=2026-01-01&fq=bfq")
+	require.Equal(t, http.StatusBadGateway, rr.Code)
+	require.Contains(t, rr.Body.String(), "请缩短查询区间")
 }
