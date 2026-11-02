@@ -29,6 +29,7 @@ func NewValuationCLI() *cobra.Command {
 		RunE: ValuationHandler,
 	}
 	cmd.Flags().BoolP("debug", "D", false, "Enable debug mode")
+	cmd.Flags().Bool("json", false, "Output the full valuation as JSON, regardless of --method")
 	cmd.Flags().StringP("method", "m", "overview",
 		"Valuation method: overview, pe, pb, ps, peg, graham, dcf")
 	// DCF parameters
@@ -63,7 +64,11 @@ func ValuationHandler(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("搜索证券失败: %w", err)
 	}
+	asJSON, _ := cmd.Flags().GetBool("json")
 	if len(secs) == 0 {
+		if asJSON {
+			return fmt.Errorf("未找到证券: %s", args[0])
+		}
 		fmt.Fprintf(cmd.OutOrStdout(), "未找到证券: %s\n", args[0])
 		return nil
 	}
@@ -75,8 +80,14 @@ func ValuationHandler(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
+		if asJSON {
+			return utils.PrintJSON(cmd.OutOrStdout(), result)
+		}
 		render(cmd.OutOrStdout(), method, result)
 		return nil
+	}
+	if asJSON {
+		return fmt.Errorf("%s %s: %w", secs[0].ExCode, secs[0].Name, shared.ErrNoData)
 	}
 	fmt.Fprintf(cmd.OutOrStdout(), "%s %s: %v\n", secs[0].ExCode, secs[0].Name, shared.ErrNoData)
 	return nil
@@ -238,22 +249,26 @@ func printDCF(out io.Writer, r *shared.Result) {
 		return
 	}
 	richTable(out, []string{"参数", "数值", "说明"}, [][]string{
-		{"当前现金流 (近似)", humanMoney(dcf.BaseCash), "TTM 归母净利润 × 70%"},
+		{"当前现金流 (近似)", humanMoney(*dcf.BaseCash), "TTM 归母净利润 × 70%"},
 		{"增长期", "5 年", ""},
 		{"增长率", fpct(dcf.Params.Growth), dcf.GrowthSource},
 		{"永续增长率", fmt.Sprintf("%.1f%%", dcf.Params.TerminalGrowth), "--terminal-growth"},
 		{"折现率", fmt.Sprintf("%.1f%%", dcf.Params.WACC), "--wacc"},
 		{"安全边际", fmt.Sprintf("%.1f%%", dcf.Params.MarginOfSafety), "--margin-of-safety"},
 	})
+	upside := "-"
+	if dcf.Upside != nil {
+		upside = fmt.Sprintf("%+.1f%%", *dcf.Upside)
+	}
 	fmt.Fprintln(out, "\n【DCF 估值结果】")
 	richTable(out, []string{"项目", "数值"}, [][]string{
-		{"增长期现值", humanMoney(dcf.GrowthPV)},
-		{"终值现值", fmt.Sprintf("%s (占 %.0f%%)", humanMoney(dcf.TerminalPV), dcf.TerminalShare)},
-		{"股权价值", humanMoney(dcf.Value)},
-		{"每股价值", fmt.Sprintf("%.2f", dcf.PerShare)},
-		{"扣除安全边际后", fmt.Sprintf("%.2f", dcf.FairPrice)},
+		{"增长期现值", humanMoney(*dcf.GrowthPV)},
+		{"终值现值", fmt.Sprintf("%s (占 %.0f%%)", humanMoney(*dcf.TerminalPV), *dcf.TerminalShare)},
+		{"股权价值", humanMoney(*dcf.Value)},
+		{"每股价值", fmt.Sprintf("%.2f", *dcf.PerShare)},
+		{"扣除安全边际后", fmt.Sprintf("%.2f", *dcf.FairPrice)},
 		{"收盘价", fmt.Sprintf("%.2f", r.Price)},
-		{"相对收盘价", fmt.Sprintf("%+.1f%%", dcf.Upside)},
+		{"相对收盘价", upside},
 	})
 	fmt.Fprintln(out, "\nDCF 对参数高度敏感，可通过 --growth-rate、--wacc、--terminal-growth 调整")
 }

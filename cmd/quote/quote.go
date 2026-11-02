@@ -19,6 +19,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// maxQuoteKeys 是一次查询的证券数量上限。
+const maxQuoteKeys = 5
+
 func NewQuoteCLI() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:           "quote",
@@ -34,6 +37,8 @@ func NewQuoteCLI() *cobra.Command {
 	}
 	rootCmd.Flags().BoolP("debug", "D", false, "Enable debug mode")
 	rootCmd.Flags().BoolP("realtime", "r", false, "Realtime update quote info")
+	rootCmd.Flags().Bool("json", false, "Output JSON")
+	rootCmd.MarkFlagsMutuallyExclusive("realtime", "json")
 
 	return rootCmd
 }
@@ -44,9 +49,12 @@ func QuoteHandler(cmd *cobra.Command, args []string) error {
 	keys := strings.Split(args[0], ",")
 	dedupKeys := stringSliceDedup(keys)
 	slog.Debug("QuoteHandler", "dedupKeys", dedupKeys)
-	if len(dedupKeys) > 5 {
+	if asJSON, _ := cmd.Flags().GetBool("json"); asJSON {
+		return quoteJSON(cmd, dedupKeys)
+	}
+	if len(dedupKeys) > maxQuoteKeys {
 		slog.Warn("QuoteHandler support 5 secs at most, will choose top 5 keys")
-		dedupKeys = dedupKeys[:5]
+		dedupKeys = dedupKeys[:maxQuoteKeys]
 	}
 
 	realTime, err := cmd.Flags().GetBool("realtime")
@@ -102,25 +110,9 @@ func quoteMultiSec(ctx context.Context, keys []string) error {
 
 	slog.DebugContext(ctx, "quoteMultiSec", "secs", secs)
 
-	codes := make([]string, 0, len(secs))
-	secMap := make(map[string]*sina.BasicSecurity, len(secs))
-	for i, sec := range secs {
-		codes = append(codes, sec.ExCode)
-		secMap[sec.Name] = secs[i]
-	}
-
-	// res, err := sina.QuoteWs(codes)
-	res, err := sina.QueryQuoteList(ctx, codes)
+	res, err := queryQuotes(ctx, secs)
 	if err != nil {
 		return err
-	}
-
-	// 填充证券代码
-	for _, quote := range res {
-		if sec, ok := secMap[quote.Name]; ok {
-			quote.ExCode = sec.ExCode
-			quote.Code = sec.Code
-		}
 	}
 
 	printQuote(res)
@@ -150,30 +142,14 @@ func quoteMultiSecRealtime(ctx context.Context, keys []string) error {
 
 	slog.DebugContext(ctx, "quoteMultiSecRealtime", "secs", secs)
 
-	codes := make([]string, 0, len(secs))
-	secMap := make(map[string]*sina.BasicSecurity, len(secs))
-	for i, sec := range secs {
-		codes = append(codes, sec.ExCode)
-		secMap[sec.Name] = secs[i]
-	}
-
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
 		default:
-			// res, err := sina.QuoteWs(codes)
-			res, err := sina.QueryQuoteList(ctx, codes)
+			res, err := queryQuotes(ctx, secs)
 			if err != nil {
 				return err
-			}
-
-			// 填充证券代码
-			for _, quote := range res {
-				if sec, ok := secMap[quote.Name]; ok {
-					quote.ExCode = sec.ExCode
-					quote.Code = sec.Code
-				}
 			}
 			clearTerm()
 			printQuote(res)
@@ -181,6 +157,103 @@ func quoteMultiSecRealtime(ctx context.Context, keys []string) error {
 			time.Sleep(3 * time.Second)
 		}
 	}
+}
+
+// queryQuotes 查询行情并填充证券代码。A 股和 H 股可能同名，只能按交易所代码匹配。
+func queryQuotes(ctx context.Context, secs []*sina.BasicSecurity) ([]*sina.SecurityQuote, error) {
+	codes := make([]string, 0, len(secs))
+	secMap := make(map[string]*sina.BasicSecurity, len(secs))
+	for _, sec := range secs {
+		codes = append(codes, sec.ExCode)
+		secMap[strings.ToUpper(sec.ExCode)] = sec
+	}
+	quotes, err := sina.QueryQuoteList(ctx, codes)
+	if err != nil {
+		return nil, err
+	}
+	for _, quote := range quotes {
+		if sec, ok := secMap[strings.ToUpper(quote.ExCode)]; ok {
+			quote.ExCode, quote.Code = sec.ExCode, sec.Code
+		}
+	}
+	return quotes, nil
+}
+
+// quoteRow 是 sec quote 的 --json 输出，不可用的值是 null。
+type quoteRow struct {
+	ExCode        string   `json:"ex_code"`
+	Code          string   `json:"code"`
+	Name          string   `json:"name"`
+	TradeDate     string   `json:"trade_date"`
+	Time          string   `json:"time"`
+	Price         *float64 `json:"price"`
+	PriceIsYClose bool     `json:"price_is_yclose"`
+	YClose        *float64 `json:"yclose"`
+	Open          *float64 `json:"open"`
+	High          *float64 `json:"high"`
+	Low           *float64 `json:"low"`
+	Change        *float64 `json:"change"`
+	ChangePct     *float64 `json:"change_pct"`
+	Volume        int64    `json:"volume"` // 成交量，单位：股或份
+	Amount        float64  `json:"amount"` // 成交额
+}
+
+func positive(value float64) *float64 {
+	if value <= 0 {
+		return nil
+	}
+	return &value
+}
+
+func newQuoteRow(quote *sina.SecurityQuote) quoteRow {
+	price, isYClose := quote.EffectivePrice()
+	row := quoteRow{
+		ExCode: quote.ExCode, Code: quote.Code, Name: quote.Name, TradeDate: quote.TradeDate, Time: quote.Time,
+		Price: positive(price), PriceIsYClose: isYClose, YClose: positive(quote.YClose), Open: positive(quote.Open),
+		High: positive(quote.High), Low: positive(quote.Low), Volume: quote.TurnOver, Amount: quote.Volume,
+	}
+	if quote.Current > 0 && quote.YClose > 0 {
+		change := quote.Current - quote.YClose
+		pct := change / quote.YClose * 100
+		row.Change, row.ChangePct = &change, &pct
+	}
+	return row
+}
+
+// quoteJSON 要么输出全部证券，要么失败，脚本不会拿到少了几只却看起来成功的结果。
+func quoteJSON(cmd *cobra.Command, keys []string) error {
+	if len(keys) > maxQuoteKeys {
+		return fmt.Errorf("一次最多查询 %d 只证券，当前 %d 只", maxQuoteKeys, len(keys))
+	}
+	ctx := cmd.Context()
+	secs := make([]*sina.BasicSecurity, 0, len(keys))
+	for _, key := range keys {
+		found, err := sina.Search(ctx, key)
+		if err != nil {
+			return fmt.Errorf("搜索证券失败: %w", err)
+		}
+		if len(found) == 0 {
+			return fmt.Errorf("未找到证券: %s", key)
+		}
+		secs = append(secs, found[0])
+	}
+	quotes, err := queryQuotes(ctx, secs)
+	if err != nil {
+		return err
+	}
+	byCode := make(map[string]*sina.SecurityQuote, len(quotes))
+	for _, quote := range quotes {
+		byCode[quote.ExCode] = quote
+	}
+	rows := make([]quoteRow, 0, len(secs))
+	for _, sec := range secs {
+		quote, ok := byCode[sec.ExCode]
+		if !ok {
+			return fmt.Errorf("%s 没有行情数据", sec.ExCode)
+		}
+		rows = append(rows, newQuoteRow(quote))
+	}
+	return utils.PrintJSON(cmd.OutOrStdout(), map[string]any{"results": rows})
 }
 
 // currentText 返回当前价格和涨跌的文字及涨跌幅。没有成交价时显示昨收，不计算涨跌。

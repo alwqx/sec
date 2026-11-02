@@ -223,7 +223,7 @@ export interface ValuationAnnual { year: string; eps: number | null; bps: number
 export interface ValuationDCF {
   applicable: boolean; note: string; warning: string; growth_source: string
   params: { growth: number | null; terminal_growth: number; wacc: number; margin_of_safety: number }
-  base_cash: number; growth_pv: number; terminal_pv: number; terminal_share: number; value: number; per_share: number; fair_price: number; upside: number
+  base_cash: number | null; growth_pv: number | null; terminal_pv: number | null; terminal_share: number | null; value: number | null; per_share: number | null; fair_price: number | null; upside: number | null
 }
 export interface ValuationResult {
   code: string; name: string; industry: string; trade_date: string; price: number; market_cap: number; shares: number

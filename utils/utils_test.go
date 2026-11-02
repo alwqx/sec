@@ -1,8 +1,10 @@
 package utils
 
 import (
+	"bytes"
 	"context"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -185,4 +187,11 @@ func TestHumanNum(t *testing.T) {
 	require.EqualValues(t, "1.00万", HumanNum(10000))
 	require.EqualValues(t, "10.09万", HumanNum(100900))
 	require.EqualValues(t, "1000.09亿", HumanNum(100009000009))
+}
+
+func TestPrintJSON(t *testing.T) {
+	var out bytes.Buffer
+	require.NoError(t, PrintJSON(&out, map[string]any{"title": "A&B <年报>", "value": nil}))
+	require.Equal(t, "{\n  \"title\": \"A&B <年报>\",\n  \"value\": null\n}\n", out.String(), "不转义 & 和 <，保留可读性")
+	require.Error(t, PrintJSON(&out, math.NaN()))
 }

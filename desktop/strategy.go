@@ -172,9 +172,9 @@ func (s *desktopServer) handleStrategy(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
 	// EMA 和 RSI 依赖起点。至少多取一年、长周期按周期放大，同一天的值基本不随查询区间变化；预热数据不进入结果。
-	warmup := history.begin.AddDate(0, 0, -max(365, plan.required*8))
+	warmup := history.begin.AddDate(0, 0, -max(365, plan.required*8*history.freq.BarDays()))
 	fetched, err := quotehistory.GetFrom(ctx, &eastmoney.GetQuoteHistoryReq{
-		Code: history.symbol, MarketCode: history.market, Begin: warmup.Format("20060102"), End: history.end.Format("20060102"), FQT: history.fqt,
+		Code: history.symbol, MarketCode: history.market, Begin: warmup.Format("20060102"), End: history.end.Format("20060102"), FQT: history.fqt, Freq: history.freq,
 	}, history.begin.Format("20060102"))
 	if err != nil {
 		if r.Context().Err() != nil {

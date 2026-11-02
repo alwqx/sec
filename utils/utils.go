@@ -114,6 +114,14 @@ func CheckStatus(resp *http.Response) error {
 	return fmt.Errorf("%s 返回 HTTP %d", host, resp.StatusCode)
 }
 
+// PrintJSON 把数据按缩进格式写到 out，供命令的 --json 输出使用。
+func PrintJSON(out io.Writer, data any) error {
+	encoder := json.NewEncoder(out)
+	encoder.SetEscapeHTML(false)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(data)
+}
+
 // WriteJson 把数据结构转换成 json 格式写到文件中
 func WriteJson(data interface{}, filePath string) error {
 	if data == nil {

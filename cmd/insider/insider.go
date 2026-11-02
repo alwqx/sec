@@ -3,10 +3,10 @@ package insider
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/alwqx/sec/provider/cninfo"
 	"github.com/alwqx/sec/provider/sina"
+	"github.com/alwqx/sec/utils"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 )
@@ -22,6 +22,7 @@ func NewInsiderCLI() *cobra.Command {
 		CompletionOptions: cobra.CompletionOptions{DisableDefaultCmd: true},
 		RunE:              runInsider,
 	}
+	cmd.Flags().Bool("json", false, "Output JSON")
 	return cmd
 }
 
@@ -31,7 +32,11 @@ func runInsider(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("搜索证券失败: %w", err)
 	}
+	asJSON, _ := cmd.Flags().GetBool("json")
 	if len(secs) == 0 {
+		if asJSON {
+			return fmt.Errorf("未找到证券: %s", key)
+		}
 		fmt.Fprintf(cmd.OutOrStdout(), "未找到证券: %s\n", key)
 		return nil
 	}
@@ -44,6 +49,9 @@ func runInsider(cmd *cobra.Command, args []string) error {
 	anns, truncated, err := cninfo.QueryInsiderAnnouncements(cmd.Context(), fmt.Sprintf("%s,%s", sec.Code, orgID))
 	if err != nil {
 		return fmt.Errorf("查询增减持公告失败: %w", err)
+	}
+	if asJSON {
+		return utils.PrintJSON(cmd.OutOrStdout(), map[string]any{"ex_code": sec.ExCode, "name": sec.Name, "truncated": truncated, "results": cninfo.ToRows(anns)})
 	}
 	if len(anns) == 0 {
 		fmt.Fprintf(cmd.OutOrStdout(), "未找到 %s 的增减持公告\n", sec.Name)
@@ -63,12 +71,12 @@ func runInsider(cmd *cobra.Command, args []string) error {
 
 	for _, a := range anns {
 		title := cninfo.CleanTitle(a.Title)
-		t := time.Unix(a.Time/1000, 0).In(cninfo.Beijing).Format("2006-01-02")
+		t := a.DateText()
 		typeName := a.TypeName
 		if typeName == "" {
 			typeName = "-"
 		}
-		data = append(data, []string{t, title, typeName, formatSize(float64(a.AdjunctSize))})
+		data = append(data, []string{t, title, typeName, formatSize(a.SizeBytes())})
 
 		style := make([]tablewriter.Colors, len(headers))
 		if strings.Contains(title, "增持") {

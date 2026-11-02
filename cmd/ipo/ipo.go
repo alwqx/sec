@@ -68,6 +68,7 @@ func newListCmd() *cobra.Command {
 	}
 	cmd.Flags().BoolP("debug", "D", false, "Enable debug mode")
 	cmd.Flags().IntP("size", "n", defaultListSize, "Number of listings to display (max 5000)")
+	cmd.Flags().Bool("json", false, "Output JSON")
 	cmd.Flags().String("since", "", "Only show listings on or after this date (YYYY-MM-DD)")
 	cmd.Flags().String("until", "", "Only show listings on or before this date (YYYY-MM-DD)")
 	return cmd
@@ -110,6 +111,9 @@ func runList(cmd *cobra.Command, args []string) error {
 	}
 
 	filtered := items
+	if asJSON, _ := cmd.Flags().GetBool("json"); asJSON {
+		return utils.PrintJSON(cmd.OutOrStdout(), map[string]any{"results": newListRows(filtered)})
+	}
 	if len(filtered) == 0 {
 		fmt.Fprintln(cmd.OutOrStdout(), "未找到 IPO 记录（尝试放宽年份或 --size）")
 		return nil
@@ -118,6 +122,26 @@ func runList(cmd *cobra.Command, args []string) error {
 	out := cmd.OutOrStdout()
 	printIPOList(out, filtered)
 	return nil
+}
+
+// listRow 是 sec ipo list 的 --json 输出，上市日期是 YYYY-MM-DD，未上市时为 null。
+type listRow struct {
+	Code        string  `json:"code"`
+	Name        string  `json:"name"`
+	ListingDate *string `json:"listing_date"`
+}
+
+func newListRows(items []*eastmoney.IListing) []listRow {
+	rows := make([]listRow, 0, len(items))
+	for _, item := range items {
+		row := listRow{Code: item.Code, Name: item.Name}
+		if item.ListingDate != "" && item.ListingDate != "-" {
+			date := dateSafe(item.ListingDate)
+			row.ListingDate = &date
+		}
+		rows = append(rows, row)
+	}
+	return rows
 }
 
 func printIPOList(out io.Writer, items []*eastmoney.IListing) {
@@ -177,6 +201,7 @@ func newCalendarCmd() *cobra.Command {
 	}
 	cmd.Flags().BoolP("debug", "D", false, "Enable debug mode")
 	cmd.Flags().String("since", "", "Start date (YYYY-MM-DD), default: today")
+	cmd.Flags().Bool("json", false, "Output JSON")
 	cmd.Flags().String("until", "", "End date (YYYY-MM-DD), default: start + 30 days")
 	return cmd
 }
@@ -195,6 +220,9 @@ func runCalendar(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("获取新股日历失败: %w", err)
 	}
 
+	if asJSON, _ := cmd.Flags().GetBool("json"); asJSON {
+		return utils.PrintJSON(cmd.OutOrStdout(), map[string]any{"results": cninfo.ToRows(announcements)})
+	}
 	if len(announcements) == 0 {
 		fmt.Fprintln(cmd.OutOrStdout(), "未找到 IPO 相关公告；请确认 --since/--until 范围正确")
 		return nil
@@ -236,7 +264,7 @@ func printIPOCalendar(out io.Writer, announcements []*cninfo.Announcement) {
 		}
 		sizeStr := "-"
 		if a.AdjunctSize > 0 {
-			sizeStr = utils.HumanByte(float64(a.AdjunctSize))
+			sizeStr = utils.HumanByte(a.SizeBytes())
 		}
 		row := []string{dateSafe(a.Date), a.SecCode, a.SecName, title, sizeStr}
 		styles := make([]tablewriter.Colors, len(headers))
@@ -442,7 +470,7 @@ func printProspectus(out io.Writer, announcements []*cninfo.Announcement) {
 	for _, a := range announcements {
 		sizeStr := "-"
 		if a.AdjunctSize > 0 {
-			sizeStr = utils.HumanByte(float64(a.AdjunctSize))
+			sizeStr = utils.HumanByte(a.SizeBytes())
 		}
 		title := a.Title
 		if len([]rune(title)) > 60 {

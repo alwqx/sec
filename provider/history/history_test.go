@@ -109,22 +109,22 @@ func TestOtherMarketsHaveNoFallback(t *testing.T) {
 
 // 取满上限且开始日期更早时，数据被截断，不能悄悄返回一部分。
 func TestFallbackRejectsTruncatedRange(t *testing.T) {
-	bars := make([]*sina.DailyBar, sina.MaxDailyBars)
+	bars := make([]*sina.Bar, sina.MaxBars)
 	start := time.Date(2022, 8, 10, 0, 0, 0, 0, time.UTC)
 	for i := range bars {
-		bars[i] = &sina.DailyBar{Date: start.AddDate(0, 0, i).Format("2006-01-02"), Close: 10}
+		bars[i] = &sina.Bar{Date: start.AddDate(0, 0, i).Format("2006-01-02"), Close: 10}
 	}
 	_, err := toQuotes(bars, unadjusted("20200101", ""), "20200101")
 	require.ErrorIs(t, err, ErrRangeNotCovered)
 
 	quotes, err := toQuotes(bars, unadjusted("20220810", ""), "20220810")
 	require.NoError(t, err)
-	require.Len(t, quotes, sina.MaxDailyBars)
+	require.Len(t, quotes, sina.MaxBars)
 
 	// 预热部分超出范围时，只要可见区间有数据就可以返回。
 	quotes, err = toQuotes(bars, unadjusted("20200101", ""), "20230101")
 	require.NoError(t, err)
-	require.Len(t, quotes, sina.MaxDailyBars)
+	require.Len(t, quotes, sina.MaxBars)
 
 	// 不满上限说明已经到上市首日，早于上市日的开始日期不算截断。
 	quotes, err = toQuotes(bars[:100], unadjusted("20200101", ""), "20200101")
@@ -149,4 +149,31 @@ func TestCanceledRequestDoesNotFallBack(t *testing.T) {
 	_, err := Get(ctx, unadjusted("20261001", "20261031"))
 	require.Error(t, err)
 	require.Len(t, gock.Pending(), 1, "取消后不再请求备用数据源")
+}
+
+// 周线和月线请求对应周期的数据，东方财富和新浪都一样。
+func TestFreqIsPassedToBothSources(t *testing.T) {
+	defer gock.Off()
+	for _, tc := range []struct {
+		freq       eastmoney.Freq
+		klt, scale string
+	}{{eastmoney.FreqDay, "101", "240"}, {eastmoney.FreqWeek, "102", "1200"}, {eastmoney.FreqMonth, "103", "7200"}, {"", "101", "240"}} {
+		gock.New("https://push2his.eastmoney.com").Get(klinePath).MatchParam("klt", tc.klt).Reply(503)
+		gock.New("https://money.finance.sina.com.cn").Get("/quotes_service").MatchParam("scale", tc.scale).Reply(200).
+			BodyString(`[{"day":"2026-10-30","open":"1","high":"2","low":"1","close":"2","volume":"100"}]`)
+		req := unadjusted("20261001", "20261031")
+		req.Freq = tc.freq
+		result, err := Get(context.Background(), req)
+		require.NoError(t, err, string(tc.freq))
+		require.Len(t, result.Quotes, 1)
+	}
+	require.False(t, gock.IsPending())
+}
+
+func TestFallbackRoundsChange(t *testing.T) {
+	quotes, err := toQuotes([]*sina.Bar{{Date: "2026-10-08", Close: 41.26}, {Date: "2026-10-09", Close: 41.71, High: 41.83, Low: 41}}, unadjusted("", ""), "")
+	require.NoError(t, err)
+	require.Equal(t, 0.45, quotes[1].Change)
+	require.Equal(t, 1.09, quotes[1].ChangeRate)
+	require.Equal(t, 2.01, quotes[1].Amplitude)
 }

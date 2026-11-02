@@ -74,8 +74,8 @@ func parseOverlays(ma, boll string) ([]overlaySpec, error) {
 }
 
 // warmupBegin 往前多取数据，使查询区间第一天的指标也有完整窗口。
-// 交易日少于自然日，按最长周期的 2 倍加 15 天估算。
-func warmupBegin(begin time.Time, specs []overlaySpec) time.Time {
+// 交易日少于自然日，按最长周期的 2 倍加 15 根估算，再换算成自然日。
+func warmupBegin(begin time.Time, specs []overlaySpec, freq eastmoney.Freq) time.Time {
 	longest := 0
 	for _, spec := range specs {
 		longest = max(longest, spec.period)
@@ -83,7 +83,7 @@ func warmupBegin(begin time.Time, specs []overlaySpec) time.Time {
 	if longest == 0 {
 		return begin
 	}
-	return begin.AddDate(0, 0, -(longest*2 + 15))
+	return begin.AddDate(0, 0, -(longest*2+15)*freq.BarDays())
 }
 
 // nullBefore 返回下标 first 起的序列，start 之前窗口不足的位置为 null。

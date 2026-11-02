@@ -16,7 +16,7 @@ import (
 //
 // A buy signal fires when MACD crosses above Signal; sell when below.
 func ComputeMACD(quotes []*eastmoney.Quote, fast, slow, signal int) (headers []string, data [][]string, signals []Signal) {
-	if len(quotes) < slow+signal {
+	if len(quotes) < max(fast, slow)+signal {
 		return nil, nil, nil
 	}
 
@@ -58,16 +58,33 @@ func runMACD(cmd *cobra.Command, args []string) error {
 	fast, _ := cmd.Flags().GetInt("fast")
 	slow, _ := cmd.Flags().GetInt("slow")
 	signal, _ := cmd.Flags().GetInt("signal")
+	if err := checkPeriods(map[string]int{"fast": fast, "slow": slow, "signal": signal}); err != nil {
+		return err
+	}
 
-	exCode, name, quotes, err := fetchOHLCV(cmd, args[0], 250)
+	exCode, name, quotes, note, err := fetchOHLCV(cmd, args[0], 250)
 	if err != nil {
 		return err
 	}
 
 	headers, data, signals := ComputeMACD(quotes, fast, slow, signal)
 	if headers == nil {
-		fmt.Fprintf(cmd.OutOrStdout(), "数据不足（需要至少 %d 个交易日）\n", slow+signal)
+		if wantJSON(cmd) {
+			return fmt.Errorf("数据不足（需要至少 %d 根 K 线）", max(fast, slow)+signal)
+		}
+		fmt.Fprintf(cmd.OutOrStdout(), "数据不足（需要至少 %d 根 K 线）\n", max(fast, slow)+signal)
 		return nil
+	}
+
+	if wantJSON(cmd) {
+		prices, _ := strategyPrices(quotes)
+		line, signalLine, histogram := indicator.MACD(prices, fast, slow, signal)
+		start := indicator.MACDStart(fast, slow, signal)
+		return printJSON(cmd, exCode, name, "macd", map[string]any{"fast": fast, "slow": slow, "signal": signal}, note, quotes, []jsonSeries{
+			{"macd", line, max(fast, slow) - 1},
+			{"signal", signalLine, start},
+			{"histogram", histogram, start},
+		}, signals)
 	}
 
 	fmt.Fprintf(cmd.OutOrStdout(), "\n证券代码: %s  证券名称: %s  策略: MACD(%d,%d,%d)\n\n", exCode, name, fast, slow, signal)

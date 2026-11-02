@@ -15,3 +15,15 @@ export function monthsAgo(months: number, today = marketToday()) {
   date.setUTCDate(Math.min(day, lastDay))
   return date.toISOString().slice(0, 10)
 }
+
+// K 线周期。切换周期时换一个合适的默认区间，快捷区间也随周期变化；单次最长年数和后端一致。
+export const frequencies = {
+  day: { title: '日线', short: '日', months: 3, ranges: [1, 3, 6, 12, 24, 60], maxYears: 5 },
+  week: { title: '周线', short: '周', months: 24, ranges: [12, 24, 60, 120], maxYears: 20 },
+  month: { title: '月线', short: '月', months: 60, ranges: [60, 120, 240], maxYears: 40 },
+}
+export type Frequency = keyof typeof frequencies
+
+export function rangeLabel(months: number) {
+  return months < 12 ? `近 ${months} 个月` : `近 ${months / 12} 年`
+}

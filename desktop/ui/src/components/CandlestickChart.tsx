@@ -10,11 +10,12 @@ function compactNumber(value: number | null | undefined) {
 
 const overlayClass = (label: string) => label.startsWith('BOLL') ? 'boll' : label.toLowerCase()
 
-export default function CandlestickChart({ data, name, unit, showVolume = false, overlays = [] }: {
+export default function CandlestickChart({ freqLabel = '日', data, name, unit, showVolume = false, overlays = [] }: {
   data: HistoryQuote[]
   name: string
   unit: string
   showVolume?: boolean
+  freqLabel?: string
   overlays?: HistoryOverlay[]
 }) {
   const container = useRef<HTMLDivElement>(null)
@@ -84,7 +85,7 @@ export default function CandlestickChart({ data, name, unit, showVolume = false,
   }
 
   return <div className="history-chart candle-chart" ref={container}>
-    <div className="section-caption"><span>{name} · 日 K 线 · {unit}</span><span>红：收盘高于开盘 · 绿：收盘低于开盘</span></div>
+    <div className="section-caption"><span>{name} · {freqLabel} K 线 · {unit}</span><span>红：收盘高于开盘 · 绿：收盘低于开盘</span></div>
     <div className="candle-detail"><time>{item.date}</time><span>开 {item.open.toFixed(2)}</span><span>高 {item.high.toFixed(2)}</span><span>低 {item.low.toFixed(2)}</span><span>收 {item.close.toFixed(2)}</span>
       {showVolume && <><span>成交量 {compactNumber(item.volume)} 股/份</span><span>成交额 {compactNumber(item.turnover)} {unit}</span></>}
       {overlays.map(overlay => <span key={overlay.label} className={`overlay-text overlay-${overlayClass(overlay.label)}`}>{overlay.label} {overlay.values[current]?.toFixed(2) ?? '—'}</span>)}
@@ -103,7 +104,7 @@ export default function CandlestickChart({ data, name, unit, showVolume = false,
       </svg>
       <div className="candle-scroll" ref={scroll}>
         <svg width={chartWidth} height={height} viewBox={`0 0 ${chartWidth} ${height}`} role="img" tabIndex={0}
-          aria-label={`${name} 日K线，${data.length} 个交易日，单位${unit}；左右方向键选择交易日，Home 和 End 跳至首尾`}
+          aria-label={`${name} ${freqLabel}K线，${data.length} 根，单位${unit}；左右方向键选择交易日，Home 和 End 跳至首尾`}
           onKeyDown={selectKey} onPointerMove={selectPointer} onPointerDown={selectPointer} onPointerLeave={() => setSelected(null)}>
           {[0, .5, 1].map(value => {
             const price = low + (high - low) * value

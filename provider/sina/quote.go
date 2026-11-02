@@ -270,7 +270,8 @@ func parseSecQuoteOfHstock(quoteLine string) (*SecurityQuote, error) {
 		slog.Error(err.Error())
 		return nil, err
 	}
-	res.TradeDate = strings.TrimSpace(items[17])
+	// 港股日期是 2025/05/27，统一成和其他市场一样的格式。
+	res.TradeDate = strings.ReplaceAll(strings.TrimSpace(items[17]), "/", "-")
 	res.Time = strings.TrimSpace(items[18])
 
 	return res, nil

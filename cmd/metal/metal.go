@@ -17,6 +17,7 @@ func NewMetalCLI() *cobra.Command {
 		RunE:    MetalHandler,
 	}
 	rootCmd.Flags().BoolP("debug", "D", false, "Enable debug mode")
+	rootCmd.Flags().Bool("json", false, "Output JSON")
 
 	return rootCmd
 }
@@ -33,6 +34,12 @@ func MetalHandler(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	num := len(resp.Data)
+	if asJSON, _ := cmd.Flags().GetBool("json"); asJSON {
+		if num > 0 {
+			return printDailyJSON(cmd, resp.Data[num-1:])
+		}
+		return printDailyJSON(cmd, nil)
+	}
 	if num == 0 {
 		slog.Warn("no data")
 	} else {

@@ -49,7 +49,7 @@ type Announcement struct {
 	Title            string `json:"announcementTitle"`
 	Time             int64  `json:"announcementTime"`
 	AdjunctURL       string `json:"adjunctUrl"`
-	AdjunctSize      int64  `json:"adjunctSize"`
+	AdjunctSize      int64  `json:"adjunctSize"` // 单位 KB
 	AdjunctType      string `json:"adjunctType"`
 	SecCode          string `json:"secCode"`
 	SecName          string `json:"secName"`

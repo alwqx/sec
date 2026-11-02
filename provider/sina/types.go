@@ -80,12 +80,12 @@ func (q *SecurityQuote) EffectivePrice() (float64, bool) {
 
 // 分红送转信息
 type Dividend struct {
-	PublicDate     string  // 公告日期
-	RecordDate     string  // 登记日期
-	DividendedDate string  // 除息日期
-	Shares         float64 // 送股数量
-	AddShares      float64 // 转增股票数量
-	Bonus          float64 // 红利
+	PublicDate     string  `json:"public_date"`     // 公告日期
+	RecordDate     string  `json:"record_date"`     // 登记日期
+	DividendedDate string  `json:"dividended_date"` // 除息日期
+	Shares         float64 `json:"shares"`          // 送股数量
+	AddShares      float64 `json:"add_shares"`      // 转增股票数量
+	Bonus          float64 `json:"bonus"`           // 红利
 }
 
 // PriceText 返回当前价格的文字，用昨收时加以说明。

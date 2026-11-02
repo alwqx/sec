@@ -18,6 +18,7 @@ func NewBondHistoryCLI() *cobra.Command {
 		RunE:    BondHistoryHandler,
 	}
 	rootCmd.Flags().BoolP("debug", "D", false, "Enable debug mode")
+	rootCmd.Flags().Bool("json", false, "Output JSON")
 	rootCmd.Flags().StringP("begin", "b", "", "Begin date 20260101")
 	rootCmd.Flags().StringP("end", "e", "", "End date 20260131")
 
@@ -38,6 +39,9 @@ func BondHistoryHandler(cmd *cobra.Command, args []string) error {
 	resp, err := bond.QueryBond(cmd.Context(), req)
 	if err != nil {
 		return err
+	}
+	if asJSON, _ := cmd.Flags().GetBool("json"); asJSON {
+		return printYieldJSON(cmd, resp.Data)
 	}
 	printBondHistory(cmd.OutOrStdout(), resp.Data)
 

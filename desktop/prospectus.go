@@ -57,11 +57,7 @@ func queryProspectuses(ctx context.Context, stock, begin, end string, page int) 
 			continue
 		}
 		seen[pdf] = true
-		date := ""
-		if item.Time > 0 {
-			date = time.UnixMilli(item.Time).In(time.FixedZone("CST", 8*3600)).Format("2006-01-02")
-		}
-		results = append(results, prospectusDocument{ID: item.ID, Title: strings.TrimSpace(html.UnescapeString(titleTags.ReplaceAllString(item.Title, ""))), Date: date, URL: pdf})
+		results = append(results, prospectusDocument{ID: item.ID, Title: strings.TrimSpace(html.UnescapeString(titleTags.ReplaceAllString(item.Title, ""))), Date: item.DateText(), URL: pdf})
 	}
 	return results, response.HasMore || page < response.TotalPages, nil
 }

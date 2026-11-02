@@ -173,6 +173,8 @@ CLI `sec watch` 与 Desktop「我的自选」统一使用 `~/.sec/watchlist.json
 | `valuation`                                   | 估值指标与 DCF 分析                      |
 | `upgrade`、`--version`                        | CLI 升级与版本信息                       |
 
+只读数据命令都支持 `--json`，K 线和技术分析支持 `--freq day|week|month`，约定见[命令对照文档](docs/commands.md#脚本调用)。
+
 使用 `sec <命令> --help` 查看参数，IPO 等子命令使用 `sec ipo <子命令> --help`。
 
 ```shell

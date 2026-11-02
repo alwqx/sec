@@ -1,7 +1,10 @@
 package bond
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"os"
 	"testing"
 	"time"
@@ -271,4 +274,28 @@ func TestPrintBondHistoryEdgeCases(t *testing.T) {
 			},
 		})
 	})
+}
+
+// 上游缺失的期限是 null，真实的 0% 保留为 0。
+func TestPrintYieldJSON(t *testing.T) {
+	cmd := NewBondCLI()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	require.NoError(t, printYieldJSON(cmd, []*bond.BondYieldItem{{Date: "2026-10-30", BC1Year: 0, BC10Year: 4.25, MissingTenors: map[string]bool{"1m": true}}}))
+	var data struct {
+		Results []struct {
+			Date   string              `json:"date"`
+			Yields map[string]*float64 `json:"yields"`
+		} `json:"results"`
+	}
+	require.NoError(t, json.Unmarshal(out.Bytes(), &data))
+	yields := data.Results[0].Yields
+	require.Nil(t, yields["1m"])
+	require.Zero(t, *yields["1y"])
+	require.Equal(t, 4.25, *yields["10y"])
+	require.Len(t, yields, 11)
+
+	out.Reset()
+	require.NoError(t, printYieldJSON(cmd, nil))
+	require.Contains(t, out.String(), `"results": []`)
 }

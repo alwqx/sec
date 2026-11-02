@@ -69,7 +69,7 @@ func TestParseSinaInfoQuote(t *testing.T) {
 	quote1, err := parseSecQuote(exCode1, body1)
 	require.Nil(t, err)
 	require.NotNil(t, quote1)
-	require.Equal(t, "2025/05/27", quote1.TradeDate)
+	require.Equal(t, "2025-05-27", quote1.TradeDate)
 	require.EqualValues(t, "16:08", quote1.Time)
 	require.Equal(t, "", quote1.Code)
 	require.Equal(t, "腾讯控股", quote1.Name)

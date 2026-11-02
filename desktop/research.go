@@ -5,9 +5,9 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"regexp"
 	"slices"
 	"sort"
@@ -66,30 +66,11 @@ func (s *desktopServer) handleIPO(w http.ResponseWriter, r *http.Request) {
 
 var titleTags = regexp.MustCompile(`<[^>]*>`)
 
-func announcementURL(a *cninfo.Announcement) string {
-	if a.AdjunctURL != "" {
-		u, err := url.Parse(a.AdjunctURL)
-		if err == nil && u.Host == "" && !strings.HasPrefix(u.Path, "//") && strings.HasPrefix(u.Path, "finalpage/") {
-			return "https://static.cninfo.com.cn/" + u.String()
-		}
-		if err == nil && (u.Scheme == "https" || u.Scheme == "http") && u.Host == "static.cninfo.com.cn" && u.User == nil {
-			u.Scheme = "https"
-			return u.String()
-		}
-	}
-	values := url.Values{"stockCode": {a.SecCode}, "announcementId": {a.ID}, "orgId": {a.OrgID}}
-	return "https://www.cninfo.com.cn/new/disclosure/detail?" + values.Encode()
-}
-
 // announcementItem 转为页面使用的公告字段，标题和名称去掉高亮标签。
 func announcementItem(a *cninfo.Announcement) map[string]any {
-	date := ""
-	if a.Time > 0 {
-		date = time.UnixMilli(a.Time).In(cninfo.Beijing).Format("2006-01-02")
-	}
 	return map[string]any{
 		"id": a.ID, "title": cninfo.CleanTitle(a.Title),
-		"date": date, "code": a.SecCode, "name": cninfo.CleanTitle(a.SecName), "url": announcementURL(a),
+		"date": a.DateText(), "code": a.SecCode, "name": cninfo.CleanTitle(a.SecName), "url": cninfo.AnnouncementURL(a),
 	}
 }
 
@@ -294,6 +275,7 @@ type historyQuery struct {
 	market     int
 	begin, end time.Time
 	fqt        eastmoney.FuQuanType
+	freq       eastmoney.Freq
 }
 
 func parseHistoryQuery(w http.ResponseWriter, r *http.Request) (historyQuery, bool) {
@@ -334,8 +316,15 @@ func parseHistoryQuery(w http.ResponseWriter, r *http.Request) (historyQuery, bo
 		writeError(w, 400, "开始日期格式无效，请使用 YYYY-MM-DD")
 		return historyQuery{}, false
 	}
-	if beginTime.After(endTime) || beginTime.Year() < 1990 || end > now.Format("2006-01-02") || endTime.After(beginTime.AddDate(5, 0, 0)) {
-		writeError(w, 400, "日期范围须在 1990 年至今日之间，开始不晚于结束，单次最多 5 年")
+	freq, err := eastmoney.ParseFreq(query.Get("freq"))
+	if err != nil {
+		writeError(w, 400, err.Error())
+		return historyQuery{}, false
+	}
+	// 周期越长，单次能看的年数越多，K 线根数大致不变。
+	maxYears := map[eastmoney.Freq]int{eastmoney.FreqDay: 5, eastmoney.FreqWeek: 20, eastmoney.FreqMonth: 40}[freq]
+	if beginTime.After(endTime) || beginTime.Year() < 1990 || end > now.Format("2006-01-02") || endTime.After(beginTime.AddDate(maxYears, 0, 0)) {
+		writeError(w, 400, fmt.Sprintf("日期范围须在 1990 年至今日之间，开始不晚于结束，%s线单次最多 %d 年", freq.Label(), maxYears))
 		return historyQuery{}, false
 	}
 	fq := query.Get("fq")
@@ -350,7 +339,7 @@ func parseHistoryQuery(w http.ResponseWriter, r *http.Request) (historyQuery, bo
 		writeError(w, 400, "复权方式必须为 bfq、qfq 或 hfq")
 		return historyQuery{}, false
 	}
-	return historyQuery{symbol, market, beginTime, endTime, fqt}, true
+	return historyQuery{symbol, market, beginTime, endTime, fqt, freq}, true
 }
 
 // historyErrorMessage 在只有复权行情失败时提示可以切换，备用数据源只有不复权行情。
@@ -359,7 +348,7 @@ func historyErrorMessage(err error) string {
 		return "复权行情暂时获取失败，可切换为不复权"
 	}
 	if errors.Is(err, quotehistory.ErrRangeNotCovered) {
-		return "东方财富行情暂不可用，备用数据只有最近约 4 年，请缩短查询区间"
+		return "东方财富行情暂不可用，备用数据只有最近 1023 根 K 线，请缩短查询区间"
 	}
 	return "历史行情获取失败，请稍后重试"
 }
@@ -387,7 +376,7 @@ func (s *desktopServer) handleHistory(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
 	fetched, err := quotehistory.GetFrom(ctx, &eastmoney.GetQuoteHistoryReq{
-		Code: query.symbol, MarketCode: query.market, Begin: warmupBegin(beginTime, specs).Format("20060102"), End: endTime.Format("20060102"), FQT: query.fqt,
+		Code: query.symbol, MarketCode: query.market, Begin: warmupBegin(beginTime, specs, query.freq).Format("20060102"), End: endTime.Format("20060102"), FQT: query.fqt, Freq: query.freq,
 	}, beginTime.Format("20060102"))
 	if err != nil {
 		slog.ErrorContext(ctx, "查询历史行情失败", "error", err)

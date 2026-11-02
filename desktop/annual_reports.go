@@ -156,11 +156,7 @@ func queryPeriodicReports(ctx context.Context, stock string, startYear, endYear,
 		if pdfURL == "" {
 			continue
 		}
-		date := ""
-		if item.Time > 0 {
-			date = time.UnixMilli(item.Time).In(time.FixedZone("CST", 8*3600)).Format("2006-01-02")
-		}
-		results = append(results, annualReport{ID: item.ID, Title: title, Date: date, Year: year, Type: reportType, URL: pdfURL})
+		results = append(results, annualReport{ID: item.ID, Title: title, Date: item.DateText(), Year: year, Type: reportType, URL: pdfURL})
 	}
 	return results, response.HasMore || page < response.TotalPages, nil
 }

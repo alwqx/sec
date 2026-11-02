@@ -20,6 +20,7 @@ func NewBondCLI() *cobra.Command {
 		RunE:    BondHandler,
 	}
 	rootCmd.Flags().BoolP("debug", "D", false, "Enable debug mode")
+	rootCmd.Flags().Bool("json", false, "Output JSON")
 
 	return rootCmd
 }
@@ -36,6 +37,12 @@ func BondHandler(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	num := len(resp.Data)
+	if asJSON, _ := cmd.Flags().GetBool("json"); asJSON {
+		if num > 0 {
+			return printYieldJSON(cmd, resp.Data[num-1:])
+		}
+		return printYieldJSON(cmd, nil)
+	}
 	if num == 0 {
 		slog.Warn("no data")
 	} else {
