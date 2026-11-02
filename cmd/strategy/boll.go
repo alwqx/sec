@@ -21,35 +21,16 @@ func ComputeBollinger(quotes []*eastmoney.Quote, period int, k float64) (headers
 		return nil, nil, nil
 	}
 
-	n := len(quotes)
-	prices := make([]float64, n)
-	dates := make([]string, n)
-	for i, q := range quotes {
-		prices[i] = q.Close
-		dates[i] = q.Date.Format("2006-01-02")
-	}
-
+	prices, dates := strategyPrices(quotes)
 	middle, upper, lower := indicator.Bollinger(prices, period, k)
+	signals, labels := toSignals(quotes, prices, indicator.BollingerSignals(prices, upper, lower, period-1), "☍ 下轨买入", "☍ 上轨卖出")
 
 	headers = []string{"日期", "收盘", "下轨", "中轨", "上轨", "信号"}
-	data = make([][]string, n)
-
+	data = make([][]string, len(prices))
 	for i := range prices {
-		lo, mid, hi := lower[i], middle[i], upper[i]
-		sig := "-"
-		if i > 0 && lo > 0 && mid > 0 && hi > 0 {
-			// Touch lower band → buy signal on next day's rise
-			if prices[i-1] <= lower[i-1] && prices[i] > lower[i] {
-				sig = "☍ 下轨买入"
-				signals = append(signals, Signal{Date: quotes[i].Date, Type: "buy", Price: prices[i], Reason: "触及下轨回升"})
-			} else if prices[i-1] >= upper[i-1] && prices[i] < upper[i] {
-				sig = "☍ 上轨卖出"
-				signals = append(signals, Signal{Date: quotes[i].Date, Type: "sell", Price: prices[i], Reason: "触及上轨回落"})
-			}
-		}
-		data[i] = []string{dates[i], fmt.Sprintf("%.2f", prices[i]), fv(lo), fv(mid), fv(hi), sig}
+		data[i] = []string{dates[i], fmt.Sprintf("%.2f", prices[i]), fv(lower[i]), fv(middle[i]), fv(upper[i]), labels[i]}
 	}
-	return
+	return headers, data, signals
 }
 
 func NewBollCLI() *cobra.Command {

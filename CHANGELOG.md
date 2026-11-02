@@ -20,6 +20,13 @@
 16. Add insider announcements to Desktop stock announcements and an IPO announcement date view to the Desktop IPO page, stating that they are title matches and announcement dates rather than structured trades or a subscription calendar
 17. Make `sec insider` match titles strictly, remove duplicates, clean highlight tags and fetch beyond the first 30 results of each keyword, through a provider query shared with Desktop
 18. Show CNINFO announcement dates in Beijing time in `sec insider`, `sec ipo calendar` and prospectus queries, regardless of the local time zone
+19. Add a Desktop technical analysis tab for A-share and HK securities with MA crossover, MACD, RSI and Bollinger Bands, adjustable parameters, signal markers and a signal table; it defaults to forward-adjusted prices, while `sec strategy` stays unadjusted
+20. Move the strategy indicators and signal rules into the shared `indicator` package used by `sec strategy` and Desktop
+21. Fix a spurious sell signal in `sec strategy boll` on the first day the Bollinger window is full, caused by comparing the close with an empty previous upper band; signal counts can drop by one
+22. Fix `sec strategy` indicator validity so zero and negative values count as real data: RSI rebounds from 0 now produce buy signals and RSI 0 is shown instead of `-`, and a non-positive lower Bollinger band no longer drops signals
+23. Seed the `sec strategy macd` signal line from the first valid MACD value instead of leading zeros, and emit no MACD signals before the signal line is valid; early signal line values and signals can change
+24. Report RSI as a neutral 50 instead of 100 when prices are completely flat over the window
+25. Reject `NaN` for Desktop strategy and Bollinger overlay parameters with a validation error instead of an empty response
 
 ### v0.4.1
 

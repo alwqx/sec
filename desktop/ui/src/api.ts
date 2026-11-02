@@ -1,4 +1,4 @@
-import type { BasicSecurity, SecurityQuote, Company, Dividend, WorkspaceState, PageResult, IPOListing, Announcement, FinancialReport, MetalData, HistoryQuote, BondData, CompanyMetrics, SavedDownload, AnnualReportsPage, ProspectusPage , MacroCatalog, MacroDataset , FxDataset, FxSpread , HistoryOverlay } from './types'
+import type { BasicSecurity, SecurityQuote, Company, Dividend, WorkspaceState, PageResult, IPOListing, Announcement, FinancialReport, MetalData, HistoryQuote, BondData, CompanyMetrics, SavedDownload, AnnualReportsPage, ProspectusPage , MacroCatalog, MacroDataset , FxDataset, FxSpread , HistoryOverlay , StrategyResult } from './types'
 
 async function request<T>(path: string, signal?: AbortSignal, options?: RequestInit): Promise<T> {
   const resp = await fetch(path, { ...options, signal })
@@ -138,4 +138,8 @@ export function fxData(query: Record<string, string>, signal?: AbortSignal): Pro
 
 export function ipoAnnouncements(page: number, since: string, until: string, signal?: AbortSignal): Promise<PageResult<Announcement>> {
   return request(`/api/v1/ipo/announcements?${new URLSearchParams({ page: String(page), since, until })}`, signal)
+}
+
+export function strategy(query: Record<string, string>, signal?: AbortSignal): Promise<StrategyResult> {
+  return request(`/api/v1/strategy?${new URLSearchParams(query)}`, signal)
 }
