@@ -126,7 +126,7 @@ func TestStrategyJSONKeepsAllRowsAndPrecision(t *testing.T) {
 		rows = append(rows, fmt.Sprintf("2026-01-%02d,%s,%s,%s,%s,100,1000,0,0,0,0", i+1, price, price, price, price))
 	}
 	gock.New("https://push2his.eastmoney.com").Get("/api/qt/stock/kline/get").Reply(200).BodyString(klineBody(rows...))
-	data, _, err := runJSON(t, "strategy", "ma", "600036", "--json", "-f", "2", "-s", "3")
+	data, _, err := runJSON(t, "strategy", "ma", "600036", "--json", "-f", "2", "-s", "3", "-b", "20260101", "-e", "20260131")
 	require.NoError(t, err)
 	require.Equal(t, "ma", data["strategy"])
 	require.Equal(t, "day", data["freq"])
@@ -140,7 +140,7 @@ func TestStrategyJSONKeepsAllRowsAndPrecision(t *testing.T) {
 
 	mockSearch(suggestBody)
 	gock.New("https://push2his.eastmoney.com").Get("/api/qt/stock/kline/get").Reply(200).BodyString(klineBody(rows[:2]...))
-	_, output, err := runJSON(t, "strategy", "ma", "600036", "--json", "-f", "2", "-s", "3")
+	_, output, err := runJSON(t, "strategy", "ma", "600036", "--json", "-f", "2", "-s", "3", "-b", "20260101", "-e", "20260131")
 	require.ErrorContains(t, err, "数据不足")
 	require.Empty(t, output)
 }
@@ -249,7 +249,7 @@ func TestStrategyJSONFastLongerThanData(t *testing.T) {
 	mockSearch(suggestBody)
 	gock.New("https://push2his.eastmoney.com").Get("/api/qt/stock/kline/get").Reply(200).
 		BodyString(klineBody("2026-01-02,10,10,10,10,100,1000,0,0,0,0", "2026-01-03,10,10,10,10,100,1000,0,0,0,0", "2026-01-04,10,10,10,10,100,1000,0,0,0,0"))
-	_, output, err := runJSON(t, "strategy", "ma", "600036", "-f", "5", "-s", "2", "--json")
+	_, output, err := runJSON(t, "strategy", "ma", "600036", "-f", "5", "-s", "2", "--json", "-b", "20260101", "-e", "20260131")
 	require.ErrorContains(t, err, "需要至少 5 根")
 	require.Empty(t, output)
 }
@@ -268,4 +268,36 @@ func TestInfoRowMissingValues(t *testing.T) {
 	require.Nil(t, data["listing_price"])
 	data = marshal(infoRow{Dividends: []sina.Dividend{}})
 	require.Equal(t, []any{}, data["dividends"], "查了但没有分红是空数组")
+}
+
+// 只给 --end 时，默认区间从结束日期往前推，预热数据再往前多取一年。
+func TestStrategyEndOnly(t *testing.T) {
+	defer gock.Off()
+	mockSearch(suggestBody)
+	rows := []string{}
+	for i, price := range []string{"10", "9", "8", "7", "6", "7", "8", "9", "10", "11"} {
+		rows = append(rows, fmt.Sprintf("2020-01-%02d,%s,%s,%s,%s,100,1000,0,0,0,0", i+1, price, price, price, price))
+	}
+	gock.New("https://push2his.eastmoney.com").Get("/api/qt/stock/kline/get").MatchParam("beg", "20180526").MatchParam("end", "20200131").Reply(200).BodyString(klineBody(rows...))
+	data, _, err := runJSON(t, "strategy", "ma", "600036", "--json", "-f", "2", "-s", "3", "-e", "20200131")
+	require.NoError(t, err)
+	require.Len(t, data["results"].([]any), 10)
+}
+
+// 回测参数和周期在联网前检查：搜索接口返回错误也不影响报错内容。
+func TestStrategyBacktestFlagsCheckedFirst(t *testing.T) {
+	defer gock.Off()
+	for _, tc := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"--cash", "10"}, "初始资金"},
+		{[]string{"--freq", "week"}, "回测只支持日线"},
+		{[]string{"-b", "20260201", "-e", "20260101"}, "晚于"},
+	} {
+		gock.New("https://suggest3.sinajs.cn").Get("/suggest/").Reply(500)
+		_, _, err := runJSON(t, append([]string{"strategy", "ma", "600036", "--backtest"}, tc.args...)...)
+		require.ErrorContains(t, err, tc.want, tc.args)
+		gock.Off()
+	}
 }

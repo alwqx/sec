@@ -54,10 +54,11 @@ func runBoll(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	exCode, name, quotes, note, err := fetchOHLCV(cmd, args[0], 250)
+	a, err := fetchOHLCV(cmd, args[0], period)
 	if err != nil {
 		return err
 	}
+	quotes := a.quotes
 
 	headers, data, signals := ComputeBollinger(quotes, period, k)
 	if headers == nil {
@@ -68,17 +69,11 @@ func runBoll(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	if wantJSON(cmd) {
-		prices, _ := strategyPrices(quotes)
-		middle, upper, lower := indicator.Bollinger(prices, period, k)
-		return printJSON(cmd, exCode, name, "boll", map[string]any{"period": period, "k": k}, note, quotes, []jsonSeries{
-			{"lower", lower, period - 1},
-			{"middle", middle, period - 1},
-			{"upper", upper, period - 1},
-		}, signals)
-	}
-
-	fmt.Fprintf(cmd.OutOrStdout(), "\n证券代码: %s  证券名称: %s  策略: 布林带(%d,%.1f)\n\n", exCode, name, period, k)
-	displayTable(cmd, headers, data, signals)
-	return nil
+	prices, _ := strategyPrices(quotes)
+	middle, upper, lower := indicator.Bollinger(prices, period, k)
+	return a.finish(cmd, "boll", map[string]any{"period": period, "k": k}, fmt.Sprintf("布林带(%d,%.1f)", period, k), headers, data, signals, []jsonSeries{
+		{"lower", lower, period - 1},
+		{"middle", middle, period - 1},
+		{"upper", upper, period - 1},
+	})
 }

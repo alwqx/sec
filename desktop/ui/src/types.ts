@@ -214,7 +214,16 @@ export interface FxSpread {
 
 export interface StrategySeries { label: string; panel: 'price' | 'indicator'; style: 'line' | 'bar'; values: (number | null)[] }
 export interface StrategySignal { date: string; type: 'buy' | 'sell'; price: number; reason: string }
-export interface StrategyResult { source_note?: string; params: Record<string, number>; levels: number[] | null; dates: string[]; closes: number[]; series: StrategySeries[]; signals: StrategySignal[]; required: number; insufficient: boolean }
+export interface BacktestPerformance { total_return: number; annualized: number | null; max_drawdown: number; drawdown_start: string; drawdown_end: string; final_equity: number }
+export interface BacktestResult {
+  config: { cash: number; commission: number; min_commission: number; stamp_tax: number; slippage: number }
+  begin: string; end: string; strategy: BacktestPerformance; benchmark: BacktestPerformance
+  round_trips: number; win_rate: number | null; total_fees: number; exposure: number; open_position: boolean
+  trades: { signal_date: string; date: string; side: 'buy' | 'sell'; price: number; shares: number; amount: number; fee: number; reason: string; profit: number | null }[]
+  events: { date: string; side: 'buy' | 'sell'; reason: string }[]
+  curve: { date: string; equity: number; benchmark: number; holding: boolean }[]
+}
+export interface StrategyResult { source_note?: string; params: Record<string, number>; levels: number[] | null; dates: string[]; closes: number[]; series: StrategySeries[]; signals: StrategySignal[]; required: number; insufficient: boolean; backtest: BacktestResult | null; backtest_note: string }
 
 export interface ValuationHistory { since: string; samples: number; min: number; median: number; max: number; percentile: number | null; short: boolean }
 export interface ValuationScenario { label: string; multiple: number; price: number; change: number }

@@ -20,10 +20,15 @@
 ```shell
 sec valuation 600036 --json          # 完整估值，不受 --method 影响
 sec strategy macd 600036 --json      # 全部日期，不像表格只显示最后 20 行
+sec strategy ma 600036 -b 20210101 -e 20251231 --backtest   # 指定区间并回测，和买入持有对比
 sec quote-history 600036 --freq week --json
 ```
 
 `sec quote -r` 和 `sec kline --ma`、`--boll` 不能和 `--json` 同时使用。`sec kline`、`sec quote-history`、`sec strategy` 用 `--freq day|week|month` 选择周期，周线和月线的日期是该周期最后一个交易日。`sec strategy` 的周期参数必须大于 0，K 线少于最长周期时报数据不足。
+
+`sec strategy` 用 `--begin/-b`、`--end/-e`（YYYYMMDD）指定区间，默认结束于今天、往前 250 个日历日（周线、月线按周期放大）。区间之前会多取预热数据（至少一年，长周期按周期放大），所以 `ma -s 200` 这类长周期也能从区间第一天就有值；预热数据和预热期的信号不输出。
+
+加 `--backtest` 按信号回测，只支持沪深 A 股个股的日线（指数、基金不能回测，`sec strategy` 目前不支持北交所），自动使用前复权价格；回测参数和周期在联网查询之前检查。只给 `--end` 时，默认区间从结束日往前推。信号在收盘产生，下一交易日开盘成交，每次全仓买入或全部卖出，按 100 股一手；开盘涨停买不进、跌停卖不出、停牌顺延，没成交的委托遇到反向信号作废；涨跌停幅度按板块（主板 10%，创业板 2020-08-24 起和科创板 20%），ST 股按普通股票处理。成本用 `--cash`（初始资金，默认 100000）、`--commission`（佣金 %，默认 0.025，最低 `--min-commission` 5 元）、`--stamp-tax`（卖出印花税 %，默认 0.05）、`--slippage`（滑点 %，默认 0.1）调整。输出总收益、年化收益（区间不足 30 天不计算）、最大回撤，和区间第一天开盘买入持有对比，并列出成交明细和没有成交的信号；`--json` 时在 `backtest` 字段输出，包括每天的资产曲线。分红没有单独计入现金；一手 100 股的取整和最低佣金按复权价格计算，和按当时实际价格算会有出入；老股票往前很多年时前复权价格可能不是正数，这时报错，请缩短区间或用 Desktop 的后复权。结果不构成投资建议。
 
 ## Desktop 菜单
 
@@ -50,7 +55,7 @@ sec quote-history 600036 --freq week --json
 | `financials` | 资产负债表、利润表、现金流量表 | 自选与行情 → 财报 | 已有；图表分析（桑基图、瀑布图、趋势）只在 Desktop |
 | `annual-report` | 年报 PDF 下载 | 自选与行情 → 财报 | 已有，Desktop 另含半年报和季报 |
 | `valuation` | 估值指标、历史分位、同行业对比、股息率与 DCF | 自选与行情 → 估值 | 已有；仅沪深北 A 股 |
-| `strategy ma / macd / rsi / boll` | 技术分析信号（计算） | 自选与行情 → 技术分析 | 已有；默认前复权，`sec strategy` 不复权 |
+| `strategy ma / macd / rsi / boll` | 技术分析信号（计算） | 自选与行情 → 技术分析 | 已有；默认前复权，`sec strategy` 不复权（`--backtest` 时前复权）；两端都可回测 |
 
 ## 公告与 IPO
 
