@@ -15,6 +15,8 @@
 11. Reject `sec strategy` periods below 1, and report insufficient data based on the longest period rather than the slow period, instead of printing zeros or empty indicator columns
 12. Show HK quote dates as `YYYY-MM-DD` in `sec quote` and Desktop, and return `null` instead of 0 for DCF values that do not apply in the Desktop valuation API and `sec valuation --json`
 13. Add an industry peer comparison to `sec valuation` (`--method peers`, the overview and `--json`) and the Desktop valuation tab, showing the median, rank, percentile and premium of PE, PB and PS among East Money industry peers on the same trading day. Industry PE and PB percentiles now count in the rule summary when at least 10 companies can be compared, so assessments can change. If peer data is unavailable, the rest of the valuation still works, `peers` is `null` and `peers_note` and the rule summary say the industry rules were not counted
+14. Harden Desktop: a rendering error now shows a retry message instead of a blank window, limited to the affected area when it happens in page content, and the local server rejects requests whose `Host` is not `127.0.0.1` or `localhost`, which blocks DNS rebinding. Add frontend unit tests for formatting, market dates and exchange inference, run in CI
+15. Upgrade `golang.org/x/net` to v0.62.0 to fix GO-2026-6860, quadratic complexity in HTML parsing reachable through dividend page parsing. Require Go 1.26.10, so CI and releases, which took their version from `go.mod` and last built with Go 1.25, include the fixes for standard library vulnerabilities in `net/http`, `crypto/tls`, `crypto/x509` and others that the code reaches
 
 ### v0.4.2
 

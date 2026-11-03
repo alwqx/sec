@@ -31,7 +31,7 @@ func TestClaimsOfficialSnapshotAndCache(t *testing.T) {
 		require.Equal(t, "ICSA,CCSA", r.URL.Query().Get("id"))
 		require.Equal(t, "curl", r.UserAgent())
 		if fail.Load() {
-			http.Error(w, "failed", 503)
+			http.Error(w, "failed", http.StatusServiceUnavailable)
 			return
 		}
 		_, _ = w.Write([]byte(raw))

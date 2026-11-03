@@ -170,7 +170,7 @@ func TestLaborForceSameBatchBaselines(t *testing.T) {
 					require.Equal(t, 2023, first)
 					require.Equal(t, 2026, last)
 					if mode == "failure" {
-						http.Error(w, "failed", 503)
+						http.Error(w, "failed", http.StatusServiceUnavailable)
 						return
 					}
 					points = []rawPoint{{Year: "2024", Period: "M01", Value: "9.9"}}

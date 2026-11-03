@@ -36,7 +36,7 @@ go run . bond
 go run . ipo list
 ```
 
-CI runs `gofmt`, `go vet` and `go test -v ./...` on Linux on every push, and a macOS job builds the Desktop frontend and vets and tests `./desktop`, which only compiles on Windows and macOS. Release builds (linux/windows/darwin × amd64/arm64) trigger on GitHub Release creation via ldflags-injected version.
+CI runs `gofmt`, `go vet` and `go test -v ./...` on Linux on every push, and a macOS job builds and tests the Desktop frontend and vets and tests `./desktop`, which only compiles on Windows and macOS. Release builds (linux/windows/darwin × amd64/arm64) trigger on GitHub Release creation via ldflags-injected version.
 
 ## Architecture
 

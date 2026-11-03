@@ -133,7 +133,7 @@ func shouldUpgrade(current, latest string, force bool) (bool, error) {
 func verifyDigest(digest string, sum []byte) error {
 	want, ok := strings.CutPrefix(digest, "sha256:")
 	if !ok || want == "" {
-		return fmt.Errorf("Release 文件没有 sha256 校验值（%q），拒绝安装", digest)
+		return fmt.Errorf("发布文件没有 sha256 校验值（%q），拒绝安装", digest)
 	}
 	if got := hex.EncodeToString(sum); !strings.EqualFold(got, want) {
 		return fmt.Errorf("sha256 校验失败，文件可能已损坏或被篡改：期望 %s，实际 %s", want, got)

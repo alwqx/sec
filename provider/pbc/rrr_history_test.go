@@ -72,7 +72,7 @@ func TestRRRIncrementalAppend(t *testing.T) {
 		calls.Add(1)
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		if failed {
-			http.Error(w, "unavailable", 503)
+			http.Error(w, "unavailable", http.StatusServiceUnavailable)
 		} else if r.URL.Path == rrrNewsPath {
 			fmt.Fprint(w, root)
 		} else if body, ok := files[r.URL.Path]; ok {

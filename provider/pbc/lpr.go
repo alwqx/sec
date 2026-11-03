@@ -20,7 +20,7 @@ const LPRCoverageStart = "201908"
 type LPRRequest struct{ Begin, End string }
 
 func (r LPRRequest) Validate() error {
-	if err := (FinancingRequest{Begin: r.Begin, End: r.End}).Validate(); err != nil {
+	if err := FinancingRequest(r).Validate(); err != nil {
 		return err
 	}
 	if r.Begin < LPRCoverageStart {

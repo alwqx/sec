@@ -8,7 +8,7 @@ import (
 type MoneySupplyRequest struct{ Begin, End string }
 
 func (r MoneySupplyRequest) Validate() error {
-	return (FinancingRequest{Begin: r.Begin, End: r.End}).Validate()
+	return FinancingRequest(r).Validate()
 }
 
 // MoneySupplyObservation 保存人民银行金融统计报告直接公布的 M1、M2 余额和同比。
@@ -33,7 +33,7 @@ func (c *Client) MoneySupply(ctx context.Context, req MoneySupplyRequest) ([]Mon
 	if err := req.Validate(); err != nil {
 		return nil, err
 	}
-	reports, err := c.loanReports(ctx, LoanRequest{Begin: req.Begin, End: req.End})
+	reports, err := c.loanReports(ctx, LoanRequest(req))
 	if err != nil {
 		return nil, err
 	}

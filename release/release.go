@@ -46,14 +46,14 @@ func FetchLatest(ctx context.Context) (*Info, error) {
 		return nil, err
 	}
 	if len(body) > max {
-		return nil, fmt.Errorf("Release 响应过大")
+		return nil, fmt.Errorf("发布信息响应过大")
 	}
 	var result Info
 	if err = json.Unmarshal(body, &result); err != nil {
 		return nil, err
 	}
 	if result.TagName == "" || strings.ContainsAny(result.TagName, "\r\n") {
-		return nil, fmt.Errorf("Release 版本信息无效")
+		return nil, fmt.Errorf("发布版本信息无效")
 	}
 	return &result, nil
 }

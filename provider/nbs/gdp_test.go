@@ -29,7 +29,7 @@ func TestGDPCollection(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
 		if fail.Load() {
-			http.Error(w, "failed", 503)
+			http.Error(w, "failed", http.StatusServiceUnavailable)
 			return
 		}
 		switch r.URL.Path {

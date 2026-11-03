@@ -44,7 +44,7 @@ func main() {
 	port := ln.Addr().(*net.TCPAddr).Port
 
 	backend := &desktopServer{token: newToken(), dev: *dev}
-	srv := &http.Server{Handler: backend.Handler()}
+	srv := &http.Server{Handler: backend.publicHandler()}
 	go func() {
 		if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			slog.Error("http server", "error", err)

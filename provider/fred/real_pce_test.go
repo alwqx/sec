@@ -31,7 +31,7 @@ func TestRealPCEOfficialComponentsAndCache(t *testing.T) {
 		require.Equal(t, "PCEC96,DGDSRX1,PCEDGC96,PCENDC96,PCESC96", r.URL.Query().Get("id"))
 		require.Equal(t, "curl", r.UserAgent())
 		if fail.Load() {
-			http.Error(w, "failed", 503)
+			http.Error(w, "failed", http.StatusServiceUnavailable)
 			return
 		}
 		_, _ = w.Write([]byte(raw))

@@ -44,7 +44,7 @@ func TestCPIOfficialDataAndCache(t *testing.T) {
 		require.Equal(t, "2024", body.Start)
 		require.Equal(t, "2026", body.End)
 		if fail.Load() {
-			http.Error(w, "quota", 429)
+			http.Error(w, "quota", http.StatusTooManyRequests)
 			return
 		}
 		w.Write(raw)
@@ -206,7 +206,7 @@ func TestCPIBatchBoundaries(t *testing.T) {
 			require.Equal(t, 2024, first)
 			require.Equal(t, 2026, last)
 			if fail.Load() {
-				http.Error(w, "failed", 503)
+				http.Error(w, "failed", http.StatusServiceUnavailable)
 				return
 			}
 		}

@@ -34,7 +34,7 @@ func TestProductionOfficialSeriesAndCache(t *testing.T) {
 			return
 		}
 		if failed.Load() {
-			http.Error(w, "failed", 503)
+			http.Error(w, "failed", http.StatusServiceUnavailable)
 			return
 		}
 		if invalid.Load() {

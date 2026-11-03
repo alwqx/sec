@@ -5,6 +5,7 @@ import type { BasicSecurity, WorkspaceSettings, WorkspaceState } from './types'
 import SearchBar from './components/SearchBar'
 import SecurityList from './components/SecurityList'
 import SecurityDetails from './components/SecurityDetails'
+import ErrorBoundary from './components/ErrorBoundary'
 import Overview from './components/Overview'
 import Financials from './components/Financials'
 import IPOCalendar from './components/IPOCalendar'
@@ -207,24 +208,26 @@ export default function App() {
               <header className="security-header"><div><h2>{selected.name}<span>{selected.ex_code}</span></h2></div><button className={watched ? 'watch-button is-watched' : 'watch-button'} aria-pressed={watched} aria-label={watched ? `将${selected.name}移出自选` : `将${selected.name}加入自选`} title={watched ? '点击移出自选' : '点击加入自选'} disabled={!ready || saving} onClick={toggleWatch}><Star size={15} fill={watched ? 'currentColor' : 'none'} aria-hidden="true" />{saving ? '保存中…' : watched ? '已加入自选' : '加入自选'}</button></header>
               <div className="research-tabs" role="tablist" aria-label="个股研究栏目">{tabs.map((item, index) => <button key={item.id} id={`tab-${item.id}`} role="tab" aria-controls="research-panel" aria-selected={tab === item.id} tabIndex={tab === item.id ? 0 : -1} onKeyDown={e => tabKey(e, index)} onClick={() => setTab(item.id)}>{item.title}</button>)}</div>
               <div className="research-panel" role="tabpanel" id="research-panel" aria-labelledby={`tab-${tab}`} key={`${selected.ex_code}-${tab}`}>
-                {tab === 'overview' ? <Overview security={selected} interval={workspace.settings.refresh_seconds} />
+                <ErrorBoundary>{tab === 'overview' ? <Overview security={selected} interval={workspace.settings.refresh_seconds} />
                   : tab === 'technical' ? <Strategy code={selected.ex_code} />
                   : tab === 'quotes' ? <WatchQuotes items={workspace.watchlist} state={watchQuotes} selected={selected} onSelect={onSelect} compare={compare} onCompare={setCompare} />
                   : !aShare ? <div className="empty-state">此栏目暂仅支持沪深北 A 股，当前证券可在概览中查看行情。</div>
                   : tab === 'valuation' ? <Valuation code={selected.ex_code} />
                   : tab === 'financials' ? <Financials security={selected} />
                   : tab === 'announcements' ? <Announcements code={selected.ex_code} compact />
-                  : <SecurityDetails security={selected} tab={tab} />}
+                  : <SecurityDetails security={selected} tab={tab} />}</ErrorBoundary>
               </div>
             </> : <div className="welcome-state"><div className="welcome-symbol" aria-hidden="true">↗</div><h2>从一只证券开始研究</h2><p>搜索证券，或从自选列表中选择。<br />行情、公司资料、财报与公告都在这里。</p><div className="welcome-examples">试试 <button onClick={() => void onSearch('招商银行')}>招商银行</button><button onClick={() => void onSearch('腾讯控股')}>腾讯控股</button><button onClick={() => void onSearch('AAPL')}>AAPL</button></div></div>}
           </section>
         </div>}
+        <ErrorBoundary key={page}>
         {page === 'macro' && <Macro />}
         {page === 'fx' && <Fx />}
         {page === 'metal' && <Metal />}
         {page === 'ipo' && <IPOCalendar onSelect={openIPO} />}
-        {page === 'announcements' && <div className="global-announcements page-panel"><div className="scope-bar"><span>公告范围</span><button aria-pressed={announcementScope === 'latest' || !aShare} onClick={() => setAnnouncementScope('latest')}>最新披露</button><button disabled={!aShare} aria-pressed={announcementScope === 'selected' && !!aShare} onClick={() => setAnnouncementScope('selected')}>{selected ? selected.name : '当前证券'}</button></div><Announcements compact key={announcementScope === 'selected' && aShare ? selected!.ex_code : 'latest'} code={announcementScope === 'selected' && aShare ? selected!.ex_code : ''} /></div>}
+        {page === 'announcements' && <div className="global-announcements page-panel"><div className="scope-bar"><span>公告范围</span><button aria-pressed={announcementScope === 'latest' || !aShare} onClick={() => setAnnouncementScope('latest')}>最新披露</button><button disabled={!aShare} aria-pressed={announcementScope === 'selected' && !!aShare} onClick={() => setAnnouncementScope('selected')}>{selected ? selected.name : '当前证券'}</button></div><ErrorBoundary key={announcementScope === 'selected' && aShare ? selected!.ex_code : 'latest'}><Announcements compact code={announcementScope === 'selected' && aShare ? selected!.ex_code : ''} /></ErrorBoundary></div>}
         {page === 'settings' && (ready ? <Settings settings={workspace.settings} saving={saving} onSave={saveSettings} /> : <div className="page-panel empty-state">读取本地数据后可修改设置</div>)}
+        </ErrorBoundary>
         </div>
       </main>
     </div>

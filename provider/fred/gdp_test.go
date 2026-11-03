@@ -129,7 +129,7 @@ func TestGDPVintageCacheAndRefreshFailure(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls++
 		if fail {
-			http.Error(w, "failed", 503)
+			http.Error(w, "failed", http.StatusServiceUnavailable)
 			return
 		}
 		w.Write(raw)
