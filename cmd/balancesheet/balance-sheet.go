@@ -3,8 +3,8 @@ package balancesheet
 import (
 	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"log/slog"
 	"os"
 	"strings"
 
@@ -52,12 +52,9 @@ func BalanceSheetHandler(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("搜索证券失败: %w", err)
 	}
 	asJSON, _ := cmd.Flags().GetBool("json")
+	// 找不到证券在文本、导出和 JSON 模式下都算失败。
 	if len(secs) == 0 {
-		if asJSON {
-			return fmt.Errorf("未找到证券: %s", key)
-		}
-		slog.Info("search no sec", "code", key)
-		return nil
+		return fmt.Errorf("未找到证券: %s", key)
 	}
 	sec := secs[0]
 
@@ -81,8 +78,11 @@ func BalanceSheetHandler(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	outputPath, _ := cmd.Flags().GetString("output")
+
 	// Fetch data
 	var results []result
+	var failures []string
 	if len(reportTypes) > 0 {
 		// Specific type requested
 		items, err := eastmoney.GetFinancialReport(cmd.Context(), &eastmoney.GetFinancialReportReq{
@@ -102,19 +102,33 @@ func BalanceSheetHandler(cmd *cobra.Command, args []string) error {
 				ReportType: rt,
 				Period:     periodFilter,
 			})
+			// 按 Ctrl-C 取消不是报表失败。
+			if cmd.Context().Err() != nil {
+				return nil
+			}
 			if err != nil {
-				if asJSON {
+				// JSON 和导出文件不能少一类报表；文本先显示拿到的，最后报错。
+				if asJSON || outputPath != "" {
 					return fmt.Errorf("获取%s失败: %w", rt.DisplayName(), err)
 				}
-				slog.Warn("failed fetch report", "type", rt.DisplayName(), "error", err)
+				failures = append(failures, fmt.Sprintf("%s获取失败（%v）", rt.DisplayName(), err))
 				continue
 			}
 			results = append(results, result{rt: rt, items: items})
 		}
 	}
+	partial := func() error {
+		if len(failures) == 0 {
+			return nil
+		}
+		return errors.New("部分财报没有获取到：" + strings.Join(failures, "；"))
+	}
 
 	// 上游查询为空时返回空列表；没有任何数据时不能写出空报告，也不能当成成功。
 	if !hasReports(results) {
+		if err := partial(); err != nil {
+			return err
+		}
 		return fmt.Errorf("%s 没有符合条件的财报数据", sec.ExCode)
 	}
 
@@ -122,8 +136,6 @@ func BalanceSheetHandler(cmd *cobra.Command, args []string) error {
 		return utils.PrintJSON(cmd.OutOrStdout(), map[string]any{"ex_code": sec.ExCode, "name": sec.Name, "results": exportItems(results)})
 	}
 
-	// Check output flag
-	outputPath, _ := cmd.Flags().GetString("output")
 	if outputPath != "" {
 		return exportToFile(results, outputPath)
 	}
@@ -145,7 +157,7 @@ func BalanceSheetHandler(cmd *cobra.Command, args []string) error {
 		printDetailed(cmd, results[0])
 	}
 
-	return nil
+	return partial()
 }
 
 // printSummary prints a summary list of available reports across all types.

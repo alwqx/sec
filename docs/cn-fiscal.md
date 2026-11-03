@@ -40,7 +40,8 @@ go run . macro cn fiscal --begin 202609 --end 202610 --budget fund --no-cache
 
 - [财政部全国财政收支专题](https://www.mof.gov.cn/zhengwuxinxi/redianzhuanti/quanguocaizhengshouzhiqingkuang/)：读取真实分页总数，逐页扫描全部目录，避免置顶或乱序旧稿造成提前终止。仅接受财政部官网链接，并将旧HTTP链接升级为HTTPS。
 - 正式发布稿位于财政部国库司 `gks.mof.gov.cn/tongjishuju/`。标题所属期、金额单位、主句、全国口径及重复项在使用和缓存前校验；解析异常直接报错，不静默返回部分成功结果。
-- `published_date` 保存官方目录日期；若稿件 `PubDate` 元数据提供北京时间精确时间，则另存 `published_at`。缺少精确时间时为 `null`，不造午夜时间。
+- `published_date` 一般是官方目录日期（例外见下一条）；若稿件 `PubDate` 元数据提供北京时间精确时间，则另存 `published_at`。缺少精确时间时为 `null`，不造午夜时间。
+- 目录日期和稿件 `PubDate` 不一致时以稿件为准，`note` 记录目录日期。例如 2024 年上半年和 7 月的稿件在目录里都标为 2024-09-09，稿件和链接里的日期分别是 2024-07-22 和 2024-08-26，目录日期是之后重新编辑的日期。只在稿件日期更早且相差不超过 180 天时这样处理，其他不一致仍然报错，避免接受目录链错的稿件。
 - `fetched_at` 为实际抓取时间，不能替代公布时间。`data_version=current-visible-release` 表示抓取时可见正文；`revision_id=null`，不宣称提供历史时点修订档案。
 - 两本预算的收入减支出不等同于官方财政赤字。本命令不根据这四项推算赤字，也未采集社保基金预算等其他预算。
 

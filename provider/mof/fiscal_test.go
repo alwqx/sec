@@ -203,3 +203,21 @@ func TestFiscalMonthlyAndYTDSameParagraphAndGrowthBases(t *testing.T) {
 	_, err := rate([]string{"", "增长", strings.Repeat("9", 400), "%"})
 	require.Error(t, err)
 }
+
+// 目录日期和发布稿不一致时以发布稿为准，不再报错。
+func TestFiscalCatalogDateMismatch(t *testing.T) {
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader(fixture(t, "fiscal-202609")))
+	require.NoError(t, err)
+	published, ok := doc.Find(`meta[name="PubDate"]`).Attr("content")
+	require.True(t, ok)
+	got, err := parseRelease(doc, release{Period: "202609", Title: "2026年前三季度财政收支情况", PublishedDate: "2026-12-09"})
+	require.NoError(t, err)
+	require.Equal(t, published[:10], got.PublishedDate)
+	require.Contains(t, got.Note, "2026-12-09")
+	require.NotEmpty(t, got.Metrics)
+
+	for _, date := range []string{"2025-12-09", "2028-10-01", "invalid"} {
+		_, err = parseRelease(doc, release{Period: "202609", Title: "2026年前三季度财政收支情况", PublishedDate: date})
+		require.ErrorContains(t, err, "不一致", "目录早于发布稿或相差太久时可能链错了稿件: %s", date)
+	}
+}

@@ -22,7 +22,6 @@ import (
 
 const (
 	SinaReferer = "https://finance.sina.com.cn"
-	MAX_KEY_NUM = 8 // 最大查询证券数量
 )
 
 // defaultHTTPHeaders 生成请求 sina 接口的默认 http.Header
@@ -56,56 +55,6 @@ func Search(ctx context.Context, key string) ([]*BasicSecurity, error) {
 		return nil, errors.New("搜索接口返回了无法识别的内容")
 	}
 	return parseBasicSecurity(string(resBytes)), nil
-}
-
-// MultiSearch 根据关键字查询多个证券信息，每个关键字取第一条结果。
-// 最多支持 MAX_KEY_NUM 条证券信息查询。有结果时部分失败只记录日志；没有结果且有失败时返回错误。
-func MultiSearch(ctx context.Context, keys []string) ([]*BasicSecurity, error) {
-	if len(keys) == 0 {
-		return nil, nil
-	}
-	if len(keys) > MAX_KEY_NUM {
-		slog.DebugContext(ctx, "keys num exceed", "max num", MAX_KEY_NUM)
-		keys = keys[:MAX_KEY_NUM]
-	}
-
-	type result struct {
-		sec *BasicSecurity
-		err error
-	}
-	res := make([]*BasicSecurity, 0, len(keys))
-	ch := make(chan result, len(keys))
-	for _, key := range keys {
-		go func(code string) {
-			secs, err := Search(ctx, code)
-			if err != nil {
-				slog.WarnContext(ctx, "MultiSearch failed", "code", code, "error", err)
-				ch <- result{err: err}
-				return
-			}
-			if len(secs) == 0 {
-				ch <- result{}
-				return
-			}
-			slog.DebugContext(ctx, "MultiSearch results", "code", code, "secs", secs)
-			ch <- result{sec: secs[0]}
-		}(key)
-	}
-
-	var failures []error
-	for range keys {
-		item := <-ch
-		if item.err != nil {
-			failures = append(failures, item.err)
-		}
-		if item.sec != nil {
-			res = append(res, item.sec)
-		}
-	}
-	if len(res) == 0 && len(failures) > 0 {
-		return nil, errors.Join(failures...)
-	}
-	return res, nil
 }
 
 // Profile 根据证券代码获取证券的基本信息，exCode SH600036

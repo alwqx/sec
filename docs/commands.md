@@ -11,6 +11,7 @@
 - 输出到 stdout，字段名是 snake_case，列表放在 `results` 里，没有结果时是空数组。
 - 上游缺失或不适用的值是 `null`，不是 0。
 - 失败时 stdout 为空，错误写到 stderr，退出码非 0。找不到证券也算失败。
+- 文本模式下，`sec quote`（含 `-r`）和不带 `--type` 的 `sec financials` 有部分证券或报表没取到时，先显示取到的部分，再列出失败项并以非 0 退出；`sec quote -r` 把失败项显示在表格下方，搜索失败的约每 15 秒重试；`sec financials -o` 不写出少一类报表的文件。`sec quote` 超过 5 个关键字时，多出的列为“未查询”并以非 0 退出；`sec financials` 找不到证券时报错。
 - 不输出部分结果：`sec quote --json` 有任何一只证券查不到、超过 5 只，或 `sec financials --json` 不带 `--type` 时任何一类报表失败，都按失败处理。例外：`sec valuation --json` 的同行业和分红数据是附加信息，获取失败时仍退出 0，`peers` 或 `dividends` 为 `null`，原因在 `peers_note` 或 `dividends_note`。
 - 日期都是 `YYYY-MM-DD`。
 - 涨跌幅、换手率、振幅的单位都是 %；K 线的 `volume` 单位是股或份，`amount` 是成交额。
