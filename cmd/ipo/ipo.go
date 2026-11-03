@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/alwqx/sec/cmd/internal/termtable"
 	"github.com/alwqx/sec/provider/cninfo"
 	"github.com/alwqx/sec/provider/eastmoney"
 	"github.com/alwqx/sec/provider/sina"
@@ -145,21 +146,10 @@ func newListRows(items []*eastmoney.IListing) []listRow {
 }
 
 func printIPOList(out io.Writer, items []*eastmoney.IListing) {
-	table := tablewriter.NewWriter(out)
 	// 仅保留确定性高的字段（东方财富各股发行价/PE 字段顺序会随 fs 改变，
 	// 列表 UI 仅承诺代码、名称、上市日）
 	headers := []string{"代码", "名称", "上市日"}
-	table.SetHeader(headers)
-	headerStyles := make([]tablewriter.Colors, len(headers))
-	for i := range headers {
-		headerStyles[i] = tablewriter.Colors{tablewriter.Bold}
-	}
-	table.SetHeaderColor(headerStyles...)
-	table.SetHeaderLine(false)
-	table.SetBorder(false)
-	table.SetAlignment(tablewriter.ALIGN_LEFT)
-	table.SetNoWhiteSpace(true)
-	table.SetTablePadding("\t")
+	table := termtable.New(out, headers, termtable.Compact)
 
 	for _, it := range items {
 		listingDate := "-"
@@ -243,19 +233,8 @@ func dateSafe(s string) string {
 }
 
 func printIPOCalendar(out io.Writer, announcements []*cninfo.Announcement) {
-	table := tablewriter.NewWriter(out)
 	headers := []string{"公告日期", "代码", "名称", "公告标题", "大小"}
-	table.SetHeader(headers)
-	hs := make([]tablewriter.Colors, len(headers))
-	for i := range headers {
-		hs[i] = tablewriter.Colors{tablewriter.Bold}
-	}
-	table.SetHeaderColor(hs...)
-	table.SetHeaderLine(false)
-	table.SetBorder(false)
-	table.SetAlignment(tablewriter.ALIGN_LEFT)
-	table.SetNoWhiteSpace(true)
-	table.SetTablePadding("\t")
+	table := termtable.New(out, headers, termtable.Compact)
 
 	for _, a := range announcements {
 		title := a.Title
@@ -452,19 +431,8 @@ func printProspectus(out io.Writer, announcements []*cninfo.Announcement) {
 		return
 	}
 
-	table := tablewriter.NewWriter(out)
 	headers := []string{"公告日期", "公告标题", "大小", "PDF 链接"}
-	table.SetHeader(headers)
-	headerStyles := make([]tablewriter.Colors, len(headers))
-	for i := range headers {
-		headerStyles[i] = tablewriter.Colors{tablewriter.Bold}
-	}
-	table.SetHeaderColor(headerStyles...)
-	table.SetHeaderLine(false)
-	table.SetBorder(false)
-	table.SetAlignment(tablewriter.ALIGN_LEFT)
-	table.SetNoWhiteSpace(true)
-	table.SetTablePadding("\t")
+	table := termtable.New(out, headers, termtable.Compact)
 
 	seenProspectus := false
 	for _, a := range announcements {

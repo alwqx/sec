@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/alwqx/sec/cmd/internal/termtable"
 	"github.com/alwqx/sec/provider/sina"
 	"github.com/alwqx/sec/utils"
 	"github.com/olekukonko/tablewriter"
@@ -98,37 +99,17 @@ func optional(value *float64, format string) string {
 	return fmt.Sprintf(format, *value)
 }
 
-// changeColor 按涨跌着色：红涨绿跌。
+// changeColor 按涨跌着色：红涨绿跌，没有涨跌时不着色。
 func changeColor(rate *float64) tablewriter.Colors {
-	switch {
-	case rate == nil || *rate == 0:
+	if rate == nil {
 		return tablewriter.Colors{}
-	case *rate > 0:
-		return tablewriter.Colors{tablewriter.Bold, tablewriter.FgRedColor}
 	}
-	return tablewriter.Colors{tablewriter.Bold, tablewriter.FgGreenColor}
-}
-
-func newTable(out io.Writer, headers []string) *tablewriter.Table {
-	table := tablewriter.NewWriter(out)
-	table.SetHeader(headers)
-	bold := make([]tablewriter.Colors, len(headers))
-	for i := range bold {
-		bold[i] = tablewriter.Colors{tablewriter.Bold}
-	}
-	table.SetHeaderColor(bold...)
-	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
-	table.SetAlignment(tablewriter.ALIGN_LEFT)
-	table.SetAutoWrapText(false)
-	table.SetHeaderLine(false)
-	table.SetBorder(false)
-	table.SetTablePadding("\t")
-	return table
+	return termtable.Change(*rate, false)
 }
 
 func printQuotes(out io.Writer, quotes []*sina.CommodityQuote) {
 	headers := []string{"代码", "品种", "最新", "涨跌", "涨跌幅", "开盘", "最高", "最低", "昨结算", "单位", "时间"}
-	table := newTable(out, headers)
+	table := termtable.New(out, headers, termtable.LeftHeader, termtable.NoWrap)
 	for _, q := range quotes {
 		row := []string{q.ID, q.Name, number(q.Price), optional(q.Change, "%+.2f"), optional(q.ChangeRate, "%+.2f%%"),
 			number(q.Open), number(q.High), number(q.Low), optional(q.PrevSettle, "%g"), q.Unit, q.Date + " " + q.Time}
@@ -148,7 +129,7 @@ func printHistory(out io.Writer, item sina.Commodity, bars []sina.CommodityBar) 
 		return
 	}
 	headers := []string{"日期", "收盘", "涨跌", "涨跌幅", "开盘", "最高", "最低", "结算", "成交量"}
-	table := newTable(out, headers)
+	table := termtable.New(out, headers, termtable.LeftHeader, termtable.NoWrap)
 	// 国内品种前一天没有结算价时，涨跌相对收盘价，标 *。
 	marked := false
 	for _, bar := range bars {

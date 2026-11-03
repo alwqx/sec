@@ -5,9 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
-	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
@@ -67,18 +65,9 @@ func getOriginQuoteHistory(ctx context.Context, req *GetQuoteHistoryReq) (res *Q
 	}
 
 	reqURL := fmt.Sprintf("%s/api/qt/stock/kline/get?%s", EastMoneyPush2HisApiBase, values.Encode())
-	resp, err := utils.MakeRequest(ctx, http.MethodGet, reqURL, nil, nil, 0)
+	body, err := getBody(ctx, reqURL)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed request", "url", reqURL, "error", err)
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if err := utils.CheckStatus(resp); err != nil {
-		return nil, err
-	}
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		slog.ErrorContext(ctx, "failed read body", "error", err)
 		return nil, err
 	}
 	err = json.Unmarshal(body, &res)

@@ -5,14 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log/slog"
-	"net/http"
 	"net/url"
 	"strings"
 	"time"
-
-	"github.com/alwqx/sec/utils"
 )
 
 const (
@@ -80,18 +76,18 @@ func GetValuationHistory(ctx context.Context, exCode string) ([]*ValuationPoint,
 	points := make([]*ValuationPoint, 0, len(rows))
 	for i := len(rows) - 1; i >= 0; i-- {
 		row := rows[i]
-		date, closePrice := rowDate(row, "TRADE_DATE"), rowNumber(row, "CLOSE_PRICE")
+		date, closePrice := rowDate(row, "TRADE_DATE"), RowNumber(row, "CLOSE_PRICE")
 		if date == "" || closePrice == nil {
 			continue
 		}
-		point := &ValuationPoint{Date: date, Close: *closePrice, PE: rowNumber(row, "PE_TTM"), PB: rowNumber(row, "PB_MRQ"), PS: rowNumber(row, "PS_TTM")}
+		point := &ValuationPoint{Date: date, Close: *closePrice, PE: RowNumber(row, "PE_TTM"), PB: RowNumber(row, "PB_MRQ"), PS: RowNumber(row, "PS_TTM")}
 		point.Name, _ = row["SECURITY_NAME_ABBR"].(string)
 		point.Board, _ = row["BOARD_NAME"].(string)
 		point.BoardCode, _ = row["BOARD_CODE"].(string)
-		if value := rowNumber(row, "TOTAL_MARKET_CAP"); value != nil {
+		if value := RowNumber(row, "TOTAL_MARKET_CAP"); value != nil {
 			point.MarketCap = *value
 		}
-		if value := rowNumber(row, "TOTAL_SHARES"); value != nil {
+		if value := RowNumber(row, "TOTAL_SHARES"); value != nil {
 			point.Shares = *value
 		}
 		points = append(points, point)
@@ -133,13 +129,13 @@ func GetDividendPlans(ctx context.Context, exCode string) ([]*DividendPlan, erro
 	}
 	plans := make([]*DividendPlan, 0, len(rows))
 	for _, row := range rows {
-		plan := &DividendPlan{ReportDate: rowDate(row, "REPORT_DATE"), ExDate: rowDate(row, "EX_DIVIDEND_DATE"), EPS: rowNumber(row, "BASIC_EPS")}
+		plan := &DividendPlan{ReportDate: rowDate(row, "REPORT_DATE"), ExDate: rowDate(row, "EX_DIVIDEND_DATE"), EPS: RowNumber(row, "BASIC_EPS")}
 		plan.Progress, _ = row["ASSIGN_PROGRESS"].(string)
 		plan.Profile, _ = row["IMPL_PLAN_PROFILE"].(string)
-		if value := rowNumber(row, "PRETAX_BONUS_RMB"); value != nil {
+		if value := RowNumber(row, "PRETAX_BONUS_RMB"); value != nil {
 			plan.CashPerTen = *value
 		}
-		if value := rowNumber(row, "BONUS_IT_RATIO"); value != nil {
+		if value := RowNumber(row, "BONUS_IT_RATIO"); value != nil {
 			plan.StockPerTen = *value
 		}
 		plans = append(plans, plan)
@@ -175,7 +171,7 @@ func GetBoardValuations(ctx context.Context, boardCode, date string) ([]*PeerVal
 		if !ok || code == "" || exchange == "" {
 			continue
 		}
-		peer := &PeerValuation{ExCode: exchange + code, MarketCap: rowNumber(row, "TOTAL_MARKET_CAP"), PE: rowNumber(row, "PE_TTM"), PB: rowNumber(row, "PB_MRQ"), PS: rowNumber(row, "PS_TTM")}
+		peer := &PeerValuation{ExCode: exchange + code, MarketCap: RowNumber(row, "TOTAL_MARKET_CAP"), PE: RowNumber(row, "PE_TTM"), PB: RowNumber(row, "PB_MRQ"), PS: RowNumber(row, "PS_TTM")}
 		peer.Name, _ = row["SECURITY_NAME_ABBR"].(string)
 		peers = append(peers, peer)
 	}
@@ -199,8 +195,8 @@ func GetPerformanceReports(ctx context.Context, exCode string) ([]*PerformanceRe
 			continue
 		}
 		reports = append(reports, &PerformanceReport{
-			Date: date, EPS: rowNumber(row, "BASIC_EPS"), BPS: rowNumber(row, "BPS"), ROE: rowNumber(row, "WEIGHTAVG_ROE"),
-			Revenue: rowNumber(row, "TOTAL_OPERATE_INCOME"), Profit: rowNumber(row, "PARENT_NETPROFIT"),
+			Date: date, EPS: RowNumber(row, "BASIC_EPS"), BPS: RowNumber(row, "BPS"), ROE: RowNumber(row, "WEIGHTAVG_ROE"),
+			Revenue: RowNumber(row, "TOTAL_OPERATE_INCOME"), Profit: RowNumber(row, "PARENT_NETPROFIT"),
 		})
 	}
 	return reports, nil
@@ -212,13 +208,6 @@ func rowDate(row map[string]any, key string) string {
 		return ""
 	}
 	return text[:10]
-}
-
-func rowNumber(row map[string]any, key string) *float64 {
-	if value, ok := row[key].(float64); ok {
-		return &value
-	}
-	return nil
 }
 
 // datacenterRows 查询一页数据中心报表，按 sortColumn 降序。上游没有数据时返回空列表。
@@ -233,17 +222,9 @@ func datacenterRows(ctx context.Context, report, columns, filter, sortColumn str
 	params.Set("pageNumber", "1")
 	reqURL := datacenterAPIBase + "?" + params.Encode()
 	slog.DebugContext(ctx, "datacenterRows", "reqURL", reqURL)
-	resp, err := utils.MakeRequest(ctx, http.MethodGet, reqURL, nil, nil, 0)
+	body, err := getBody(ctx, reqURL)
 	if err != nil {
 		slog.ErrorContext(ctx, "failed request", "url", reqURL, "error", err)
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if err := utils.CheckStatus(resp); err != nil {
-		return nil, err
-	}
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
 		return nil, err
 	}
 	jsonData, err := stripJSONP(body)

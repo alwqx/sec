@@ -14,6 +14,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/alwqx/sec/cmd/internal/termtable"
 	"github.com/alwqx/sec/provider/sina"
 	"github.com/alwqx/sec/utils"
 	"github.com/alwqx/sec/watchlist"
@@ -205,27 +206,11 @@ func printWatchQuotes(out io.Writer, rows []quoteRow) {
 		data = append(data, row)
 
 		style := make([]tablewriter.Colors, len(headers))
-		if r.chgPct > 0 {
-			style[3] = tablewriter.Colors{tablewriter.FgRedColor, tablewriter.Bold}
-		} else if r.chgPct < 0 {
-			style[3] = tablewriter.Colors{tablewriter.FgGreenColor, tablewriter.Bold}
-		}
+		style[3] = termtable.Change(r.chgPct, false)
 		styles = append(styles, style)
 	}
 
-	table := tablewriter.NewWriter(out)
-	table.SetHeader(headers)
-	hs := make([]tablewriter.Colors, len(headers))
-	for i := range headers {
-		hs[i] = tablewriter.Colors{tablewriter.Bold}
-	}
-	table.SetHeaderColor(hs...)
-	table.SetHeaderLine(false)
-	table.SetBorder(false)
-	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
-	table.SetAlignment(tablewriter.ALIGN_LEFT)
-	table.SetNoWhiteSpace(false)
-	table.SetTablePadding("\t")
+	table := termtable.New(out, headers, termtable.LeftHeader)
 
 	for i, row := range data {
 		table.Rich(row, styles[i])

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/alwqx/sec/cmd/internal/termtable"
 	"github.com/alwqx/sec/provider/cninfo"
 	"github.com/alwqx/sec/provider/sina"
 	"github.com/alwqx/sec/utils"
@@ -80,26 +81,14 @@ func runInsider(cmd *cobra.Command, args []string) error {
 
 		style := make([]tablewriter.Colors, len(headers))
 		if strings.Contains(title, "增持") {
-			style[1] = tablewriter.Colors{tablewriter.FgRedColor, tablewriter.Bold}
+			style[1] = termtable.Up(false)
 		} else if strings.Contains(title, "减持") {
-			style[1] = tablewriter.Colors{tablewriter.FgGreenColor, tablewriter.Bold}
+			style[1] = termtable.Down(false)
 		}
 		styles = append(styles, style)
 	}
 
-	table := tablewriter.NewWriter(out)
-	table.SetHeader(headers)
-	hs := make([]tablewriter.Colors, len(headers))
-	for i := range headers {
-		hs[i] = tablewriter.Colors{tablewriter.Bold}
-	}
-	table.SetHeaderColor(hs...)
-	table.SetHeaderLine(false)
-	table.SetBorder(false)
-	table.SetAlignment(tablewriter.ALIGN_LEFT)
-	table.SetNoWhiteSpace(true)
-	table.SetTablePadding("\t")
-	table.SetColWidth(60)
+	table := termtable.New(out, headers, termtable.Compact, termtable.ColWidth(60))
 	for i, row := range data {
 		table.Rich(row, styles[i])
 	}

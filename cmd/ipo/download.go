@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/alwqx/sec/cmd/internal/termtable"
 	"github.com/alwqx/sec/provider/cninfo"
 	"github.com/alwqx/sec/utils"
 	"github.com/olekukonko/tablewriter"
@@ -196,19 +197,8 @@ func filterValidPDFs(announcements []*cninfo.Announcement) []*cninfo.Announcemen
 
 // printDownloadList renders the announcement list with index numbers for selection.
 func printDownloadList(out io.Writer, announcements []*cninfo.Announcement) {
-	table := tablewriter.NewWriter(out)
 	headers := []string{"#", "公告日期", "公告标题", "大小"}
-	table.SetHeader(headers)
-	headerStyles := make([]tablewriter.Colors, len(headers))
-	for i := range headers {
-		headerStyles[i] = tablewriter.Colors{tablewriter.Bold}
-	}
-	table.SetHeaderColor(headerStyles...)
-	table.SetHeaderLine(false)
-	table.SetBorder(false)
-	table.SetAlignment(tablewriter.ALIGN_LEFT)
-	table.SetNoWhiteSpace(true)
-	table.SetTablePadding("\t")
+	table := termtable.New(out, headers, termtable.Compact)
 
 	for i, a := range announcements {
 		sizeStr := "-"

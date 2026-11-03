@@ -4,14 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
-	"net/http"
 	"net/url"
 	"strings"
 	"time"
-
-	"github.com/alwqx/sec/utils"
 )
 
 // f10Base 是个股 F10 的完整财务报表接口。数据中心的财报只有约 50 个汇总科目，拆不出研发费用和银行的收入结构。
@@ -143,15 +139,7 @@ func f10Request(ctx context.Context, reqURL string) ([]map[string]any, error) {
 		return nil, ctx.Err()
 	}
 	defer func() { <-f10Limit }()
-	resp, err := utils.MakeRequest(ctx, http.MethodGet, reqURL, nil, nil, 0)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if err := utils.CheckStatus(resp); err != nil {
-		return nil, err
-	}
-	body, err := io.ReadAll(resp.Body)
+	body, err := getBody(ctx, reqURL)
 	if err != nil {
 		return nil, err
 	}
