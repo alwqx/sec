@@ -17,7 +17,6 @@ func printDividend(out io.Writer, r *shared.Result) {
 		fmt.Fprintf(out, "\n【评估】%s\n", r.DividendsNote)
 		return
 	}
-	fmt.Fprintln(out, "上游可能缺少特别分红，这时股息率偏低，完整记录见 sec info -d")
 	fmt.Fprintln(out)
 	median, spread := "-", "-"
 	if d.History != nil {
@@ -58,6 +57,19 @@ func printDividend(out io.Writer, r *shared.Result) {
 		richTable(out, []string{"财年", "每股分红", "基本每股收益", "分红率"}, rows)
 	} else {
 		fmt.Fprintln(out, "\n【评估】有分红记录，但没有实施过现金分红")
+	}
+	if !d.MismatchChecked {
+		fmt.Fprintln(out, "\n未能和新浪核对，东方财富可能缺少特别分红，股息率可能偏低")
+	}
+	if len(d.Mismatches) > 0 {
+		fmt.Fprintln(out, "\n【与新浪记录不一致】近 5 年，股息率按东方财富计算")
+		for _, item := range d.Mismatches {
+			east := "缺少"
+			if item.EastMoney != nil {
+				east = fmt.Sprintf("%.4f", *item.EastMoney)
+			}
+			fmt.Fprintf(out, "  除息日 %s: 新浪 %.4f，东方财富 %s\n", item.ExDate, item.Sina, east)
+		}
 	}
 	if len(d.Pending) > 0 {
 		fmt.Fprintln(out, "\n【未除息】不计入股息率")

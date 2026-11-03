@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/alwqx/sec/provider/eastmoney"
+	"github.com/alwqx/sec/provider/sina"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/h2non/gock.v1"
 )
@@ -130,7 +131,7 @@ func TestConsecutiveYears(t *testing.T) {
 
 func TestStoppedDividendsHaveNoStreak(t *testing.T) {
 	r := Compute(priced("2020-01-02", "2025-12-01"), nil, DefaultDCFParams())
-	applyDividends(r, priced("2020-01-02", "2025-12-01"), []*eastmoney.DividendPlan{paid("2023-12-31", "2024-03-01", 10, 0), paid("2022-12-31", "2023-03-01", 10, 0)})
+	applyDividends(r, priced("2020-01-02", "2025-12-01"), []*eastmoney.DividendPlan{paid("2023-12-31", "2024-03-01", 10, 0), paid("2022-12-31", "2023-03-01", 10, 0)}, nil, false)
 	require.Equal(t, 0.0, *r.Dividends.Yield)
 	require.Zero(t, r.Dividends.ConsecutiveYears, "股息率是 0 时不能显示连续分红")
 	require.Len(t, r.Dividends.Years, 2)
@@ -150,7 +151,7 @@ func TestApplyDividends(t *testing.T) {
 		{ReportDate: "2019-12-31", Progress: "股东大会决议通过", Profile: "早已放弃", CashPerTen: 9},
 		{ReportDate: "2026-06-30", Progress: "预披露", Profile: "比例 35%"},
 	}
-	applyDividends(r, priced("2020-01-02", "2026-11-02"), plans)
+	applyDividends(r, priced("2020-01-02", "2026-11-02"), plans, nil, false)
 	d := r.Dividends
 	require.InDelta(t, 1, d.PerShare, 1e-9)
 	require.Equal(t, "2025", d.FiscalYear)
@@ -166,7 +167,7 @@ func TestApplyDividendsWithoutCash(t *testing.T) {
 	r := Compute(flat(300, 10, 1, 2), nil, DefaultDCFParams())
 	before := len(r.Signals)
 	points := flat(300, 10, 1, 2)
-	applyDividends(r, points, []*eastmoney.DividendPlan{{ReportDate: "2025-12-31", Progress: "董事会决议通过", Profile: "不分配不转增"}})
+	applyDividends(r, points, []*eastmoney.DividendPlan{{ReportDate: "2025-12-31", Progress: "董事会决议通过", Profile: "不分配不转增"}}, nil, false)
 	require.Equal(t, 0.0, *r.Dividends.Yield, "有记录但没有现金分红是真实的 0")
 	require.Nil(t, r.Dividends.History)
 	require.Equal(t, []DividendYear{}, r.Dividends.Years)
@@ -176,14 +177,63 @@ func TestApplyDividendsWithoutCash(t *testing.T) {
 
 func TestApplyDividendsWithoutRecords(t *testing.T) {
 	r := Compute(flat(300, 10, 1, 2), nil, DefaultDCFParams())
-	applyDividends(r, flat(300, 10, 1, 2), nil)
-	require.Nil(t, r.Dividends, "无法区分没有分红和上游缺数据，不能当成 0")
+	applyDividends(r, flat(300, 10, 1, 2), nil, nil, false)
+	require.Nil(t, r.Dividends, "新浪不可用时无法区分没有分红和上游缺数据，不能当成 0")
 	require.Contains(t, r.DividendsNote, "没有分红记录")
+
+	r = Compute(flat(300, 10, 1, 2), nil, DefaultDCFParams())
+	applyDividends(r, flat(300, 10, 1, 2), nil, []sina.Dividend{{PublicDate: "2026-04-27", DividendedDate: "--"}}, true)
+	require.Equal(t, 0.0, *r.Dividends.Yield, "新浪也只有不分配记录，是真实的 0")
+	require.Empty(t, r.DividendsNote)
+
+	r = Compute(flat(300, 10, 1, 2), nil, DefaultDCFParams())
+	applyDividends(r, flat(300, 10, 1, 2), nil, []sina.Dividend{{DividendedDate: "2025-07-01", Bonus: 5}}, true)
+	require.Nil(t, r.Dividends)
+	require.Contains(t, r.DividendsNote, "东方财富缺少分红数据")
+
+	// 新浪只有预案或很久以前的分红：近 18 个月确实没分，是真实的 0。
+	for _, check := range [][]sina.Dividend{{{DividendedDate: "--", Bonus: 5}}, {{DividendedDate: "2019-07-01", Bonus: 5}}} {
+		r = Compute(flat(300, 10, 1, 2), nil, DefaultDCFParams())
+		applyDividends(r, flat(300, 10, 1, 2), nil, check, true)
+		require.Equal(t, 0.0, *r.Dividends.Yield, check[0].DividendedDate)
+	}
+
+	// 新浪返回空列表可能是页面被拦截，不能确认没有分红。
+	r = Compute(flat(300, 10, 1, 2), nil, DefaultDCFParams())
+	applyDividends(r, flat(300, 10, 1, 2), nil, []sina.Dividend{}, false)
+	require.Nil(t, r.Dividends)
+}
+
+func TestMismatchesNotCheckedWithoutSina(t *testing.T) {
+	r := Compute(priced("2020-01-02", "2026-11-02"), nil, DefaultDCFParams())
+	applyDividends(r, priced("2020-01-02", "2026-11-02"), []*eastmoney.DividendPlan{paid("2025-12-31", "2026-07-10", 10, 0)}, []sina.Dividend{{DividendedDate: "2026-01-01", Bonus: 9}}, false)
+	require.False(t, r.Dividends.MismatchChecked)
+	require.Empty(t, r.Dividends.Mismatches, "没有核对时不能用不可信的记录")
+}
+
+func TestDividendMismatches(t *testing.T) {
+	events := []dividendEvent{{"2025-12-31", "2026-04-22", 69.57, 0}, {"2024-12-31", "2025-04-22", 45.53, 0}, {"2020-12-31", "2021-04-22", 10, 0}}
+	check := []sina.Dividend{
+		{DividendedDate: "2026-04-22", Bonus: 21.78}, // 金额不同
+		{DividendedDate: "2025-04-22", Bonus: 45.53}, // 一致
+		{DividendedDate: "2025-01-24", Bonus: 12.3},  // 东方财富缺少的特别分红
+		{DividendedDate: "2021-04-22", Bonus: 1},     // 超过 5 年，不核对
+		{DividendedDate: "--", Bonus: 9},             // 未除息
+		{DividendedDate: "2026-12-01", Bonus: 9},     // 交易日之后
+	}
+	mismatches := dividendMismatches(events, check, "2026-11-02")
+	require.Len(t, mismatches, 2)
+	require.Equal(t, "2026-04-22", mismatches[0].ExDate)
+	require.InDelta(t, 2.178, mismatches[0].Sina, 1e-9)
+	require.InDelta(t, 6.957, *mismatches[0].EastMoney, 1e-9)
+	require.Equal(t, "2025-01-24", mismatches[1].ExDate)
+	require.Nil(t, mismatches[1].EastMoney)
+	require.Equal(t, []DividendMismatch{}, dividendMismatches(events, nil, "2026-11-02"), "新浪不可用时为空")
 }
 
 func TestAverageNeedsFiveYears(t *testing.T) {
 	r := Compute(priced("2024-01-02", "2026-11-02"), nil, DefaultDCFParams())
-	applyDividends(r, priced("2024-01-02", "2026-11-02"), []*eastmoney.DividendPlan{paid("2025-12-31", "2026-07-10", 10, 0)})
+	applyDividends(r, priced("2024-01-02", "2026-11-02"), []*eastmoney.DividendPlan{paid("2025-12-31", "2026-07-10", 10, 0)}, nil, false)
 	require.Nil(t, r.Dividends.Average5Y, "上市不足 5 年时不计算")
 }
 
@@ -198,6 +248,35 @@ func TestDividendSignalDirection(t *testing.T) {
 	require.False(t, ok, "近 12 个月没有分红时不计入")
 	_, ok = dividendSignal(&Dividends{Yield: num(5), History: &History{Short: true}})
 	require.False(t, ok)
+}
+
+func TestAnalyzeSkipsSinaForUnsupportedCodes(t *testing.T) {
+	defer gock.Off()
+	gock.CleanUnmatchedRequest()
+	for _, code := range []string{"HK00700", "$AAPL", "", "X"} {
+		_, err := Analyze(context.Background(), code, DefaultDCFParams())
+		require.ErrorIs(t, err, ErrNoData, code)
+	}
+	for _, request := range gock.GetUnmatchedRequests() {
+		require.NotContains(t, request.URL.Host, "sina", "不支持的代码不请求新浪")
+	}
+}
+
+func TestSlowSinaDoesNotBlockValuation(t *testing.T) {
+	defer gock.Off()
+	defer func(timeout time.Duration) { sinaCheckTimeout = timeout }(sinaCheckTimeout)
+	sinaCheckTimeout = 50 * time.Millisecond
+	gock.New("https://vip.stock.finance.sina.com.cn").Get("/corp/go.php").Reply(200).Delay(2 * time.Second).BodyString("")
+	gock.New("https://datacenter-web.eastmoney.com").Get("/api/data/v1/get").MatchParam("reportName", "RPT_SHAREBONUS_DET").Reply(200).
+		BodyString(`{"success":true,"code":0,"result":{"data":[{"REPORT_DATE":"2025-12-31 00:00:00","EX_DIVIDEND_DATE":"2026-07-10 00:00:00","ASSIGN_PROGRESS":"实施分配","PRETAX_BONUS_RMB":10}]}}`)
+	mockPeerUpstream()
+	gock.New("https://datacenter-web.eastmoney.com").Get("/api/data/v1/get").MatchParam("filter", "BOARD_CODE").Reply(200).BodyString(emptyReports)
+	start := time.Now()
+	r, err := Analyze(context.Background(), "SH600036", DefaultDCFParams())
+	require.NoError(t, err)
+	require.Less(t, time.Since(start), time.Second)
+	require.False(t, r.Dividends.MismatchChecked)
+	require.InDelta(t, 1, r.Dividends.PerShare, 1e-9)
 }
 
 func TestAnalyzeDividendFailureKeepsValuation(t *testing.T) {

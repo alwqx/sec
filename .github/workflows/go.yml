@@ -27,6 +27,9 @@ jobs:
       - name: Test
         run: go test -v ./...
 
+      - name: Vulnerability check
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+
   # desktop 包只在 windows 和 darwin 上编译，Linux 上的 go test ./... 不会检查它。
   desktop:
     name: Desktop
@@ -61,3 +64,7 @@ jobs:
 
       - name: Test
         run: go test -v ./desktop
+
+      # Linux 上的检查不包含 desktop 包。
+      - name: Vulnerability check
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./desktop

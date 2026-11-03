@@ -14,8 +14,10 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/alwqx/sec/provider/eastmoney"
+	"github.com/alwqx/sec/provider/sina"
 )
 
 const (
@@ -171,18 +173,29 @@ type Result struct {
 	Disclaimer    string     `json:"disclaimer"`
 }
 
+// sinaCheckTimeout 是核对用的新浪请求的超时时间。
+var sinaCheckTimeout = 5 * time.Second
+
+// aShareCode 判断是不是 SH600036 这样的沪深北代码。
+func aShareCode(exCode string) bool {
+	exCode = strings.ToUpper(strings.TrimSpace(exCode))
+	return len(exCode) == 8 && (strings.HasPrefix(exCode, "SH") || strings.HasPrefix(exCode, "SZ") || strings.HasPrefix(exCode, "BJ"))
+}
+
 // Analyze 查询数据并计算估值，params 应已通过 Validate。估值或业绩报表失败时返回错误，不输出部分结果；分红或同行业数据失败时只写入对应的说明。
 func Analyze(ctx context.Context, exCode string, params DCFParams) (*Result, error) {
 	var (
 		points  []*eastmoney.ValuationPoint
 		reports []*eastmoney.PerformanceReport
 		plans   []*eastmoney.DividendPlan
+		check   []sina.Dividend
 		err1    error
 		err2    error
 		err3    error
+		err4    error
 		wg      sync.WaitGroup
 	)
-	wg.Add(3)
+	wg.Add(4)
 	go func() {
 		defer wg.Done()
 		points, err1 = eastmoney.GetValuationHistory(ctx, exCode)
@@ -194,6 +207,17 @@ func Analyze(ctx context.Context, exCode string, params DCFParams) (*Result, err
 	go func() {
 		defer wg.Done()
 		plans, err3 = eastmoney.GetDividendPlans(ctx, exCode)
+	}()
+	// 新浪的分红记录只用来核对东方财富是否缺记录，获取失败或超时不影响结果，也不应拖慢估值。
+	go func() {
+		defer wg.Done()
+		if !aShareCode(exCode) {
+			err4 = eastmoney.ErrUnsupportedCode
+			return
+		}
+		checkCtx, cancel := context.WithTimeout(ctx, sinaCheckTimeout)
+		defer cancel()
+		check, err4 = sina.QueryDividends(checkCtx, exCode[2:])
 	}()
 	wg.Wait()
 	if errors.Is(err1, eastmoney.ErrUnsupportedCode) {
@@ -215,7 +239,12 @@ func Analyze(ctx context.Context, exCode string, params DCFParams) (*Result, err
 		slog.WarnContext(ctx, "获取分红数据失败", "code", exCode, "error", err3)
 		result.DividendsNote = "分红数据获取失败，规则汇总未计入股息率"
 	} else {
-		applyDividends(result, points, plans)
+		// 新浪返回空列表可能是页面被拦截或改版，和请求失败一样算没有核对。
+		checked := err4 == nil && len(check) > 0
+		if !checked {
+			slog.WarnContext(ctx, "没有拿到新浪分红记录，不核对", "code", exCode, "error", err4)
+		}
+		applyDividends(result, points, plans, check, checked)
 	}
 	var rows []*eastmoney.PeerValuation
 	if latest := points[len(points)-1]; latest.BoardCode != "" {
