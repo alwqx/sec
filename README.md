@@ -18,7 +18,7 @@ SEC（Security Information Client）提供 CLI 与 Desktop 两种界面，用于
 | 黄金           | Au99.99 最新日行情、历史蜡烛图与日期筛选                                  | `metal`、`metal-history`                      |
 | 美债           | 11 个期限收益率、收益率曲线、历史趋势与明细                               | `bond`、`bond-history`                        |
 | 技术分析       | 双均线、MACD、RSI、布林带，参数可调，买卖信号与明细                       | `strategy`                                    |
-| 估值           | PE、PB、PS 历史分位，PEG、ROE、格雷厄姆数、规则汇总，可调参数的 DCF       | `valuation`                                   |
+| 估值           | PE、PB、PS 历史分位和同行业对比，PEG、ROE、格雷厄姆数、规则汇总，可调参数的 DCF | `valuation`                                   |
 | 版本与更新     | 设置页版本、构建时间、提交号，手动检查更新和 Release 下载入口             | `--version`、`upgrade`                        |
 
 市场覆盖按功能区分：Desktop 搜索与实时行情支持 A 股、港股和美股；证券历史 K 线支持沪深和港股；公司资料、核心指标、财报、分红及个股公告面向沪深北 A 股。黄金为上海黄金交易所 Au99.99 日行情。

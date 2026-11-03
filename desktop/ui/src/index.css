@@ -384,4 +384,6 @@ h1, h2, h3 { font-weight: 600; }
 .valuation-page .section-toolbar { justify-content: space-between; margin-bottom: 12px; }
 .valuation-page .strategy-form input { width: 72px; }
 .valuation-annuals { max-height: 300px; }
+.valuation-peers { margin: 12px 0; max-height: 420px; }
+.valuation-peer-self td { font-weight: 600; background: var(--accent-soft); }
 .valuation-dot { fill: #d97706; }

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type PointerEvent } from 'react'
 import { valuation } from '../api'
 import { useResource } from '../hooks/useResource'
-import type { ValuationHistory, ValuationMultiple, ValuationResult } from '../types'
+import type { ValuationHistory, ValuationMultiple, ValuationPeers, ValuationResult } from '../types'
 import { money } from '../format'
 import ResourceState from './ResourceState'
 
@@ -118,6 +118,24 @@ function Annuals({ data }: { data: ValuationResult }) {
       <tbody>{data.annuals.map(row => <tr key={row.year}><td>{row.year}</td><td>{fixed(row.eps)}</td><td>{fixed(row.bps)}</td><td>{percent(row.roe)}</td><td>{money(row.revenue)}</td><td>{money(row.profit)}</td></tr>)}</tbody></table></div></section>
 }
 
+// 默认列出的公司数，按总市值排序。
+const peerListSize = 10
+const peerMultiple = (value: number | null) => value === null || value <= 0 ? '—' : value.toFixed(2)
+
+function Peers({ peers, note }: { peers: ValuationPeers | null; note: string }) {
+  const [all, setAll] = useState(false)
+  if (!peers) return <section aria-label="同行业对比"><div className="section-caption"><h3>同行业对比</h3></div><div className="empty-state">{note}</div></section>
+  const items = all ? peers.items : peers.items.filter((item, index) => index < peerListSize || item.self)
+  return <section aria-label="同行业对比"><div className="section-caption"><h3>同行业对比：{peers.board}</h3><span>{peers.date} · 共 {peers.items.length} 家</span></div>
+    <div className="table-scroll"><table className="data-table"><thead><tr><th>指标</th><th>当前值</th><th>行业中位</th><th>相对中位</th><th>排名（低到高）</th><th>分位</th><th>参与比较</th></tr></thead>
+      <tbody>{(Object.keys(multiples) as MultipleKey[]).map(key => { const item = peers[key]; return <tr key={key}><td>{multiples[key]}</td><td>{fixed(item.current)}</td><td>{item.short ? '样本不足' : fixed(item.median)}</td><td>{item.premium === null ? '—' : signed(item.premium)}</td><td>{item.rank === null ? '—' : `${item.rank} / ${item.samples}`}</td><td>{percent(item.percentile, 0)}</td><td>{item.samples} 家，排除 {item.excluded} 家</td></tr> })}</tbody></table></div>
+    <div className="table-scroll valuation-peers"><table className="data-table"><thead><tr><th>公司</th><th>代码</th><th>总市值</th><th>PE</th><th>PB</th><th>PS</th></tr></thead>
+      <tbody>{items.map(item => <tr key={item.code} className={item.self ? 'valuation-peer-self' : undefined}><td>{item.name}</td><td>{item.code}</td><td>{money(item.market_cap)}</td><td>{peerMultiple(item.pe)}</td><td>{peerMultiple(item.pb)}</td><td>{peerMultiple(item.ps)}</td></tr>)}</tbody></table></div>
+    {peers.items.length > peerListSize && <button type="button" onClick={() => setAll(!all)}>{all ? `只看总市值前 ${peerListSize} 家` : `显示全部 ${peers.items.length} 家`}</button>}
+    <p className="data-note">比较同一交易日、东方财富同一行业的公司。倍数小于等于 0 或缺失的公司不参与比较，中位数偏向盈利公司；少于 5 家时不计算中位数和排名。行业内公司的业务和增长可能差别很大。</p>
+  </section>
+}
+
 function DCFResult({ data, loading, error, retry }: { data: ValuationResult; loading: boolean; error: string; retry: () => void }) {
   const dcf = data.dcf
   if (loading || error) return <ResourceState loading={loading} error={error} retry={retry} />
@@ -151,10 +169,11 @@ export default function Valuation({ code }: { code: string }) {
     {data && <>
       <Summary data={data} />
       <Multiples data={data} />
+      <Peers peers={data.peers} note={data.peers_note} />
       <section aria-label="规则汇总"><div className="section-caption"><h3>规则汇总：{data.assessment}</h3></div>
         {data.signals.length > 0 && <div className="table-scroll"><table className="data-table"><thead><tr><th>指标</th><th>判断</th><th>依据</th></tr></thead>
           <tbody>{data.signals.map(row => <tr key={row.name}><td>{row.name}</td><td>{levels[row.level]}</td><td>{row.rule}</td></tr>)}</tbody></table></div>}
-        <p className="data-note">按上述规则的偏低、偏高个数比较得出，少于两条规则时显示数据不足。这只是机械汇总，未考虑行业差异和公司基本面。</p></section>
+        <p className="data-note">按上述规则的偏低、偏高个数比较得出，少于两条规则时显示数据不足；同行业参与比较的公司少于 10 家时不计入行业规则。这只是机械汇总，未考虑公司基本面。{data.peers_note && ` ${data.peers_note}。`}</p></section>
       <section aria-label="DCF"><div className="section-caption"><h3>DCF 折现</h3></div>
         <form className="section-toolbar strategy-form" onSubmit={submit}>
           {dcfFields.map(([name, label, placeholder]) => <label key={name}>{label}<input aria-label={label} inputMode="decimal" placeholder={placeholder} value={draft[name]} onChange={event => setDraft({ ...draft, [name]: event.target.value })} /></label>)}

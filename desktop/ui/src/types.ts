@@ -225,11 +225,16 @@ export interface ValuationDCF {
   params: { growth: number | null; terminal_growth: number; wacc: number; margin_of_safety: number }
   base_cash: number | null; growth_pv: number | null; terminal_pv: number | null; terminal_share: number | null; value: number | null; per_share: number | null; fair_price: number | null; upside: number | null
 }
+export interface ValuationPeerMetric {
+  current: number | null; samples: number; excluded: number; short: boolean; median: number | null; rank: number | null; percentile: number | null; premium: number | null
+}
+export interface ValuationPeer { code: string; name: string; self: boolean; market_cap: number | null; pe: number | null; pb: number | null; ps: number | null }
+export interface ValuationPeers { board: string; date: string; pe: ValuationPeerMetric; pb: ValuationPeerMetric; ps: ValuationPeerMetric; items: ValuationPeer[] }
 export interface ValuationResult {
   code: string; name: string; industry: string; trade_date: string; price: number; market_cap: number; shares: number
   pe: ValuationMultiple; pb: ValuationMultiple; ps: ValuationMultiple; dates: string[]
   eps: number | null; bvps: number | null; profit_ttm: number | null; revenue_ttm: number | null; roe: number | null; roe_year: string
   growth: { rate: number | null; from_year: string; to_year: string; note: string }
   peg: number | null; graham: number | null; graham_margin: number | null
-  annuals: ValuationAnnual[]; dcf: ValuationDCF; signals: { name: string; level: 'low' | 'neutral' | 'high'; rule: string }[]; assessment: string; disclaimer: string
+  annuals: ValuationAnnual[]; peers: ValuationPeers | null; peers_note: string; dcf: ValuationDCF; signals: { name: string; level: 'low' | 'neutral' | 'high'; rule: string }[]; assessment: string; disclaimer: string
 }

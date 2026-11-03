@@ -14,6 +14,7 @@
 10. Fix `sec quote` labeling a security with the wrong code when an A-share and an H-share have the same name, by matching quotes on exchange code instead of name
 11. Reject `sec strategy` periods below 1, and report insufficient data based on the longest period rather than the slow period, instead of printing zeros or empty indicator columns
 12. Show HK quote dates as `YYYY-MM-DD` in `sec quote` and Desktop, and return `null` instead of 0 for DCF values that do not apply in the Desktop valuation API and `sec valuation --json`
+13. Add an industry peer comparison to `sec valuation` (`--method peers`, the overview and `--json`) and the Desktop valuation tab, showing the median, rank, percentile and premium of PE, PB and PS among East Money industry peers on the same trading day. Industry PE and PB percentiles now count in the rule summary when at least 10 companies can be compared, so assessments can change. If peer data is unavailable, the rest of the valuation still works, `peers` is `null` and `peers_note` and the rule summary say the industry rules were not counted
 
 ### v0.4.2
 

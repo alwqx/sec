@@ -65,3 +65,15 @@ func TestValuationRejectsInvalidParams(t *testing.T) {
 		require.Equal(t, http.StatusBadRequest, rr.Code, query)
 	}
 }
+
+func TestValuationPeerFailureKeepsResult(t *testing.T) {
+	defer gock.Off()
+	mockValuationUpstream(`{"success":true,"code":0,"result":{"data":[{"SECURITY_NAME_ABBR":"招商银行","BOARD_CODE":"016029","BOARD_NAME":"银行Ⅱ","TRADE_DATE":"2026-10-30 00:00:00","CLOSE_PRICE":40,"TOTAL_MARKET_CAP":4e11,"TOTAL_SHARES":1e10,"PE_TTM":8,"PB_MRQ":0.8,"PS_TTM":3}]}}`, performanceBody)
+	gock.New("https://datacenter-web.eastmoney.com").Get("/api/data/v1/get").MatchParam("filter", "BOARD_CODE").Reply(500)
+	rr := macroRequest(t, "/api/v1/valuation?code=SH600036")
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	var data map[string]any
+	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &data))
+	require.Nil(t, data["peers"])
+	require.Contains(t, data["peers_note"], "未计入行业规则")
+}

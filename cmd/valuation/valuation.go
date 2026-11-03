@@ -31,7 +31,7 @@ func NewValuationCLI() *cobra.Command {
 	cmd.Flags().BoolP("debug", "D", false, "Enable debug mode")
 	cmd.Flags().Bool("json", false, "Output the full valuation as JSON, regardless of --method")
 	cmd.Flags().StringP("method", "m", "overview",
-		"Valuation method: overview, pe, pb, ps, peg, graham, dcf")
+		"Valuation method: overview, pe, pb, ps, peg, graham, dcf, peers")
 	// DCF parameters
 	defaults := shared.DefaultDCFParams()
 	cmd.Flags().Float64("growth-rate", 0, "DCF: growth rate %, omit to use the 5-year CAGR, limited to ±15%")
@@ -41,7 +41,7 @@ func NewValuationCLI() *cobra.Command {
 	return cmd
 }
 
-var methods = []string{"overview", "pe", "pb", "ps", "peg", "graham", "dcf"}
+var methods = []string{"overview", "pe", "pb", "ps", "peg", "graham", "dcf", "peers"}
 
 func ValuationHandler(cmd *cobra.Command, args []string) error {
 	method, _ := cmd.Flags().GetString("method")
@@ -132,6 +132,8 @@ func render(out io.Writer, method string, r *shared.Result) {
 		printGraham(out, r)
 	case "dcf":
 		printDCF(out, r)
+	case "peers":
+		printPeers(out, r)
 	default:
 		printOverview(out, r)
 	}
@@ -151,6 +153,9 @@ func printOverview(out io.Writer, r *shared.Result) {
 		{"格雷厄姆数", ff(r.Graham), "-", "√(22.5 × 每股收益 × 每股净资产)"},
 	})
 	printGrowth(out, r)
+	if r.Peers != nil {
+		printPeerMetrics(out, r.Peers)
+	}
 
 	if len(r.Annuals) > 0 {
 		fmt.Fprintln(out, "\n【近年年报】")
@@ -165,6 +170,9 @@ func printOverview(out io.Writer, r *shared.Result) {
 	}
 
 	fmt.Fprintf(out, "\n【规则汇总】→ %s\n", r.Assessment)
+	if r.PeersNote != "" {
+		fmt.Fprintf(out, "  注意: %s\n", r.PeersNote)
+	}
 	for _, signal := range r.Signals {
 		fmt.Fprintf(out, "  %s: %s\n", signal.Name, signal.Rule)
 	}

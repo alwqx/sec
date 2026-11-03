@@ -19,6 +19,8 @@ const (
 	reportPerformance = "RPT_LICO_FN_CPD"       // 业绩报表
 	// 数据中心查询为空时不返回空列表，而是返回这个错误码。
 	datacenterEmptyCode = 9201
+	// 最大的行业约 280 家，一页取完。
+	boardPageSize = 1000
 )
 
 // ErrUnsupportedCode 表示证券不是沪深北市场的，数据中心查不了。
@@ -29,6 +31,7 @@ type ValuationPoint struct {
 	Date      string // YYYY-MM-DD
 	Name      string
 	Board     string // 行业
+	BoardCode string
 	Close     float64
 	MarketCap float64
 	Shares    float64
@@ -68,7 +71,7 @@ func GetValuationHistory(ctx context.Context, exCode string) ([]*ValuationPoint,
 		return nil, err
 	}
 	// 2018 年以来约 2100 个交易日，一页取完。
-	rows, err := datacenterRows(ctx, reportValuation, "SECURITY_NAME_ABBR,BOARD_NAME,TRADE_DATE,CLOSE_PRICE,TOTAL_MARKET_CAP,TOTAL_SHARES,PE_TTM,PB_MRQ,PS_TTM", filter, "TRADE_DATE", 5000)
+	rows, err := datacenterRows(ctx, reportValuation, "SECURITY_NAME_ABBR,BOARD_CODE,BOARD_NAME,TRADE_DATE,CLOSE_PRICE,TOTAL_MARKET_CAP,TOTAL_SHARES,PE_TTM,PB_MRQ,PS_TTM", filter, "TRADE_DATE", 5000)
 	if err != nil {
 		return nil, err
 	}
@@ -82,6 +85,7 @@ func GetValuationHistory(ctx context.Context, exCode string) ([]*ValuationPoint,
 		point := &ValuationPoint{Date: date, Close: *closePrice, PE: rowNumber(row, "PE_TTM"), PB: rowNumber(row, "PB_MRQ"), PS: rowNumber(row, "PS_TTM")}
 		point.Name, _ = row["SECURITY_NAME_ABBR"].(string)
 		point.Board, _ = row["BOARD_NAME"].(string)
+		point.BoardCode, _ = row["BOARD_CODE"].(string)
 		if value := rowNumber(row, "TOTAL_MARKET_CAP"); value != nil {
 			point.MarketCap = *value
 		}
@@ -91,6 +95,41 @@ func GetValuationHistory(ctx context.Context, exCode string) ([]*ValuationPoint,
 		points = append(points, point)
 	}
 	return points, nil
+}
+
+// PeerValuation 是一家公司某个交易日的估值，用于同行业比较。倍数的含义同 ValuationPoint。
+type PeerValuation struct {
+	ExCode    string // SH600036
+	Name      string
+	MarketCap *float64
+	PE        *float64
+	PB        *float64
+	PS        *float64
+}
+
+// GetBoardValuations 返回某个行业在某个交易日的估值，按总市值降序。上游没有数据时返回空列表。
+func GetBoardValuations(ctx context.Context, boardCode, date string) ([]*PeerValuation, error) {
+	filter := fmt.Sprintf(`(BOARD_CODE="%s")(TRADE_DATE='%s')`, boardCode, date)
+	rows, err := datacenterRows(ctx, reportValuation, "SECUCODE,SECURITY_NAME_ABBR,TOTAL_MARKET_CAP,PE_TTM,PB_MRQ,PS_TTM", filter, "TOTAL_MARKET_CAP", boardPageSize)
+	if err != nil {
+		return nil, err
+	}
+	// 只取到一部分时分位和中位数都不对，不能当成完整结果。
+	if len(rows) >= boardPageSize {
+		return nil, fmt.Errorf("行业 %s 的公司超过 %d 家", boardCode, boardPageSize)
+	}
+	peers := make([]*PeerValuation, 0, len(rows))
+	for _, row := range rows {
+		secu, _ := row["SECUCODE"].(string)
+		code, exchange, ok := strings.Cut(secu, ".")
+		if !ok || code == "" || exchange == "" {
+			continue
+		}
+		peer := &PeerValuation{ExCode: exchange + code, MarketCap: rowNumber(row, "TOTAL_MARKET_CAP"), PE: rowNumber(row, "PE_TTM"), PB: rowNumber(row, "PB_MRQ"), PS: rowNumber(row, "PS_TTM")}
+		peer.Name, _ = row["SECURITY_NAME_ABBR"].(string)
+		peers = append(peers, peer)
+	}
+	return peers, nil
 }
 
 // GetPerformanceReports 返回业绩报表，按报告期降序。上游没有数据时返回空列表。
