@@ -3,7 +3,6 @@ package metal
 import (
 	"fmt"
 	"log/slog"
-	"time"
 
 	"github.com/alwqx/sec/provider/metal"
 	"github.com/alwqx/sec/utils"
@@ -34,25 +33,16 @@ func NewMetalCLI() *cobra.Command {
 func queryRange(cmd *cobra.Command) (start, end string, ranged bool, err error) {
 	beginText, _ := cmd.Flags().GetString("begin")
 	endText, _ := cmd.Flags().GetString("end")
-	endTime := time.Now()
-	if endText != "" {
-		if endTime, err = time.Parse(utils.ParseMetalCmdArgTimeLayout, endText); err != nil {
-			return "", "", false, fmt.Errorf("--end 须为 YYYYMMDD: %s", endText)
-		}
+	ranged = beginText != "" || endText != ""
+	days := historyDays
+	if !ranged {
+		days = 10
 	}
-	if beginText == "" && endText == "" {
-		return endTime.AddDate(0, 0, -10).Format(utils.LayoutYYMMDD), endTime.Format(utils.LayoutYYMMDD), false, nil
+	beginTime, endTime, err := utils.ParseRange(beginText, endText, days)
+	if err != nil {
+		return "", "", false, err
 	}
-	beginTime := endTime.AddDate(0, 0, -historyDays)
-	if beginText != "" {
-		if beginTime, err = time.Parse(utils.ParseMetalCmdArgTimeLayout, beginText); err != nil {
-			return "", "", false, fmt.Errorf("--begin 须为 YYYYMMDD: %s", beginText)
-		}
-	}
-	if beginTime.After(endTime) {
-		return "", "", false, fmt.Errorf("--begin %s 晚于 --end %s", beginTime.Format(utils.ParseMetalCmdArgTimeLayout), endTime.Format(utils.ParseMetalCmdArgTimeLayout))
-	}
-	return beginTime.Format(utils.LayoutYYMMDD), endTime.Format(utils.LayoutYYMMDD), true, nil
+	return beginTime.Format(utils.LayoutYYMMDD), endTime.Format(utils.LayoutYYMMDD), ranged, nil
 }
 
 // MetalHandler 打印贵金属日行情，默认 Au99.99 最近一个交易日；指定区间时打印区间内每一天。

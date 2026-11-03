@@ -9,6 +9,7 @@ import (
 	"github.com/alwqx/sec/cmd/announcements"
 	"github.com/alwqx/sec/cmd/balancesheet"
 	"github.com/alwqx/sec/cmd/bond"
+	"github.com/alwqx/sec/cmd/commodity"
 	"github.com/alwqx/sec/cmd/fx"
 	"github.com/alwqx/sec/cmd/insider"
 	"github.com/alwqx/sec/cmd/ipo"
@@ -82,6 +83,7 @@ func NewCLI() *cobra.Command {
 		fx.NewFXCLI(),
 		quote.NewQuoteCLI(), quote.NewQuoteHistoryCLI(),
 		metal.NewMetalCLI(),
+		commodity.NewCommodityCLI(),
 		upgrade.NewUpgradeCLI(),
 		valuation.NewValuationCLI(),
 		strategy.NewStrategyCLI(),

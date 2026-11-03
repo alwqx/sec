@@ -49,8 +49,8 @@ func mapMetalQuote(item *metal.DailyHQItem) metalQuote {
 	return quote
 }
 
-// metalRange 读取 begin、end（YYYY-MM-DD），默认结束于今天（上海时区）、往前 30 天。
-func metalRange(w http.ResponseWriter, r *http.Request) (begin, end, today string, ok bool) {
+// dailyRange 读取 begin、end（YYYY-MM-DD），默认结束于今天（上海时区）、往前 30 天。
+func dailyRange(w http.ResponseWriter, r *http.Request) (begin, end, today string, ok bool) {
 	const layout = utils.LayoutYYMMDD
 	today = time.Now().In(time.FixedZone("CST", 8*3600)).Format(layout)
 	end = strings.TrimSpace(r.URL.Query().Get("end"))
@@ -85,7 +85,7 @@ func (s *desktopServer) handleMetal(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	begin, end, today, ok := metalRange(w, r)
+	begin, end, today, ok := dailyRange(w, r)
 	if !ok {
 		return
 	}

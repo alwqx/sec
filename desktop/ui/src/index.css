@@ -249,6 +249,11 @@ h1, h2, h3 { font-weight: 600; }
 .metal-quote-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 0; }
 .metal-history h2 { margin: 0; }
 .metal-history .section-caption { align-items: center; }
+.commodity-table .link-button { padding: 0; border: 0; background: none; color: var(--accent); font-weight: 600; cursor: pointer; }
+.commodity-table th:first-child small { display: block; color: var(--muted); font-size: 11px; font-weight: 400; }
+.commodity-table td, .commodity-table thead th { text-align: right; white-space: nowrap; }
+.commodity-table thead th:first-child { text-align: left; }
+.commodity-table tr[aria-selected='true'] { background: var(--accent-soft); }
 .metal-table-heading { border-top: 1px solid var(--border); margin-top: 20px; padding-top: 18px; }
 .metal-table td, .metal-table th { text-align: right; }
 .metal-table th:first-child { text-align: left; }
