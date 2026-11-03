@@ -4,6 +4,7 @@
 
 1. Add dividend yield to `sec valuation` (`--method dividend`, the overview and `--json`) and the Desktop valuation tab: the yield on the latest complete fiscal year adjusted for stock dividends and splits, the 5-year average, its historical range and percentile, consecutive years and payout by fiscal year. Plans not yet paid are listed separately. The yield percentile now counts in the rule summary, so assessments can change. If dividend data is unavailable or there are no dividend records at all, the rest of the valuation still works and `dividends_note` and the rule summary say so. Dividends from the last 5 years are checked against Sina, which also tells non-payers apart from missing data, and records missing from East Money or with different amounts are listed
 2. Run `govulncheck` in CI, and skip `TestQuoteWs`, a live websocket test that occasionally failed CI
+3. Add a chart view to the Desktop financials tab, built from East Money's full F10 statements: a profit Sankey diagram, profit and cash waterfalls, and trends for revenue and profit, margins, expense ratios (cost-income ratio for financial companies), debt ratio, asset mix, cash flows and operating cash flow to net profit, over the last 10 years or 12 single quarters. Every step ties to the reported subtotals, with unlisted and small items shown as "other", and banks, securities firms and insurers get their own revenue breakdowns
 
 ### v0.4.3
 

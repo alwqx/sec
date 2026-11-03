@@ -11,7 +11,7 @@ SEC（Security Information Client）提供 CLI 与 Desktop 两种界面，用于
 | 证券搜索与自选 | 名称／代码／拼音搜索，自选增删，与 CLI 共享存储                           | `search`、`watch`                             |
 | 实时与历史行情 | 行情自动刷新，日 K 线、成交量与成交额，日期范围、快捷区间和复权选择       | `quote`、`quote-history`、`kline`             |
 | 公司研究       | 公司资料、行业、PE、PB、总市值、流通市值与分红记录                        | `info`                                        |
-| 财务报表       | 资产负债表、利润表、现金流量表，报告期筛选，CSV／JSON 导出                | `financials`                               |
+| 财务报表       | 资产负债表、利润表、现金流量表，报告期筛选，CSV／JSON 导出；Desktop 有利润桑基图、利润和现金瀑布图及多维趋势图 | `financials`                               |
 | 报告原文       | 年报、半年报、一季报、三季报，年份范围查询、单份／多选 PDF 下载及任务进度 | `annual-report`（年报）              |
 | 公告           | 标题搜索、报告类别筛选、分页与原文查看                                    | `announcements`、`insider`（增减持公告）      |
 | IPO            | 新股上市日期筛选，招股说明书查询、原文查看及单份／多选下载                | `ipo list / calendar / prospectus / download` |

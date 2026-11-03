@@ -46,7 +46,7 @@ sec quote-history 600036 --freq week --json
 | `quote-history` | 历史行情 | 自选与行情 → 概览 | 已有 |
 | `kline` | 蜡烛图，支持 MA、布林带叠加 | 自选与行情 → 概览 | 已有；固定为 MA5/10/20/60 和 BOLL(20,2) |
 | `info` | 公司资料、核心指标与分红 | 自选与行情 → 公司、分红 | 已有 |
-| `financials` | 资产负债表、利润表、现金流量表 | 自选与行情 → 财报 | 已有 |
+| `financials` | 资产负债表、利润表、现金流量表 | 自选与行情 → 财报 | 已有；图表分析（桑基图、瀑布图、趋势）只在 Desktop |
 | `annual-report` | 年报 PDF 下载 | 自选与行情 → 财报 | 已有，Desktop 另含半年报和季报 |
 | `valuation` | 估值指标、历史分位、同行业对比、股息率与 DCF | 自选与行情 → 估值 | 已有；仅沪深北 A 股 |
 | `strategy ma / macd / rsi / boll` | 技术分析信号（计算） | 自选与行情 → 技术分析 | 已有；默认前复权，`sec strategy` 不复权 |

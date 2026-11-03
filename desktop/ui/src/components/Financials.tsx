@@ -5,6 +5,7 @@ import type { BasicSecurity, SavedDownload as SavedFile } from '../types'
 import ResourceState from './ResourceState'
 import AnnualReports from './AnnualReports'
 import SavedDownload from './SavedDownload'
+import FinancialCharts from './FinancialCharts'
 
 function amount(value: unknown) {
   if (value === null || value === undefined || value === '') return '—'
@@ -59,12 +60,13 @@ function FinancialStatements({ security }: { security: BasicSecurity }) {
 }
 
 export default function Financials({ security }: { security: BasicSecurity }) {
-  const [view, setView] = useState<'statements' | 'annual'>('statements')
+  const [view, setView] = useState<'statements' | 'charts' | 'annual'>('statements')
   return <div className="financials-page">
     <div className="segmented financial-views" aria-label="财报内容">
       <button aria-pressed={view === 'statements'} onClick={() => setView('statements')}>财务报表</button>
+      <button aria-pressed={view === 'charts'} onClick={() => setView('charts')}>图表分析</button>
       <button aria-pressed={view === 'annual'} onClick={() => setView('annual')}>定期报告</button>
     </div>
-    {view === 'statements' ? <FinancialStatements security={security} /> : <AnnualReports security={security} />}
+    {view === 'statements' ? <FinancialStatements security={security} /> : view === 'charts' ? <FinancialCharts security={security} /> : <AnnualReports security={security} />}
   </div>
 }

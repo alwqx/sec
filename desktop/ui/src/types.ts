@@ -244,3 +244,13 @@ export interface ValuationResult {
   peg: number | null; graham: number | null; graham_margin: number | null
   annuals: ValuationAnnual[]; peers: ValuationPeers | null; peers_note: string; dividends: ValuationDividends | null; dividends_note: string; dcf: ValuationDCF; signals: { name: string; level: 'low' | 'neutral' | 'high'; rule: string }[]; assessment: string; disclaimer: string
 }
+
+export interface FinancialItem { label: string; value: number }
+export interface FinancialBridge { start: FinancialItem | null; steps: { items: FinancialItem[]; total: FinancialItem }[] }
+export interface FinancialMetrics {
+  revenue: number | null; net_profit: number | null; parent_net_profit: number | null; deduct_net_profit: number | null
+  gross_margin: number | null; net_margin: number | null; sale_ratio: number | null; manage_ratio: number | null; research_ratio: number | null; finance_ratio: number | null
+  cost_income_ratio: number | null; debt_ratio: number | null; operating_cash: number | null; investing_cash: number | null; financing_cash: number | null; cash_to_profit: number | null
+}
+export interface FinancialPeriod { date: string; income: FinancialBridge | null; cash: FinancialBridge | null; assets: FinancialItem[] | null; metrics: FinancialMetrics }
+export interface FinancialCharts { code: string; company_type: 'general' | 'bank' | 'securities' | 'insurance'; quarterly: boolean; periods: FinancialPeriod[] }
