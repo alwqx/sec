@@ -17,7 +17,7 @@ SEC（Security Information Client）提供 CLI 与 Desktop 两种界面，用于
 | IPO            | 新股上市日期筛选，招股说明书查询、原文查看及单份／多选下载                | `ipo list / calendar / prospectus / download` |
 | 黄金           | Au99.99 最新日行情、历史蜡烛图与日期筛选                                  | `metal`、`metal-history`                      |
 | 美债           | 11 个期限收益率、收益率曲线、历史趋势与明细                               | `bond`、`bond-history`                        |
-| 技术分析       | 双均线、MACD、RSI、布林带，参数可调，买卖信号与明细                       | `strategy`                                    |
+| 技术分析       | 双均线、MACD、RSI、布林带，参数可调，买卖信号与明细，A 股日线回测         | `strategy`                                    |
 | 估值           | PE、PB、PS 历史分位和同行业对比，股息率，PEG、ROE、格雷厄姆数、规则汇总，可调参数的 DCF | `valuation`                                   |
 | 版本与更新     | 设置页版本、构建时间、提交号，手动检查更新和 Release 下载入口             | `--version`、`upgrade`                        |
 
@@ -169,7 +169,7 @@ CLI `sec watch` 与 Desktop「我的自选」统一使用 `~/.sec/watchlist.json
 | `macro us auctions` | 国债逐券发行日期、拍卖面值与分配、SOMA及再发行事件，见 [美国拍卖文档](docs/us-auctions.md) |
 | `macro us corporate-profits`、`macro us business-inventories`、`macro us new-orders` | 企业税前利润、商业库存及制造业新订单，分开保留季度流量、月末余额和月度流量，见 [美国企业文档](docs/us-enterprise.md) |
 | `macro us housing`、`macro us house-price`     | 新房与成屋销售、FHFA季度房价指数，保留各自历史覆盖和统计口径，见 [美国房地产文档](docs/us-housing.md) |
-| `strategy ma / macd / rsi / boll`             | 技术指标与信号                           |
+| `strategy ma / macd / rsi / boll`             | 技术指标与信号，`--backtest` 回测        |
 | `valuation`                                   | 估值指标与 DCF 分析                      |
 | `upgrade`、`--version`                        | CLI 升级与版本信息                       |
 
@@ -192,6 +192,7 @@ sec ipo prospectus 300750
 
 # 技术分析与估值
 sec strategy macd SH600036
+sec strategy ma SH600036 -b 20210101 -e 20251231 --backtest
 sec valuation SH600036
 ```
 

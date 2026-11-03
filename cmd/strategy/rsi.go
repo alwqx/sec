@@ -55,10 +55,11 @@ func runRSI(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	exCode, name, quotes, note, err := fetchOHLCV(cmd, args[0], 250)
+	a, err := fetchOHLCV(cmd, args[0], period+1)
 	if err != nil {
 		return err
 	}
+	quotes := a.quotes
 
 	headers, data, signals := ComputeRSI(quotes, period, overbought, oversold)
 	if headers == nil {
@@ -69,15 +70,8 @@ func runRSI(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	if wantJSON(cmd) {
-		prices, _ := strategyPrices(quotes)
-		return printJSON(cmd, exCode, name, "rsi", map[string]any{"period": period, "overbought": overbought, "oversold": oversold}, note, quotes, []jsonSeries{
-			{"rsi", indicator.RSI(prices, period), period},
-		}, signals)
-	}
-
-	fmt.Fprintf(cmd.OutOrStdout(), "\n证券代码: %s  证券名称: %s  策略: RSI(%d)\n\n", exCode, name, period)
-	fmt.Fprintf(cmd.OutOrStdout(), "超买阈值: %.0f  超卖阈值: %.0f\n\n", overbought, oversold)
-	displayTable(cmd, headers, data, signals)
-	return nil
+	prices, _ := strategyPrices(quotes)
+	return a.finish(cmd, "rsi", map[string]any{"period": period, "overbought": overbought, "oversold": oversold}, fmt.Sprintf("RSI(%d)  超买阈值: %.0f  超卖阈值: %.0f", period, overbought, oversold), headers, data, signals, []jsonSeries{
+		{"rsi", indicator.RSI(prices, period), period},
+	})
 }

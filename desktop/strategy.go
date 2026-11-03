@@ -11,8 +11,10 @@ import (
 	"net/url"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/alwqx/sec/backtest"
 	"github.com/alwqx/sec/indicator"
 	"github.com/alwqx/sec/provider/eastmoney"
 	quotehistory "github.com/alwqx/sec/provider/history"
@@ -158,7 +160,46 @@ func parseStrategy(q url.Values) (strategyPlan, error) {
 	}
 }
 
-// handleStrategy 计算技术指标和信号。信号由规则机械生成，不是回测结果，也不构成投资建议。
+// parseBacktestConfig 读取回测参数，费率以 % 为单位，留空用默认值。
+func parseBacktestConfig(q url.Values) (backtest.Config, error) {
+	cfg := backtest.DefaultConfig()
+	for _, item := range []struct {
+		name, label string
+		target      *float64
+		percent     bool
+	}{{"cash", "初始资金", &cfg.Cash, false}, {"commission", "佣金费率", &cfg.Commission, true}, {"min_commission", "最低佣金", &cfg.MinCommission, false}, {"stamp_tax", "印花税率", &cfg.StampTax, true}, {"slippage", "滑点", &cfg.Slippage, true}} {
+		text := q.Get(item.name)
+		if text == "" {
+			continue
+		}
+		value, err := strconv.ParseFloat(text, 64)
+		if err != nil || math.IsNaN(value) || math.IsInf(value, 0) {
+			return cfg, fmt.Errorf("%s须为数字", item.label)
+		}
+		if item.percent {
+			value /= 100
+		}
+		*item.target = value
+	}
+	return cfg, cfg.Validate()
+}
+
+// backtestNote 说明不能回测的原因；能回测时返回空字符串。用复权价格时不会退回备用数据，所以不用另外判断。
+func backtestNote(code string, query historyQuery) string {
+	switch {
+	case strings.HasPrefix(code, "HK"):
+		return "回测只支持 A 股个股：港股没有涨跌停、可以 T+0，每手股数也不同。"
+	case backtest.Supported(code) != nil:
+		return backtest.Supported(code).Error()
+	case query.freq != eastmoney.FreqDay:
+		return "回测只支持日线。"
+	case query.fqt == eastmoney.QuoteFQTDefault:
+		return "回测需要复权价格，不复权价格在除权日会出现虚假的涨跌，请选择前复权或后复权。"
+	}
+	return ""
+}
+
+// handleStrategy 计算技术指标和信号；沪深 A 股的复权日线同时按信号回测。结果由规则机械生成，不构成投资建议。
 func (s *desktopServer) handleStrategy(w http.ResponseWriter, r *http.Request) {
 	history, ok := parseHistoryQuery(w, r)
 	if !ok {
@@ -169,10 +210,12 @@ func (s *desktopServer) handleStrategy(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	// 回测参数有误时照常返回指标和信号，只在回测里说明，页面上的参数表单不会消失。
+	cfg, cfgErr := parseBacktestConfig(r.URL.Query())
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
-	// EMA 和 RSI 依赖起点。至少多取一年、长周期按周期放大，同一天的值基本不随查询区间变化；预热数据不进入结果。
-	warmup := history.begin.AddDate(0, 0, -max(365, plan.required*8*history.freq.BarDays()))
+	// 预热数据不进入结果。
+	warmup := quotehistory.IndicatorWarmup(history.begin, plan.required, history.freq)
 	fetched, err := quotehistory.GetFrom(ctx, &eastmoney.GetQuoteHistoryReq{
 		Code: history.symbol, MarketCode: history.market, Begin: warmup.Format("20060102"), End: history.end.Format("20060102"), FQT: history.fqt, Freq: history.freq,
 	}, history.begin.Format("20060102"))
@@ -207,8 +250,20 @@ func (s *desktopServer) handleStrategy(w http.ResponseWriter, r *http.Request) {
 			signals = append(signals, strategySignal{quotes[signal.Index].Date.Format("2006-01-02"), signal.Type, closes[signal.Index], signal.Reason})
 		}
 	}
+	code := strings.ToUpper(strings.TrimSpace(r.URL.Query().Get("code")))
+	note := backtestNote(code, history)
+	if note == "" && cfgErr != nil {
+		note = cfgErr.Error()
+	}
+	var result *backtest.Result
+	if note == "" && len(quotes) >= plan.required && first < len(quotes) {
+		if result, err = backtest.RunQuotes(code, quotes, first, rawSignals, cfg); err != nil {
+			note = err.Error()
+		}
+	}
 	writeJSON(w, map[string]any{
 		"params": plan.params, "levels": plan.levels, "dates": dates, "closes": closes[first:], "series": series, "signals": signals,
 		"required": plan.required, "insufficient": len(quotes) < plan.required, "source_note": fetched.Note,
+		"backtest": result, "backtest_note": note,
 	})
 }

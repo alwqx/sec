@@ -129,3 +129,9 @@ func toQuotes(bars []*sina.Bar, req *eastmoney.GetQuoteHistoryReq, required stri
 	}
 	return quotes, nil
 }
+
+// IndicatorWarmup 返回计算技术指标时开始取数的日期。EMA 和 RSI 依赖起点：至少多取一年，长周期按周期放大，
+// 同一天的值基本不随查询区间变化。sec strategy 和 Desktop 技术分析共用。
+func IndicatorWarmup(begin time.Time, required int, freq eastmoney.Freq) time.Time {
+	return begin.AddDate(0, 0, -max(365, required*8*freq.BarDays()))
+}

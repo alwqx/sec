@@ -57,10 +57,11 @@ func runMA(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	exCode, name, quotes, note, err := fetchOHLCV(cmd, args[0], 250)
+	a, err := fetchOHLCV(cmd, args[0], max(fast, slow))
 	if err != nil {
 		return err
 	}
+	quotes := a.quotes
 
 	headers, data, signals := ComputeMA(quotes, fast, slow)
 	if headers == nil {
@@ -71,15 +72,9 @@ func runMA(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	if wantJSON(cmd) {
-		prices, _ := strategyPrices(quotes)
-		return printJSON(cmd, exCode, name, "ma", map[string]any{"fast": fast, "slow": slow}, note, quotes, []jsonSeries{
-			{"ma_fast", indicator.SMA(prices, fast), fast - 1},
-			{"ma_slow", indicator.SMA(prices, slow), slow - 1},
-		}, signals)
-	}
-
-	fmt.Fprintf(cmd.OutOrStdout(), "\n证券代码: %s  证券名称: %s  策略: 双均线(%d,%d)\n\n", exCode, name, fast, slow)
-	displayTable(cmd, headers, data, signals)
-	return nil
+	prices, _ := strategyPrices(quotes)
+	return a.finish(cmd, "ma", map[string]any{"fast": fast, "slow": slow}, fmt.Sprintf("双均线(%d,%d)", fast, slow), headers, data, signals, []jsonSeries{
+		{"ma_fast", indicator.SMA(prices, fast), fast - 1},
+		{"ma_slow", indicator.SMA(prices, slow), slow - 1},
+	})
 }

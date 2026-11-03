@@ -62,10 +62,11 @@ func runMACD(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	exCode, name, quotes, note, err := fetchOHLCV(cmd, args[0], 250)
+	a, err := fetchOHLCV(cmd, args[0], max(fast, slow)+signal)
 	if err != nil {
 		return err
 	}
+	quotes := a.quotes
 
 	headers, data, signals := ComputeMACD(quotes, fast, slow, signal)
 	if headers == nil {
@@ -76,18 +77,12 @@ func runMACD(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	if wantJSON(cmd) {
-		prices, _ := strategyPrices(quotes)
-		line, signalLine, histogram := indicator.MACD(prices, fast, slow, signal)
-		start := indicator.MACDStart(fast, slow, signal)
-		return printJSON(cmd, exCode, name, "macd", map[string]any{"fast": fast, "slow": slow, "signal": signal}, note, quotes, []jsonSeries{
-			{"macd", line, max(fast, slow) - 1},
-			{"signal", signalLine, start},
-			{"histogram", histogram, start},
-		}, signals)
-	}
-
-	fmt.Fprintf(cmd.OutOrStdout(), "\n证券代码: %s  证券名称: %s  策略: MACD(%d,%d,%d)\n\n", exCode, name, fast, slow, signal)
-	displayTable(cmd, headers, data, signals)
-	return nil
+	prices, _ := strategyPrices(quotes)
+	line, signalLine, histogram := indicator.MACD(prices, fast, slow, signal)
+	start := indicator.MACDStart(fast, slow, signal)
+	return a.finish(cmd, "macd", map[string]any{"fast": fast, "slow": slow, "signal": signal}, fmt.Sprintf("MACD(%d,%d,%d)", fast, slow, signal), headers, data, signals, []jsonSeries{
+		{"macd", line, max(fast, slow) - 1},
+		{"signal", signalLine, start},
+		{"histogram", histogram, start},
+	})
 }

@@ -43,9 +43,9 @@ jobs:
           ldflags: -X "github.com/alwqx/sec/version.Version=${{ env.SEC_VERSION }}" -X "github.com/alwqx/sec/version.BuildTime=${{ env.SEC_BUILD_TIME }}" -X github.com/alwqx/sec/version.GitCommit=${{ env.SEC_SHORT_SHA }}
 
   # macOS 桌面版：构建前端 → 编译桌面二进制 → 封装 .app → 打包 .dmg 上传。
-  # 当前只在 macos-latest（Apple Silicon，arm64）上构建；Intel/通用二进制留待后续。
+  # 当前只在 macos-15（Apple Silicon，arm64）上构建；固定版本，避免 macos-latest 切换时构建环境悄悄变化；Intel/通用二进制留待后续。
   build-macos-desktop:
-    runs-on: macos-latest
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v6
 
@@ -84,7 +84,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          # 架构归一化：macos-latest 为 arm64，未来若支持 Intel 则映射为 amd64。
+          # 架构归一化：macos-15 为 arm64，未来若支持 Intel 则映射为 amd64。
           ARCH="$(uname -m)"
           case "$ARCH" in
             x86_64) ARCH="amd64" ;;

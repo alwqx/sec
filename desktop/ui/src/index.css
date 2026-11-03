@@ -423,3 +423,9 @@ h1, h2, h3 { font-weight: 600; }
 .chart-tooltip-row strong { font-variant-numeric: tabular-nums; }
 .chart-tooltip-row span { color: var(--muted); }
 .financial-data-table summary { cursor: pointer; color: var(--muted); margin-top: 12px; }
+
+.backtest { display: grid; gap: 10px; margin-top: 18px; }
+.backtest h3 { margin: 0; }
+.backtest-summary small { display: block; color: var(--muted); font-size: 11px; }
+.backtest-holding { fill: var(--series-1); background: var(--series-1); opacity: .45; }
+.chart-legend i.backtest-holding { height: 3px; border-radius: 0; }

@@ -3,6 +3,7 @@ import { strategy } from '../api'
 import { useResource } from '../hooks/useResource'
 import type { StrategyResult } from '../types'
 import ResourceState from './ResourceState'
+import Backtest from './Backtest'
 import { frequencies, marketToday, monthsAgo, rangeLabel, type Frequency } from '../marketDate'
 
 const kinds = {
@@ -101,7 +102,12 @@ function LoadedStrategy({ code }: { code: string }) {
   const [range, setRange] = useState(() => ({ begin: monthsAgo(12), end: marketToday() }))
   const [draft, setDraft] = useState(() => defaultParams('ma'))
   const [params, setParams] = useState(draft)
-  const load = useCallback((signal: AbortSignal) => strategy({ code, kind, fq, freq, ...range, ...params }, signal), [code, kind, fq, freq, range, params])
+  const [backtestDraft, setBacktestDraft] = useState<Record<string, string>>({})
+  const [backtestParams, setBacktestParams] = useState<Record<string, string>>({})
+  const load = useCallback((signal: AbortSignal) => {
+    const filled = Object.fromEntries(Object.entries(backtestParams).filter(([, value]) => value.trim() !== ''))
+    return strategy({ code, kind, fq, freq, ...range, ...params, ...filled }, signal)
+  }, [code, kind, fq, freq, range, params, backtestParams])
   const resource = useResource(load)
   const data = resource.data
   const signals = useMemo(() => [...(data?.signals ?? [])].reverse(), [data])
@@ -136,8 +142,9 @@ function LoadedStrategy({ code }: { code: string }) {
       <div className="section-caption"><span>信号 {signals.length} 个（买入 {buys} · 卖出 {signals.length - buys}）</span></div>
       {signals.length ? <div className="table-scroll strategy-signals"><table className="data-table"><thead><tr><th>日期</th><th>信号</th><th>收盘价</th><th>原因</th></tr></thead>
         <tbody>{signals.map(item => <tr key={item.date}><td>{item.date}</td><td className={item.type === 'buy' ? 'up' : 'down'}>{item.type === 'buy' ? '买入' : '卖出'}</td><td>{item.price.toFixed(2)}</td><td>{item.reason}</td></tr>)}</tbody></table></div> : <div className="empty-state">所选区间没有触发信号。</div>}
+      <Backtest result={data.backtest} note={data.backtest_note} draft={backtestDraft} setDraft={setBacktestDraft} apply={() => setBacktestParams({ ...backtestDraft })} />
     </>)}
-    <p className="data-note">信号由规则机械生成，未计入交易成本和滑点，不是回测结果，也不构成投资建议。默认前复权，避免除权缺口产生假信号；命令行 sec strategy 使用不复权价格，结果可能不同。</p>
+    <p className="data-note">信号由规则机械生成，信号表未计入交易成本，交易成本和成交规则见上方回测。默认前复权，避免除权缺口产生假信号；命令行 sec strategy 默认使用不复权价格，加 --backtest 时使用前复权，结果可能和这里不同。</p>
   </div>
 }
 

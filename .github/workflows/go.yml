@@ -33,7 +33,7 @@ jobs:
   # desktop 包只在 windows 和 darwin 上编译，Linux 上的 go test ./... 不会检查它。
   desktop:
     name: Desktop
-    runs-on: macos-latest
+    runs-on: macos-15
     steps:
       - name: Check out source code
         uses: actions/checkout@v6

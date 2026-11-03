@@ -60,7 +60,6 @@
 
 ## CLI
 
-- [ ] `sec strategy` 历史长度：固定只取约 250 个日历日，日线约 170 根 K 线，`ma -s 200` 这类长周期报数据不足；应支持指定区间，策略回测也需要更长的历史。
 
 ## Desktop
 
@@ -69,4 +68,3 @@
 ## 工程
 
 - [ ] F10 财报请求与数据中心请求重复：`provider/eastmoney/statements.go` 的 `f10Request` 和 `datacenterRows` 各自实现请求、状态检查和 JSON 解析，`financials` 包的取数函数也重复了 `rowNumber`；合并时需要导出 provider 的内部函数并统一错误处理。
-- [ ] CI 的 macOS 运行器：`go.yml` 的 Desktop job 和 `release.yml` 的打包 job 使用 `macos-latest`，镜像升级时发布用的打包环境会跟着变化；Ubuntu job 已固定为 `ubuntu-24.04`，macOS 也应固定版本。
