@@ -195,3 +195,25 @@ func TestPrintJSON(t *testing.T) {
 	require.Equal(t, "{\n  \"title\": \"A&B <年报>\",\n  \"value\": null\n}\n", out.String(), "不转义 & 和 <，保留可读性")
 	require.Error(t, PrintJSON(&out, math.NaN()))
 }
+
+func TestParseRange(t *testing.T) {
+	begin, end, err := ParseRange("", "20261103", 30)
+	require.NoError(t, err)
+	require.Equal(t, "2026-10-04", begin.Format("2006-01-02"), "默认开始日期从结束日期往前推")
+	require.Equal(t, "2026-11-03", end.Format("2006-01-02"))
+	begin, _, err = ParseRange("20260101", "20261103", 30)
+	require.NoError(t, err)
+	require.Equal(t, "2026-01-01", begin.Format("2006-01-02"))
+	_, _, err = ParseRange("20261104", "20261103", 30)
+	require.ErrorContains(t, err, "晚于")
+	_, _, err = ParseRange("2026-11-01", "", 30)
+	require.ErrorContains(t, err, "YYYYMMDD")
+}
+
+// 只给今天作为 --begin 时，任何时刻都是有效区间。
+func TestParseRangeToday(t *testing.T) {
+	today := ShanghaiToday().Format("20060102")
+	begin, end, err := ParseRange(today, "", 30)
+	require.NoError(t, err)
+	require.Equal(t, begin, end)
+}

@@ -44,6 +44,8 @@ func (s *desktopServer) Handler() http.Handler {
 	mux.Handle("PUT /api/v1/workspace", s.withAuth(http.HandlerFunc(s.handleWorkspace)))
 	mux.Handle("GET /api/v1/bond", s.withAuth(s.withCORS(http.HandlerFunc(s.handleBond))))
 	mux.Handle("GET /api/v1/metal", s.withAuth(s.withCORS(http.HandlerFunc(s.handleMetal))))
+	mux.Handle("GET /api/v1/commodity", s.withAuth(s.withCORS(http.HandlerFunc(s.handleCommodities))))
+	mux.Handle("GET /api/v1/commodity/history", s.withAuth(s.withCORS(http.HandlerFunc(s.handleCommodityHistory))))
 	mux.Handle("GET /api/v1/macro/catalog", s.withAuth(http.HandlerFunc(s.handleMacroCatalog)))
 	mux.Handle("GET /api/v1/macro/data", s.withAuth(http.HandlerFunc(s.handleMacroData)))
 	mux.Handle("GET /api/v1/fx/options", s.withAuth(http.HandlerFunc(s.handleFXOptions)))

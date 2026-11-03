@@ -68,6 +68,35 @@ func ParseBeginEnd(beginStr, endStr string, defaultDays int, parseLayout, output
 	return begin.Format(outputLayout), end.Format(outputLayout), nil
 }
 
+// ShanghaiToday 返回上海时区的今天，表示为 UTC 零点，和 time.Parse 解析出的日期可以直接比较。
+// 国内行情按北京时间划分交易日，和 Desktop 的默认日期一致，不随本机时区变化。
+func ShanghaiToday() time.Time {
+	now := time.Now().In(time.FixedZone("CST", 8*3600))
+	return time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+}
+
+// ParseRange 解析 --begin、--end（YYYYMMDD）。没有指定 begin 时从 end 往前 defaultDays 个日历日，没有指定 end 时是上海时区的今天。
+// 和 ParseBeginEnd 不同，默认开始日期从结束日期往前推，只给 --end 时也是有效区间；只比较日期，不受当天时刻影响。
+func ParseRange(beginText, endText string, defaultDays int) (time.Time, time.Time, error) {
+	end := ShanghaiToday()
+	var err error
+	if endText != "" {
+		if end, err = time.Parse(ParseMetalCmdArgTimeLayout, endText); err != nil {
+			return end, end, fmt.Errorf("--end 须为 YYYYMMDD: %s", endText)
+		}
+	}
+	begin := end.AddDate(0, 0, -defaultDays)
+	if beginText != "" {
+		if begin, err = time.Parse(ParseMetalCmdArgTimeLayout, beginText); err != nil {
+			return begin, end, fmt.Errorf("--begin 须为 YYYYMMDD: %s", beginText)
+		}
+	}
+	if begin.After(end) {
+		return begin, end, fmt.Errorf("--begin %s 晚于 --end %s", begin.Format(ParseMetalCmdArgTimeLayout), end.Format(ParseMetalCmdArgTimeLayout))
+	}
+	return begin, end, nil
+}
+
 // UserAgent 生成 user-agent
 func UserAgent() string {
 	return fmt.Sprintf("sec/%s (%s %s) Go/%s", version.Version, runtime.GOARCH, runtime.GOOS, runtime.Version())

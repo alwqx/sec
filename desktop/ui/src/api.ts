@@ -1,4 +1,4 @@
-import type { BasicSecurity, SecurityQuote, Company, Dividend, WorkspaceState, PageResult, IPOListing, Announcement, FinancialReport, MetalData, HistoryQuote, BondData, CompanyMetrics, SavedDownload, AnnualReportsPage, ProspectusPage , MacroCatalog, MacroDataset , FxDataset, FxSpread , HistoryOverlay , StrategyResult, ValuationResult, FinancialCharts } from './types'
+import type { BasicSecurity, SecurityQuote, Company, Dividend, WorkspaceState, PageResult, IPOListing, Announcement, FinancialReport, MetalData, CommodityQuote, CommodityHistory, HistoryQuote, BondData, CompanyMetrics, SavedDownload, AnnualReportsPage, ProspectusPage , MacroCatalog, MacroDataset , FxDataset, FxSpread , HistoryOverlay , StrategyResult, ValuationResult, FinancialCharts } from './types'
 
 async function request<T>(path: string, signal?: AbortSignal, options?: RequestInit): Promise<T> {
   const resp = await fetch(path, { ...options, signal })
@@ -70,6 +70,14 @@ export function quotes(codes: string[], signal?: AbortSignal): Promise<{ results
 // 后端缓存上海黄金交易所的数据 10 分钟；refresh 为 true 时重新请求。
 export function metal(inst: string, begin: string, end: string, refresh: boolean, signal?: AbortSignal): Promise<MetalData> {
   return request(`/api/v1/metal?${new URLSearchParams({ inst, begin, end, ...(refresh ? { refresh: '1' } : {}) })}`, signal)
+}
+
+export function commodities(signal?: AbortSignal): Promise<{ results: CommodityQuote[]; failed: string[] | null }> {
+  return request('/api/v1/commodity', signal)
+}
+
+export function commodityHistory(id: string, begin: string, end: string, signal?: AbortSignal): Promise<CommodityHistory> {
+  return request(`/api/v1/commodity/history?${new URLSearchParams({ id, begin, end })}`, signal)
 }
 
 export function bond(begin: string, end: string, signal?: AbortSignal): Promise<BondData> {

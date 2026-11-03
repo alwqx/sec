@@ -268,3 +268,11 @@ export interface FinancialMetrics {
 }
 export interface FinancialPeriod { date: string; income: FinancialBridge | null; cash: FinancialBridge | null; assets: FinancialItem[] | null; metrics: FinancialMetrics }
 export interface FinancialCharts { code: string; company_type: 'general' | 'bank' | 'securities' | 'insurance'; quarterly: boolean; periods: FinancialPeriod[] }
+
+export interface CommodityInfo { id: string; name: string; exchange: string; unit: string; domestic: boolean }
+// 涨跌相对昨日结算价，change_rate 为百分比
+export interface CommodityQuote extends CommodityInfo { date: string; time: string; price: number; open: number; high: number; low: number; prev_settle: number | null; change: number | null; change_rate: number | null }
+// 国内涨跌相对前一日结算价，国际相对前一日收盘价；settle 只有国内品种有
+// basis 为 settle 或 close：国内品种前一天没有结算价时用收盘价
+export interface CommodityBar { date: string; open: number; high: number; low: number; close: number; volume: number; settle: number | null; yclose: number | null; basis: '' | 'settle' | 'close'; change: number | null; change_rate: number | null }
+export interface CommodityHistory { commodity: CommodityInfo; begin: string; end: string; results: CommodityBar[] }
