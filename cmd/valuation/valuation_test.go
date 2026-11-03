@@ -86,3 +86,13 @@ func TestRenderLoss(t *testing.T) {
 	render(&out, "overview", sampleResult(-10))
 	require.Contains(t, out.String(), "亏损或净资产为负")
 }
+
+func TestRenderPeersNote(t *testing.T) {
+	r := sampleResult(10)
+	r.PeersNote = "同行业数据获取失败，规则汇总未计入行业规则"
+	for _, method := range []string{"overview", "peers"} {
+		var out bytes.Buffer
+		render(&out, method, r)
+		require.Contains(t, out.String(), r.PeersNote, method)
+	}
+}

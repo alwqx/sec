@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math"
 	"sort"
 	"strconv"
@@ -160,13 +161,15 @@ type Result struct {
 	Graham       *float64 `json:"graham"`
 	GrahamMargin *float64 `json:"graham_margin"` // 格雷厄姆数相对当前价，单位 %
 	Annuals      []Annual `json:"annuals"`
+	Peers        *Peers   `json:"peers"`      // 不可用时为 nil，原因见 PeersNote
+	PeersNote    string   `json:"peers_note"` // 同行业数据不可用时说明原因
 	DCF          DCF      `json:"dcf"`
 	Signals      []Signal `json:"signals"`
 	Assessment   string   `json:"assessment"`
 	Disclaimer   string   `json:"disclaimer"`
 }
 
-// Analyze 查询数据并计算估值，params 应已通过 Validate。任一数据源失败都返回错误，不输出部分结果。
+// Analyze 查询数据并计算估值，params 应已通过 Validate。估值或业绩报表失败时返回错误，不输出部分结果；同行业数据失败时只写入 PeersNote。
 func Analyze(ctx context.Context, exCode string, params DCFParams) (*Result, error) {
 	var (
 		points  []*eastmoney.ValuationPoint
@@ -199,6 +202,18 @@ func Analyze(ctx context.Context, exCode string, params DCFParams) (*Result, err
 	}
 	result := Compute(points, reports, params)
 	result.Code = strings.ToUpper(exCode)
+	// 同行业对比是附加信息，失败时不影响其他结果，但要说明规则汇总少了行业规则。
+	var rows []*eastmoney.PeerValuation
+	if latest := points[len(points)-1]; latest.BoardCode != "" {
+		var err error
+		rows, err = eastmoney.GetBoardValuations(ctx, latest.BoardCode, latest.Date)
+		if err != nil {
+			slog.WarnContext(ctx, "获取同行业估值失败", "code", exCode, "error", err)
+			result.PeersNote = "同行业数据获取失败，规则汇总未计入行业规则"
+			return result, nil
+		}
+	}
+	applyPeers(result, rows)
 	return result, nil
 }
 
@@ -277,10 +292,7 @@ func buildMultiple(points []*eastmoney.ValuationPoint, price float64, field func
 	}
 	sort.Float64s(valid)
 	n := len(valid)
-	median := valid[n/2]
-	if n%2 == 0 {
-		median = (valid[n/2-1] + valid[n/2]) / 2
-	}
+	median := medianSorted(valid)
 	m.History = &History{Since: since, Samples: n, Min: valid[0], Median: median, Max: valid[n-1]}
 	if n < minPercentileSamples {
 		m.History.Short = true
@@ -392,18 +404,34 @@ func computeDCF(r *Result, params DCFParams) DCF {
 	return dcf
 }
 
+// percentileBands 说明 percentileLevel 的区间。
+const percentileBands = "低于 30% 偏低，高于 70% 偏高"
+
+func percentileLevel(value float64) string {
+	switch {
+	case value < 30:
+		return "low"
+	case value > 70:
+		return "high"
+	}
+	return "neutral"
+}
+
+// medianSorted 返回升序非空切片的中位数。
+func medianSorted(values []float64) float64 {
+	n := len(values)
+	if n%2 == 0 {
+		return (values[n/2-1] + values[n/2]) / 2
+	}
+	return values[n/2]
+}
+
 func percentileSignal(name string, m Multiple) (Signal, bool) {
 	if m.History == nil || m.History.Percentile == nil {
 		return Signal{}, false
 	}
 	value := *m.History.Percentile
-	level := "neutral"
-	if value < 30 {
-		level = "low"
-	} else if value > 70 {
-		level = "high"
-	}
-	return Signal{name, level, fmt.Sprintf("处于 %s 以来 %.0f%% 分位（低于 30%% 偏低，高于 70%% 偏高）", m.History.Since, value)}, true
+	return Signal{name, percentileLevel(value), fmt.Sprintf("处于 %s 以来 %.0f%% 分位（%s）", m.History.Since, value, percentileBands)}, true
 }
 
 func computeSignals(r *Result) []Signal {
