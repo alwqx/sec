@@ -28,7 +28,7 @@ const pages: { id: Page; title: string; icon: LucideIcon }[] = [
   { id: 'announcements', title: '公告中心', icon: Newspaper },
   { id: 'macro', title: '宏观', icon: Landmark },
   { id: 'fx', title: '汇率', icon: ArrowLeftRight },
-  { id: 'metal', title: '黄金行情', icon: Coins },
+  { id: 'metal', title: '贵金属', icon: Coins },
   { id: 'settings', title: '设置', icon: SettingsIcon },
 ]
 const tabs: { id: Tab; title: string }[] = [

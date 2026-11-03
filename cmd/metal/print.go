@@ -6,61 +6,21 @@ import (
 	"strconv"
 
 	"github.com/alwqx/sec/provider/metal"
-	"github.com/alwqx/sec/utils"
 	"github.com/olekukonko/tablewriter"
-	"github.com/spf13/cobra"
 )
 
-func NewMetalHistoryCLI() *cobra.Command {
-	rootCmd := &cobra.Command{
-		Use:     "metal-history",
-		Aliases: []string{"mh"},
-		Short:   "Print quote history of precious metal(default au999)",
-		RunE:    MetalHistoryHandler,
-	}
-	rootCmd.Flags().BoolP("debug", "D", false, "Enable debug mode")
-	rootCmd.Flags().Bool("json", false, "Output JSON")
-	rootCmd.Flags().StringP("begin", "b", "", "Begin date 20250101")
-	rootCmd.Flags().StringP("end", "e", "", "End date 20250131")
-
-	return rootCmd
-}
-
-// MetalHistoryHandler 打印贵金属历史数据，默认 Au999
-func MetalHistoryHandler(cmd *cobra.Command, args []string) error {
-	req := &metal.QueryAu999Req{}
-	var err error
-	beginStr, _ := cmd.Flags().GetString("begin")
-	endStr, _ := cmd.Flags().GetString("end")
-	req.Start, req.End, err = utils.ParseBeginEnd(beginStr, endStr, 30, utils.ParseMetalCmdArgTimeLayout, utils.LayoutYYMMDD)
-	if err != nil {
-		return err
-	}
-
-	resp, err := metal.QueryAu999(cmd.Context(), req)
-	if err != nil {
-		return err
-	}
-	if asJSON, _ := cmd.Flags().GetBool("json"); asJSON {
-		return printDailyJSON(cmd, resp.Data)
-	}
-	printAu999History(cmd.OutOrStdout(), resp.Data)
-
-	return nil
-}
-
-// printAu999History 打印 Au999 信息
-func printAu999History(out io.Writer, aus []*metal.DailyHQItem) {
-	num := len(aus)
+// printDailyHistory 打印一个品种的日行情
+func printDailyHistory(out io.Writer, inst metal.Instrument, items []*metal.DailyHQItem) {
+	num := len(items)
 	if num == 0 {
 		return
 	}
 
-	headers := []string{"日期", "名称", "收盘", "开盘", "最高", "最低"}
+	headers := []string{"日期", "品种", "收盘", "开盘", "最高", "最低", "单位"}
 	columnsStyles := make([][]tablewriter.Colors, 0, len(headers))
 
 	data := make([][]string, 0, num)
-	for _, au := range aus {
+	for _, au := range items {
 		combineClose := ""
 		if au.YClose == -1 {
 			combineClose = fmt.Sprintf("%-.5g %-.5g %-.2g%s", au.Close, 0.0, 0.00, "%")
@@ -70,11 +30,12 @@ func printAu999History(out io.Writer, aus []*metal.DailyHQItem) {
 
 		row := []string{
 			au.Date,
-			"Au99.99",
+			inst.ID + " " + inst.Name,
 			combineClose,
 			strconv.FormatFloat(au.Open, 'g', -1, 64),
 			strconv.FormatFloat(au.High, 'g', -1, 64),
 			strconv.FormatFloat(au.Low, 'g', -1, 64),
+			inst.Unit,
 		}
 		data = append(data, row)
 

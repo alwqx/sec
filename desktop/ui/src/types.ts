@@ -91,9 +91,14 @@ export interface MetalQuote {
   change_rate: number | null // 百分比
 }
 
+export interface MetalInstrument { id: string; name: string; unit: string; alias: string }
+
 export interface MetalData {
+  inst: string
   name: string
+  description: string
   unit: string
+  instruments: MetalInstrument[]
   begin: string
   end: string
   latest: MetalQuote | null

@@ -18,16 +18,20 @@ type dailyRow struct {
 	ChangeRate *float64 `json:"change_rate"` // 单位 %
 }
 
-func printDailyJSON(cmd *cobra.Command, items []*metal.DailyHQItem) error {
+func newDailyRow(item *metal.DailyHQItem) dailyRow {
+	row := dailyRow{Date: item.Date, Open: item.Open, Close: item.Close, High: item.High, Low: item.Low}
+	if item.YClose > 0 {
+		// provider 里的涨跌幅是比例，输出统一为 %，和其他命令一致。
+		rate := item.ChangeRate * 100
+		row.YClose, row.Change, row.ChangeRate = &item.YClose, &item.Change, &rate
+	}
+	return row
+}
+
+func printDailyJSON(cmd *cobra.Command, inst metal.Instrument, items []*metal.DailyHQItem) error {
 	rows := make([]dailyRow, 0, len(items))
 	for _, item := range items {
-		row := dailyRow{Date: item.Date, Open: item.Open, Close: item.Close, High: item.High, Low: item.Low}
-		if item.YClose > 0 {
-			// provider 里的涨跌幅是比例，输出统一为 %，和其他命令一致。
-			rate := item.ChangeRate * 100
-			row.YClose, row.Change, row.ChangeRate = &item.YClose, &item.Change, &rate
-		}
-		rows = append(rows, row)
+		rows = append(rows, newDailyRow(item))
 	}
-	return utils.PrintJSON(cmd.OutOrStdout(), map[string]any{"results": rows})
+	return utils.PrintJSON(cmd.OutOrStdout(), map[string]any{"inst": inst.ID, "name": inst.Name, "unit": inst.Unit, "results": rows})
 }

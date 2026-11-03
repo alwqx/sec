@@ -81,7 +81,7 @@ func NewCLI() *cobra.Command {
 		macro.NewMacroCLI(),
 		fx.NewFXCLI(),
 		quote.NewQuoteCLI(), quote.NewQuoteHistoryCLI(),
-		metal.NewMetalCLI(), metal.NewMetalHistoryCLI(),
+		metal.NewMetalCLI(),
 		upgrade.NewUpgradeCLI(),
 		valuation.NewValuationCLI(),
 		strategy.NewStrategyCLI(),

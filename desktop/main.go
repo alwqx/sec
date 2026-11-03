@@ -17,6 +17,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/alwqx/sec/provider/metal"
 	"github.com/webview/webview_go"
 )
 
@@ -43,6 +44,8 @@ func main() {
 	}
 	port := ln.Addr().(*net.TCPAddr).Port
 
+	// 上海黄金交易所的频率限制很低，切换贵金属品种和区间时复用 10 分钟内的数据。
+	metal.CacheTTL = 10 * time.Minute
 	backend := &desktopServer{token: newToken(), dev: *dev}
 	srv := &http.Server{Handler: backend.publicHandler()}
 	go func() {

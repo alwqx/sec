@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"testing"
 	"time"
 
@@ -91,6 +92,35 @@ func TestMetalUpstreamFailure(t *testing.T) {
 	rr := httptest.NewRecorder()
 	(&desktopServer{dev: true}).Handler().ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/api/v1/metal", nil))
 	require.Equal(t, http.StatusBadGateway, rr.Code)
-	require.Contains(t, rr.Body.String(), "黄金行情获取失败")
+	require.Contains(t, rr.Body.String(), "Au99.99 黄金现货行情获取失败")
 	require.True(t, gock.IsDone())
+}
+
+func TestMetalInstrument(t *testing.T) {
+	defer gock.Off()
+	gock.New("https://www.sge.com.cn").Get("/graph/Dailyhq").MatchParam("instid", "^"+regexp.QuoteMeta("Ag99.99")+"$").Reply(200).BodyString(`{"time":[["2026-11-03",11747,11747,11747,11747]]}`)
+	rr := httptest.NewRecorder()
+	(&desktopServer{dev: true}).Handler().ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/api/v1/metal?inst=ag999&begin=2026-11-01&end=2026-11-03", nil))
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	var response metalResponse
+	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &response))
+	require.Equal(t, "Ag99.99", response.Inst)
+	require.Equal(t, "白银现货", response.Description)
+	require.Equal(t, "元/千克", response.Unit)
+	require.Len(t, response.Instruments, 2)
+	require.Len(t, response.Results, 1)
+
+	rr = httptest.NewRecorder()
+	(&desktopServer{dev: true}).Handler().ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/api/v1/metal?inst=cu", nil))
+	require.Equal(t, http.StatusBadRequest, rr.Code)
+	require.Contains(t, rr.Body.String(), "不支持的品种")
+}
+
+func TestMetalBlocked(t *testing.T) {
+	defer gock.Off()
+	gock.New("https://www.sge.com.cn").Get("/graph/Dailyhq").Reply(403).BodyString("<html>")
+	rr := httptest.NewRecorder()
+	(&desktopServer{dev: true}).Handler().ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/api/v1/metal", nil))
+	require.Equal(t, http.StatusBadGateway, rr.Code)
+	require.Contains(t, rr.Body.String(), "访问过于频繁")
 }
