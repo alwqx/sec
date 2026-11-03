@@ -67,8 +67,9 @@ export function quotes(codes: string[], signal?: AbortSignal): Promise<{ results
   return request(`/api/v1/quotes?${new URLSearchParams({ codes: codes.join(',') })}`, signal)
 }
 
-export function metal(begin: string, end: string, signal?: AbortSignal): Promise<MetalData> {
-  return request(`/api/v1/metal?${new URLSearchParams({ begin, end })}`, signal)
+// 后端缓存上海黄金交易所的数据 10 分钟；refresh 为 true 时重新请求。
+export function metal(inst: string, begin: string, end: string, refresh: boolean, signal?: AbortSignal): Promise<MetalData> {
+  return request(`/api/v1/metal?${new URLSearchParams({ inst, begin, end, ...(refresh ? { refresh: '1' } : {}) })}`, signal)
 }
 
 export function bond(begin: string, end: string, signal?: AbortSignal): Promise<BondData> {

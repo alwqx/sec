@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 // 每次切换资源时取消旧请求，不把上一只证券或上一页的结果显示到当前页面。
 // 调用者使用 useCallback 稳定 load 的身份。
@@ -21,5 +21,7 @@ export function useResource<T>(load: (signal: AbortSignal) => Promise<T>) {
     })
     return () => controller.abort()
   }, [load, retry])
-  return { data, error, loading, reload: () => setRetry(n => n + 1) }
+  // reload 的身份保持不变，可以放进调用者 effect 的依赖。
+  const reload = useCallback(() => setRetry(n => n + 1), [])
+  return { data, error, loading, reload }
 }

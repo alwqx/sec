@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"math"
 	"net/http"
@@ -27,12 +28,15 @@ type metalQuote struct {
 }
 
 type metalResponse struct {
-	Name    string       `json:"name"`
-	Unit    string       `json:"unit"`
-	Begin   string       `json:"begin"`
-	End     string       `json:"end"`
-	Latest  *metalQuote  `json:"latest"`
-	Results []metalQuote `json:"results"`
+	Inst        string             `json:"inst"`
+	Name        string             `json:"name"`
+	Description string             `json:"description"`
+	Unit        string             `json:"unit"`
+	Instruments []metal.Instrument `json:"instruments"`
+	Begin       string             `json:"begin"`
+	End         string             `json:"end"`
+	Latest      *metalQuote        `json:"latest"`
+	Results     []metalQuote       `json:"results"`
 }
 
 func mapMetalQuote(item *metal.DailyHQItem) metalQuote {
@@ -45,11 +49,11 @@ func mapMetalQuote(item *metal.DailyHQItem) metalQuote {
 	return quote
 }
 
-// handleMetal 一次获取数据，同时返回最新日行情与指定区间历史，避免重复抓取同一上游全量接口。
-func (s *desktopServer) handleMetal(w http.ResponseWriter, r *http.Request) {
+// metalRange 读取 begin、end（YYYY-MM-DD），默认结束于今天（上海时区）、往前 30 天。
+func metalRange(w http.ResponseWriter, r *http.Request) (begin, end, today string, ok bool) {
 	const layout = utils.LayoutYYMMDD
-	today := time.Now().In(time.FixedZone("CST", 8*3600)).Format(layout)
-	end := strings.TrimSpace(r.URL.Query().Get("end"))
+	today = time.Now().In(time.FixedZone("CST", 8*3600)).Format(layout)
+	end = strings.TrimSpace(r.URL.Query().Get("end"))
 	if end == "" {
 		end = today
 	}
@@ -58,7 +62,7 @@ func (s *desktopServer) handleMetal(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "结束日期格式无效，请使用 YYYY-MM-DD")
 		return
 	}
-	begin := strings.TrimSpace(r.URL.Query().Get("begin"))
+	begin = strings.TrimSpace(r.URL.Query().Get("begin"))
 	if begin == "" {
 		begin = endTime.AddDate(0, 0, -30).Format(layout)
 	}
@@ -71,17 +75,31 @@ func (s *desktopServer) handleMetal(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "开始日期不能晚于结束日期")
 		return
 	}
+	return begin, end, today, true
+}
+
+// handleMetal 一次获取数据，同时返回最新日行情与指定区间历史，避免重复抓取同一上游全量接口。inst 为空时查询 Au99.99。
+func (s *desktopServer) handleMetal(w http.ResponseWriter, r *http.Request) {
+	inst, err := metal.FindInstrument(r.URL.Query().Get("inst"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	begin, end, today, ok := metalRange(w, r)
+	if !ok {
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
 	// 查询截止今日的全部日行情，最新记录独立于用户选择的历史区间。
 	// provider 在区间筛选前计算昨收，确保首个历史交易日仍有正确的涨跌基准。
-	response, err := metal.QueryAu999(ctx, &metal.QueryAu999Req{Start: "1900-01-01", End: today})
+	response, err := metal.Query(ctx, &metal.QueryReq{Inst: inst.ID, Start: "1900-01-01", End: today, Fresh: r.URL.Query().Get("refresh") == "1"})
 	if err != nil || response == nil {
-		slog.ErrorContext(ctx, "查询黄金日行情失败", "error", err)
-		writeError(w, http.StatusBadGateway, "黄金行情获取失败，请稍后重试")
+		slog.ErrorContext(ctx, "查询贵金属日行情失败", "inst", inst.ID, "error", err)
+		writeError(w, http.StatusBadGateway, metalErrorMessage(err, inst.ID+" "+inst.Name+"行情获取失败，请稍后重试"))
 		return
 	}
-	result := metalResponse{Name: "Au99.99", Unit: "元/克", Begin: begin, End: end, Results: []metalQuote{}}
+	result := metalResponse{Inst: inst.ID, Name: inst.ID, Description: inst.Name, Unit: inst.Unit, Instruments: metal.Instruments, Begin: begin, End: end, Results: []metalQuote{}}
 	for _, item := range response.Data {
 		if item == nil {
 			continue
@@ -93,4 +111,12 @@ func (s *desktopServer) handleMetal(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, result)
+}
+
+// metalErrorMessage 被上海黄金交易所拦截时说明原因，其他错误用 fallback。
+func metalErrorMessage(err error, fallback string) string {
+	if errors.Is(err, metal.ErrBlocked) {
+		return err.Error()
+	}
+	return fallback
 }

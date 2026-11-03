@@ -1,5 +1,5 @@
 import PageActions from './PageActions'
-import { useCallback, useState, type FormEvent } from 'react'
+import { useCallback, useRef, useState, type FormEvent } from 'react'
 import { metal } from '../api'
 import { useResource } from '../hooks/useResource'
 import type { MetalQuote } from '../types'
@@ -29,9 +29,12 @@ function change(value: number | null, percent = false) {
   return value === null ? '—' : `${value > 0 ? '+' : ''}${value.toFixed(2)}${percent ? '%' : ''}`
 }
 
-function Latest({ quote, name, unit }: { quote: MetalQuote; name: string; unit: string }) {
-  return <section className="metal-latest" aria-label="最新黄金日行情">
-    <div className="metal-quote-heading"><div><span className="eyebrow">上海黄金交易所</span><h2>{name}<span>黄金现货</span></h2></div><span className="data-note">最新交易日 {quote.date}</span></div>
+// 品种在数据返回前也要能切换，先用固定列表，数据返回后以后端列表为准。
+const defaultInstruments = [{ id: 'Au99.99', name: '黄金现货' }, { id: 'Ag99.99', name: '白银现货' }]
+
+function Latest({ quote, name, description, unit }: { quote: MetalQuote; name: string; description: string; unit: string }) {
+  return <section className="metal-latest" aria-label={`${name} 最新日行情`}>
+    <div className="metal-quote-heading"><div><span className="eyebrow">上海黄金交易所</span><h2>{name}<span>{description}</span></h2></div><span className="data-note">最新交易日 {quote.date}</span></div>
     <div className="metal-price-row"><div><span className="data-note">收盘价 · {unit}</span><div className={`quote-price ${direction(quote.change)}`}>{quote.close.toFixed(2)}</div><div className={`quote-change ${direction(quote.change)}`}>{change(quote.change)} {unit}（{change(quote.change_rate, true)}）</div></div>
       <dl className="quote-grid metal-quote-grid">{[['开盘', quote.open], ['最高', quote.high], ['最低', quote.low], ['昨收', quote.yclose]].map(([label, value]) => <div key={String(label)}><dt>{label}</dt><dd>{typeof value === 'number' ? value.toFixed(2) : '—'}</dd></div>)}</dl>
     </div>
@@ -40,18 +43,27 @@ function Latest({ quote, name, unit }: { quote: MetalQuote; name: string; unit: 
 }
 
 export default function Metal() {
+  const [inst, setInst] = useState('Au99.99')
   const [range, setRange] = useState(() => dateRange(30))
   const [draft, setDraft] = useState(range)
   const [validation, setValidation] = useState('')
   const [page, setPage] = useState(1)
-  const load = useCallback((signal: AbortSignal) => metal(range.begin, range.end, signal), [range.begin, range.end])
+  // 只有点刷新按钮的那一次绕过后端缓存；切换品种和区间用缓存，避免触发上海黄金交易所的频率限制。
+  const force = useRef(false)
+  const load = useCallback((signal: AbortSignal) => {
+    const refresh = force.current
+    force.current = false
+    return metal(inst, range.begin, range.end, refresh, signal)
+  }, [inst, range.begin, range.end])
   const resource = useResource(load)
+  const refresh = () => { force.current = true; resource.reload() }
   const apply = (next: typeof range) => {
     setValidation('')
     setPage(1)
     setRange(next)
     if (next.begin === range.begin && next.end === range.end) resource.reload()
   }
+  const changeInst = (next: string) => { setPage(1); setInst(next) }
   const submit = (e: FormEvent) => {
     e.preventDefault()
     if (!draft.begin || !draft.end) { setValidation('请选择开始和结束日期'); return }
@@ -60,28 +72,30 @@ export default function Metal() {
   }
   const quickRange = (days: number) => { const next = dateRange(days); setDraft(next); apply(next) }
   const data = resource.data
+  const instruments = data?.instruments ?? defaultInstruments
   const pageSize = 30
   const currentPage = Math.min(page, Math.max(1, Math.ceil((data?.results.length ?? 0) / pageSize)))
   const rows = data ? [...data.results].reverse().slice((currentPage - 1) * pageSize, currentPage * pageSize) : []
 
   return <div className="metal-page">
-    {data && <div className="page-panel">{data.latest ? <Latest quote={data.latest} name={data.name} unit={data.unit} /> : <div className="empty-state">暂无黄金日行情</div>}</div>}
-    <section className="page-panel metal-controls" aria-label="黄金历史查询">
+    <div className="segmented" role="group" aria-label="品种">{instruments.map(item => <button key={item.id} type="button" aria-pressed={inst === item.id} title={item.name} onClick={() => changeInst(item.id)}>{item.id}</button>)}</div>
+    {data && <div className="page-panel">{data.latest ? <Latest quote={data.latest} name={data.name} description={data.description} unit={data.unit} /> : <div className="empty-state">暂无 {data.name} 日行情</div>}</div>}
+    <section className="page-panel metal-controls" aria-label="贵金属历史查询">
       <form className="section-toolbar metal-range-form" onSubmit={submit}>
         <label htmlFor="metal-begin">开始日期<input id="metal-begin" type="date" required value={draft.begin} onChange={e => setDraft({ ...draft, begin: e.target.value })} /></label>
         <label htmlFor="metal-end">结束日期<input id="metal-end" type="date" required value={draft.end} onChange={e => setDraft({ ...draft, end: e.target.value })} /></label>
         <button className="primary-button" type="submit">查询</button>
-        <PageActions><button type="button" onClick={resource.reload} disabled={resource.loading}>刷新行情</button></PageActions>
+        <PageActions><button type="button" onClick={refresh} disabled={resource.loading}>刷新行情</button></PageActions>
       </form>
       <div className="metal-quick-ranges"><span className="data-note">快捷区间</span>{[[30, '近 1 个月'], [90, '近 3 个月'], [365, '近 1 年']].map(([days, label]) => <button type="button" key={days} onClick={() => quickRange(Number(days))}>{label}</button>)}</div>
       {validation && <p className="error" role="alert">{validation}</p>}
     </section>
     <ResourceState {...resource} retry={resource.reload} />
     {data && <>
-      <section className="page-panel metal-history" aria-label="黄金历史行情">
+      <section className="page-panel metal-history" aria-label={`${data.name} 历史行情`}>
         <div className="section-caption"><h2>历史行情</h2><span>{data.begin} 至 {data.end} · {data.results.length} 个交易日</span></div>
         {data.results.length === 0 ? <div className="empty-state">所选区间暂无交易记录，请调整日期范围。</div> : <>
-          <CandlestickChart key={`${data.begin}-${data.end}`} data={data.results} name={data.name} unit={data.unit} />
+          <CandlestickChart key={`${data.inst}-${data.begin}-${data.end}`} data={data.results} name={data.name} unit={data.unit} />
           <div className="section-caption metal-table-heading"><span>日行情明细 · 最新在前</span><span>价格单位：{data.unit}</span></div>
           <div className="table-scroll"><table className="data-table metal-table"><thead><tr>{['日期', '收盘', '涨跌', '涨跌幅', '开盘', '最高', '最低', '昨收'].map(label => <th key={label}>{label}</th>)}</tr></thead><tbody>{rows.map(item => <tr key={item.date}>
             <th scope="row">{item.date}</th><td className={direction(item.change)}>{item.close.toFixed(2)}</td><td className={direction(item.change)}>{change(item.change)}</td><td className={direction(item.change)}>{change(item.change_rate, true)}</td><td>{item.open.toFixed(2)}</td><td>{item.high.toFixed(2)}</td><td>{item.low.toFixed(2)}</td><td>{item.yclose?.toFixed(2) ?? '—'}</td>

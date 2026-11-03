@@ -1,6 +1,7 @@
 package metal
 
 import (
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -9,42 +10,77 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// historyDays 是只指定 --end 时往前取的日历天数。
+const historyDays = 30
+
 func NewMetalCLI() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:     "metal",
 		Aliases: []string{"m"},
-		Short:   "Print quote of precious metal(default au999)",
+		Short:   "Print daily quotes of gold (Au99.99) or silver (Ag99.99) on the Shanghai Gold Exchange: the latest day, or a date range with --begin/--end",
 		RunE:    MetalHandler,
 	}
 	rootCmd.Flags().BoolP("debug", "D", false, "Enable debug mode")
 	rootCmd.Flags().Bool("json", false, "Output JSON")
+	rootCmd.Flags().StringP("inst", "i", "", "SGE instrument, case-insensitive, alias in brackets: "+metal.InstrumentList()+"; default Au99.99")
+	rootCmd.Flags().StringP("begin", "b", "", "Begin date 20250101; with --begin or --end, print every day in the range")
+	rootCmd.Flags().StringP("end", "e", "", fmt.Sprintf("End date 20250131, default today; with only --end, the range starts %d days earlier", historyDays))
 
 	return rootCmd
 }
 
-// MetalHandler 打印贵金属最新行情数据，默认 Au999
-func MetalHandler(cmd *cobra.Command, args []string) error {
-	end := time.Now()
-	req := &metal.QueryAu999Req{
-		Start: end.Add(-10 * 24 * time.Hour).Format(utils.LayoutYYMMDD),
-		End:   end.Format(utils.LayoutYYMMDD),
+// queryRange 返回查询区间（YYYY-MM-DD）。没有指定 --begin、--end 时查最近 10 天，只输出最后一个交易日，
+// 休市时也能取到最近一天；ranged 为 true 时输出区间内的每一天。
+func queryRange(cmd *cobra.Command) (start, end string, ranged bool, err error) {
+	beginText, _ := cmd.Flags().GetString("begin")
+	endText, _ := cmd.Flags().GetString("end")
+	endTime := time.Now()
+	if endText != "" {
+		if endTime, err = time.Parse(utils.ParseMetalCmdArgTimeLayout, endText); err != nil {
+			return "", "", false, fmt.Errorf("--end 须为 YYYYMMDD: %s", endText)
+		}
 	}
-	resp, err := metal.QueryAu999(cmd.Context(), req)
+	if beginText == "" && endText == "" {
+		return endTime.AddDate(0, 0, -10).Format(utils.LayoutYYMMDD), endTime.Format(utils.LayoutYYMMDD), false, nil
+	}
+	beginTime := endTime.AddDate(0, 0, -historyDays)
+	if beginText != "" {
+		if beginTime, err = time.Parse(utils.ParseMetalCmdArgTimeLayout, beginText); err != nil {
+			return "", "", false, fmt.Errorf("--begin 须为 YYYYMMDD: %s", beginText)
+		}
+	}
+	if beginTime.After(endTime) {
+		return "", "", false, fmt.Errorf("--begin %s 晚于 --end %s", beginTime.Format(utils.ParseMetalCmdArgTimeLayout), endTime.Format(utils.ParseMetalCmdArgTimeLayout))
+	}
+	return beginTime.Format(utils.LayoutYYMMDD), endTime.Format(utils.LayoutYYMMDD), true, nil
+}
+
+// MetalHandler 打印贵金属日行情，默认 Au99.99 最近一个交易日；指定区间时打印区间内每一天。
+func MetalHandler(cmd *cobra.Command, args []string) error {
+	req := &metal.QueryReq{}
+	req.Inst, _ = cmd.Flags().GetString("inst")
+	var (
+		ranged bool
+		err    error
+	)
+	if req.Start, req.End, ranged, err = queryRange(cmd); err != nil {
+		return err
+	}
+	resp, err := metal.Query(cmd.Context(), req)
 	if err != nil {
 		return err
 	}
-	num := len(resp.Data)
+	items := resp.Data
+	if !ranged && len(items) > 0 {
+		items = items[len(items)-1:]
+	}
 	if asJSON, _ := cmd.Flags().GetBool("json"); asJSON {
-		if num > 0 {
-			return printDailyJSON(cmd, resp.Data[num-1:])
-		}
-		return printDailyJSON(cmd, nil)
+		return printDailyJSON(cmd, resp.Instrument, items)
 	}
-	if num == 0 {
+	if len(items) == 0 {
 		slog.Warn("no data")
-	} else {
-		printAu999History(cmd.OutOrStdout(), resp.Data[num-1:])
+		return nil
 	}
-
+	printDailyHistory(cmd.OutOrStdout(), resp.Instrument, items)
 	return nil
 }

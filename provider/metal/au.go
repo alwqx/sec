@@ -4,18 +4,56 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
+	"fmt"
 	"log/slog"
-	"net/http"
+	"net/url"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/alwqx/sec/utils"
 )
 
-var (
-	sgeAu999DailyQuoteUrl = "https://www.sge.com.cn/graph/Dailyhq?instid=Au99.99"
-)
+const sgeDailyQuoteURL = "https://www.sge.com.cn/graph/Dailyhq"
+
+// Instrument 是上海黄金交易所的一个交易品种。白银按千克报价，黄金和铂金按克报价。
+type Instrument struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Unit string `json:"unit"`
+	// Alias 是不带点的简写。
+	Alias string `json:"alias"`
+}
+
+// Instruments 是可以查询日行情的品种，第一个是默认品种。日行情从 2016 年 12 月起。
+// 上海黄金交易所还有 Au(T+D)、Ag(T+D)、Pt99.95 等品种，接口相同，需要时加在这里即可。
+var Instruments = []Instrument{
+	{"Au99.99", "黄金现货", "元/克", "au999"},
+	{"Ag99.99", "白银现货", "元/千克", "ag999"},
+}
+
+// FindInstrument 按代码查找品种，不区分大小写；也接受不带点的写法，比如 ag999。
+func FindInstrument(id string) (Instrument, error) {
+	key := strings.ToLower(strings.TrimSpace(id))
+	if key == "" {
+		return Instruments[0], nil
+	}
+	for _, inst := range Instruments {
+		if key == strings.ToLower(inst.ID) || key == inst.Alias {
+			return inst, nil
+		}
+	}
+	return Instrument{}, fmt.Errorf("不支持的品种 %s，可选：%s", id, InstrumentList())
+}
+
+// InstrumentList 列出全部品种和别名，用于报错和命令行帮助。
+func InstrumentList() string {
+	names := make([]string, 0, len(Instruments))
+	for _, inst := range Instruments {
+		names = append(names, inst.ID+"（"+inst.Alias+"）")
+	}
+	return strings.Join(names, "、")
+}
 
 // DailyHQItem 日行情
 type DailyHQItem struct {
@@ -42,33 +80,23 @@ type innerDailyHQResp struct {
 	Time [][]interface{} `json:"time"`
 }
 
-// getAllDailyQuote 获取 https://www.sge.com.cn/sjzx/mrhq 中的全部日行情数据
-func getAllDailyQuote(ctx context.Context) (*dailyHQResp, error) {
-	resp, err := utils.MakeRequest(ctx, http.MethodGet, sgeAu999DailyQuoteUrl, nil, nil, 0)
+// getAllDailyQuote 获取 https://www.sge.com.cn/sjzx/mrhq 中一个品种的全部日行情数据
+func getAllDailyQuote(ctx context.Context, instID string, fresh bool) (*dailyHQResp, error) {
+	link := sgeDailyQuoteURL + "?instid=" + url.QueryEscape(instID)
+	var items []*DailyHQItem
+	_, err := fetch(ctx, link, fresh, func(body []byte) error {
+		var tmp *innerDailyHQResp
+		if err := json.Unmarshal(body, &tmp); err != nil {
+			return err
+		}
+		var err error
+		items, err = parseDailyHQ(tmp)
+		return err
+	})
 	if err != nil {
-		slog.ErrorContext(ctx, "failed request", "url", sgeAu999DailyQuoteUrl)
+		slog.ErrorContext(ctx, "failed request", "url", link, "error", err)
 		return nil, err
 	}
-
-	defer resp.Body.Close()
-	if err := utils.CheckStatus(resp); err != nil {
-		return nil, err
-	}
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	var tmp *innerDailyHQResp
-	err = json.Unmarshal(body, &tmp)
-	if err != nil {
-		return nil, err
-	}
-
-	items, err := parseDailyHQ(tmp)
-	if err != nil {
-		return nil, err
-	}
-
 	return &dailyHQResp{Time: items}, nil
 }
 
@@ -153,18 +181,21 @@ func parseDailyHQ(resp *innerDailyHQResp) ([]*DailyHQItem, error) {
 	return res, nil
 }
 
-// QueryAu999Req 请求结构体
-type QueryAu999Req struct {
+// QueryReq 请求结构体，Inst 为空时查询 Au99.99。Fresh 为 true 时不用缓存。
+type QueryReq struct {
+	Inst       string
 	Start, End string
+	Fresh      bool
 }
 
-// QueryAu999Resp 返回数据结构体
-type QueryAu999Resp struct {
-	Data []*DailyHQItem
+// QueryResp 返回数据结构体
+type QueryResp struct {
+	Instrument Instrument
+	Data       []*DailyHQItem
 }
 
-// QueryAu999 根据时间范围查询数据
-func QueryAu999(ctx context.Context, req *QueryAu999Req) (*QueryAu999Resp, error) {
+// Query 根据时间范围查询一个品种的日行情。昨收在区间筛选前计算，区间第一天也有涨跌。
+func Query(ctx context.Context, req *QueryReq) (*QueryResp, error) {
 	if req == nil {
 		return nil, errors.New("req is new")
 	}
@@ -173,6 +204,10 @@ func QueryAu999(ctx context.Context, req *QueryAu999Req) (*QueryAu999Resp, error
 		start, end time.Time
 		err        error
 	)
+	inst, err := FindInstrument(req.Inst)
+	if err != nil {
+		return nil, err
+	}
 	start, err = time.Parse(utils.LayoutYYMMDD, req.Start)
 	if err != nil {
 		return nil, err
@@ -182,7 +217,7 @@ func QueryAu999(ctx context.Context, req *QueryAu999Req) (*QueryAu999Resp, error
 		return nil, err
 	}
 
-	res, err := getAllDailyQuote(ctx)
+	res, err := getAllDailyQuote(ctx, inst.ID, req.Fresh)
 	if err != nil {
 		return nil, err
 	}
@@ -195,8 +230,9 @@ func QueryAu999(ctx context.Context, req *QueryAu999Req) (*QueryAu999Resp, error
 		data = append(data, item)
 	}
 
-	resp := &QueryAu999Resp{
-		Data: data,
+	resp := &QueryResp{
+		Instrument: inst,
+		Data:       data,
 	}
 
 	return resp, nil
