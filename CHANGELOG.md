@@ -2,7 +2,8 @@
 
 ### v0.4.4
 
-1. Add dividend yield to `sec valuation` (`--method dividend`, the overview and `--json`) and the Desktop valuation tab: the yield on the latest complete fiscal year adjusted for stock dividends and splits, the 5-year average, its historical range and percentile, consecutive years and payout by fiscal year. Plans not yet paid are listed separately. The yield percentile now counts in the rule summary, so assessments can change. If dividend data is unavailable or there are no dividend records at all, the rest of the valuation still works and `dividends_note` and the rule summary say so
+1. Add dividend yield to `sec valuation` (`--method dividend`, the overview and `--json`) and the Desktop valuation tab: the yield on the latest complete fiscal year adjusted for stock dividends and splits, the 5-year average, its historical range and percentile, consecutive years and payout by fiscal year. Plans not yet paid are listed separately. The yield percentile now counts in the rule summary, so assessments can change. If dividend data is unavailable or there are no dividend records at all, the rest of the valuation still works and `dividends_note` and the rule summary say so. Dividends from the last 5 years are checked against Sina, which also tells non-payers apart from missing data, and records missing from East Money or with different amounts are listed
+2. Run `govulncheck` in CI, and skip `TestQuoteWs`, a live websocket test that occasionally failed CI
 
 ### v0.4.3
 

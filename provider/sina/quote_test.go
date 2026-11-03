@@ -10,6 +10,7 @@ import (
 )
 
 func TestQuoteWs(t *testing.T) {
+	t.Skip("仅用于开发调试")
 	ctx := context.TODO()
 	keys := []string{"sh600036", "sh688047"}
 	res, err := QuoteWs(ctx, keys)

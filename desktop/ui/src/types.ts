@@ -234,6 +234,7 @@ export interface ValuationDividends {
   yield: number | null; per_share: number; fiscal_year: string; average_5y: number | null; consecutive_years: number; history: ValuationHistory | null
   years: { year: string; per_share: number; eps: number | null; payout: number | null }[]
   pending: { report: string; progress: string; plan: string; per_share: number | null; ex_date: string }[]
+  mismatches: { ex_date: string; sina: number; east_money: number | null }[]; mismatch_checked: boolean
 }
 export interface ValuationResult {
   code: string; name: string; industry: string; trade_date: string; price: number; market_cap: number; shares: number

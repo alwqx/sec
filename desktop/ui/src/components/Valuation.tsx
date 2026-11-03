@@ -138,7 +138,7 @@ function Peers({ peers, note }: { peers: ValuationPeers | null; note: string }) 
 
 function Dividends({ dividends, note }: { dividends: ValuationDividends | null; note: string }) {
   if (!dividends) return <section aria-label="分红"><div className="section-caption"><h3>分红</h3></div><div className="empty-state">{note}</div></section>
-  const { history, years, pending } = dividends
+  const { history, years, pending, mismatches } = dividends
   return <section aria-label="分红"><div className="section-caption"><h3>分红</h3></div>
     <dl className="quote-grid metrics-grid">
       <div><dt>股息率{dividends.fiscal_year && `（${dividends.fiscal_year} 财年）`}</dt><dd>{percent(dividends.yield, 2)}</dd></div>
@@ -151,8 +151,10 @@ function Dividends({ dividends, note }: { dividends: ValuationDividends | null; 
     </dl>
     {years.length > 0 ? <div className="table-scroll valuation-annuals"><table className="data-table"><thead><tr><th>财年</th><th>每股现金分红</th><th>基本每股收益</th><th>分红率</th></tr></thead>
       <tbody>{years.map(row => <tr key={row.year}><td>{row.year}</td><td>{row.per_share.toFixed(3)}</td><td>{fixed(row.eps)}</td><td>{percent(row.payout)}</td></tr>)}</tbody></table></div> : <div className="empty-state">有分红记录，但没有实施过现金分红。</div>}
+    {!dividends.mismatch_checked && <p className="data-note">未能和新浪核对，东方财富可能缺少特别分红，股息率可能偏低。</p>}
+    {mismatches.length > 0 && <p className="error" role="note">近 5 年有 {mismatches.length} 次分红和新浪记录不一致，股息率按东方财富计算，可能有偏差：{mismatches.map(item => `${item.ex_date} 新浪 ${item.sina.toFixed(4)}，东方财富 ${item.east_money === null ? '缺少' : item.east_money.toFixed(4)}`).join('；')}</p>}
     {pending.length > 0 && <p className="data-note">未除息，不计入股息率：{pending.map(item => `${item.report} ${item.progress} ${item.plan}`).join('；')}</p>}
-    <p className="data-note">股息率是最近完整财年（年度分红已除息）的税前每股现金分红，按当前股本调整送转后除以收盘价，不含送转、配股和回购。最近一次分红超过 18 个月时按 0 计算。历史分位只比较有分红的交易日。上游可能缺少特别分红，这时股息率偏低，完整记录见“分红”栏目。分红可能不持续。财年表按报告期归属，金额和每股收益都是当时的股本口径；没有年度分红或财年内发生送转时不计算分红率。</p>
+    <p className="data-note">股息率是最近完整财年（年度分红已除息）的税前每股现金分红，按当前股本调整送转后除以收盘价，不含送转、配股和回购。最近一次分红超过 18 个月时按 0 计算。历史分位只比较有分红的交易日。东方财富可能缺少特别分红，近 5 年的记录会尽量和新浪核对，不一致或没能核对时在上方说明。分红可能不持续。财年表按报告期归属，金额和每股收益都是当时的股本口径；没有年度分红或财年内发生送转时不计算分红率。</p>
   </section>
 }
 

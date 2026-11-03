@@ -2,11 +2,14 @@ package valuation
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/alwqx/sec/provider/eastmoney"
+	"github.com/alwqx/sec/provider/sina"
 )
 
 // 最近一次现金分红超过这么多个月时，认为公司已经停止分红，股息率为 0。
@@ -32,14 +35,67 @@ type PendingDividend struct {
 
 // Dividends 是分红和股息率。股息率是最近完整财年的税前每股现金分红除以收盘价，不含送转、配股和回购。分红记录为空时整体不可用。
 type Dividends struct {
-	Yield            *float64          `json:"yield"`             // 单位 %；已停止分红或有记录但没有现金分红时为 0，没有收盘价时为 nil
-	PerShare         float64           `json:"per_share"`         // 最近完整财年的每股现金分红，按当前股本
-	FiscalYear       string            `json:"fiscal_year"`       // 最近完整财年，股息率为 0 时为空字符串
-	Average5Y        *float64          `json:"average_5y"`        // 近 5 个完整财年平均分红对应的股息率，单位 %；数据不足时为 nil
-	ConsecutiveYears int               `json:"consecutive_years"` // 连续现金分红的财年数
-	History          *History          `json:"history"`           // 有分红的交易日的股息率分布，没有时为 nil
-	Years            []DividendYear    `json:"years"`             // 按财年降序
-	Pending          []PendingDividend `json:"pending"`
+	Yield            *float64           `json:"yield"`             // 单位 %；已停止分红或有记录但没有现金分红时为 0，没有收盘价时为 nil
+	PerShare         float64            `json:"per_share"`         // 最近完整财年的每股现金分红，按当前股本
+	FiscalYear       string             `json:"fiscal_year"`       // 最近完整财年，股息率为 0 时为空字符串
+	Average5Y        *float64           `json:"average_5y"`        // 近 5 个完整财年平均分红对应的股息率，单位 %；数据不足时为 nil
+	ConsecutiveYears int                `json:"consecutive_years"` // 连续现金分红的财年数
+	History          *History           `json:"history"`           // 有分红的交易日的股息率分布，没有时为 nil
+	Years            []DividendYear     `json:"years"`             // 按财年降序
+	Pending          []PendingDividend  `json:"pending"`
+	Mismatches       []DividendMismatch `json:"mismatches"`       // 近 5 年和新浪记录不一致的分红，不影响计算
+	MismatchChecked  bool               `json:"mismatch_checked"` // 是否和新浪核对过；没有核对时 Mismatches 为空，不说明没有差异
+}
+
+// DividendMismatch 是新浪有、东方财富缺少或金额不同的一次分红，金额是税前每股现金分红，当时的股本口径。
+type DividendMismatch struct {
+	ExDate    string   `json:"ex_date"`
+	Sina      float64  `json:"sina"`
+	EastMoney *float64 `json:"east_money"` // 东方财富没有这次分红时为 nil
+}
+
+// dividendMismatches 找出近 5 年新浪有现金分红、东方财富缺少或金额不同的除息日。
+// 东方财富每个报告期基本只有一条记录，特别分红可能缺失。
+func dividendMismatches(events []dividendEvent, check []sina.Dividend, tradeDate string) []DividendMismatch {
+	since := monthsBefore(tradeDate, 60)
+	cash := map[string]float64{}
+	for _, event := range events {
+		if event.cash > 0 {
+			cash[event.exDate] += event.cash / 10
+		}
+	}
+	// 两边都可能把同一天的常规分红和特别分红分成几行，按除息日合计后再比较。
+	sinaCash := map[string]float64{}
+	for _, item := range check {
+		if date := strings.TrimSpace(item.DividendedDate); item.Bonus > 0 && len(date) == 10 && date > since && date <= tradeDate {
+			sinaCash[date] += item.Bonus / 10
+		}
+	}
+	mismatches := []DividendMismatch{}
+	for date, sinaValue := range sinaCash {
+		value, ok := cash[date]
+		if ok && math.Abs(value-sinaValue) < 0.0005 {
+			continue
+		}
+		mismatch := DividendMismatch{ExDate: date, Sina: sinaValue}
+		if ok {
+			mismatch.EastMoney = ptr(value)
+		}
+		mismatches = append(mismatches, mismatch)
+	}
+	sort.Slice(mismatches, func(i, j int) bool { return mismatches[i].ExDate > mismatches[j].ExDate })
+	return mismatches
+}
+
+// hasRecentSinaCash 判断新浪在近 18 个月内是否有已除息的现金分红，和股息率的停止分红口径一致。
+func hasRecentSinaCash(check []sina.Dividend, tradeDate string) bool {
+	since := monthsBefore(tradeDate, dividendStaleMonths)
+	for _, item := range check {
+		if date := strings.TrimSpace(item.DividendedDate); item.Bonus > 0 && len(date) == 10 && date > since && date <= tradeDate {
+			return true
+		}
+	}
+	return false
 }
 
 // dividendEvent 是一次已确定除息日的分红。每 10 股的金额和送转比例都是当时的股本口径。
@@ -224,15 +280,26 @@ func average5Y(events []dividendEvent, fiscalYear, asOf string) float64 {
 	return total / 5
 }
 
-// applyDividends 写入分红数据，并把股息率的历史位置计入规则汇总。plans 是所有分红记录。
-// 一条记录都没有时，无法区分公司没有分红和上游缺数据（上游不一定记录不分配的年度），不能当成 0。
-func applyDividends(r *Result, points []*eastmoney.ValuationPoint, plans []*eastmoney.DividendPlan) {
+// applyDividends 写入分红数据，并把股息率的历史位置计入规则汇总。plans 是东方财富的所有分红记录，
+// check 是新浪的分红记录，只用来核对；checked 为 false 表示没有拿到新浪记录，这时 check 不可信。
+// 东方财富一条记录都没有时，不一定说明公司没有分红（它不一定记录不分配的年度），要靠新浪区分。
+func applyDividends(r *Result, points []*eastmoney.ValuationPoint, plans []*eastmoney.DividendPlan, check []sina.Dividend, checked bool) {
 	if len(plans) == 0 {
-		r.DividendsNote = "没有分红记录，规则汇总未计入股息率"
-		return
+		switch {
+		case !checked:
+			r.DividendsNote = "没有分红记录，规则汇总未计入股息率"
+			return
+		case hasRecentSinaCash(check, r.TradeDate):
+			r.DividendsNote = "东方财富缺少分红数据，规则汇总未计入股息率"
+			return
+		}
+		// 新浪有记录，近 18 个月也没有现金分红，股息率是真实的 0。
+	}
+	if !checked {
+		check = nil
 	}
 	events := dividendEvents(plans)
-	d := &Dividends{Years: buildDividendYears(plans, r.TradeDate), Pending: []PendingDividend{}}
+	d := &Dividends{Years: buildDividendYears(plans, r.TradeDate), Pending: []PendingDividend{}, Mismatches: dividendMismatches(events, check, r.TradeDate), MismatchChecked: checked}
 	d.PerShare, d.FiscalYear = fiscalPerShare(events, r.TradeDate)
 	for _, plan := range plans {
 		if plan.Implemented() && plan.ExDate != "" && plan.ExDate <= r.TradeDate || plan.CashPerTen <= 0 || !plan.Current(r.TradeDate) {
