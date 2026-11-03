@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/alwqx/sec/utils"
 )
@@ -17,6 +18,7 @@ import (
 const (
 	reportValuation   = "RPT_VALUEANALYSIS_DET" // 个股每日估值
 	reportPerformance = "RPT_LICO_FN_CPD"       // 业绩报表
+	reportDividend    = "RPT_SHAREBONUS_DET"    // 分红送转
 	// 数据中心查询为空时不返回空列表，而是返回这个错误码。
 	datacenterEmptyCode = 9201
 	// 最大的行业约 280 家，一页取完。
@@ -95,6 +97,54 @@ func GetValuationHistory(ctx context.Context, exCode string) ([]*ValuationPoint,
 		points = append(points, point)
 	}
 	return points, nil
+}
+
+// DividendPlan 是一条分红送转记录，包括还没有实施的预案。
+type DividendPlan struct {
+	ReportDate  string   // 报告期 YYYY-MM-DD
+	ExDate      string   // 除权除息日，未确定时为空字符串
+	Progress    string   // 进度，如 实施分配、董事会决议通过、股东大会决议通过
+	Profile     string   // 方案说明
+	CashPerTen  float64  // 每 10 股税前现金分红
+	StockPerTen float64  // 每 10 股送转股数
+	EPS         *float64 // 该报告期的基本每股收益，当时的口径
+}
+
+// Implemented 判断方案是否已经进入实施。
+func (p *DividendPlan) Implemented() bool {
+	return p.Progress == "实施分配"
+}
+
+// Current 判断方案是否还在有效期：报告期不早于交易日前 24 个月。更早的预案通常已经被放弃。
+func (p *DividendPlan) Current(tradeDate string) bool {
+	trade, err := time.Parse("2006-01-02", tradeDate)
+	return err == nil && p.ReportDate != "" && p.ReportDate >= trade.AddDate(0, -24, 0).Format("2006-01-02")
+}
+
+// GetDividendPlans 返回分红送转记录。上游没有数据时返回空列表。
+func GetDividendPlans(ctx context.Context, exCode string) ([]*DividendPlan, error) {
+	filter, err := secuFilter(exCode)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := datacenterRows(ctx, reportDividend, "REPORT_DATE,EX_DIVIDEND_DATE,ASSIGN_PROGRESS,IMPL_PLAN_PROFILE,PRETAX_BONUS_RMB,BONUS_IT_RATIO,BASIC_EPS", filter, "REPORT_DATE", 500)
+	if err != nil {
+		return nil, err
+	}
+	plans := make([]*DividendPlan, 0, len(rows))
+	for _, row := range rows {
+		plan := &DividendPlan{ReportDate: rowDate(row, "REPORT_DATE"), ExDate: rowDate(row, "EX_DIVIDEND_DATE"), EPS: rowNumber(row, "BASIC_EPS")}
+		plan.Progress, _ = row["ASSIGN_PROGRESS"].(string)
+		plan.Profile, _ = row["IMPL_PLAN_PROFILE"].(string)
+		if value := rowNumber(row, "PRETAX_BONUS_RMB"); value != nil {
+			plan.CashPerTen = *value
+		}
+		if value := rowNumber(row, "BONUS_IT_RATIO"); value != nil {
+			plan.StockPerTen = *value
+		}
+		plans = append(plans, plan)
+	}
+	return plans, nil
 }
 
 // PeerValuation 是一家公司某个交易日的估值，用于同行业比较。倍数的含义同 ValuationPoint。

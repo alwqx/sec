@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type PointerEvent } from 'react'
 import { valuation } from '../api'
 import { useResource } from '../hooks/useResource'
-import type { ValuationHistory, ValuationMultiple, ValuationPeers, ValuationResult } from '../types'
+import type { ValuationDividends, ValuationHistory, ValuationMultiple, ValuationPeers, ValuationResult } from '../types'
 import { money } from '../format'
 import ResourceState from './ResourceState'
 
@@ -136,6 +136,26 @@ function Peers({ peers, note }: { peers: ValuationPeers | null; note: string }) 
   </section>
 }
 
+function Dividends({ dividends, note }: { dividends: ValuationDividends | null; note: string }) {
+  if (!dividends) return <section aria-label="分红"><div className="section-caption"><h3>分红</h3></div><div className="empty-state">{note}</div></section>
+  const { history, years, pending } = dividends
+  return <section aria-label="分红"><div className="section-caption"><h3>分红</h3></div>
+    <dl className="quote-grid metrics-grid">
+      <div><dt>股息率{dividends.fiscal_year && `（${dividends.fiscal_year} 财年）`}</dt><dd>{percent(dividends.yield, 2)}</dd></div>
+      <div><dt>每股分红</dt><dd>{dividends.per_share.toFixed(3)}</dd></div>
+      <div><dt>近 5 个财年平均股息率</dt><dd>{percent(dividends.average_5y, 2)}</dd></div>
+      <div><dt>历史中位</dt><dd>{percent(history?.median, 2)}</dd></div>
+      <div><dt>历史范围</dt><dd>{history ? `${history.min.toFixed(2)}% ~ ${history.max.toFixed(2)}%` : '—'}</dd></div>
+      <div><dt>历史分位</dt><dd>{history?.short ? '样本不足' : percent(history?.percentile, 0)}</dd></div>
+      <div><dt>连续分红</dt><dd>{dividends.consecutive_years} 个财年</dd></div>
+    </dl>
+    {years.length > 0 ? <div className="table-scroll valuation-annuals"><table className="data-table"><thead><tr><th>财年</th><th>每股现金分红</th><th>基本每股收益</th><th>分红率</th></tr></thead>
+      <tbody>{years.map(row => <tr key={row.year}><td>{row.year}</td><td>{row.per_share.toFixed(3)}</td><td>{fixed(row.eps)}</td><td>{percent(row.payout)}</td></tr>)}</tbody></table></div> : <div className="empty-state">有分红记录，但没有实施过现金分红。</div>}
+    {pending.length > 0 && <p className="data-note">未除息，不计入股息率：{pending.map(item => `${item.report} ${item.progress} ${item.plan}`).join('；')}</p>}
+    <p className="data-note">股息率是最近完整财年（年度分红已除息）的税前每股现金分红，按当前股本调整送转后除以收盘价，不含送转、配股和回购。最近一次分红超过 18 个月时按 0 计算。历史分位只比较有分红的交易日。上游可能缺少特别分红，这时股息率偏低，完整记录见“分红”栏目。分红可能不持续。财年表按报告期归属，金额和每股收益都是当时的股本口径；没有年度分红或财年内发生送转时不计算分红率。</p>
+  </section>
+}
+
 function DCFResult({ data, loading, error, retry }: { data: ValuationResult; loading: boolean; error: string; retry: () => void }) {
   const dcf = data.dcf
   if (loading || error) return <ResourceState loading={loading} error={error} retry={retry} />
@@ -170,10 +190,11 @@ export default function Valuation({ code }: { code: string }) {
       <Summary data={data} />
       <Multiples data={data} />
       <Peers peers={data.peers} note={data.peers_note} />
+      <Dividends dividends={data.dividends} note={data.dividends_note} />
       <section aria-label="规则汇总"><div className="section-caption"><h3>规则汇总：{data.assessment}</h3></div>
         {data.signals.length > 0 && <div className="table-scroll"><table className="data-table"><thead><tr><th>指标</th><th>判断</th><th>依据</th></tr></thead>
           <tbody>{data.signals.map(row => <tr key={row.name}><td>{row.name}</td><td>{levels[row.level]}</td><td>{row.rule}</td></tr>)}</tbody></table></div>}
-        <p className="data-note">按上述规则的偏低、偏高个数比较得出，少于两条规则时显示数据不足；同行业参与比较的公司少于 10 家时不计入行业规则。这只是机械汇总，未考虑公司基本面。{data.peers_note && ` ${data.peers_note}。`}</p></section>
+        <p className="data-note">按上述规则的偏低、偏高个数比较得出，少于两条规则时显示数据不足；同行业参与比较的公司少于 10 家时不计入行业规则。这只是机械汇总，未考虑公司基本面。{data.peers_note && ` ${data.peers_note}。`}{data.dividends_note && ` ${data.dividends_note}。`}</p></section>
       <section aria-label="DCF"><div className="section-caption"><h3>DCF 折现</h3></div>
         <form className="section-toolbar strategy-form" onSubmit={submit}>
           {dcfFields.map(([name, label, placeholder]) => <label key={name}>{label}<input aria-label={label} inputMode="decimal" placeholder={placeholder} value={draft[name]} onChange={event => setDraft({ ...draft, [name]: event.target.value })} /></label>)}

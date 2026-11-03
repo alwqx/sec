@@ -139,46 +139,50 @@ type DCF struct {
 
 // Result 是一只证券的完整估值。无法计算的指标为 nil，不用 0 表示。
 type Result struct {
-	Code         string   `json:"code"`
-	Name         string   `json:"name"`
-	Industry     string   `json:"industry"`
-	TradeDate    string   `json:"trade_date"`
-	Price        float64  `json:"price"`
-	MarketCap    float64  `json:"market_cap"`
-	Shares       float64  `json:"shares"`
-	PE           Multiple `json:"pe"`
-	PB           Multiple `json:"pb"`
-	PS           Multiple `json:"ps"`
-	Dates        []string `json:"dates"`
-	EPS          *float64 `json:"eps"`
-	BVPS         *float64 `json:"bvps"`
-	ProfitTTM    *float64 `json:"profit_ttm"`
-	RevenueTTM   *float64 `json:"revenue_ttm"`
-	ROE          *float64 `json:"roe"`
-	ROEYear      string   `json:"roe_year"`
-	Growth       Growth   `json:"growth"`
-	PEG          *float64 `json:"peg"`
-	Graham       *float64 `json:"graham"`
-	GrahamMargin *float64 `json:"graham_margin"` // 格雷厄姆数相对当前价，单位 %
-	Annuals      []Annual `json:"annuals"`
-	Peers        *Peers   `json:"peers"`      // 不可用时为 nil，原因见 PeersNote
-	PeersNote    string   `json:"peers_note"` // 同行业数据不可用时说明原因
-	DCF          DCF      `json:"dcf"`
-	Signals      []Signal `json:"signals"`
-	Assessment   string   `json:"assessment"`
-	Disclaimer   string   `json:"disclaimer"`
+	Code          string     `json:"code"`
+	Name          string     `json:"name"`
+	Industry      string     `json:"industry"`
+	TradeDate     string     `json:"trade_date"`
+	Price         float64    `json:"price"`
+	MarketCap     float64    `json:"market_cap"`
+	Shares        float64    `json:"shares"`
+	PE            Multiple   `json:"pe"`
+	PB            Multiple   `json:"pb"`
+	PS            Multiple   `json:"ps"`
+	Dates         []string   `json:"dates"`
+	EPS           *float64   `json:"eps"`
+	BVPS          *float64   `json:"bvps"`
+	ProfitTTM     *float64   `json:"profit_ttm"`
+	RevenueTTM    *float64   `json:"revenue_ttm"`
+	ROE           *float64   `json:"roe"`
+	ROEYear       string     `json:"roe_year"`
+	Growth        Growth     `json:"growth"`
+	PEG           *float64   `json:"peg"`
+	Graham        *float64   `json:"graham"`
+	GrahamMargin  *float64   `json:"graham_margin"` // 格雷厄姆数相对当前价，单位 %
+	Annuals       []Annual   `json:"annuals"`
+	Peers         *Peers     `json:"peers"`          // 不可用时为 nil，原因见 PeersNote
+	PeersNote     string     `json:"peers_note"`     // 同行业数据不可用时说明原因
+	Dividends     *Dividends `json:"dividends"`      // 不可用时为 nil，原因见 DividendsNote
+	DividendsNote string     `json:"dividends_note"` // 分红数据不可用时说明原因
+	DCF           DCF        `json:"dcf"`
+	Signals       []Signal   `json:"signals"`
+	Assessment    string     `json:"assessment"`
+	Disclaimer    string     `json:"disclaimer"`
 }
 
-// Analyze 查询数据并计算估值，params 应已通过 Validate。估值或业绩报表失败时返回错误，不输出部分结果；同行业数据失败时只写入 PeersNote。
+// Analyze 查询数据并计算估值，params 应已通过 Validate。估值或业绩报表失败时返回错误，不输出部分结果；分红或同行业数据失败时只写入对应的说明。
 func Analyze(ctx context.Context, exCode string, params DCFParams) (*Result, error) {
 	var (
 		points  []*eastmoney.ValuationPoint
 		reports []*eastmoney.PerformanceReport
+		plans   []*eastmoney.DividendPlan
 		err1    error
 		err2    error
+		err3    error
 		wg      sync.WaitGroup
 	)
-	wg.Add(2)
+	wg.Add(3)
 	go func() {
 		defer wg.Done()
 		points, err1 = eastmoney.GetValuationHistory(ctx, exCode)
@@ -186,6 +190,10 @@ func Analyze(ctx context.Context, exCode string, params DCFParams) (*Result, err
 	go func() {
 		defer wg.Done()
 		reports, err2 = eastmoney.GetPerformanceReports(ctx, exCode)
+	}()
+	go func() {
+		defer wg.Done()
+		plans, err3 = eastmoney.GetDividendPlans(ctx, exCode)
 	}()
 	wg.Wait()
 	if errors.Is(err1, eastmoney.ErrUnsupportedCode) {
@@ -202,7 +210,13 @@ func Analyze(ctx context.Context, exCode string, params DCFParams) (*Result, err
 	}
 	result := Compute(points, reports, params)
 	result.Code = strings.ToUpper(exCode)
-	// 同行业对比是附加信息，失败时不影响其他结果，但要说明规则汇总少了行业规则。
+	// 分红和同行业对比是附加信息，失败时不影响其他结果，但要说明规则汇总少了对应的规则。
+	if err3 != nil {
+		slog.WarnContext(ctx, "获取分红数据失败", "code", exCode, "error", err3)
+		result.DividendsNote = "分红数据获取失败，规则汇总未计入股息率"
+	} else {
+		applyDividends(result, points, plans)
+	}
 	var rows []*eastmoney.PeerValuation
 	if latest := points[len(points)-1]; latest.BoardCode != "" {
 		var err error
@@ -270,6 +284,22 @@ func Compute(points []*eastmoney.ValuationPoint, reports []*eastmoney.Performanc
 
 func ptr(value float64) *float64 { return &value }
 
+// buildHistory 计算非空样本的分布，会把 values 排成升序。样本不足或当前值不可用时不计算分位。
+func buildHistory(values []float64, since string, current *float64) *History {
+	sort.Float64s(values)
+	n := len(values)
+	history := &History{Since: since, Samples: n, Min: values[0], Median: medianSorted(values), Max: values[n-1]}
+	if n < minPercentileSamples {
+		history.Short = true
+		return history
+	}
+	if current != nil {
+		notAbove := sort.Search(n, func(i int) bool { return values[i] > *current })
+		history.Percentile = ptr(float64(notAbove) / float64(n) * 100)
+	}
+	return history
+}
+
 func buildMultiple(points []*eastmoney.ValuationPoint, price float64, field func(*eastmoney.ValuationPoint) *float64) Multiple {
 	m := Multiple{Series: make([]*float64, len(points)), Scenarios: []Scenario{}}
 	valid := []float64{}
@@ -290,19 +320,11 @@ func buildMultiple(points []*eastmoney.ValuationPoint, price float64, field func
 	if len(valid) == 0 {
 		return m
 	}
-	sort.Float64s(valid)
-	n := len(valid)
-	median := medianSorted(valid)
-	m.History = &History{Since: since, Samples: n, Min: valid[0], Median: median, Max: valid[n-1]}
-	if n < minPercentileSamples {
-		m.History.Short = true
+	m.History = buildHistory(valid, since, m.Current)
+	if m.History.Short || m.Current == nil {
 		return m
 	}
-	if m.Current == nil {
-		return m
-	}
-	notAbove := sort.Search(n, func(i int) bool { return valid[i] > *m.Current })
-	m.History.Percentile = ptr(float64(notAbove) / float64(n) * 100)
+	median, n := m.History.Median, len(valid)
 	for _, item := range []struct {
 		label string
 		value float64
