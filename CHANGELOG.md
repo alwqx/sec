@@ -1,5 +1,9 @@
 ## sec change log
 
+### v0.4.4
+
+1. Add dividend yield to `sec valuation` (`--method dividend`, the overview and `--json`) and the Desktop valuation tab: the yield on the latest complete fiscal year adjusted for stock dividends and splits, the 5-year average, its historical range and percentile, consecutive years and payout by fiscal year. Plans not yet paid are listed separately. The yield percentile now counts in the rule summary, so assessments can change. If dividend data is unavailable or there are no dividend records at all, the rest of the valuation still works and `dividends_note` and the rule summary say so
+
 ### v0.4.3
 
 1. Report search failures instead of treating them as no results: `sina.Search` and `MultiSearch` now return errors, CLI commands fail with a non-zero exit code, and Desktop search shows an error. Unrecognized responses and failures mixed with no matches also count as failures, and `sec watch add` continues with the remaining keywords before reporting them

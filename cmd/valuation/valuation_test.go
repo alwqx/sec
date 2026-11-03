@@ -96,3 +96,23 @@ func TestRenderPeersNote(t *testing.T) {
 		require.Contains(t, out.String(), r.PeersNote, method)
 	}
 }
+
+func TestRenderDividend(t *testing.T) {
+	r := sampleResult(10)
+	var out bytes.Buffer
+	r.DividendsNote = "分红数据获取失败，规则汇总未计入股息率"
+	render(&out, "dividend", r)
+	require.Contains(t, out.String(), r.DividendsNote)
+
+	r = sampleResult(10)
+	r.DividendsNote = ""
+	r.Dividends = &shared.Dividends{Yield: num(4.5), PerShare: 2, FiscalYear: "2025", ConsecutiveYears: 3, Years: []shared.DividendYear{{Year: "2025", PerShare: 2, EPS: num(5), Payout: num(40)}}, Pending: []shared.PendingDividend{{Report: "2026-06-30", Progress: "董事会决议通过", Plan: "10派5元"}}}
+	out.Reset()
+	render(&out, "dividend", r)
+	for _, text := range []string{"4.50%", "3 个财年", "40.0%", "10派5元"} {
+		require.Contains(t, out.String(), text)
+	}
+	out.Reset()
+	render(&out, "overview", r)
+	require.Contains(t, out.String(), "股息率")
+}

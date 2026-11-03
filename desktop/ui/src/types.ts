@@ -230,11 +230,16 @@ export interface ValuationPeerMetric {
 }
 export interface ValuationPeer { code: string; name: string; self: boolean; market_cap: number | null; pe: number | null; pb: number | null; ps: number | null }
 export interface ValuationPeers { board: string; date: string; pe: ValuationPeerMetric; pb: ValuationPeerMetric; ps: ValuationPeerMetric; items: ValuationPeer[] }
+export interface ValuationDividends {
+  yield: number | null; per_share: number; fiscal_year: string; average_5y: number | null; consecutive_years: number; history: ValuationHistory | null
+  years: { year: string; per_share: number; eps: number | null; payout: number | null }[]
+  pending: { report: string; progress: string; plan: string; per_share: number | null; ex_date: string }[]
+}
 export interface ValuationResult {
   code: string; name: string; industry: string; trade_date: string; price: number; market_cap: number; shares: number
   pe: ValuationMultiple; pb: ValuationMultiple; ps: ValuationMultiple; dates: string[]
   eps: number | null; bvps: number | null; profit_ttm: number | null; revenue_ttm: number | null; roe: number | null; roe_year: string
   growth: { rate: number | null; from_year: string; to_year: string; note: string }
   peg: number | null; graham: number | null; graham_margin: number | null
-  annuals: ValuationAnnual[]; peers: ValuationPeers | null; peers_note: string; dcf: ValuationDCF; signals: { name: string; level: 'low' | 'neutral' | 'high'; rule: string }[]; assessment: string; disclaimer: string
+  annuals: ValuationAnnual[]; peers: ValuationPeers | null; peers_note: string; dividends: ValuationDividends | null; dividends_note: string; dcf: ValuationDCF; signals: { name: string; level: 'low' | 'neutral' | 'high'; rule: string }[]; assessment: string; disclaimer: string
 }

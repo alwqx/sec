@@ -11,7 +11,7 @@
 - 输出到 stdout，字段名是 snake_case，列表放在 `results` 里，没有结果时是空数组。
 - 上游缺失或不适用的值是 `null`，不是 0。
 - 失败时 stdout 为空，错误写到 stderr，退出码非 0。找不到证券也算失败。
-- 不输出部分结果：`sec quote --json` 有任何一只证券查不到、超过 5 只，或 `sec financials --json` 不带 `--type` 时任何一类报表失败，都按失败处理。例外：`sec valuation --json` 的同行业数据是附加信息，获取失败时仍退出 0，`peers` 为 `null`，原因在 `peers_note`。
+- 不输出部分结果：`sec quote --json` 有任何一只证券查不到、超过 5 只，或 `sec financials --json` 不带 `--type` 时任何一类报表失败，都按失败处理。例外：`sec valuation --json` 的同行业和分红数据是附加信息，获取失败时仍退出 0，`peers` 或 `dividends` 为 `null`，原因在 `peers_note` 或 `dividends_note`。
 - 日期都是 `YYYY-MM-DD`。
 - 涨跌幅、换手率、振幅的单位都是 %；K 线的 `volume` 单位是股或份，`amount` 是成交额。
 - 备用数据的提示写到 stderr，并放在 `source_note`，不影响解析。
@@ -48,7 +48,7 @@ sec quote-history 600036 --freq week --json
 | `info` | 公司资料、核心指标与分红 | 自选与行情 → 公司、分红 | 已有 |
 | `financials` | 资产负债表、利润表、现金流量表 | 自选与行情 → 财报 | 已有 |
 | `annual-report` | 年报 PDF 下载 | 自选与行情 → 财报 | 已有，Desktop 另含半年报和季报 |
-| `valuation` | 估值指标、历史分位、同行业对比与 DCF | 自选与行情 → 估值 | 已有；仅沪深北 A 股 |
+| `valuation` | 估值指标、历史分位、同行业对比、股息率与 DCF | 自选与行情 → 估值 | 已有；仅沪深北 A 股 |
 | `strategy ma / macd / rsi / boll` | 技术分析信号（计算） | 自选与行情 → 技术分析 | 已有；默认前复权，`sec strategy` 不复权 |
 
 ## 公告与 IPO

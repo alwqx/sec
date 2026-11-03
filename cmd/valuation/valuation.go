@@ -31,7 +31,7 @@ func NewValuationCLI() *cobra.Command {
 	cmd.Flags().BoolP("debug", "D", false, "Enable debug mode")
 	cmd.Flags().Bool("json", false, "Output the full valuation as JSON, regardless of --method")
 	cmd.Flags().StringP("method", "m", "overview",
-		"Valuation method: overview, pe, pb, ps, peg, graham, dcf, peers")
+		"Valuation method: overview, pe, pb, ps, peg, graham, dcf, peers, dividend")
 	// DCF parameters
 	defaults := shared.DefaultDCFParams()
 	cmd.Flags().Float64("growth-rate", 0, "DCF: growth rate %, omit to use the 5-year CAGR, limited to ±15%")
@@ -41,7 +41,7 @@ func NewValuationCLI() *cobra.Command {
 	return cmd
 }
 
-var methods = []string{"overview", "pe", "pb", "ps", "peg", "graham", "dcf", "peers"}
+var methods = []string{"overview", "pe", "pb", "ps", "peg", "graham", "dcf", "peers", "dividend"}
 
 func ValuationHandler(cmd *cobra.Command, args []string) error {
 	method, _ := cmd.Flags().GetString("method")
@@ -134,6 +134,8 @@ func render(out io.Writer, method string, r *shared.Result) {
 		printDCF(out, r)
 	case "peers":
 		printPeers(out, r)
+	case "dividend":
+		printDividend(out, r)
 	default:
 		printOverview(out, r)
 	}
@@ -146,6 +148,7 @@ func printOverview(out io.Writer, r *shared.Result) {
 		{"P/E", ff(r.PE.Current), percentile(r.PE), multipleNote(r.PE, "TTM")},
 		{"P/B", ff(r.PB.Current), percentile(r.PB), multipleNote(r.PB, "MRQ")},
 		{"P/S", ff(r.PS.Current), percentile(r.PS), multipleNote(r.PS, "TTM")},
+		overviewYield(r),
 		{"PEG", ff(r.PEG), "-", "P/E ÷ 净利润 CAGR"},
 		{"ROE", fpct(r.ROE), "-", r.ROEYear + " 年报加权"},
 		{"每股收益", ff(r.EPS), "-", "TTM，由 PE 反推"},
@@ -170,8 +173,10 @@ func printOverview(out io.Writer, r *shared.Result) {
 	}
 
 	fmt.Fprintf(out, "\n【规则汇总】→ %s\n", r.Assessment)
-	if r.PeersNote != "" {
-		fmt.Fprintf(out, "  注意: %s\n", r.PeersNote)
+	for _, note := range []string{r.PeersNote, r.DividendsNote} {
+		if note != "" {
+			fmt.Fprintf(out, "  注意: %s\n", note)
+		}
 	}
 	for _, signal := range r.Signals {
 		fmt.Fprintf(out, "  %s: %s\n", signal.Name, signal.Rule)
@@ -331,13 +336,17 @@ func moneyOrDash(v *float64) string {
 }
 
 func percentile(m shared.Multiple) string {
-	if m.History != nil && m.History.Short {
+	return historyPercentile(m.History)
+}
+
+func historyPercentile(h *shared.History) string {
+	if h != nil && h.Short {
 		return "样本不足"
 	}
-	if m.History == nil || m.History.Percentile == nil {
+	if h == nil || h.Percentile == nil {
 		return "-"
 	}
-	return fmt.Sprintf("%.0f%%", *m.History.Percentile)
+	return fmt.Sprintf("%.0f%%", *h.Percentile)
 }
 
 // multipleNote 说明倍数的口径；上游返回负值时说明原因。
