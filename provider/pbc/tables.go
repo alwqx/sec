@@ -22,7 +22,12 @@ type financingTable struct {
 
 var monthPattern = regexp.MustCompile(`^(\d{4})[.年/\-](\d{1,2})月?$`)
 var unitPattern = regexp.MustCompile(`单位[:：](万亿元|亿元)`)
-var numberedNotePattern = regexp.MustCompile(`^\d+[.、．]`)
+
+// 注释编号只有一两位，不能匹配 2017.01 这样的月份行。
+var numberedNotePattern = regexp.MustCompile(`^\d{1,2}[.、．]`)
+
+// appendixPattern 匹配主表之后附带的口径调整表标题，如“表1：2017年以来各月完善后的社会融资规模存量余额”。
+var appendixPattern = regexp.MustCompile(`^表\d+[:：]`)
 
 func monthCode(text string) string {
 	m := monthPattern.FindStringSubmatch(compact(text))
@@ -36,12 +41,17 @@ func monthCode(text string) string {
 	return fmt.Sprintf("%s%02d", m[1], n)
 }
 
+// maxGridCells 是展开后的总格数上限，真实的社融表不到 4 万格。
+const maxGridCells = 200000
+
 // tableGrid 展开 Excel 导出 HTML 的合并单元格，避免月份与金额/增速列错位。
 func tableGrid(table *goquery.Selection) ([][]string, error) {
 	cells := map[int]map[int]string{}
 	width := 0
 	var parseErr error
 	count := 0
+	// 总格数上限：单个单元格的跨行跨列都合法时，很多这样的单元格仍可能占用大量内存。
+	total := 0
 	table.Find("tr").Each(func(row int, tr *goquery.Selection) {
 		count = row + 1
 		if row > 2000 {
@@ -62,19 +72,20 @@ func tableGrid(table *goquery.Selection) ([][]string, error) {
 				}
 				column++
 			}
-			span := func(name string) int {
+			// Excel 导出的注释行会横跨两百多列；跨行没有这么多。上限分开，避免一个单元格展开过多格子。
+			span := func(name string, limit int) int {
 				value, ok := td.Attr(name)
 				if !ok {
 					return 1
 				}
 				n, err := strconv.Atoi(value)
-				if err != nil || n < 1 || n > 100 {
+				if err != nil || n < 1 || n > limit {
 					parseErr = fmt.Errorf("统计表合并单元格无效")
 					return 1
 				}
 				return n
 			}
-			rs, cs := span("rowspan"), span("colspan")
+			rs, cs := span("rowspan", 100), span("colspan", 300)
 			text := compact(td.Text())
 			for r := row; r < row+rs; r++ {
 				if cells[r] == nil {
@@ -83,6 +94,10 @@ func tableGrid(table *goquery.Selection) ([][]string, error) {
 				for c := column; c < column+cs; c++ {
 					if _, ok := cells[r][c]; ok {
 						parseErr = fmt.Errorf("统计表合并单元格重叠")
+						return
+					}
+					if total++; total > maxGridCells {
+						parseErr = fmt.Errorf("统计表单元格超过限制")
 						return
 					}
 					cells[r][c] = text
@@ -110,6 +125,26 @@ func tableGrid(table *goquery.Selection) ([][]string, error) {
 	return grid, nil
 }
 
+// isMainHeader 判断是不是主表的表头行：增量表有“社会融资规模增量”列，存量表有“存量”列。
+func isMainHeader(row []string) bool {
+	for _, text := range row {
+		if text == "社会融资规模增量" || text == "存量" {
+			return true
+		}
+	}
+	return false
+}
+
+// firstText 返回一行中第一个非空单元格，附表标题不一定在第一列。
+func firstText(row []string) string {
+	for _, text := range row {
+		if text != "" {
+			return text
+		}
+	}
+	return ""
+}
+
 func number(text string) (*float64, error) {
 	text = strings.ReplaceAll(compact(text), ",", "")
 	text = strings.ReplaceAll(text, "，", "")
@@ -133,7 +168,9 @@ func component(text string) (string, string) {
 		}
 		label = append(label, r)
 	}
+	// 存量表把第一个分项写成“其中:人民币贷款”。
 	name := strings.TrimSpace(string(label))
+	name = strings.TrimPrefix(strings.TrimPrefix(name, "其中:"), "其中：")
 	for _, pair := range []struct{ prefix, key string }{
 		{"社会融资规模", "total"}, {"人民币贷款", "rmb-loans"}, {"外币贷款", "foreign-currency-loans"},
 		{"委托贷款", "entrusted-loans"}, {"信托贷款", "trust-loans"}, {"未贴现银行承兑汇票", "undiscounted-acceptances"},
@@ -164,6 +201,20 @@ func parseFinancing(doc *goquery.Document, year int, kind string) (financingTabl
 	grid, err := tableGrid(doc.Find("table").First())
 	if err != nil {
 		return result, err
+	}
+	// 部分年份在同一张表里附带口径调整后的历史表，其中又有本年月份；只解析主表，用当时公布的数据。
+	// 读到主表表头之后才按附表标题截断，主表标题本身以“表1：”开头时不受影响。
+	header := false
+	for i, row := range grid {
+		if !header {
+			header = isMainHeader(row)
+			continue
+		}
+		if appendixPattern.MatchString(firstText(row)) {
+			grid = grid[:i]
+			result.Notes = append(result.Notes, "页面附带的口径调整历史表未采用，数值为当时公布的主表")
+			break
+		}
 	}
 	if len(grid) == 0 {
 		return result, fmt.Errorf("社融表为空")

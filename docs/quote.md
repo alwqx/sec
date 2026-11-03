@@ -32,7 +32,7 @@ provider/sina/quote.go    -- 行情查询（HTTP + WebSocket）
 
 ### 数据流程
 
-1. `sina.MultiSearch(ctx, keys)` — 并发搜索证券代码，获取 `ExCode` 等信息
+1. `resolveKeys(ctx, keys)` — 并发搜索证券代码，结果保持输入顺序，搜到同一只证券的关键字只保留一个；找不到和搜索失败的关键字单独列出
 2. `sina.QueryQuoteList(ctx, codes)` — 批量 HTTP 查询实时行情
 3. `printQuote` — 使用 `tablewriter.Rich()` 渲染表格
 

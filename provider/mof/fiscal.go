@@ -263,6 +263,9 @@ func rate(match []string) (*float64, error) {
 	return &n, nil
 }
 
+// maxCatalogLag 是目录日期晚于发布稿日期的最大容忍天数，已知的实例相差 49 天。
+const maxCatalogLag = 180 * 24 * time.Hour
+
 func parseRelease(doc *goquery.Document, r release) (FiscalObservation, error) {
 	item := FiscalObservation{Period: r.Period, YTDPeriod: r.Period[:4] + "01-" + r.Period, Source: r.URL, Title: r.Title, PublishedDate: r.PublishedDate, Metrics: []FiscalMetric{}, Status: "complete"}
 	title, _ := doc.Find(`meta[name="ArticleTitle"]`).Attr("content")
@@ -277,8 +280,16 @@ func parseRelease(doc *goquery.Document, r release) (FiscalObservation, error) {
 		if err != nil {
 			return item, fmt.Errorf("财政发布稿公布时间无效: %s", text)
 		}
-		if published.Format("2006-01-02") != r.PublishedDate {
-			return item, fmt.Errorf("财政发布稿与目录公布日期不一致")
+		// 目录日期偶尔是之后重新编辑的日期（如 2024 年上半年和 7 月的发布稿在目录里都是 2024-09-09），
+		// 发布稿的日期和链接里的日期一致，以发布稿为准，并保留目录日期。只接受发布稿更早且相差不大的情况，
+		// 否则可能是目录链到了别的稿件，仍然报错。
+		if date := published.Format("2006-01-02"); date != r.PublishedDate {
+			catalog, err := time.ParseInLocation("2006-01-02", r.PublishedDate, published.Location())
+			if err != nil || date > r.PublishedDate || catalog.Sub(published) > maxCatalogLag {
+				return item, fmt.Errorf("财政发布稿日期 %s 与目录日期 %s 不一致", date, r.PublishedDate)
+			}
+			item.Note = fmt.Sprintf("财政部目录标注的日期为 %s，与发布稿不一致，以发布稿日期 %s 为准", r.PublishedDate, date)
+			item.PublishedDate = date
 		}
 		item.PublishedAt = &published
 	}
