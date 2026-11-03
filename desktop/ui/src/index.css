@@ -15,6 +15,8 @@
   --down: #5cc99e;
   --flat: #a1a1aa;
   --error-bg: #342129;
+  /* 图表系列色：按固定顺序使用，深色和浅色各自校验过色盲区分度。 */
+  --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --series-4: #c98500; --series-5: #d55181;
 }
 :root[data-theme='light'] {
   color-scheme: light;
@@ -33,6 +35,7 @@
   --down: #16744f;
   --flat: #71717a;
   --error-bg: #fff0f2;
+  --series-1: #2a78d6; --series-2: #eb6834; --series-3: #1baf7a; --series-4: #eda100; --series-5: #e87ba4;
 }
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
@@ -387,3 +390,36 @@ h1, h2, h3 { font-weight: 600; }
 .valuation-peers { margin: 12px 0; max-height: 420px; }
 .valuation-peer-self td { font-weight: 600; background: var(--accent-soft); }
 .valuation-dot { fill: #d97706; }
+
+.financial-charts { display: grid; gap: 22px; }
+.financial-charts.is-refreshing .financial-chart-section { opacity: .55; transition: opacity .2s; }
+.financial-chart-section { min-width: 0; }
+.financial-chart-section h3, .period-chart h4 { margin: 0; }
+.period-chart h4 { font-size: 13px; }
+.chart-box { position: relative; min-width: 0; }
+.chart-box svg { display: block; overflow: visible; }
+.chart-box svg text { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.chart-box svg:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.chart-axis { stroke: var(--muted); stroke-width: 1; opacity: .6; }
+.chart-hover-band { fill: var(--accent-soft); opacity: .6; }
+.sankey .sankey-label { fill: var(--text); font-size: 12px; paint-order: stroke; stroke: var(--panel); stroke-width: 3px; stroke-linejoin: round; }
+.sankey .sankey-value { fill: var(--muted); }
+.waterfall-label { fill: var(--text) !important; font-size: 12px !important; }
+.waterfall-label.is-total { font-weight: 600; }
+.waterfall-value { fill: var(--text) !important; }
+.waterfall-connector { stroke: var(--muted); stroke-width: 1; opacity: .6; }
+.period-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.period-dot { stroke: var(--panel); stroke-width: 2; }
+.period-chart-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px 28px; }
+.chart-legend, .period-readout { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; color: var(--muted); font-size: 12px; margin: 6px 0; }
+.period-readout strong { color: var(--text); }
+.period-readout span { color: var(--text); font-variant-numeric: tabular-nums; }
+.chart-legend span, .period-readout span { display: inline-flex; align-items: center; gap: 5px; }
+.chart-legend i, .period-readout i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.chart-legend b, .period-readout b, .chart-key-line { width: 14px; height: 2px; border-radius: 1px; display: inline-block; }
+.chart-tooltip { position: absolute; z-index: 5; pointer-events: none; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 6px 18px rgba(0, 0, 0, .25); white-space: nowrap; }
+.chart-tooltip-title { color: var(--muted); margin-bottom: 4px; }
+.chart-tooltip-row { display: flex; align-items: center; gap: 6px; }
+.chart-tooltip-row strong { font-variant-numeric: tabular-nums; }
+.chart-tooltip-row span { color: var(--muted); }
+.financial-data-table summary { cursor: pointer; color: var(--muted); margin-top: 12px; }

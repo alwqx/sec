@@ -60,6 +60,7 @@ func (s *desktopServer) Handler() http.Handler {
 	mux.Handle("GET /api/v1/annual-reports", s.withAuth(http.HandlerFunc(s.handleAnnualReports)))
 	mux.Handle("POST /api/v1/annual-reports/download", s.withAuth(http.HandlerFunc(s.handleAnnualDownload)))
 	mux.Handle("GET /api/v1/financials", s.withAuth(http.HandlerFunc(s.handleFinancials)))
+	mux.Handle("GET /api/v1/financials/charts", s.withAuth(http.HandlerFunc(s.handleFinancialCharts)))
 
 	// 前端 SPA：先尝试真实文件，否则回退 index.html（支持前端路由）。
 	mux.Handle("GET /", s.spa())
@@ -220,12 +221,20 @@ func writeError(w http.ResponseWriter, status int, msg string) {
 var aShareCode = regexp.MustCompile(`^(SH|SZ|BJ)[0-9]{6}$`)
 
 func companyCode(w http.ResponseWriter, r *http.Request) string {
+	if code := companyExCode(w, r); code != "" {
+		return code[2:]
+	}
+	return ""
+}
+
+// companyExCode 校验并返回带交易所的代码，如 SH600036；不合法时写入 400 并返回空字符串。
+func companyExCode(w http.ResponseWriter, r *http.Request) string {
 	code := strings.ToUpper(strings.TrimSpace(r.URL.Query().Get("code")))
 	if !aShareCode.MatchString(code) {
 		writeError(w, http.StatusBadRequest, "此功能暂仅支持沪深北 A 股，请提供带交易所的六位代码")
 		return ""
 	}
-	return code[2:]
+	return code
 }
 
 func (s *desktopServer) handleCompany(w http.ResponseWriter, r *http.Request) {

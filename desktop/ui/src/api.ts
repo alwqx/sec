@@ -1,4 +1,4 @@
-import type { BasicSecurity, SecurityQuote, Company, Dividend, WorkspaceState, PageResult, IPOListing, Announcement, FinancialReport, MetalData, HistoryQuote, BondData, CompanyMetrics, SavedDownload, AnnualReportsPage, ProspectusPage , MacroCatalog, MacroDataset , FxDataset, FxSpread , HistoryOverlay , StrategyResult, ValuationResult } from './types'
+import type { BasicSecurity, SecurityQuote, Company, Dividend, WorkspaceState, PageResult, IPOListing, Announcement, FinancialReport, MetalData, HistoryQuote, BondData, CompanyMetrics, SavedDownload, AnnualReportsPage, ProspectusPage , MacroCatalog, MacroDataset , FxDataset, FxSpread , HistoryOverlay , StrategyResult, ValuationResult, FinancialCharts } from './types'
 
 async function request<T>(path: string, signal?: AbortSignal, options?: RequestInit): Promise<T> {
   const resp = await fetch(path, { ...options, signal })
@@ -49,6 +49,10 @@ export function announcements(page: number, code: string, key: string, type: str
   const params = new URLSearchParams({ page: String(page), key, type })
   if (code) params.set('code', code)
   return request(`/api/v1/announcements?${params}`, signal)
+}
+
+export function financialCharts(code: string, freq: 'annual' | 'quarter', signal?: AbortSignal): Promise<FinancialCharts> {
+  return request(`/api/v1/financials/charts?${new URLSearchParams({ code, freq })}`, signal)
 }
 
 export function financials(code: string, report: string, period: string, signal?: AbortSignal): Promise<FinancialReport> {
