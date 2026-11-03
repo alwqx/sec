@@ -52,6 +52,10 @@ jobs:
         working-directory: desktop/ui
         run: npm ci && npm run build
 
+      - name: Test frontend
+        working-directory: desktop/ui
+        run: npm test
+
       - name: Vet
         run: go vet ./desktop
 

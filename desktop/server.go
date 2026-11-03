@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"io/fs"
 	"log/slog"
+	"net"
 	"net/http"
 	"regexp"
 	"strings"
@@ -65,6 +66,30 @@ func (s *desktopServer) Handler() http.Handler {
 
 	// 兜底捕获 panic，避免单个 provider 异常拖垮整个桌面进程。
 	return s.withRecover(mux)
+}
+
+// publicHandler 是实际对外提供服务的 handler，比 Handler 多一层 Host 校验。
+func (s *desktopServer) publicHandler() http.Handler {
+	return s.withHost(s.Handler())
+}
+
+// withHost 只接受本机地址。否则网页可以用 DNS 重绑定把自己的域名解析到本机，拿到页面下发的 token cookie 后调用接口。
+func (s *desktopServer) withHost(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !localHost(r.Host) {
+			writeError(w, http.StatusForbidden, "访问验证失败，请重新打开应用")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// localHost 判断请求的 Host 是不是本机地址，可以带端口。
+func localHost(host string) bool {
+	if name, _, err := net.SplitHostPort(host); err == nil {
+		host = name
+	}
+	return host == "127.0.0.1" || host == "localhost"
 }
 
 // withRecover 捕获 handler 中未预料的 panic，返回 500 JSON 而非空连接。

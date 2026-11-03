@@ -36,7 +36,7 @@ func TestPayrollsBatchRevisionBaselines(t *testing.T) {
 					require.Equal(t, 2025, first)
 					require.Equal(t, 2026, last)
 					if mode == "failure" {
-						http.Error(w, "failed", 503)
+						http.Error(w, "failed", http.StatusServiceUnavailable)
 						return
 					}
 					points = []rawPoint{{Year: "2026", Period: "M01", Value: "910"}}

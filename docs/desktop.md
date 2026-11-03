@@ -85,6 +85,8 @@ CLI 的根 `main.go` 保持不变；桌面版是独立二进制：`go build ./de
 
 - 启动时用 `crypto/rand` 生成随机 token；server 在返回页面时通过 `Set-Cookie: token=...; HttpOnly` 下发。
 - `/api/*` 校验 cookie 与 token 一致，否则返回 403，防止本机其他程序（如网页）跨站调用。
+- 所有请求校验 `Host` 必须是 `127.0.0.1` 或 `localhost`，否则返回 403，页面也不下发 cookie，防止 DNS 重绑定。dev 模式也校验。
+- 页面内容渲染出错时只影响所在区域，显示提示和重试按钮，侧栏和其他页面不受影响；侧栏等应用外壳出错时显示整个应用的提示和重试按钮。
 - dev 模式跳过鉴权并打开 CORS，便于前端连 Vite dev server。
 
 ## 研究工作台
@@ -245,6 +247,7 @@ React 18 + TypeScript + Vite 5，手写 CSS。`desktop/ui/src/components/` 按�
 # 前端（开发热更新 / 生产构建）
 cd desktop/ui && npm install && npm run dev        # 开发
 cd desktop/ui && npm run build                     # 生产（生成 dist/）
+cd desktop/ui && npm test                          # 前端单元测试（需要 Node 24）
 
 # 桌面端
 go run ./desktop -dev                        # 联调：WebView 加载 http://localhost:5173，server 固定 3001

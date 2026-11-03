@@ -33,7 +33,7 @@ func TestPCEOfficialDataAndCache(t *testing.T) {
 		require.Equal(t, "PCEPI,PCEPILFE", r.URL.Query().Get("id"))
 		require.Equal(t, "curl", r.UserAgent())
 		if fail.Load() {
-			http.Error(w, "unavailable", 503)
+			http.Error(w, "unavailable", http.StatusServiceUnavailable)
 			return
 		}
 		w.Write([]byte(raw))

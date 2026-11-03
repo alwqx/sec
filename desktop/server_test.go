@@ -125,3 +125,45 @@ func TestHandleDividendsEmpty(t *testing.T) {
 	require.Equal(t, http.StatusOK, rr.Code)
 	require.JSONEq(t, `{"results":[]}`, rr.Body.String())
 }
+
+func TestWithHost(t *testing.T) {
+	// dev 模式端口固定又没有鉴权，同样要校验。Vite 代理转发的 Host 是 localhost:5173。
+	for _, dev := range []bool{false, true} {
+		srv := &desktopServer{token: "secret", dev: dev}
+		next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.SetCookie(w, &http.Cookie{Name: "token", Value: "secret"})
+		})
+		for _, tc := range []struct {
+			host string
+			ok   bool
+		}{
+			{"127.0.0.1:53000", true}, {"127.0.0.1", true}, {"localhost:53000", true}, {"localhost:5173", true},
+			{"evil.example.com", false}, {"evil.example.com:53000", false}, {"127.0.0.1.evil.example.com:53000", false}, {"[::1]:53000", false}, {"", false},
+		} {
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			req.Host = tc.host
+			rr := httptest.NewRecorder()
+			srv.withHost(next).ServeHTTP(rr, req)
+			if tc.ok {
+				require.Equal(t, http.StatusOK, rr.Code, tc.host)
+				continue
+			}
+			require.Equal(t, http.StatusForbidden, rr.Code, tc.host)
+			require.Empty(t, rr.Result().Cookies(), "不能把 token 发给其他域名: %s", tc.host)
+		}
+	}
+}
+
+func TestPublicHandlerChecksHost(t *testing.T) {
+	srv := &desktopServer{token: "secret"}
+	request := func(host string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/version", nil)
+		req.Host = host
+		req.AddCookie(&http.Cookie{Name: "token", Value: "secret"})
+		rr := httptest.NewRecorder()
+		srv.publicHandler().ServeHTTP(rr, req)
+		return rr
+	}
+	require.Equal(t, http.StatusOK, request("127.0.0.1:53000").Code)
+	require.Equal(t, http.StatusForbidden, request("evil.example.com:53000").Code, "cookie 正确也要拒绝")
+}

@@ -13,7 +13,7 @@ import (
 
 type LoanRequest struct{ Begin, End string }
 
-func (r LoanRequest) Validate() error { return (FinancingRequest{r.Begin, r.End}).Validate() }
+func (r LoanRequest) Validate() error { return FinancingRequest(r).Validate() }
 
 type LoanComponent struct {
 	Key                    string   `json:"key"`
