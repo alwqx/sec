@@ -26,7 +26,7 @@ func TestConfigCommands(t *testing.T) {
 	t.Setenv("HOME", home)
 	output, err := run(t, "get", "sec-edgar-email")
 	require.NoError(t, err)
-	require.Equal(t, "kenan3015@gmail.com\n", output, "没有配置文件时是默认值")
+	require.Equal(t, "sec_dev@example.com\n", output, "没有配置文件时是默认值")
 
 	output, err = run(t, "set", "sec-edgar-email", "me@example.org")
 	require.NoError(t, err)
@@ -48,7 +48,7 @@ func TestConfigCommands(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(home, ".sec", "config.json"), []byte(`{"sec_edgar_email":"me"}`), 0600))
 	output, err = run(t, "get", "sec-edgar-email")
 	require.NoError(t, err)
-	require.Equal(t, "kenan3015@gmail.com\n", output)
+	require.Equal(t, "sec_dev@example.com\n", output)
 	_, err = run(t, "set", "sec-edgar-email", "fixed@example.org")
 	require.NoError(t, err)
 	output, err = run(t, "get", "sec-edgar-email")

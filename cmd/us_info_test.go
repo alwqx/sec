@@ -12,7 +12,7 @@ func TestUSInfoJSON(t *testing.T) {
 	defer gock.Off()
 	t.Setenv("HOME", t.TempDir())
 	mockSearch(`var suggestvalue="AAPL,41,aapl,aapl,苹果,,苹果,99,1,ESG,,";`)
-	gock.New("https://www.sec.gov").Get("/files/company_tickers.json").MatchHeader("User-Agent", `kenan3015@gmail\.com$`).
+	gock.New("https://www.sec.gov").Get("/files/company_tickers.json").MatchHeader("User-Agent", `sec_dev@example\.com$`).
 		Reply(200).BodyString(`{"0":{"cik_str":320193,"ticker":"AAPL","title":"Apple Inc."}}`)
 	gock.New("https://data.sec.gov").Get("/submissions/CIK0000320193.json").
 		Reply(200).BodyString(`{"name":"Apple Inc.","exchanges":["Nasdaq"],"sicDescription":"Electronic Computers","sic":"3571","fiscalYearEnd":"0926","category":"Large accelerated filer","filings":{"recent":{}}}`)

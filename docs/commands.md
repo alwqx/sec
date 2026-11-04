@@ -32,67 +32,67 @@ sec quote-history 600036 --freq week --json
 
 ## Desktop 菜单
 
-| 一级菜单 | 对应命令 | 状态 |
-| --- | --- | --- |
-| 自选与行情 | 个股命令 | 已有 |
-| IPO | `ipo *` | 已有 |
-| 公告中心 | `announcements`、`insider` | 已有 |
-| 自选与行情 → 公告（美股） | `filings` | 已有 |
-| 设置 → 数据源 | `config` | 已有 |
-| 宏观 | `macro *`、`bond`、`bond-history` | 已有；原“美债收益率”菜单已并入 |
-| 汇率 | `fx *` | 已有 |
-| 贵金属行情 | `metal` | 已有 |
-| 大宗商品 | `commodity` | 已有 |
-| 设置 | `upgrade` | 已有 |
+| 一级菜单                  | 对应命令                          | 状态                           |
+| ------------------------- | --------------------------------- | ------------------------------ |
+| 自选与行情                | 个股命令                          | 已有                           |
+| IPO                       | `ipo *`                           | 已有                           |
+| 公告中心                  | `announcements`、`insider`        | 已有                           |
+| 自选与行情 → 公告（美股） | `filings`                         | 已有                           |
+| 设置 → 数据源             | `config`                          | 已有                           |
+| 宏观                      | `macro *`、`bond`、`bond-history` | 已有；原“美债收益率”菜单已并入 |
+| 汇率                      | `fx *`                            | 已有                           |
+| 贵金属行情                | `metal`                           | 已有                           |
+| 大宗商品                  | `commodity`                       | 已有                           |
+| 设置                      | `upgrade`                         | 已有                           |
 
 ## 个股
 
-| 命令 | 数据 | Desktop 位置 | 状态 |
-| --- | --- | --- | --- |
-| `search` | 按代码、名称或拼音搜索证券 | 自选与行情 → 证券列表 | 已有 |
-| `watch` | 自选行情总览 | 自选与行情 → 证券列表、自选行情 | 已有 |
-| `quote` | 单只／多只证券实时行情 | 自选与行情 → 概览、自选行情 | 已有；多只对比限于自选证券 |
-| `quote-history` | 历史行情 | 自选与行情 → 概览 | 已有 |
-| `kline` | 蜡烛图，支持 MA、布林带叠加 | 自选与行情 → 概览 | 已有；固定为 MA5/10/20/60 和 BOLL(20,2) |
-| `info` | 公司资料、核心指标与分红 | 自选与行情 → 公司、分红 | 已有 |
-| `financials` | 资产负债表、利润表、现金流量表 | 自选与行情 → 财报 | 已有；图表分析（桑基图、瀑布图、趋势）只在 Desktop |
-| `annual-report` | 年报 PDF 下载 | 自选与行情 → 财报 | 已有，Desktop 另含半年报和季报 |
-| `valuation` | 估值指标、历史分位、同行业对比、股息率与 DCF | 自选与行情 → 估值 | 已有；仅沪深北 A 股 |
-| `strategy ma / macd / rsi / boll` | 技术分析信号（计算） | 自选与行情 → 技术分析 | 已有；默认前复权，`sec strategy` 不复权（`--backtest` 时前复权）；两端都可回测 |
+| 命令                              | 数据                                         | Desktop 位置                    | 状态                                                                           |
+| --------------------------------- | -------------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------ |
+| `search`                          | 按代码、名称或拼音搜索证券                   | 自选与行情 → 证券列表           | 已有                                                                           |
+| `watch`                           | 自选行情总览                                 | 自选与行情 → 证券列表、自选行情 | 已有                                                                           |
+| `quote`                           | 单只／多只证券实时行情                       | 自选与行情 → 概览、自选行情     | 已有；多只对比限于自选证券                                                     |
+| `quote-history`                   | 历史行情                                     | 自选与行情 → 概览               | 已有                                                                           |
+| `kline`                           | 蜡烛图，支持 MA、布林带叠加                  | 自选与行情 → 概览               | 已有；固定为 MA5/10/20/60 和 BOLL(20,2)                                        |
+| `info`                            | 公司资料、核心指标与分红                     | 自选与行情 → 公司、分红         | 已有                                                                           |
+| `financials`                      | 资产负债表、利润表、现金流量表               | 自选与行情 → 财报               | 已有；图表分析（桑基图、瀑布图、趋势）只在 Desktop                             |
+| `annual-report`                   | 年报 PDF 下载                                | 自选与行情 → 财报               | 已有，Desktop 另含半年报和季报                                                 |
+| `valuation`                       | 估值指标、历史分位、同行业对比、股息率与 DCF | 自选与行情 → 估值               | 已有；仅沪深北 A 股                                                            |
+| `strategy ma / macd / rsi / boll` | 技术分析信号（计算）                         | 自选与行情 → 技术分析           | 已有；默认前复权，`sec strategy` 不复权（`--backtest` 时前复权）；两端都可回测 |
 
 ## 公告与 IPO
 
-| 命令 | 数据 | Desktop 位置 | 状态 |
-| --- | --- | --- | --- |
-| `announcements` | 公司公告 | 公告中心；个股的公告标签页 | 已有 |
-| `filings` | 美股公司向 SEC 提交的申报（10-K、10-Q、8-K、20-F、6-K、Form 4 等），来自 SEC EDGAR 官方接口 | 自选与行情 → 美股的公告标签页 | 已有 |
-| `insider` | 按“增持／减持”标题筛选的公告，不是结构化交易记录 | 个股的公告标签页和公告中心的当前证券范围，类别选“增减持公告” | 已有 |
-| `ipo list` | 新股上市列表 | IPO | 已有 |
-| `ipo prospectus`、`ipo download` | 招股说明书查询与下载 | IPO | 已有 |
-| `ipo calendar` | IPO 相关公告日期，不是准确的申购日历 | IPO → 发行公告日期 | 已有 |
+| 命令                             | 数据                                                                                        | Desktop 位置                                                 | 状态 |
+| -------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------ | ---- |
+| `announcements`                  | 公司公告                                                                                    | 公告中心；个股的公告标签页                                   | 已有 |
+| `filings`                        | 美股公司向 SEC 提交的申报（10-K、10-Q、8-K、20-F、6-K、Form 4 等），来自 SEC EDGAR 官方接口 | 自选与行情 → 美股的公告标签页                                | 已有 |
+| `insider`                        | 按“增持／减持”标题筛选的公告，不是结构化交易记录                                            | 个股的公告标签页和公告中心的当前证券范围，类别选“增减持公告” | 已有 |
+| `ipo list`                       | 新股上市列表                                                                                | IPO                                                          | 已有 |
+| `ipo prospectus`、`ipo download` | 招股说明书查询与下载                                                                        | IPO                                                          | 已有 |
+| `ipo calendar`                   | IPO 相关公告日期，不是准确的申购日历                                                        | IPO → 发行公告日期                                           | 已有 |
 
 美股：`sec info` 的公司资料来自 SEC EDGAR（公司名称、曾用名、CIK、交易所、行业和 SIC、注册地、申报人类别、财年截止日、办公地址、电话），价格、52 周区间、市盈率和每股收益（最近四个季度）、总市值和总股本来自新浪美股行情；公司资料和行情任一失败时仍输出另一部分，`--json` 对应的 `company` 或 `quote` 为 `null`（`--json` 格式为 `{ex_code, ticker, company, quote}`，和 A 股不同）；SEC 没有的代码（比如 QQQ 等基金、场外交易股票）只显示行情；美股不支持 `-d` 分红。每股收益为负表示亏损，亏损公司没有市盈率。`sec kline` 的美股标题用新浪美股行情。`sec quote-history` 和 `sec kline` 的美股行情来自东方财富：新浪搜索把美股都标成纳斯达克，按纳斯达克（105）查不到时依次改用纽交所（106）和 NYSE American（107）；类别股（比如 BRK.B）在东方财富写作 BRK_B，在新浪行情写作 brk$b。东方财富失败时，不复权日线改用新浪美股日线（从上市起全部历史，不复权，拆股当天价格会跳变），复权、周线和月线没有备用数据。
 
 `sec filings <代码>` 列出美股公司的 SEC 申报，按申报日期从新到旧，默认 20 条（`-n`）。默认只列主要申报：10-K 年报、10-Q 季报、8-K 重大事项、20-F/40-F 外国公司年报、6-K 外国公司临时报告、DEF 14A 委托书、S-1/F-1 招股书；`--form 4,144` 指定类型，`--form all` 列出全部，指定 10-K 时也包含修订版 10-K/A。`-b/-e`（YYYYMMDD）按申报日期筛选，开始日期早于 SEC 最近列表（约 1000 份）时自动读取历史分页。按类型筛选后不够 `-n` 条时，也会继续读历史分页，最多 10 页：高盛、摩根大通这类公司一年有上万份结构化产品申报，最近列表只覆盖约一年，读到上限时提示结果可能不全，用 `-b` 指定开始日期可以查全（`--json` 的 `truncated` 为 true）。"说明"列是中文类型名，8-K 附上事项，比如"重大事项：经营业绩"。`-o 目录` 下载列出申报的主文件，文件名为 `代码-申报日-类型-申报编号.扩展名`。`--json` 输出 `company`（CIK、交易所、行业、财年截止日）和 `results`。
 
-SEC 要求自动程序在 User-Agent 里提供联系邮箱，否则返回 403，并限制每秒最多 10 个请求，`sec filings` 按这个频率请求。邮箱保存在 CLI 和 Desktop 共用的 `~/.sec/config.json`，默认 `kenan3015@gmail.com`；读写都加文件锁，修改时在同一把锁里读改写，文件内容无效时提示并使用默认值，修改配置会直接覆盖无效内容：`sec config` 查看全部配置，`sec config set sec-edgar-email you@example.com` 修改，Desktop 在设置 → 数据源修改。股票代码到 CIK 的对照表缓存在 `~/.sec/cache/edgar`，每天更新一次，写入时先写临时文件再改名，缓存损坏时重新下载；同一代码对应多家公司时按 SEC 的排列顺序取第一家。
+SEC 要求自动程序在 User-Agent 里提供联系邮箱，否则返回 403，并限制每秒最多 10 个请求，`sec filings` 按这个频率请求。邮箱保存在 CLI 和 Desktop 共用的 `~/.sec/config.json`，默认 `sec_dev@example.com`；读写都加文件锁，修改时在同一把锁里读改写，文件内容无效时提示并使用默认值，修改配置会直接覆盖无效内容：`sec config` 查看全部配置，`sec config set sec-edgar-email you@example.com` 修改，Desktop 在设置 → 数据源修改。股票代码到 CIK 的对照表缓存在 `~/.sec/cache/edgar`，每天更新一次，写入时先写临时文件再改名，缓存损坏时重新下载；同一代码对应多家公司时按 SEC 的排列顺序取第一家。
 
 ## 宏观
 
 全部已有。页面先切换中国／美国（与 `macro cn`、`macro us` 一致），再按类别选择指标；分类来自 `cmd/macro/catalog.go`，`--help` 与 Desktop 菜单共用。
 
-| 类别 | `macro cn` | `macro us` |
-| --- | --- | --- |
-| 增长与产出 | `gdp`、`industrial`、`pmi`、`nonmanufacturing-pmi` | `gdp`、`industrial-production`、`capacity-utilization` |
-| 价格 | `cpi`、`core-cpi`、`ppi` | `cpi`、`core-cpi`、`pce`、`core-pce` |
-| 就业 | `unemployment` | `payrolls`、`unemployment`、`participation`、`earnings`、`weekly-hours`、`initial-claims`、`continued-claims` |
-| 消费与收入 | `retail`、`household` | `real-pce`、`real-income` |
-| 投资与房地产 | `investment`、`property` | `equipment-investment`、`housing-starts`、`housing`、`house-price` |
-| 企业 | `enterprise` | `corporate-profits`、`business-inventories`、`new-orders` |
-| 货币与信贷 | `money`、`financing`、`loans`、`deposits` | `money`、`bank-credit`、`lending-standards`、`debt-service` |
-| 利率与收益率 | `lpr`、`reverse-repo`、`reverse-repo-history`、`rrr`、`treasury` | `target-rate`、`effr`、`treasury` |
-| 财政与国债 | `fiscal` | `fiscal`、`debt`、`debt-cash`、`auctions` |
-| 对外贸易 | `trade`、`services-trade` | `trade`、`real-trade` |
+| 类别         | `macro cn`                                                       | `macro us`                                                                                                    |
+| ------------ | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| 增长与产出   | `gdp`、`industrial`、`pmi`、`nonmanufacturing-pmi`               | `gdp`、`industrial-production`、`capacity-utilization`                                                        |
+| 价格         | `cpi`、`core-cpi`、`ppi`                                         | `cpi`、`core-cpi`、`pce`、`core-pce`                                                                          |
+| 就业         | `unemployment`                                                   | `payrolls`、`unemployment`、`participation`、`earnings`、`weekly-hours`、`initial-claims`、`continued-claims` |
+| 消费与收入   | `retail`、`household`                                            | `real-pce`、`real-income`                                                                                     |
+| 投资与房地产 | `investment`、`property`                                         | `equipment-investment`、`housing-starts`、`housing`、`house-price`                                            |
+| 企业         | `enterprise`                                                     | `corporate-profits`、`business-inventories`、`new-orders`                                                     |
+| 货币与信贷   | `money`、`financing`、`loans`、`deposits`                        | `money`、`bank-credit`、`lending-standards`、`debt-service`                                                   |
+| 利率与收益率 | `lpr`、`reverse-repo`、`reverse-repo-history`、`rrr`、`treasury` | `target-rate`、`effr`、`treasury`                                                                             |
+| 财政与国债   | `fiscal`                                                         | `fiscal`、`debt`、`debt-cash`、`auctions`                                                                     |
+| 对外贸易     | `trade`、`services-trade`                                        | `trade`、`real-trade`                                                                                         |
 
 一个页面可以对应多个命令，不必一个命令一个菜单项。例如 `cpi` 和 `core-cpi` 可在同一页切换；`reverse-repo` 和 `reverse-repo-history` 是不同机制下的两段数据，可放在同一页，但不拼接成一条序列。
 
@@ -102,22 +102,22 @@ SEC 要求自动程序在 User-Agent 里提供联系邮箱，否则返回 403，
 
 全部已有，位于「汇率」菜单，每个命令一个栏目。
 
-| 命令 | 数据 |
-| --- | --- |
-| `fx quote` | 新浪最新参考行情 |
-| `fx history` | 新浪、FRED 来源的日线 |
-| `fx fixing` | 人民币中间价 |
-| `fx reference` | 在岸固定时点参考汇率 |
-| `fx cross` | 交叉汇率（计算） |
-| `fx spread` | 在岸／离岸报价价差（计算） |
+| 命令           | 数据                       |
+| -------------- | -------------------------- |
+| `fx quote`     | 新浪最新参考行情           |
+| `fx history`   | 新浪、FRED 来源的日线      |
+| `fx fixing`    | 人民币中间价               |
+| `fx reference` | 在岸固定时点参考汇率       |
+| `fx cross`     | 交叉汇率（计算）           |
+| `fx spread`    | 在岸／离岸报价价差（计算） |
 
 ## 贵金属与美债
 
-| 命令 | 数据 | Desktop 位置 | 状态 |
-| --- | --- | --- | --- |
-| `metal` | 上海黄金交易所 Au99.99、Ag99.99 日行情：默认 Au99.99 最近一个交易日，`--inst/-i` 选品种，`--begin/-b`、`--end/-e` 查区间内每一天 | 贵金属 | 已有 |
-| `bond`、`bond-history` | 美债收益率与历史，显示五个期限及 10 年期变动 | 宏观 → 美国 → 利率与收益率 → 美债收益率 | 已有 |
-| `macro us treasury` | 美债收益率全部期限及统一导出 | 宏观 → 美国 → 利率与收益率 → 美债收益率 | 已有 |
+| 命令                   | 数据                                                                                                                             | Desktop 位置                            | 状态 |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- | ---- |
+| `metal`                | 上海黄金交易所 Au99.99、Ag99.99 日行情：默认 Au99.99 最近一个交易日，`--inst/-i` 选品种，`--begin/-b`、`--end/-e` 查区间内每一天 | 贵金属                                  | 已有 |
+| `bond`、`bond-history` | 美债收益率与历史，显示五个期限及 10 年期变动                                                                                     | 宏观 → 美国 → 利率与收益率 → 美债收益率 | 已有 |
+| `macro us treasury`    | 美债收益率全部期限及统一导出                                                                                                     | 宏观 → 美国 → 利率与收益率 → 美债收益率 | 已有 |
 
 `--inst` 可选 Au99.99（简写 au999）和 Ag99.99（ag999），不区分大小写。黄金单位是元/克，白银是元/千克；日行情从 2016 年 12 月起。只给 `--begin` 时结束于今天（北京时间），只给 `--end` 时从结束日往前 30 天，日期格式 YYYYMMDD。`--json` 输出 `inst`、`name`、`unit` 和 `results`，不指定区间时 `results` 只有最近一天。原来的 `metal-history`（`mh`）已删除，用 `metal -b/-e` 查询历史。上海黄金交易所的收盘价不是最后成交价，个别日子会略超出当天最高、最低价；Ag99.99 成交稀少，很多天开高低收相同。
 
@@ -125,9 +125,9 @@ SEC 要求自动程序在 User-Agent 里提供联系邮箱，否则返回 403，
 
 ## 大宗商品
 
-| 命令 | 数据 | Desktop 位置 | 状态 |
-| --- | --- | --- | --- |
-| `commodity`（`co`） | 新浪期货行情：默认列出 8 个品种的最新行情，`--inst/-i` 只看一个，加 `--begin/-b`、`--end/-e` 查这个品种的日行情 | 大宗商品 | 已有 |
+| 命令                | 数据                                                                                                            | Desktop 位置 | 状态 |
+| ------------------- | --------------------------------------------------------------------------------------------------------------- | ------------ | ---- |
+| `commodity`（`co`） | 新浪期货行情：默认列出 8 个品种的最新行情，`--inst/-i` 只看一个，加 `--begin/-b`、`--end/-e` 查这个品种的日行情 | 大宗商品     | 已有 |
 
 品种（`--inst` 不区分大小写）：国内主力连续合约 sc 原油（上海国际能源交易中心，元/桶）、cu 铜（上海期货交易所，元/吨）、i 铁矿石（大连商品交易所，元/吨）、rb 螺纹钢（上海期货交易所，元/吨）、m 豆粕（大连商品交易所，元/吨）；国际期货 cl WTI 原油（美元/桶）、brent 布伦特原油（美元/桶）、hg COMEX 铜（美分/磅）。
 
@@ -139,8 +139,8 @@ SEC 要求自动程序在 User-Agent 里提供联系邮箱，否则返回 403，
 
 改名后旧名继续可用，只是不再出现在命令列表中。
 
-| 现名 | 旧名 | 原因 |
-| --- | --- | --- |
-| `financials` | `balance-sheet`、`bs` | 查询三类财报，不只是资产负债表 |
-| `annual-report` | `balance-sheet-download`、`bsd` | 下载的是年报 PDF |
-| `macro us housing-starts` | `macro us investment` | 数据是住宅开工和建筑许可，与 `macro cn investment` 同名但不是一回事 |
+| 现名                      | 旧名                            | 原因                                                                |
+| ------------------------- | ------------------------------- | ------------------------------------------------------------------- |
+| `financials`              | `balance-sheet`、`bs`           | 查询三类财报，不只是资产负债表                                      |
+| `annual-report`           | `balance-sheet-download`、`bsd` | 下载的是年报 PDF                                                    |
+| `macro us housing-starts` | `macro us investment`           | 数据是住宅开工和建筑许可，与 `macro cn investment` 同名但不是一回事 |

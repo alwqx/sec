@@ -29,7 +29,7 @@ const submissions = `{"cik":"320193","name":"Apple Inc.","tickers":["AAPL"],"exc
 "primaryDocDescription":["10-K","8-K","FORM 4"],"items":["","2.02,9.01",""]},"files":[]}}`
 
 func mockSEC() {
-	gock.New("https://www.sec.gov").Get("/files/company_tickers.json").MatchHeader("User-Agent", `kenan3015@gmail\.com$`).
+	gock.New("https://www.sec.gov").Get("/files/company_tickers.json").MatchHeader("User-Agent", `sec_dev@example\.com$`).
 		Reply(200).BodyString(`{"0":{"cik_str":320193,"ticker":"AAPL","title":"Apple Inc."}}`)
 	gock.New("https://data.sec.gov").Get("/submissions/CIK0000320193.json").Reply(200).BodyString(submissions)
 }
