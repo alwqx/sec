@@ -40,7 +40,7 @@ func TestLoadSave(t *testing.T) {
 }
 
 func TestValidateEmail(t *testing.T) {
-	for _, email := range []string{"a@b.co", "kenan3015@gmail.com", "first.last+sec@example.org"} {
+	for _, email := range []string{"a@b.co", "sec_dev@example.com", "first.last+sec@example.org"} {
 		require.NoError(t, ValidateEmail(email), email)
 	}
 	for _, email := range []string{"", "abc", "a@b", "Name <a@b.co>", "a@b.co x", " a@b.co"} {

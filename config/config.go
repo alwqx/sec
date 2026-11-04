@@ -18,7 +18,7 @@ import (
 )
 
 // DefaultSECEmail 是没有配置时使用的 SEC EDGAR 联系邮箱。
-const DefaultSECEmail = "kenan3015@gmail.com"
+const DefaultSECEmail = "sec_dev@example.com"
 
 // ErrInvalid 表示配置文件内容无效。读取时返回默认配置和这个错误，调用方可以提示后继续用默认值；
 // 修改配置时直接覆盖无效内容，不需要手动编辑文件。
