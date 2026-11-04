@@ -13,6 +13,7 @@ import Announcements from './components/Announcements'
 import Settings from './components/Settings'
 import Metal from './components/Metal'
 import Commodity from './components/Commodity'
+import Filings from './components/Filings'
 import WatchQuotes, { type CompareState } from './components/WatchQuotes'
 import { useQuotes } from './hooks/useQuotes'
 import Strategy from './components/Strategy'
@@ -163,6 +164,7 @@ export default function App() {
   // 只在能看到行情时轮询：自选列表或自选行情栏目。
   const watchQuotes = useQuotes(watchCodes, workspace.settings.refresh_seconds, ready && page === 'stocks' && (listMode === 'watchlist' || tab === 'quotes'))
   const aShare = selected?.security_type === 'stock' && /^(SH|SZ|BJ)\d{6}$/i.test(selected.ex_code)
+  const usStock = selected?.ex_code.startsWith('$') ?? false
 
   const tabKey = (e: KeyboardEvent<HTMLButtonElement>, index: number) => {
     const direction = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0
@@ -213,7 +215,8 @@ export default function App() {
                 <ErrorBoundary>{tab === 'overview' ? <Overview security={selected} interval={workspace.settings.refresh_seconds} />
                   : tab === 'technical' ? <Strategy code={selected.ex_code} />
                   : tab === 'quotes' ? <WatchQuotes items={workspace.watchlist} state={watchQuotes} selected={selected} onSelect={onSelect} compare={compare} onCompare={setCompare} />
-                  : !aShare ? <div className="empty-state">此栏目暂仅支持沪深北 A 股，当前证券可在概览中查看行情。</div>
+                  : usStock && tab === 'announcements' ? <Filings code={selected.ex_code} />
+                  : !aShare ? <div className="empty-state">{usStock ? '美股目前支持行情和公告（SEC 申报），这个栏目暂不支持。' : '此栏目暂仅支持沪深北 A 股，当前证券可在概览中查看行情。'}</div>
                   : tab === 'valuation' ? <Valuation code={selected.ex_code} />
                   : tab === 'financials' ? <Financials security={selected} />
                   : tab === 'announcements' ? <Announcements code={selected.ex_code} compact />

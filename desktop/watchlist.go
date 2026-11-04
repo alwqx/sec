@@ -36,6 +36,11 @@ func (s *desktopServer) loadSharedWorkspace(ctx context.Context) (workspaceState
 	}
 	state, err := s.workspace.load()
 	state.Watchlist = watchSecurities(items)
+	if err != nil {
+		return state, err
+	}
+	cfg, err := s.loadConfig(ctx)
+	state.Settings.SECEmail = cfg.SECEmail
 	return state, err
 }
 func (s *desktopServer) handleWatchlist(w http.ResponseWriter, r *http.Request) {

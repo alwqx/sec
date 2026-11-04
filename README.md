@@ -13,7 +13,7 @@ SEC（Security Information Client）提供 CLI 与 Desktop 两种界面，用于
 | 公司研究       | 公司资料、行业、PE、PB、总市值、流通市值与分红记录                        | `info`                                        |
 | 财务报表       | 资产负债表、利润表、现金流量表，报告期筛选，CSV／JSON 导出；Desktop 有利润桑基图、利润和现金瀑布图及多维趋势图 | `financials`                               |
 | 报告原文       | 年报、半年报、一季报、三季报，年份范围查询、单份／多选 PDF 下载及任务进度 | `annual-report`（年报）              |
-| 公告           | 标题搜索、报告类别筛选、分页与原文查看                                    | `announcements`、`insider`（增减持公告）      |
+| 公告           | 标题搜索、报告类别筛选、分页与原文查看；美股为 SEC EDGAR 官方申报         | `announcements`、`insider`（增减持公告）、`filings` |
 | IPO            | 新股上市日期筛选，招股说明书查询、原文查看及单份／多选下载                | `ipo list / calendar / prospectus / download` |
 | 贵金属         | 上海黄金交易所 Au99.99 黄金、Ag99.99 白银日行情与蜡烛图                   | `metal`                                       |
 | 大宗商品       | 原油、铜、铁矿石、螺纹钢、豆粕及 WTI、布伦特、COMEX 铜期货行情与日 K 线  | `commodity`                                   |
@@ -22,7 +22,7 @@ SEC（Security Information Client）提供 CLI 与 Desktop 两种界面，用于
 | 估值           | PE、PB、PS 历史分位和同行业对比，股息率，PEG、ROE、格雷厄姆数、规则汇总，可调参数的 DCF | `valuation`                                   |
 | 版本与更新     | 设置页版本、构建时间、提交号，手动检查更新和 Release 下载入口             | `--version`、`upgrade`                        |
 
-市场覆盖按功能区分：Desktop 搜索与实时行情支持 A 股、港股和美股；证券历史 K 线支持沪深和港股；公司资料、核心指标、财报、分红及个股公告面向沪深北 A 股。贵金属为上海黄金交易所 Au99.99、Ag99.99 日行情；大宗商品为新浪期货的国内主力连续合约和国际期货。
+市场覆盖按功能区分：Desktop 搜索与实时行情支持 A 股、港股和美股；证券历史 K 线支持沪深和港股；公司资料、核心指标、财报和分红面向沪深北 A 股；个股公告支持沪深北 A 股（巨潮资讯）和美股（SEC EDGAR 申报）。贵金属为上海黄金交易所 Au99.99、Ag99.99 日行情；大宗商品为新浪期货的国内主力连续合约和国际期货。
 
 ## 安装
 
@@ -99,6 +99,8 @@ CLI `sec watch` 与 Desktop「我的自选」统一使用 `~/.sec/watchlist.json
 | `financials`                               | 三类财务报表查询及 CSV／JSON 导出        |
 | `annual-report`                      | 按单年或年份范围下载年报 PDF             |
 | `announcements`、`insider`                    | 公司公告、增减持公告                     |
+| `filings`                                     | 美股 SEC 申报（10-K、10-Q、8-K 等）      |
+| `config`                                      | CLI 与 Desktop 共用的配置，如 SEC 联系邮箱 |
 | `ipo list / calendar / prospectus / download` | 新股列表、IPO 公告日历、招股书查询与下载 |
 | `metal`                                       | 黄金、白银日行情，`--inst` 选品种、`-b/-e` 查区间 |
 | `commodity`                                   | 大宗商品期货行情，`--inst` 加 `-b/-e` 查日行情 |

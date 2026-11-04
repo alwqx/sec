@@ -99,6 +99,9 @@ func TestDisclosureURLValidation(t *testing.T) {
 	}
 	require.NoError(t, validateDisclosureURL("https://static.cninfo.com.cn/finalpage/2026-01-01/test.PDF"))
 	require.NoError(t, validateDisclosureURL("https://www.cninfo.com.cn/new/disclosure/detail?announcementId=1"))
+	require.NoError(t, validateDisclosureURL("https://www.sec.gov/Archives/edgar/data/320193/000032019326000026/aapl-20260926.htm"))
+	require.Error(t, validateDisclosureURL("https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany"), "sec.gov 只允许申报目录")
+	require.Error(t, validateDisclosureURL("http://www.sec.gov/Archives/edgar/data/1/a.htm"))
 }
 
 func TestHistoryFilters(t *testing.T) {

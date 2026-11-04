@@ -46,6 +46,7 @@ export interface WorkspaceSettings {
   download_directory: string
   refresh_seconds: number
   theme: 'dark' | 'light' | 'system'
+  sec_edgar_email?: string // 保存在和 CLI 共用的 ~/.sec/config.json
 }
 
 export interface WorkspaceState {
@@ -276,3 +277,7 @@ export interface CommodityQuote extends CommodityInfo { date: string; time: stri
 // basis 为 settle 或 close：国内品种前一天没有结算价时用收盘价
 export interface CommodityBar { date: string; open: number; high: number; low: number; close: number; volume: number; settle: number | null; yclose: number | null; basis: '' | 'settle' | 'close'; change: number | null; change_rate: number | null }
 export interface CommodityHistory { commodity: CommodityInfo; begin: string; end: string; results: CommodityBar[] }
+
+export interface SECFiling { form: string; filing_date: string; report_date: string; accession: string; items: string; description: string; size: number; url: string; index_url: string }
+export interface SECProfile { cik: number; name: string; tickers: string[] | null; exchanges: string[] | null; industry: string; fiscal_year_end: string }
+export interface SECFilings { company: SECProfile; ticker: string; total: number; has_more: boolean; truncated: boolean; results: SECFiling[] }
