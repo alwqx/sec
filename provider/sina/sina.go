@@ -245,7 +245,8 @@ func parseBasicSecurity(body string) []*BasicSecurity {
 		// 美股 AMD,41,amd,amd,AMD,,AMD,99,1,ESG,,
 		// 1 5 7名称 2市场 3 4代码 8- 9在市 10- 11-
 		ss := strings.Split(item, ",")
-		if len(ss) != 12 {
+		// 只依赖前 9 列，后面的可选字段数量会随新浪接口更新变化。
+		if len(ss) < 9 {
 			slog.Warn("parseBasicSecurity invalid line ", "body", body, "item", item)
 			continue
 		}

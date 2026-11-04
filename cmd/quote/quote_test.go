@@ -167,6 +167,19 @@ func suggestKey(key string) *gock.Request {
 const cmbSuggest = `var suggestvalue="招商银行,11,600036,sh600036,招商银行,,招商银行,99,1,ESG,,";`
 const cmbLine = `var hq_str_sh600036="招商银行,40.000,39.000,41.000,42.000,39.500,41.000,41.010,100,4100.000,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2026-10-30,15:00:00,00,";`
 
+func TestQuoteSearchWithExpandedFields(t *testing.T) {
+	defer gock.Off()
+	suggestKey("lxzk").Reply(200).BodyString(`var suggestvalue="龙芯中科,11,688047,sh688047,龙芯中科,,龙芯中科,99,1,ESG,,,";`)
+	gock.New("https://hq.sinajs.cn").Get("/list=sh688047").Reply(200).
+		BodyString(strings.NewReplacer("招商银行", "龙芯中科", "sh600036", "sh688047").Replace(cmbLine))
+	var out bytes.Buffer
+	err := quoteMultiSec(context.Background(), &out, []string{"lxzk"})
+	require.NoError(t, err)
+	require.Contains(t, out.String(), "龙芯中科")
+	require.Contains(t, out.String(), "SH688047")
+	require.True(t, gock.IsDone())
+}
+
 func TestResolveKeysKeepsOrderAndDedupes(t *testing.T) {
 	defer gock.Off()
 	suggestKey("600036").Reply(200).BodyString(cmbSuggest)
