@@ -434,3 +434,7 @@ h1, h2, h3 { font-weight: 600; }
 .backtest-summary small { display: block; color: var(--muted); font-size: 11px; }
 .backtest-holding { fill: var(--series-1); background: var(--series-1); opacity: .45; }
 .chart-legend i.backtest-holding { height: 3px; border-radius: 0; }
+.us-financials-table th small, .us-financials-table td small { display: block; color: var(--muted); font-size: 11px; font-weight: 400; }
+.us-financials-table td, .us-financials-table thead th { text-align: right; white-space: nowrap; }
+.us-financials-table th:first-child { text-align: left; }
+.us-company-table th { width: 140px; color: var(--muted); font-weight: 400; }

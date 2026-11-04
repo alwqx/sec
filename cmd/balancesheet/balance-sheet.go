@@ -30,7 +30,7 @@ func NewBalanceSheetCLI() *cobra.Command {
 	}
 	cmd.Flags().BoolP("debug", "D", false, "Enable debug mode")
 	cmd.Flags().StringP("type", "t", "", "Report type: balance, income, cashflow")
-	cmd.Flags().StringP("period", "p", "annual", "Period filter: annual, halfyear, q1, q3")
+	cmd.Flags().StringP("period", "p", "annual", "Period filter: annual, halfyear, q1, q3; US stocks: annual, quarter")
 	cmd.Flags().StringP("output", "o", "", "Export to file (.csv or .json)")
 	cmd.Flags().Bool("json", false, "Output JSON to stdout, with all raw fields")
 	cmd.MarkFlagsMutuallyExclusive("output", "json")
@@ -57,6 +57,10 @@ func BalanceSheetHandler(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("未找到证券: %s", key)
 	}
 	sec := secs[0]
+	// 美股的财报来自 SEC XBRL，报表结构和东方财富的 A 股报表不同。
+	if strings.HasPrefix(sec.ExCode, "$") {
+		return usFinancialsHandler(cmd, sec.ExCode)
+	}
 
 	// Determine which report types to fetch
 	var reportTypes []eastmoney.FinancialReportType

@@ -279,5 +279,17 @@ export interface CommodityBar { date: string; open: number; high: number; low: n
 export interface CommodityHistory { commodity: CommodityInfo; begin: string; end: string; results: CommodityBar[] }
 
 export interface SECFiling { form: string; filing_date: string; report_date: string; accession: string; items: string; description: string; size: number; url: string; index_url: string }
-export interface SECProfile { cik: number; name: string; tickers: string[] | null; exchanges: string[] | null; industry: string; fiscal_year_end: string }
+export interface SECProfile {
+  cik: number; name: string; tickers: string[] | null; exchanges: string[] | null; industry: string; sic: string; fiscal_year_end: string
+  category: string; state_of_incorporation: string; business_address: string; phone: string; website: string; former_names: { name: string; from: string; to: string }[] | null
+}
 export interface SECFilings { company: SECProfile; ticker: string; total: number; has_more: boolean; truncated: boolean; results: SECFiling[] }
+
+export interface USQuote { name: string; price: number; change_rate: number; time: string; high_52w: number | null; low_52w: number | null; market_cap: number | null; eps: number | null; pe: number | null; shares: number | null }
+export interface USCompanyData { info: { ex_code: string; ticker: string; company: SECProfile | null; quote: USQuote | null }; notes: string[] }
+export interface USReport {
+  statement: string; quarterly: boolean
+  lines: { key: string; label: string; unit: string }[]
+  periods: { end: string; start?: string; fiscal_year: number; fiscal_period: string; values: Record<string, number | null>; derived?: string[] }[]
+}
+export interface USFinancialsData { ticker: string; name: string; cik: number; report: USReport }
