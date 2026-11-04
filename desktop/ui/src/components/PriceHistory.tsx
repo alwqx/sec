@@ -73,10 +73,10 @@ function LoadedHistory({ code }: { code: string }) {
     <div className="history-indicators" role="group" aria-label="技术指标"><span className="data-note">指标</span>{[...maPeriods.map(period => `MA${period}`), 'BOLL'].map(name => <label key={name}><input type="checkbox" checked={shown.includes(name)} onChange={() => toggle(name)} />{name === 'BOLL' ? 'BOLL(20,2)' : name}</label>)}</div>
     <ResourceState {...resource} retry={resource.reload} />
     {resource.data?.source_note && <p className="data-note">{resource.data.source_note}</p>}
-    {resource.data && (values.length ? <CandlestickChart key={`${code}-${freq}-${filters.begin}-${filters.end}-${filters.fq}`} freqLabel={frequencies[freq].short} data={values} overlays={overlays} name={code} showVolume unit={code.startsWith('HK') ? '港元' : '元'} /> : <p className="data-note">所选区间暂无历史行情</p>)}
+    {resource.data && (values.length ? <CandlestickChart key={`${code}-${freq}-${filters.begin}-${filters.end}-${filters.fq}`} freqLabel={frequencies[freq].short} data={values} overlays={overlays} name={code} showVolume unit={code.startsWith('HK') ? '港元' : code.startsWith('$') ? '美元' : '元'} /> : <p className="data-note">所选区间暂无历史行情</p>)}
   </div>
 }
 
 export default function PriceHistory({ code }: { code: string }) {
-  return /^(SH|SZ)\d{6}$|^HK\d{5}$/i.test(code) ? <LoadedHistory key={code} code={code} /> : <p className="data-note">走势图暂支持沪深证券与港股。</p>
+  return /^(SH|SZ)\d{6}$|^HK\d{5}$|^\$[A-Z][A-Z0-9.-]{0,9}$/i.test(code) ? <LoadedHistory key={code} code={code} /> : <p className="data-note">走势图暂支持沪深证券、港股和美股。</p>
 }

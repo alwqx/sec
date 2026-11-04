@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/mail"
 	"os"
 	"path/filepath"
@@ -146,4 +147,14 @@ func Update(ctx context.Context, change func(*Config) error) error {
 		return err
 	}
 	return UpdateFile(ctx, path, change)
+}
+
+// LoadOrWarn 读取配置，供命令行使用：文件内容无效时把原因写到 warn，并使用默认值。
+func LoadOrWarn(ctx context.Context, warn io.Writer) (Config, error) {
+	cfg, err := Load(ctx)
+	if errors.Is(err, ErrInvalid) {
+		fmt.Fprintln(warn, err)
+		return cfg, nil
+	}
+	return cfg, err
 }

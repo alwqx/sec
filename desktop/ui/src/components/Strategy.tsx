@@ -149,5 +149,5 @@ function LoadedStrategy({ code }: { code: string }) {
 }
 
 export default function Strategy({ code }: { code: string }) {
-  return /^(SH|SZ)\d{6}$|^HK\d{5}$/i.test(code) ? <LoadedStrategy code={code} /> : <div className="empty-state">技术分析暂支持沪深证券与港股。</div>
+  return /^(SH|SZ)\d{6}$|^HK\d{5}$|^\$[A-Z][A-Z0-9.-]{0,9}$/i.test(code) ? <LoadedStrategy code={code} /> : <div className="empty-state">技术分析暂支持沪深证券、港股和美股。</div>
 }

@@ -291,9 +291,13 @@ func parseHistoryQuery(w http.ResponseWriter, r *http.Request) (historyQuery, bo
 	} else if regexp.MustCompile(`^HK[0-9]{5}$`).MatchString(code) {
 		symbol = code[2:]
 		market = 116
+	} else if usTicker.MatchString(code) {
+		// 美股先按纳斯达克查，纽交所的股票由 history 包换市场代码重试。
+		symbol = strings.ToLower(code[1:])
+		market = int(eastmoney.MarketTypeNasdaq)
 	}
 	if market < 0 {
-		writeError(w, http.StatusBadRequest, "走势图暂支持沪深证券与港股")
+		writeError(w, http.StatusBadRequest, "走势图暂支持沪深证券、港股和美股")
 		return historyQuery{}, false
 	}
 	now := time.Now().In(time.FixedZone("CST", 8*3600))

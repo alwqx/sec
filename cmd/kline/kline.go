@@ -76,7 +76,8 @@ func KLineHandler(cmd *cobra.Command, args []string) error {
 		req.MarketCode = 0
 	case types.ExChangeHKex:
 		req.MarketCode = 116
-	case types.ExChangeNasdaq:
+	case types.ExChangeNasdaq, types.ExChangeNyse:
+		// 新浪搜索把美股都标成纳斯达克；纽交所的股票用 105 查不到时，history 包会换成 106、107 再查。
 		req.MarketCode = 105
 	default:
 		return fmt.Errorf("unsupported exchange: %s", sec.ExChange)
@@ -119,6 +120,10 @@ func KLineHandler(cmd *cobra.Command, args []string) error {
 			fmt.Fprintln(cmd.ErrOrStderr(), result.Note)
 		}
 		return utils.PrintJSON(cmd.OutOrStdout(), history.NewOutput(sec.ExCode, sec.Name, req, result, result.Quotes))
+	}
+
+	if strings.HasPrefix(sec.ExCode, "$") {
+		return usKline(cmd, sec, req)
 	}
 
 	var (
@@ -166,6 +171,11 @@ func KLineHandler(cmd *cobra.Command, args []string) error {
 		profile.ListingPrice, profile.PriceText(), utils.HumanRatio(profile.PB), utils.HumanRatio(profile.PeTTM),
 		utils.HumanNum(profile.MarketCap), utils.HumanNum(profile.TradedMarketCap))
 
+	return drawChart(cmd, sec, quotes)
+}
+
+// drawChart 画蜡烛图，A 股、港股和美股共用。
+func drawChart(cmd *cobra.Command, sec *sina.BasicSecurity, quotes []*eastmoney.Quote) error {
 	// 渲染蜡烛图
 	noVolume, _ := cmd.Flags().GetBool("no-volume")
 	paging, _ := cmd.Flags().GetBool("paging")
@@ -233,6 +243,54 @@ func KLineHandler(cmd *cobra.Command, args []string) error {
 
 	candles := toCandles(quotes)
 	return render.Render(cmd.OutOrStdout(), candles, cfg)
+}
+
+// usKline 画美股 K 线。新浪没有美股的公司资料页，标题用新浪美股行情；行情失败时只提示，不影响画图。
+func usKline(cmd *cobra.Command, sec *sina.BasicSecurity, req *eastmoney.GetQuoteHistoryReq) error {
+	var (
+		result   *history.Result
+		quote    *sina.USQuote
+		err      error
+		quoteErr error
+		wg       sync.WaitGroup
+	)
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		quote, quoteErr = sina.QueryUSQuote(cmd.Context(), sec.ExCode)
+	}()
+	go func() {
+		defer wg.Done()
+		result, err = history.Get(cmd.Context(), req)
+	}()
+	wg.Wait()
+	if err != nil {
+		return err
+	}
+	if result.Note != "" {
+		fmt.Fprintln(cmd.ErrOrStderr(), result.Note)
+	}
+	if len(result.Quotes) == 0 {
+		slog.Info("no quote data", "code", req.Code)
+		return nil
+	}
+	out := cmd.OutOrStdout()
+	if quoteErr != nil {
+		fmt.Fprintf(cmd.ErrOrStderr(), "行情获取失败：%v\n", quoteErr)
+		fmt.Fprintf(out, "证券代码\t%s\n公司名称\t%s\n", sec.ExCode, sec.Name)
+	} else {
+		pe := "-"
+		if quote.PE != nil {
+			pe = fmt.Sprintf("%.2f", *quote.PE)
+		}
+		capText := "-"
+		if quote.MarketCap != nil {
+			capText = utils.HumanNum(*quote.MarketCap) + "美元"
+		}
+		fmt.Fprintf(out, "证券代码\t%s\n公司名称\t%s\n当前价格\t%.2f 美元（%+.2f%%）\n市盈率TTM\t%s\n总市值  \t%s\n", sec.ExCode, quote.Name, quote.Price, quote.ChangeRate, pe, capText)
+	}
+	return drawChart(cmd, sec, result.Quotes)
+
 }
 
 // toCandles converts eastmoney Quote slice to render Candle slice.

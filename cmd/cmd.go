@@ -156,6 +156,10 @@ func InfoHandler(cmd *cobra.Command, args []string) error {
 
 	// 2. choose the first item
 	sec := secs[0]
+	// 美股没有新浪的公司资料页，公司资料改用 SEC EDGAR。
+	if strings.HasPrefix(sec.ExCode, "$") {
+		return usInfoHandler(cmd, sec.ExCode, asJSON, opts.Dividend)
+	}
 	opts.Code = sec.Code
 	opts.ExCode = sec.ExCode
 	profile, err := sina.Profile(cmd.Context(), opts)

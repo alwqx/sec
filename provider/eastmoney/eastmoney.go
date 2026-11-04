@@ -20,6 +20,8 @@ const (
 	MarketTypeSzSe   MarketType = 0   // 深圳证券交易所
 	MarketTypeSse    MarketType = 1   // 上海证券交易所
 	MarketTypeNasdaq MarketType = 105 // 纳斯达克交易所
+	MarketTypeNyse   MarketType = 106 // 纽约证券交易所
+	MarketTypeAmex   MarketType = 107 // NYSE American（原美国证券交易所）
 	MarketTypeHK     MarketType = 116 // 香港证券交易所
 
 	EastMoney80Push2ApiBase             = "http://80.push2.eastmoney.com"
@@ -92,10 +94,13 @@ func GetQuoteHistory(ctx context.Context, req *GetQuoteHistoryReq) (res []*Quote
 	return parseQuoteHistoryResp(tmpRes)
 }
 
+// ErrNoData 表示东方财富没有这个证券的行情，比如美股的市场代码不对（纳斯达克 105、纽交所 106、NYSE American 107）。
+var ErrNoData = errors.New("东方财富没有这个证券的行情")
+
 // parseQuoteHistoryResp 解析数据结构到标准结构体
 func parseQuoteHistoryResp(resp *QuoteHistoryResp) ([]*Quote, error) {
 	if resp == nil || resp.Data == nil {
-		return nil, errors.New("nil data")
+		return nil, ErrNoData
 	}
 
 	data := resp.Data

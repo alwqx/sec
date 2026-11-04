@@ -37,12 +37,15 @@ func Get(ctx context.Context, req *eastmoney.GetQuoteHistoryReq) (*Result, error
 // GetFrom 和 Get 相同，但 req.Begin 可以早于 required：两者之间是计算指标用的预热数据。
 // 备用数据只需覆盖 required，预热数据尽力而为。
 func GetFrom(ctx context.Context, req *eastmoney.GetQuoteHistoryReq, required string) (*Result, error) {
-	quotes, err := eastmoney.GetQuoteHistory(ctx, req)
+	quotes, err := getEastMoney(ctx, req)
 	if err == nil {
 		return &Result{Quotes: quotes}, nil
 	}
 	if ctx.Err() != nil {
 		return nil, err
+	}
+	if isUS(req.MarketCode) {
+		return usFallback(ctx, req, required, err)
 	}
 	symbol, ok := sinaSymbol(req)
 	if !ok {
@@ -60,11 +63,76 @@ func GetFrom(ctx context.Context, req *eastmoney.GetQuoteHistoryReq, required st
 	if len(bars) == 0 {
 		return nil, fmt.Errorf("东方财富: %w；新浪备用没有返回数据", err)
 	}
-	quotes, fallbackErr = toQuotes(bars, req, required)
+	quotes, fallbackErr = toQuotes(bars, req, required, true)
 	if fallbackErr != nil {
 		return nil, fmt.Errorf("东方财富: %w；新浪备用: %w", err, fallbackErr)
 	}
 	return &Result{Quotes: quotes, Note: FallbackNote}, nil
+}
+
+// usMarkets 是东方财富的美股市场代码。新浪搜索把美股都标成纳斯达克，纽交所的股票用 105 查不到，依次换成 106、107。
+var usMarkets = []int{int(eastmoney.MarketTypeNasdaq), int(eastmoney.MarketTypeNyse), int(eastmoney.MarketTypeAmex)}
+
+func isUS(market int) bool {
+	for _, code := range usMarkets {
+		if market == code {
+			return true
+		}
+	}
+	return false
+}
+
+// getEastMoney 查询东方财富。美股返回"没有数据"时换其他美股市场代码再查，查到后把正确的代码写回 req。
+func getEastMoney(ctx context.Context, req *eastmoney.GetQuoteHistoryReq) ([]*eastmoney.Quote, error) {
+	if isUS(req.MarketCode) {
+		// 东方财富的类别股用下划线，比如 BRK.B 是 BRK_B；新浪日线仍用原代码，所以查完恢复。
+		original := req.Code
+		req.Code = strings.NewReplacer(".", "_", "-", "_").Replace(original)
+		defer func() { req.Code = original }()
+	}
+	quotes, err := eastmoney.GetQuoteHistory(ctx, req)
+	if !isUS(req.MarketCode) || !errors.Is(err, eastmoney.ErrNoData) {
+		return quotes, err
+	}
+	original := req.MarketCode
+	for _, market := range usMarkets {
+		if market == original {
+			continue
+		}
+		req.MarketCode = market
+		if quotes, err = eastmoney.GetQuoteHistory(ctx, req); !errors.Is(err, eastmoney.ErrNoData) {
+			return quotes, err
+		}
+	}
+	req.MarketCode = original
+	return nil, err
+}
+
+// USFallbackNote 说明美股备用数据和东方财富的差异。
+const USFallbackNote = "东方财富行情暂不可用，已改用新浪美股日线：不复权（拆股当天价格会跳变），没有成交额、换手率，只有日线。"
+
+// usFallback 东方财富失败时，美股不复权日线改用新浪。新浪美股只有日线，没有周线、月线和复权价格。
+func usFallback(ctx context.Context, req *eastmoney.GetQuoteHistoryReq, required string, err error) (*Result, error) {
+	if req.FQT != eastmoney.QuoteFQTDefault {
+		return nil, fmt.Errorf("%w: %w", ErrAdjustedUnavailable, err)
+	}
+	// 没有指定周期时是日线，和东方财富一致。
+	if req.Freq != "" && req.Freq != eastmoney.FreqDay {
+		return nil, fmt.Errorf("东方财富: %w；新浪美股备用数据只有日线", err)
+	}
+	slog.WarnContext(ctx, "东方财富美股行情失败，改用新浪备用数据", "code", req.Code, "error", err)
+	bars, fallbackErr := sina.QueryUSDailyBars(ctx, req.Code)
+	if fallbackErr != nil {
+		return nil, fmt.Errorf("东方财富: %w；新浪备用: %w", err, fallbackErr)
+	}
+	if len(bars) == 0 {
+		return nil, fmt.Errorf("东方财富: %w；新浪备用没有返回数据", err)
+	}
+	quotes, fallbackErr := toQuotes(bars, req, required, false)
+	if fallbackErr != nil {
+		return nil, fmt.Errorf("东方财富: %w；新浪备用: %w", err, fallbackErr)
+	}
+	return &Result{Quotes: quotes, Note: USFallbackNote}, nil
 }
 
 func sinaScale(freq eastmoney.Freq) int {
@@ -97,9 +165,10 @@ func round(value float64, digits int) float64 {
 	return math.Round(value*scale) / scale
 }
 
-func toQuotes(bars []*sina.Bar, req *eastmoney.GetQuoteHistoryReq, required string) ([]*eastmoney.Quote, error) {
-	// 取满上限时，更早的数据被截断了；不满上限说明已经到上市首日。
-	if len(bars) >= sina.MaxBars && required != "" && compactDate(bars[0].Date) > compactDate(required) {
+// toQuotes 把新浪 K 线转成东方财富的格式。capped 表示接口最多返回 sina.MaxBars 条（沪深 K 线）：
+// 取满上限时更早的数据被截断了，覆盖不了请求区间就报错。新浪美股日线返回上市以来的全部数据，不用判断。
+func toQuotes(bars []*sina.Bar, req *eastmoney.GetQuoteHistoryReq, required string, capped bool) ([]*eastmoney.Quote, error) {
+	if capped && len(bars) >= sina.MaxBars && required != "" && compactDate(bars[0].Date) > compactDate(required) {
 		return nil, fmt.Errorf("%w: 只有 %s 之后的数据，请求从 %s 开始", ErrRangeNotCovered, bars[0].Date, required)
 	}
 	quotes := make([]*eastmoney.Quote, 0, len(bars))

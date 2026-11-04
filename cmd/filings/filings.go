@@ -2,7 +2,6 @@
 package filings
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -64,10 +63,8 @@ func filingsHandler(cmd *cobra.Command, args []string) error {
 		query.Begin, query.End = begin.Format(utils.LayoutYYMMDD), end.Format(utils.LayoutYYMMDD)
 	}
 
-	cfg, err := config.Load(cmd.Context())
-	if errors.Is(err, config.ErrInvalid) {
-		fmt.Fprintln(cmd.ErrOrStderr(), err)
-	} else if err != nil {
+	cfg, err := config.LoadOrWarn(cmd.Context(), cmd.ErrOrStderr())
+	if err != nil {
 		return err
 	}
 	client := &edgar.Client{Email: cfg.SECEmail}

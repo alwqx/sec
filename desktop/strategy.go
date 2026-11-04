@@ -189,6 +189,8 @@ func backtestNote(code string, query historyQuery) string {
 	switch {
 	case strings.HasPrefix(code, "HK"):
 		return "回测只支持 A 股个股：港股没有涨跌停、可以 T+0，每手股数也不同。"
+	case strings.HasPrefix(code, "$"):
+		return "回测只支持 A 股个股：美股没有涨跌停、可以 T+0，可以买卖 1 股。"
 	case backtest.Supported(code) != nil:
 		return backtest.Supported(code).Error()
 	case query.freq != eastmoney.FreqDay:

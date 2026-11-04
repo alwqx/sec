@@ -114,20 +114,24 @@ func TestFallbackRejectsTruncatedRange(t *testing.T) {
 	for i := range bars {
 		bars[i] = &sina.Bar{Date: start.AddDate(0, 0, i).Format("2006-01-02"), Close: 10}
 	}
-	_, err := toQuotes(bars, unadjusted("20200101", ""), "20200101")
+	_, err := toQuotes(bars, unadjusted("20200101", ""), "20200101", true)
 	require.ErrorIs(t, err, ErrRangeNotCovered)
+	// 新浪美股日线没有条数上限，返回的就是上市以来的全部数据，不算截断。
+	all, err := toQuotes(bars, unadjusted("20200101", ""), "20200101", false)
+	require.NoError(t, err)
+	require.Len(t, all, len(bars))
 
-	quotes, err := toQuotes(bars, unadjusted("20220810", ""), "20220810")
+	quotes, err := toQuotes(bars, unadjusted("20220810", ""), "20220810", true)
 	require.NoError(t, err)
 	require.Len(t, quotes, sina.MaxBars)
 
 	// 预热部分超出范围时，只要可见区间有数据就可以返回。
-	quotes, err = toQuotes(bars, unadjusted("20200101", ""), "20230101")
+	quotes, err = toQuotes(bars, unadjusted("20200101", ""), "20230101", true)
 	require.NoError(t, err)
 	require.Len(t, quotes, sina.MaxBars)
 
 	// 不满上限说明已经到上市首日，早于上市日的开始日期不算截断。
-	quotes, err = toQuotes(bars[:100], unadjusted("20200101", ""), "20200101")
+	quotes, err = toQuotes(bars[:100], unadjusted("20200101", ""), "20200101", true)
 	require.NoError(t, err)
 	require.Len(t, quotes, 100)
 }
@@ -171,9 +175,46 @@ func TestFreqIsPassedToBothSources(t *testing.T) {
 }
 
 func TestFallbackRoundsChange(t *testing.T) {
-	quotes, err := toQuotes([]*sina.Bar{{Date: "2026-10-08", Close: 41.26}, {Date: "2026-10-09", Close: 41.71, High: 41.83, Low: 41}}, unadjusted("", ""), "")
+	quotes, err := toQuotes([]*sina.Bar{{Date: "2026-10-08", Close: 41.26}, {Date: "2026-10-09", Close: 41.71, High: 41.83, Low: 41}}, unadjusted("", ""), "", true)
 	require.NoError(t, err)
 	require.Equal(t, 0.45, quotes[1].Change)
 	require.Equal(t, 1.09, quotes[1].ChangeRate)
 	require.Equal(t, 2.01, quotes[1].Amplitude)
+}
+
+// 新浪搜索把美股都标成纳斯达克；东方财富用 105 查不到时换成 106 再查，并把正确的市场代码写回请求。
+func TestUSRetriesNyseMarket(t *testing.T) {
+	defer gock.Off()
+	gock.New("https://push2his.eastmoney.com").Get(klinePath).MatchParam("secid", "^105\\.jpm$").Reply(200).BodyString(`{"data":null}`)
+	gock.New("https://push2his.eastmoney.com").Get(klinePath).MatchParam("secid", "^106\\.jpm$").Reply(200).
+		BodyString(`{"data":{"code":"JPM","market":106,"name":"摩根大通","klines":["2026-11-03,340.00,337.98,341.00,336.00,1000,338000.00,1.0,-0.6,-2.0,0.1"]}}`)
+	req := &eastmoney.GetQuoteHistoryReq{Code: "jpm", MarketCode: 105, Begin: "20261101", End: "20261103"}
+	result, err := Get(context.Background(), req)
+	require.NoError(t, err)
+	require.Len(t, result.Quotes, 1)
+	require.Equal(t, 337.98, result.Quotes[0].Close)
+	require.Equal(t, 106, req.MarketCode)
+	require.Empty(t, result.Note)
+	require.True(t, gock.IsDone())
+}
+
+// 东方财富失败时，美股不复权日线改用新浪美股日线；复权和周线没有备用数据。
+func TestUSFallback(t *testing.T) {
+	defer gock.Off()
+	gock.New("https://push2his.eastmoney.com").Get(klinePath).Reply(503)
+	gock.New("https://stock.finance.sina.com.cn").Get("/usstock/api/jsonp.php/var.t=/US_MinKService.getDailyK").MatchParam("symbol", "aapl").
+		Reply(200).BodyString(`var t=([{"d":"2026-10-30","o":"346.71","h":"349.19","l":"334.35","c":"344.63","v":"67841500"},{"d":"2026-11-02","o":"342.67","h":"343.80","l":"335.82","c":"338.32","v":"64757676"}]);`)
+	result, err := Get(context.Background(), &eastmoney.GetQuoteHistoryReq{Code: "aapl", MarketCode: 105, Begin: "20261102", End: "20261103"})
+	require.NoError(t, err)
+	require.Equal(t, USFallbackNote, result.Note)
+	require.Len(t, result.Quotes, 1)
+	require.InDelta(t, 338.32-344.63, result.Quotes[0].Change, 1e-9, "区间第一天的涨跌用区间之前的收盘价")
+	require.True(t, gock.IsDone())
+
+	gock.New("https://push2his.eastmoney.com").Get(klinePath).Reply(503)
+	_, err = Get(context.Background(), &eastmoney.GetQuoteHistoryReq{Code: "aapl", MarketCode: 105, FQT: eastmoney.QuoteFQTFront})
+	require.ErrorIs(t, err, ErrAdjustedUnavailable)
+	gock.New("https://push2his.eastmoney.com").Get(klinePath).Reply(503)
+	_, err = Get(context.Background(), &eastmoney.GetQuoteHistoryReq{Code: "aapl", MarketCode: 105, Freq: eastmoney.FreqWeek})
+	require.ErrorContains(t, err, "只有日线")
 }
