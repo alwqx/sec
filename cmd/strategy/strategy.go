@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/alwqx/sec/backtest"
+	"github.com/alwqx/sec/cmd/internal/termtable"
 	"github.com/alwqx/sec/indicator"
 	"github.com/alwqx/sec/provider/eastmoney"
 	"github.com/alwqx/sec/provider/history"
@@ -121,12 +122,7 @@ func displayTable(cmd *cobra.Command, headers []string, data [][]string, signals
 	}
 	visible := data[start:]
 
-	table := plainTable(out, headers)
-	hs := make([]tablewriter.Colors, len(headers))
-	for i := range headers {
-		hs[i] = tablewriter.Colors{tablewriter.Bold}
-	}
-	table.SetHeaderColor(hs...)
+	table := termtable.New(out, headers, termtable.Compact, termtable.NoWrap)
 
 	sigIdx := 0
 	for i, row := range visible {
@@ -138,9 +134,9 @@ func displayTable(cmd *cobra.Command, headers []string, data [][]string, signals
 				if s.Date.Format("2006-01-02") == data[idx][0] {
 					switch s.Type {
 					case "buy":
-						colors[len(row)-1] = tablewriter.Colors{tablewriter.FgRedColor, tablewriter.Bold}
+						colors[len(row)-1] = termtable.Up(false)
 					case "sell":
-						colors[len(row)-1] = tablewriter.Colors{tablewriter.FgGreenColor, tablewriter.Bold}
+						colors[len(row)-1] = termtable.Down(false)
 					}
 					sigIdx++
 					break

@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/alwqx/sec/backtest"
+	"github.com/alwqx/sec/cmd/internal/termtable"
 	"github.com/alwqx/sec/indicator"
-	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 )
 
@@ -39,19 +39,6 @@ func (a *analysis) backtest(cmd *cobra.Command, signals []Signal) (*backtest.Res
 	return backtest.RunQuotes(a.exCode, a.quotes, a.first, items, backtestConfig(cmd))
 }
 
-// plainTable 返回无边框、制表符分隔的表格。
-func plainTable(out io.Writer, headers []string) *tablewriter.Table {
-	table := tablewriter.NewWriter(out)
-	table.SetHeader(headers)
-	table.SetAutoWrapText(false)
-	table.SetBorder(false)
-	table.SetHeaderLine(false)
-	table.SetAlignment(tablewriter.ALIGN_LEFT)
-	table.SetNoWhiteSpace(true)
-	table.SetTablePadding("\t")
-	return table
-}
-
 func percentText(value *float64) string {
 	if value == nil {
 		return "-"
@@ -71,7 +58,7 @@ func printBacktest(out io.Writer, r *backtest.Result) {
 	fmt.Fprintf(out, "回测: %s 至 %s，前复权日线，初始资金 %.0f 元\n", r.Begin, r.End, r.Config.Cash)
 	fmt.Fprintf(out, "信号在收盘产生，下一交易日开盘成交，每次全仓买入或全部卖出；按 100 股一手，开盘涨停买不进、跌停卖不出、停牌顺延。\n")
 	fmt.Fprintf(out, "成本: 佣金 %.4g%%（最低 %.0f 元），卖出印花税 %.4g%%，滑点 %.4g%%\n\n", r.Config.Commission*100, r.Config.MinCommission, r.Config.StampTax*100, r.Config.Slippage*100)
-	table := plainTable(out, []string{"", "策略", "买入持有"})
+	table := termtable.New(out, []string{"", "策略", "买入持有"}, termtable.Compact, termtable.NoWrap, termtable.PlainHeader)
 	total := func(p backtest.Performance) string { return fmt.Sprintf("%+.2f%%", p.TotalReturn) }
 	table.AppendBulk([][]string{
 		{"总收益", total(r.Strategy), total(r.Benchmark)},
@@ -90,7 +77,7 @@ func printBacktest(out io.Writer, r *backtest.Result) {
 	}
 	if len(r.Trades) > 0 {
 		fmt.Fprintln(out, "\n【成交】")
-		trades := plainTable(out, []string{"成交日", "方向", "价格", "股数", "费用", "盈亏", "信号"})
+		trades := termtable.New(out, []string{"成交日", "方向", "价格", "股数", "费用", "盈亏", "信号"}, termtable.Compact, termtable.NoWrap, termtable.PlainHeader)
 		for _, t := range r.Trades {
 			side, profit := "买入", "-"
 			if t.Side == indicator.Sell {

@@ -12,6 +12,7 @@ import (
 	"github.com/alwqx/sec/cmd/commodity"
 	"github.com/alwqx/sec/cmd/fx"
 	"github.com/alwqx/sec/cmd/insider"
+	"github.com/alwqx/sec/cmd/internal/termtable"
 	"github.com/alwqx/sec/cmd/ipo"
 	"github.com/alwqx/sec/cmd/kline"
 	"github.com/alwqx/sec/cmd/macro"
@@ -25,7 +26,6 @@ import (
 	"github.com/alwqx/sec/types"
 	"github.com/alwqx/sec/utils"
 	"github.com/alwqx/sec/version"
-	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 )
 
@@ -237,21 +237,9 @@ func printSecs(out io.Writer, secs []*sina.BasicSecurity) {
 		data = append(data, []string{sec.ExCode, sec.Name, string(sec.SecurityType), sec.ExChange})
 	}
 
-	table := tablewriter.NewWriter(out)
 	headers := []string{"证券代码", "证券名称", "证券类型", "交易所"}
-	table.SetHeader(headers)
-	headerStyles := make([]tablewriter.Colors, 0, len(headers))
-	for range headers {
-		headerStyles = append(headerStyles, tablewriter.Colors{tablewriter.Bold})
-	}
-	table.SetHeaderColor(headerStyles...)
+	table := termtable.New(out, headers, termtable.LeftHeader, termtable.Compact)
 
-	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
-	table.SetAlignment(tablewriter.ALIGN_LEFT)
-	table.SetHeaderLine(false)
-	table.SetBorder(false)
-	table.SetNoWhiteSpace(true)
-	table.SetTablePadding("\t")
 	table.AppendBulk(data)
 	table.Render()
 }
@@ -283,21 +271,9 @@ func printDividends(out io.Writer, dids []sina.Dividend) {
 		data = append(data, []string{did.PublicDate, bonus, did.DividendedDate, did.RecordDate})
 	}
 
-	table := tablewriter.NewWriter(out)
 	headers := []string{"公告日期", "分红送配", "除权除息日", "股权登记日"}
-	table.SetHeader(headers)
-	headerStyles := make([]tablewriter.Colors, 0, len(headers))
-	for range headers {
-		headerStyles = append(headerStyles, tablewriter.Colors{tablewriter.Bold})
-	}
-	table.SetHeaderColor(headerStyles...)
+	table := termtable.New(out, headers, termtable.LeftHeader, termtable.Compact)
 
-	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
-	table.SetAlignment(tablewriter.ALIGN_LEFT)
-	table.SetHeaderLine(false)
-	table.SetBorder(false)
-	table.SetNoWhiteSpace(true)
-	table.SetTablePadding("\t")
 	table.AppendBulk(data)
 	table.Render()
 }

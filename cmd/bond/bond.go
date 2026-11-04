@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/alwqx/sec/cmd/internal/termtable"
 	"github.com/alwqx/sec/provider/bond"
 	"github.com/alwqx/sec/utils"
 	"github.com/olekukonko/tablewriter"
@@ -88,35 +89,18 @@ func printBondYield(out io.Writer, items []*bond.BondYieldItem) {
 			var itemStyle tablewriter.Colors = tablewriter.Colors{}
 			// 10年收益率列着色
 			if title == "10年" {
-				if item.ChangeRate > 0 {
-					itemStyle = tablewriter.Colors{tablewriter.Bold, tablewriter.UnderlineSingle, tablewriter.FgRedColor}
-				} else if item.ChangeRate < 0 {
-					itemStyle = tablewriter.Colors{tablewriter.Bold, tablewriter.UnderlineSingle, tablewriter.FgGreenColor}
-				}
+				itemStyle = termtable.Change(item.ChangeRate, true)
 			}
 			styles = append(styles, itemStyle)
 		}
 		columnsStyles = append(columnsStyles, styles)
 	}
 
-	table := tablewriter.NewWriter(out)
-	table.SetHeader(headers)
+	table := termtable.New(out, headers, termtable.LeftHeader)
 
 	for i, row := range data {
 		table.Rich(row, columnsStyles[i])
 	}
 
-	headerStyles := make([]tablewriter.Colors, 0, len(headers))
-	for range headers {
-		headerStyles = append(headerStyles, tablewriter.Colors{tablewriter.Bold})
-	}
-	table.SetHeaderColor(headerStyles...)
-
-	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
-	table.SetAlignment(tablewriter.ALIGN_LEFT)
-	table.SetHeaderLine(false)
-	table.SetBorder(false)
-	table.SetNoWhiteSpace(false)
-	table.SetTablePadding("\t")
 	table.Render()
 }

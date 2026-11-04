@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/alwqx/sec/cmd/internal/termtable"
 	"github.com/alwqx/sec/provider/cninfo"
 	"github.com/alwqx/sec/provider/sina"
 	"github.com/alwqx/sec/utils"
@@ -144,19 +145,7 @@ func runAnnouncements(cmd *cobra.Command, args []string) error {
 		styles = append(styles, style)
 	}
 
-	table := tablewriter.NewWriter(out)
-	table.SetHeader(headers)
-	hs := make([]tablewriter.Colors, len(headers))
-	for i := range headers {
-		hs[i] = tablewriter.Colors{tablewriter.Bold}
-	}
-	table.SetHeaderColor(hs...)
-	table.SetHeaderLine(false)
-	table.SetBorder(false)
-	table.SetAlignment(tablewriter.ALIGN_LEFT)
-	table.SetNoWhiteSpace(true)
-	table.SetTablePadding("\t")
-	table.SetColWidth(60) // limit title width
+	table := termtable.New(out, headers, termtable.Compact, termtable.ColWidth(60))
 
 	for i, row := range data {
 		table.Rich(row, styles[i])

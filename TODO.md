@@ -60,11 +60,7 @@
 
 ## CLI
 
-
 ## Desktop
-
-- [ ] 真实 WebView 验证：财报图表分析、估值页的同行业对比和分红区块只在 Chrome 中验证过，需在 macOS 桌面窗口中检查渲染、悬停提示和键盘操作。
 
 ## 工程
 
-- [ ] F10 财报请求与数据中心请求重复：`provider/eastmoney/statements.go` 的 `f10Request` 和 `datacenterRows` 各自实现请求、状态检查和 JSON 解析，`financials` 包的取数函数也重复了 `rowNumber`；合并时需要导出 provider 的内部函数并统一错误处理。

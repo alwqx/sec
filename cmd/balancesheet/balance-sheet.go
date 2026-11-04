@@ -8,10 +8,10 @@ import (
 	"os"
 	"strings"
 
+	"github.com/alwqx/sec/cmd/internal/termtable"
 	"github.com/alwqx/sec/provider/eastmoney"
 	"github.com/alwqx/sec/provider/sina"
 	"github.com/alwqx/sec/utils"
-	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 )
 
@@ -210,21 +210,7 @@ func printDetailed(cmd *cobra.Command, r result) {
 
 // renderTable outputs a table to stdout using tablewriter.
 func renderTable(cmd *cobra.Command, headers []string, data [][]string) {
-	table := tablewriter.NewWriter(cmd.OutOrStdout())
-	table.SetHeader(headers)
-
-	headerStyles := make([]tablewriter.Colors, 0, len(headers))
-	for range headers {
-		headerStyles = append(headerStyles, tablewriter.Colors{tablewriter.Bold})
-	}
-	table.SetHeaderColor(headerStyles...)
-
-	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
-	table.SetAlignment(tablewriter.ALIGN_LEFT)
-	table.SetHeaderLine(false)
-	table.SetBorder(false)
-	table.SetNoWhiteSpace(true)
-	table.SetTablePadding("\t")
+	table := termtable.New(cmd.OutOrStdout(), headers, termtable.LeftHeader, termtable.Compact)
 
 	for _, row := range data {
 		table.Append(row)

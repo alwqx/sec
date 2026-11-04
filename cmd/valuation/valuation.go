@@ -7,11 +7,11 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/alwqx/sec/cmd/internal/termtable"
 	"github.com/alwqx/sec/provider/sina"
 	"github.com/alwqx/sec/types"
 	"github.com/alwqx/sec/utils"
 	shared "github.com/alwqx/sec/valuation"
-	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 )
 
@@ -289,18 +289,7 @@ func printDCF(out io.Writer, r *shared.Result) {
 // --- Helpers ---
 
 func richTable(out io.Writer, headers []string, data [][]string) {
-	table := tablewriter.NewWriter(out)
-	table.SetHeader(headers)
-	hs := make([]tablewriter.Colors, len(headers))
-	for i := range headers {
-		hs[i] = tablewriter.Colors{tablewriter.Bold}
-	}
-	table.SetHeaderColor(hs...)
-	table.SetHeaderLine(false)
-	table.SetBorder(false)
-	table.SetAlignment(tablewriter.ALIGN_LEFT)
-	table.SetNoWhiteSpace(true)
-	table.SetTablePadding("\t")
+	table := termtable.New(out, headers, termtable.Compact)
 	for _, row := range data {
 		table.Append(row)
 	}

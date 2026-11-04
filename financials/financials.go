@@ -384,13 +384,6 @@ func bankAssets(row map[string]any) []Item {
 
 func ptr(value float64) *float64 { return &value }
 
-func value(row map[string]any, key string) *float64 {
-	if v, ok := num(row, key); ok {
-		return &v
-	}
-	return nil
-}
-
 // ratio 返回 a ÷ b × scale，b 小于等于 0 或任一科目缺失时为 nil。
 func ratio(a, b *float64, scale float64) *float64 {
 	if a == nil || b == nil || *b <= 0 {
@@ -400,31 +393,31 @@ func ratio(a, b *float64, scale float64) *float64 {
 }
 
 func metrics(kind eastmoney.CompanyType, income, balance, cash map[string]any) Metrics {
-	m := Metrics{NetProfit: value(income, "NETPROFIT"), ParentNetProfit: value(income, "PARENT_NETPROFIT"), DeductNetProfit: value(income, "DEDUCT_PARENT_NETPROFIT")}
+	m := Metrics{NetProfit: eastmoney.RowNumber(income, "NETPROFIT"), ParentNetProfit: eastmoney.RowNumber(income, "PARENT_NETPROFIT"), DeductNetProfit: eastmoney.RowNumber(income, "DEDUCT_PARENT_NETPROFIT")}
 	if kind == eastmoney.CompanyGeneral {
-		m.Revenue = value(income, "TOTAL_OPERATE_INCOME")
+		m.Revenue = eastmoney.RowNumber(income, "TOTAL_OPERATE_INCOME")
 		if m.Revenue == nil {
-			m.Revenue = value(income, "OPERATE_INCOME")
+			m.Revenue = eastmoney.RowNumber(income, "OPERATE_INCOME")
 		}
 		// 毛利率按营业收入计算，不含金融子公司的利息收入。
-		sales := value(income, "OPERATE_INCOME")
+		sales := eastmoney.RowNumber(income, "OPERATE_INCOME")
 		if sales == nil || *sales <= 0 {
 			sales = m.Revenue
 		}
-		if operateCost := value(income, "OPERATE_COST"); operateCost != nil && sales != nil {
+		if operateCost := eastmoney.RowNumber(income, "OPERATE_COST"); operateCost != nil && sales != nil {
 			m.GrossMargin = ratio(ptr(*sales-*operateCost), sales, 100)
 		}
-		m.SaleRatio = ratio(value(income, "SALE_EXPENSE"), m.Revenue, 100)
-		m.ManageRatio = ratio(value(income, "MANAGE_EXPENSE"), m.Revenue, 100)
-		m.ResearchRatio = ratio(value(income, "RESEARCH_EXPENSE"), m.Revenue, 100)
-		m.FinanceRatio = ratio(value(income, "FINANCE_EXPENSE"), m.Revenue, 100)
+		m.SaleRatio = ratio(eastmoney.RowNumber(income, "SALE_EXPENSE"), m.Revenue, 100)
+		m.ManageRatio = ratio(eastmoney.RowNumber(income, "MANAGE_EXPENSE"), m.Revenue, 100)
+		m.ResearchRatio = ratio(eastmoney.RowNumber(income, "RESEARCH_EXPENSE"), m.Revenue, 100)
+		m.FinanceRatio = ratio(eastmoney.RowNumber(income, "FINANCE_EXPENSE"), m.Revenue, 100)
 	} else {
-		m.Revenue = value(income, "OPERATE_INCOME")
-		m.CostIncomeRatio = ratio(value(income, "BUSINESS_MANAGE_EXPENSE"), m.Revenue, 100)
+		m.Revenue = eastmoney.RowNumber(income, "OPERATE_INCOME")
+		m.CostIncomeRatio = ratio(eastmoney.RowNumber(income, "BUSINESS_MANAGE_EXPENSE"), m.Revenue, 100)
 	}
 	m.NetMargin = ratio(m.NetProfit, m.Revenue, 100)
-	m.DebtRatio = ratio(value(balance, "TOTAL_LIABILITIES"), value(balance, "TOTAL_ASSETS"), 100)
-	m.OperatingCash, m.InvestingCash, m.FinancingCash = value(cash, "NETCASH_OPERATE"), value(cash, "NETCASH_INVEST"), value(cash, "NETCASH_FINANCE")
+	m.DebtRatio = ratio(eastmoney.RowNumber(balance, "TOTAL_LIABILITIES"), eastmoney.RowNumber(balance, "TOTAL_ASSETS"), 100)
+	m.OperatingCash, m.InvestingCash, m.FinancingCash = eastmoney.RowNumber(cash, "NETCASH_OPERATE"), eastmoney.RowNumber(cash, "NETCASH_INVEST"), eastmoney.RowNumber(cash, "NETCASH_FINANCE")
 	m.CashToProfit = ratio(m.OperatingCash, m.NetProfit, 1)
 	return m
 }

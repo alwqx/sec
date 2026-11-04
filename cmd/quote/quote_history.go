@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 
+	"github.com/alwqx/sec/cmd/internal/termtable"
 	"github.com/alwqx/sec/provider/eastmoney"
 	"github.com/alwqx/sec/provider/history"
 	"github.com/alwqx/sec/provider/sina"
@@ -205,35 +206,18 @@ func printQuoteHistory(out io.Writer, quotes []*eastmoney.Quote) {
 			// 收盘
 			if title == headers[2] {
 				v := quote.ChangeRate
-				if v > 0 {
-					item = tablewriter.Colors{tablewriter.Bold, tablewriter.UnderlineSingle, tablewriter.FgRedColor}
-				} else if v < 0 {
-					item = tablewriter.Colors{tablewriter.Bold, tablewriter.UnderlineSingle, tablewriter.FgGreenColor}
-				}
+				item = termtable.Change(v, true)
 			}
 			styles = append(styles, item)
 		}
 		columnsStyles = append(columnsStyles, styles)
 	}
 
-	table := tablewriter.NewWriter(out)
-	table.SetHeader(headers)
+	table := termtable.New(out, headers, termtable.LeftHeader)
 
 	for i, row := range data {
 		table.Rich(row, columnsStyles[i])
 	}
 
-	headerStyles := make([]tablewriter.Colors, 0, len(headers))
-	for range headers {
-		headerStyles = append(headerStyles, tablewriter.Colors{tablewriter.Bold})
-	}
-
-	table.SetHeaderColor(headerStyles...)
-	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
-	table.SetAlignment(tablewriter.ALIGN_LEFT)
-	table.SetHeaderLine(false)
-	table.SetBorder(false)
-	table.SetNoWhiteSpace(false)
-	table.SetTablePadding("\t")
 	table.Render()
 }
