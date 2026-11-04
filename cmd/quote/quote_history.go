@@ -74,7 +74,8 @@ func QuoteHistoryHandler(cmd *cobra.Command, args []string) error {
 		req.MarketCode = 0
 	case types.ExChangeHKex:
 		req.MarketCode = 116
-	case types.ExChangeNasdaq:
+	case types.ExChangeNasdaq, types.ExChangeNyse:
+		// 新浪搜索把美股都标成纳斯达克；纽交所的股票用 105 查不到时，history 包会换成 106、107 再查。
 		req.MarketCode = 105
 	default:
 		return fmt.Errorf("unsupported exchange: %s", sec.ExChange)

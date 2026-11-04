@@ -232,12 +232,41 @@ type Filing struct {
 
 // Profile 是申报列表里的公司信息。
 type Profile struct {
-	CIK           int      `json:"cik"`
-	Name          string   `json:"name"`
-	Tickers       []string `json:"tickers"`
-	Exchanges     []string `json:"exchanges"`
-	Industry      string   `json:"industry"`
-	FiscalYearEnd string   `json:"fiscal_year_end"` // MMDD
+	CIK           int          `json:"cik"`
+	Name          string       `json:"name"`
+	Tickers       []string     `json:"tickers"`
+	Exchanges     []string     `json:"exchanges"`
+	Industry      string       `json:"industry"`
+	SIC           string       `json:"sic"`
+	FiscalYearEnd string       `json:"fiscal_year_end"` // MMDD
+	Category      string       `json:"category"`        // 申报人类别，比如 Large accelerated filer
+	Incorporation string       `json:"state_of_incorporation"`
+	Address       string       `json:"business_address"`
+	Phone         string       `json:"phone"`
+	Website       string       `json:"website"`
+	FormerNames   []FormerName `json:"former_names"`
+}
+
+// FormerName 是公司曾用名，日期为 YYYY-MM-DD。
+type FormerName struct {
+	Name string `json:"name"`
+	From string `json:"from"`
+	To   string `json:"to"`
+}
+
+type address struct {
+	Street1, Street2, City, StateOrCountry, ZipCode string
+	Country                                         string
+}
+
+func (a address) String() string {
+	parts := []string{}
+	for _, part := range []string{a.Street1, a.Street2, a.City, strings.TrimSpace(a.StateOrCountry + " " + a.ZipCode), a.Country} {
+		if part = strings.TrimSpace(part); part != "" {
+			parts = append(parts, part)
+		}
+	}
+	return strings.Join(parts, ", ")
 }
 
 // recentFilings 是 submissions 中按列存储的申报列表。
@@ -258,8 +287,20 @@ type submissions struct {
 	Tickers       []string `json:"tickers"`
 	Exchanges     []string `json:"exchanges"`
 	Industry      string   `json:"sicDescription"`
+	SIC           string   `json:"sic"`
 	FiscalYearEnd string   `json:"fiscalYearEnd"`
-	Filings       struct {
+	Category      string   `json:"category"`
+	Incorporation string   `json:"stateOfIncorporationDescription"`
+	Phone         string   `json:"phone"`
+	Website       string   `json:"website"`
+	Addresses     struct {
+		Business address `json:"business"`
+	} `json:"addresses"`
+	FormerNames []struct {
+		Name     string `json:"name"`
+		From, To string
+	} `json:"formerNames"`
+	Filings struct {
 		Recent recentFilings `json:"recent"`
 		Files  []struct {
 			Name       string `json:"name"`
@@ -336,6 +377,35 @@ func (r recentFilings) filings(cik int, q FilingQuery) []Filing {
 	return result
 }
 
+func (data *submissions) profile(cik int) *Profile {
+	p := &Profile{CIK: cik, Name: data.Name, Tickers: data.Tickers, Exchanges: unique(data.Exchanges), Industry: data.Industry, SIC: data.SIC,
+		FiscalYearEnd: data.FiscalYearEnd, Category: data.Category, Incorporation: data.Incorporation, Address: data.Addresses.Business.String(),
+		Phone: data.Phone, Website: data.Website, FormerNames: []FormerName{}}
+	day := func(text string) string {
+		if len(text) >= 10 {
+			return text[:10]
+		}
+		return text
+	}
+	for _, name := range data.FormerNames {
+		p.FormerNames = append(p.FormerNames, FormerName{name.Name, day(name.From), day(name.To)})
+	}
+	return p
+}
+
+// Profile 返回公司信息。和 Filings 读的是同一个文件，只需要公司信息时用它。
+func (c *Client) Profile(ctx context.Context, cik int) (*Profile, error) {
+	body, err := c.get(ctx, fmt.Sprintf("%sCIK%010d.json", submissionsURL, cik))
+	if err != nil {
+		return nil, err
+	}
+	var data submissions
+	if err := json.Unmarshal(body, &data); err != nil {
+		return nil, fmt.Errorf("SEC 申报列表格式无效：%w", err)
+	}
+	return data.profile(cik), nil
+}
+
 // Filings 返回公司的申报，按申报日期从新到旧。SEC 的申报列表默认只有最近约 1000 份或一年，
 // 查询开始日期更早，或按类型筛选后不够 Want 条时，再读取历史分页。
 func (c *Client) Filings(ctx context.Context, cik int, q FilingQuery) (*FilingsResult, error) {
@@ -347,7 +417,7 @@ func (c *Client) Filings(ctx context.Context, cik int, q FilingQuery) (*FilingsR
 	if err := json.Unmarshal(body, &data); err != nil {
 		return nil, fmt.Errorf("SEC 申报列表格式无效：%w", err)
 	}
-	result := &FilingsResult{Profile: &Profile{CIK: cik, Name: data.Name, Tickers: data.Tickers, Exchanges: unique(data.Exchanges), Industry: data.Industry, FiscalYearEnd: data.FiscalYearEnd}}
+	result := &FilingsResult{Profile: data.profile(cik)}
 	result.Filings = data.Filings.Recent.filings(cik, q)
 	oldest := ""
 	if dates := data.Filings.Recent.FilingDate; len(dates) > 0 {

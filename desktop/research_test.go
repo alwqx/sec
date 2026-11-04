@@ -22,7 +22,7 @@ func TestResearchEndpointsValidateParameters(t *testing.T) {
 		"/api/v1/ipo?page=0", "/api/v1/ipo?page=no", "/api/v1/ipo?page=10001",
 		"/api/v1/announcements?page=-1", "/api/v1/announcements?code=HK00700",
 		"/api/v1/financials?code=SH600036&report=unknown", "/api/v1/financials?code=SH600036&period=unknown",
-		"/api/v1/history?code=$AAPL", "/api/v1/history?code=SH600036other",
+		"/api/v1/history?code=AAPL", "/api/v1/history?code=SH600036other",
 	} {
 		t.Run(path, func(t *testing.T) {
 			rr := httptest.NewRecorder()

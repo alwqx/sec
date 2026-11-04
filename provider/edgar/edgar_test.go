@@ -14,6 +14,9 @@ import (
 const tickersBody = `{"0":{"cik_str":320193,"ticker":"AAPL","title":"Apple Inc."},"1":{"cik_str":1067983,"ticker":"BRK-B","title":"BERKSHIRE HATHAWAY INC"}}`
 
 const submissionsBody = `{"cik":"320193","name":"Apple Inc.","tickers":["AAPL"],"exchanges":["Nasdaq"],"sicDescription":"Electronic Computers","fiscalYearEnd":"0926",
+"sic":"3571","category":"Large accelerated filer","stateOfIncorporationDescription":"CA","phone":"(408) 996-1010",
+"addresses":{"business":{"street1":"ONE APPLE PARK WAY","street2":null,"city":"CUPERTINO","stateOrCountry":"CA","zipCode":"95014"}},
+"formerNames":[{"name":"APPLE INC","from":"2007-01-10T05:00:00.000Z","to":"2019-08-05T04:00:00.000Z"}],
 "filings":{"recent":{"accessionNumber":["0000320193-26-000026","0000320193-26-000024","0001140361-26-041201","0000320193-25-000079"],
 "filingDate":["2026-11-03","2026-11-02","2026-10-29","2025-10-31"],"reportDate":["2026-09-26","2026-11-02","2026-10-27","2025-09-27"],
 "form":["10-K","8-K","4","10-K/A"],"size":[100,20,5,90],"primaryDocument":["aapl-20260926.htm","aapl-20261102.htm","xslF345X06/form4.xml",""],
@@ -182,4 +185,15 @@ func TestIsDocumentURL(t *testing.T) {
 	} {
 		require.False(t, IsDocumentURL(raw), raw)
 	}
+}
+
+func TestProfile(t *testing.T) {
+	defer gock.Off()
+	gock.New("https://data.sec.gov").Get("/submissions/CIK0000320193.json").Reply(200).BodyString(submissionsBody)
+	p, err := client(t).Profile(context.Background(), 320193)
+	require.NoError(t, err)
+	require.Equal(t, "Large accelerated filer", p.Category)
+	require.Equal(t, "ONE APPLE PARK WAY, CUPERTINO, CA 95014", p.Address)
+	require.Equal(t, "3571", p.SIC)
+	require.Equal(t, []FormerName{{"APPLE INC", "2007-01-10", "2019-08-05"}}, p.FormerNames)
 }
