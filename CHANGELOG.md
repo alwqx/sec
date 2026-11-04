@@ -9,6 +9,7 @@
 5. Fill in filings for heavy filers: when 10 older pages still leave a form filter short, `sec filings` and the Desktop filings tab fall back to EDGAR full-text search by form, which covers filings since 2001, so JPMorgan's `--form 10-K` returns its 30 annual reports instead of 2
 6. Fix US financial statement and filing edge cases: recognize US GAAP annual facts filed on 20-F, 40-F and 10-KT and their amendments; derive quarters only from adjacent year-to-date values of the same concept, leaving missing quarters blank and excluding stub periods. Preserve partial filings and their incomplete flag on search errors or page limits, apply date filters and stop once enough results are found, and retain upstream descriptions for unknown forms. Bound the Desktop XBRL cache to 20 companies, evict expired entries on writes, and label financial table headers using the displayed report's period type
 7. Detect accounting-standard changes from the latest monetary reporting periods instead of silently serving historical US GAAP facts for current IFRS filers. Support quarterly statements before the first annual filing, infer fiscal periods from 10-Q year-to-date or latest single-quarter data, and preserve missing-quarter safeguards and comparative-period labels
+8. Fix Sina security search after additional trailing fields were introduced: validate only the required columns while preserving legacy responses and active-security filtering, restoring stock lookup and quote commands such as `sec q lxzk`
 
 ### v0.4.4
 

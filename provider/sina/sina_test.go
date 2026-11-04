@@ -34,6 +34,37 @@ func TestParseBasicSecuritys(t *testing.T) {
 	fmt.Println(res)
 }
 
+// 搜索只依赖前 9 列；新浪会增减后面的可选字段，不能按固定总列数丢掉有效证券。
+func TestParseBasicSecurityOptionalFields(t *testing.T) {
+	base := "龙芯中科,11,688047,sh688047,龙芯中科,,龙芯中科,99,1"
+	for _, tail := range []string{"", ",ESG,,", ",ESG,,,", ",ESG,,,new-field,another-field"} {
+		t.Run(fmt.Sprintf("%d_columns", len(strings.Split(base+tail, ","))), func(t *testing.T) {
+			res := parseBasicSecurity(`var suggestvalue="` + base + tail + `";`)
+			require.Len(t, res, 1)
+			require.Equal(t, "龙芯中科", res[0].Name)
+			require.Equal(t, "688047", res[0].Code)
+			require.Equal(t, "SH688047", res[0].ExCode)
+			require.Equal(t, types.SecurityTypeStock, res[0].SecurityType)
+		})
+	}
+
+	res := parseBasicSecurity(`var suggestvalue="too,short;龙芯中科,11,688047,sh688047,龙芯中科,,龙芯中科,99;已退市,11,688047,sh688047,已退市,,已退市,99,0,ESG,,,;` + base + `,ESG,,,";`)
+	require.Len(t, res, 1, "仍跳过缺少必需字段和非在市的记录")
+	require.Equal(t, "SH688047", res[0].ExCode)
+}
+
+func TestSearchExpandedFields(t *testing.T) {
+	defer gock.Off()
+	searchURL().Reply(200).BodyString(`var suggestvalue="龙芯中科,11,688047,sh688047,龙芯中科,,龙芯中科,99,1,ESG,,,;万讯自控,11,300112,sz300112,万讯自控,,万讯自控,99,1,,,,;绿叶制药,31,02186,02186,绿叶制药,,绿叶制药,99,1,ESG,,,;龙鑫智能,11,920117,bj920117,龙鑫智能,,龙鑫智能,99,1,,,,;AAPL,41,aapl,aapl,苹果,,苹果,99,1,ESG,,,";`)
+	res, err := Search(context.Background(), "lxzk")
+	require.NoError(t, err)
+	require.Len(t, res, 5)
+	for i, code := range []string{"SH688047", "SZ300112", "HK02186", "BJ920117", "$AAPL"} {
+		require.Equal(t, code, res[i].ExCode)
+	}
+	require.True(t, gock.IsDone())
+}
+
 func TestProfile(t *testing.T) {
 	t.Skip("just test for dev/debug")
 	ctx := context.TODO()
