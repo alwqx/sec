@@ -4,25 +4,16 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"sync"
 
 	"github.com/alwqx/sec/config"
 	"github.com/alwqx/sec/provider/edgar"
-	"github.com/alwqx/sec/provider/sina"
+	"github.com/alwqx/sec/usstock"
 	"github.com/alwqx/sec/utils"
 	"github.com/spf13/cobra"
 )
 
-// usInfo 是美股 sec info 的结果：公司资料来自 SEC EDGAR，行情和估值来自新浪。
-// 和 A 股、港股的 --json 字段不同：公司资料在 company，行情在 quote。
-type usInfo struct {
-	ExCode  string         `json:"ex_code"`
-	Ticker  string         `json:"ticker"`
-	Company *edgar.Profile `json:"company"` // SEC 没有这个代码（比如部分基金、场外交易股票）时为 null
-	Quote   *sina.USQuote  `json:"quote"`   // 行情获取失败时为 null
-}
-
-// usInfoHandler 打印美股公司资料。公司资料和行情并发请求，任一失败时仍输出另一部分；两者都失败才报错。
+// usInfoHandler 打印美股公司资料。公司资料和行情任一失败时仍输出另一部分；两者都失败才报错。
+// --json 格式是 usstock.Info，和 A 股、港股不同：公司资料在 company，行情在 quote。
 func usInfoHandler(cmd *cobra.Command, exCode string, asJSON, dividend bool) error {
 	if dividend {
 		fmt.Fprintln(cmd.ErrOrStderr(), "美股暂不支持分红数据，忽略 -d")
@@ -31,28 +22,7 @@ func usInfoHandler(cmd *cobra.Command, exCode string, asJSON, dividend bool) err
 	if err != nil {
 		return err
 	}
-	client := &edgar.Client{Email: cfg.SECEmail}
-	var (
-		wg                   sync.WaitGroup
-		profile              *edgar.Profile
-		quote                *sina.USQuote
-		profileErr, quoteErr error
-	)
-	wg.Add(2)
-	go func() {
-		defer wg.Done()
-		company, err := client.Lookup(cmd.Context(), exCode)
-		if err == nil {
-			profile, err = client.Profile(cmd.Context(), company.CIK)
-		}
-		profileErr = err
-	}()
-	go func() {
-		defer wg.Done()
-		// 新浪行情用搜索得到的代码，类别股的写法和 SEC 不同（新浪 brk$b，SEC BRK-B）。
-		quote, quoteErr = sina.QueryUSQuote(cmd.Context(), exCode)
-	}()
-	wg.Wait()
+	info, profileErr, quoteErr := usstock.Load(cmd.Context(), &edgar.Client{Email: cfg.SECEmail}, exCode)
 	if profileErr != nil && quoteErr != nil {
 		return fmt.Errorf("公司资料：%w；行情：%w", profileErr, quoteErr)
 	}
@@ -65,7 +35,6 @@ func usInfoHandler(cmd *cobra.Command, exCode string, asJSON, dividend bool) err
 	if quoteErr != nil {
 		fmt.Fprintf(cmd.ErrOrStderr(), "行情获取失败：%v\n", quoteErr)
 	}
-	info := usInfo{ExCode: exCode, Ticker: edgar.NormalizeTicker(exCode), Company: profile, Quote: quote}
 	if asJSON {
 		return utils.PrintJSON(cmd.OutOrStdout(), info)
 	}
@@ -73,7 +42,7 @@ func usInfoHandler(cmd *cobra.Command, exCode string, asJSON, dividend bool) err
 	return nil
 }
 
-func printUSInfo(cmd *cobra.Command, info usInfo) {
+func printUSInfo(cmd *cobra.Command, info usstock.Info) {
 	rows := [][2]string{{"证券代码", info.ExCode}}
 	if p := info.Company; p != nil {
 		former := []string{}

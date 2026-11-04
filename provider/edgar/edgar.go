@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -325,7 +326,7 @@ type FilingQuery struct {
 	Want       int
 }
 
-// FilingsResult 是查询结果。Truncated 表示读到分页上限时还有更早的申报没有读，结果可能不全。
+// FilingsResult 是查询结果。Truncated 表示读到分页上限或全文检索失败时仍未满足查询需求，结果可能不全。
 type FilingsResult struct {
 	Profile   *Profile
 	Filings   []Filing
@@ -449,6 +450,26 @@ func (c *Client) Filings(ctx context.Context, cik int, q FilingQuery) (*FilingsR
 		// 历史分页从新到旧，filingFrom 是该页最早的申报日期。
 		if file.FilingFrom != "" {
 			oldest = file.FilingFrom
+		}
+	}
+	// 读到分页上限还不够时，按类型用全文检索补全；全文检索失败时保留已有结果，仍标记 Truncated。
+	if result.Truncated && len(q.Forms) > 0 {
+		found, err := c.SearchFilings(ctx, cik, q)
+		if found != nil {
+			seen := map[string]bool{}
+			for _, f := range result.Filings {
+				seen[f.Accession] = true
+			}
+			for _, f := range found.Filings {
+				if !seen[f.Accession] && q.match(f.Form, f.FilingDate) {
+					result.Filings = append(result.Filings, f)
+					seen[f.Accession] = true
+				}
+			}
+			result.Truncated = err != nil || found.Truncated
+		}
+		if err != nil {
+			slog.DebugContext(ctx, "SEC 全文检索未完成，保留已有申报", "cik", cik, "error", err)
 		}
 	}
 	sort.SliceStable(result.Filings, func(i, j int) bool { return result.Filings[i].FilingDate > result.Filings[j].FilingDate })
