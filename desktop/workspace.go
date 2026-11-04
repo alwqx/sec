@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alwqx/sec/config"
 	"github.com/alwqx/sec/provider/sina"
 	"github.com/alwqx/sec/utils"
 	"github.com/alwqx/sec/watchlist"
@@ -30,6 +31,8 @@ type workspaceSettings struct {
 	DownloadDirectory string `json:"download_directory"`
 	RefreshSeconds    int    `json:"refresh_seconds"`
 	Theme             string `json:"theme"`
+	// SECEmail 保存在和 CLI 共用的 ~/.sec/config.json，不写入 workspace.json；保存时留空表示不修改。
+	SECEmail string `json:"sec_edgar_email,omitempty"`
 }
 
 type workspaceState struct {
@@ -72,6 +75,9 @@ func validateWorkspace(state workspaceState) bool {
 	switch state.Settings.Theme {
 	case "dark", "light", "system":
 	default:
+		return false
+	}
+	if state.Settings.SECEmail != "" && config.ValidateEmail(state.Settings.SECEmail) != nil {
 		return false
 	}
 	seen := make(map[string]bool)
@@ -132,9 +138,11 @@ func (s *workspaceStore) save(state workspaceState) error {
 		return err
 	}
 	defer unlock()
+	settings := state.Settings
+	settings.SECEmail = ""
 	data, err := json.MarshalIndent(struct {
 		Settings workspaceSettings `json:"settings"`
-	}{state.Settings}, "", "  ")
+	}{settings}, "", "  ")
 	if err != nil {
 		return err
 	}
@@ -188,6 +196,14 @@ func (s *desktopServer) handleWorkspace(w http.ResponseWriter, r *http.Request) 
 		slog.ErrorContext(r.Context(), "保存工作台失败", "error", err)
 		writeError(w, http.StatusInternalServerError, "保存自选与设置失败，请稍后重试")
 		return
+	}
+	// 工作台保存成功后再改共享配置，读改写在同一把锁里，不覆盖 CLI 同时做的修改。
+	if email := state.Settings.SECEmail; email != "" {
+		if err := s.updateConfig(r.Context(), func(c *config.Config) error { c.SECEmail = email; return nil }); err != nil {
+			slog.ErrorContext(r.Context(), "保存共享配置失败", "error", err)
+			writeError(w, http.StatusInternalServerError, "其他设置已保存，SEC 联系邮箱保存失败，请稍后重试")
+			return
+		}
 	}
 	state, err = s.loadSharedWorkspace(r.Context())
 	if err != nil {

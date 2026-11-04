@@ -4,6 +4,7 @@ package main
 
 import (
 	"errors"
+	"github.com/alwqx/sec/provider/edgar"
 	"github.com/alwqx/sec/release"
 	"net/url"
 	"os"
@@ -13,8 +14,12 @@ import (
 
 func validateDisclosureURL(raw string) error {
 	u, err := url.Parse(raw)
-	if err != nil || u.Scheme != "https" || u.User != nil || (u.Host != "www.cninfo.com.cn" && u.Host != "static.cninfo.com.cn") {
-		return errors.New("仅支持打开巨潮资讯原文链接")
+	if edgar.IsDocumentURL(raw) {
+		return nil
+	}
+	cninfo := u != nil && (u.Host == "www.cninfo.com.cn" || u.Host == "static.cninfo.com.cn")
+	if err != nil || u.Scheme != "https" || u.User != nil || !cninfo {
+		return errors.New("仅支持打开巨潮资讯和 SEC EDGAR 原文链接")
 	}
 	return nil
 }

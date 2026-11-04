@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/alwqx/sec/config"
 	"github.com/alwqx/sec/provider/sina"
 	"github.com/alwqx/sec/types"
 	"github.com/stretchr/testify/require"
@@ -37,7 +39,38 @@ func TestWorkspacePersistsAcrossServers(t *testing.T) {
 	rr = httptest.NewRecorder()
 	restarted.Handler().ServeHTTP(rr, httptest.NewRequest(http.MethodGet, "/api/v1/workspace", nil))
 	require.Equal(t, http.StatusOK, rr.Code)
-	require.JSONEq(t, string(data), rr.Body.String())
+	state.Settings.SECEmail = config.DefaultSECEmail
+	expected, err := json.Marshal(state)
+	require.NoError(t, err)
+	require.JSONEq(t, string(expected), rr.Body.String(), "没有共享配置时返回默认 SEC 联系邮箱")
+}
+
+// SEC 联系邮箱保存到和 CLI 共用的 config.json，不写入 workspace.json；留空表示不修改。
+func TestWorkspaceSECEmailSharedConfig(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "workspace.json")
+	srv := &desktopServer{dev: true, workspace: workspaceStore{path: path}}
+	put := func(body string) int {
+		req := httptest.NewRequest(http.MethodPut, "/api/v1/workspace", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		rr := httptest.NewRecorder()
+		srv.Handler().ServeHTTP(rr, req)
+		return rr.Code
+	}
+	require.Equal(t, http.StatusOK, put(`{"watchlist":[],"settings":{"refresh_seconds":5,"theme":"dark","sec_edgar_email":"me@example.org"}}`))
+	cfg, err := config.LoadFile(context.Background(), filepath.Join(dir, "config.json"))
+	require.NoError(t, err)
+	require.Equal(t, "me@example.org", cfg.SECEmail)
+	workspace, err := os.ReadFile(path)
+	require.NoError(t, err)
+	require.NotContains(t, string(workspace), "sec_edgar_email")
+
+	require.Equal(t, http.StatusOK, put(`{"watchlist":[],"settings":{"refresh_seconds":15,"theme":"dark"}}`))
+	cfg, err = config.LoadFile(context.Background(), filepath.Join(dir, "config.json"))
+	require.NoError(t, err)
+	require.Equal(t, "me@example.org", cfg.SECEmail, "留空不修改")
+
+	require.Equal(t, http.StatusBadRequest, put(`{"watchlist":[],"settings":{"refresh_seconds":5,"theme":"dark","sec_edgar_email":"bad"}}`))
 }
 
 func TestWorkspaceRejectsInvalidWritesWithoutReplacingData(t *testing.T) {

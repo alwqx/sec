@@ -1,5 +1,9 @@
 ## sec change log
 
+### v0.4.5
+
+1. Add US company filings from the official SEC EDGAR API: `sec filings <ticker>` lists 10-K, 10-Q, 8-K, 20-F, 6-K, proxy and registration filings by default (`--form` for others such as Form 4, `--form all` for every form), with filing and report dates, Chinese descriptions including 8-K items, `-b/-e` date filters that reach older filing pages (also used, up to 10 pages, when a form filter finds too few recent filings, as for heavy filers like Goldman Sachs), `-o` to download primary documents, and `--json`. The Desktop announcements tab shows the same filings for US stocks, with categories and links that open in the browser. SEC requires a contact email in the User-Agent, so requests carry the email from a new shared config file, `~/.sec/config.json` (default `kenan3015@gmail.com`), which `sec config` and the Desktop settings page both update under one file lock, falling back to defaults when the file is invalid; requests stay under SEC's 10 per second limit, and the ticker-to-CIK list is cached for a day
+
 ### v0.4.4
 
 1. Add dividend yield to `sec valuation` (`--method dividend`, the overview and `--json`) and the Desktop valuation tab: the yield on the latest complete fiscal year adjusted for stock dividends and splits, the 5-year average, its historical range and percentile, consecutive years and payout by fiscal year. Plans not yet paid are listed separately. The yield percentile now counts in the rule summary, so assessments can change. If dividend data is unavailable or there are no dividend records at all, the rest of the valuation still works and `dividends_note` and the rule summary say so. Dividends from the last 5 years are checked against Sina, which also tells non-payers apart from missing data, and records missing from East Money or with different amounts are listed

@@ -1,4 +1,4 @@
-import type { BasicSecurity, SecurityQuote, Company, Dividend, WorkspaceState, PageResult, IPOListing, Announcement, FinancialReport, MetalData, CommodityQuote, CommodityHistory, HistoryQuote, BondData, CompanyMetrics, SavedDownload, AnnualReportsPage, ProspectusPage , MacroCatalog, MacroDataset , FxDataset, FxSpread , HistoryOverlay , StrategyResult, ValuationResult, FinancialCharts } from './types'
+import type { BasicSecurity, SecurityQuote, Company, Dividend, WorkspaceState, PageResult, IPOListing, Announcement, FinancialReport, MetalData, SECFilings, CommodityQuote, CommodityHistory, HistoryQuote, BondData, CompanyMetrics, SavedDownload, AnnualReportsPage, ProspectusPage , MacroCatalog, MacroDataset , FxDataset, FxSpread , HistoryOverlay , StrategyResult, ValuationResult, FinancialCharts } from './types'
 
 async function request<T>(path: string, signal?: AbortSignal, options?: RequestInit): Promise<T> {
   const resp = await fetch(path, { ...options, signal })
@@ -159,4 +159,8 @@ export function valuation(query: Record<string, string>, signal?: AbortSignal): 
 
 export function strategy(query: Record<string, string>, signal?: AbortSignal): Promise<StrategyResult> {
   return request(`/api/v1/strategy?${new URLSearchParams(query)}`, signal)
+}
+
+export function filings(code: string, type: string, page: number, signal?: AbortSignal): Promise<SECFilings> {
+  return request(`/api/v1/filings?${new URLSearchParams({ code, type, page: String(page) })}`, signal)
 }
