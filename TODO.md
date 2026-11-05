@@ -67,7 +67,7 @@
   - ADS 比例没有统一来源：companyfacts 的 `dei:EntityListingDepositoryReceiptRatio` 多数公司按类别标注，读不到（7 家里只有阿里巴巴有）；20-F 封面第 12(b) 条的证券名称有时写明（"each representing eight Ordinary Shares"），丰田、台积电没有；台积电要用 XBRL 实例里按 ADS 维度的每股收益反推；新浪的 ADS 折算股数可以反解当前比例，但只有当前值，且受库存股影响（丰田算出 11.07，实际为 10）。比例会随拆股变化（丰田 2021 年从 2 变为 10）。存托银行网站是 JS 页面，不适合。
   - IFRS 公司只有 20-F 年报，TTM 只能用最近财年；诺和诺德没有封面股数，要用加权股数。
 - [ ] IFRS 财报补充：丰田等转用 IFRS 之前的 US GAAP 历史不显示；汇丰等在 6-K 里有半年数据，目前只整理 20-F 年报。
-- [ ] 美股分红：`sec info -d` 对美股提示不支持，Desktop 没有单独的美股分红表（股息率只在估值栏目里）。`edgar.Facts` 已经读取每股股息（`dps`，来自 `CommonStockDividendsPerShareDeclared` 等科目），可在此基础上整理出按期的分红表，或评估新浪的分红数据（含除权除息日）。
+- [ ] 美股分红 Desktop：`sec info -d` 已输出按财年的分红表（`usstock.BuildDividends`，SEC XBRL），Desktop 还没有美股的「分红」栏目（股息率只在估值栏目里），可复用同一个分红表。除权除息日：新浪美股没有找到可用的分红接口，纳斯达克的接口只覆盖纳斯达克上市的股票（KO、JPM 等纽交所股票返回 N/A），暂不显示。
 
 ## 港股
 
