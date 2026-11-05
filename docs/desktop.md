@@ -146,7 +146,9 @@ CLI 的根 `main.go` 保持不变；桌面版是独立二进制：`go build ./de
 
 美股（代码以 `$` 开头）的「公司」标签页复用 `usstock` 包：上方是新浪行情和估值（价格、涨跌幅、市盈率和每股收益 TTM、总市值、总股本、52 周区间），下方是 SEC EDGAR 公司资料（名称、CIK、交易所、行业和 SIC、注册地、申报人类别、财年截止日、地址、电话、曾用名）；任一部分失败时照常显示另一部分并说明原因。
 
-「财报」标签页复用 CLI `financials` 的 SEC XBRL 整理（`provider/edgar/facts.go`），可切换利润表、资产负债表、现金流量表和年度、季度，报告期为列、从新到旧（年度最多 10 期，季度最多 12 期），金额单位亿元（公司的列报币种，非美元时在数据来源后注明），负数标绿，推算值标 `*` 并有说明。XBRL 数据按公司缓存 10 分钟，最多保留 20 家公司，写入时清理过期条目并淘汰最早写入的公司；缓存命中时切换报表和年度、季度无需重新下载。首次年报之前也可读取已披露的 10-Q 季报；按国际会计准则（IFRS）申报或已从 US GAAP 切换为 IFRS 的公司用 IFRS 科目显示年度报表，数据来源后注明 IFRS；这些公司只提交 20-F 年报，切换到季度时给出说明。美股的「估值」栏目见[估值文档](valuation.md#美股)，股息率在估值栏目里。
+「财报」标签页分「财务报表」和「图表分析」。财务报表复用 CLI `financials` 的 SEC XBRL 整理（`provider/edgar/facts.go`），可切换利润表、资产负债表、现金流量表和年度、季度，报告期为列、从新到旧（年度最多 10 期，季度最多 12 期），金额单位亿元（公司的列报币种，非美元时在数据来源后注明），负数标绿，推算值标 `*` 并有说明。XBRL 数据按公司缓存 10 分钟，最多保留 20 家公司，写入时清理过期条目并淘汰最早写入的公司；缓存命中时切换报表和年度、季度无需重新下载。首次年报之前也可读取已披露的 10-Q 季报；按国际会计准则（IFRS）申报或已从 US GAAP 切换为 IFRS 的公司用 IFRS 科目显示年度报表，数据来源后注明 IFRS；这些公司只提交 20-F 年报，切换到季度时给出说明。图表分析和 A 股共用前端组件，数据由 `financials.FromSEC` 用同一份 XBRL 数据整理成和 A 股相同的格式（`source` 为 `sec`，`currency_name` 是列报币种）：利润构成桑基图和瀑布图按营业收入 →（营业成本）毛利 →（研发、销售及管理费用）营业利润 → 税前利润 →（所得税）归母净利润拆解，没有的合计跳过；有净利息收入、没有营业成本和毛利的公司按银行处理，营业收入先拆成净利息收入和非利息收入，再扣信用损失准备和营业费用到税前利润。SEC 数据只有归母净利润，税后到归母净利润之间的少数股东损益、终止经营等合为一项。现金瀑布图从上期末资产负债表的现金经三类现金流到本期末现金，受限现金、汇率变动等差额合为一项；资产构成拆成现金及等价物、其他流动资产和非流动资产（银行只拆出现金）。趋势图有收入与归母净利润、毛利率和净利率、销售及管理费用率和研发费用率、资产负债率（没有负债合计时用总资产减股东权益）、资产构成、三类现金流和经营现金流 ÷ 归母净利润；年度最近 10 个财年、单季最近 12 个季度，按财年标注（比如 FY2026Q1）。
+
+美股的「估值」栏目见[估值文档](valuation.md#美股)，股息率在估值栏目里。
 
 「分红」标签页和 CLI `sec info -d` 相同，复用 `usstock.LoadDividends`（XBRL 数据和财报、估值栏目共用缓存）：按财年从新到旧列出每股宣告股息和同比、支付股息、归母净利润、分红率和回购，金额单位亿元（公司的列报币种），口径和拆股调整见[命令文档](commands.md)。SEC 数据没有除权除息日、登记日和派息日；从不分红也不回购的公司显示"可能不分红"；新浪日线读不到时注明每股股息没有按拆股调整。
 
@@ -269,6 +271,7 @@ macOS 按当前进程架构匹配 `sec-<tag>-desktop-darwin-<arch>.dmg`，不将
 | GET | `/api/v1/filings?code=$AAPL&type=periodic&page=1` | 美股 SEC 申报：`company`、`ticker`、`total`、`has_more`、`results`；type 为 periodic（10-K/10-Q/20-F/40-F）、current（8-K/6-K）、insider（Form 3/4/5/144）、all，留空为主要申报；`truncated` 为 true 表示更早的申报没有读取；SEC 没有这家公司时 404 |
 | GET | `/api/v1/us/company?code=$AAPL` | 美股公司资料：`info`（`company` 为 SEC EDGAR 公司信息，`quote` 为新浪行情和估值，失败的一方为 null）和 `notes`（失败原因）；两方都失败时 502 |
 | GET | `/api/v1/us/dividends?code=$AAPL` | 美股按财年的分红表（`usstock.Dividends`）：`ticker`、`name`、`cik`、`currency`、`currency_name`、`splits`（识别出的拆股）、`splits_unchecked`（日线没读到、没有按拆股调整）和 `years`（`fiscal_year`、`end`、`per_share`、`growth`、`paid`、`net_income`、`payout`、`buyback`，从新到旧）；SEC 没有这家公司时 404 |
+| GET | `/api/v1/us/financials/charts?code=$AAPL&freq=annual` | 美股财报的图表数据，格式和 `/api/v1/financials/charts` 相同（`financials.Analysis`），另有 `source`（`sec`）、`currency_name` 和每期的 `label`（财年标注）；freq 为 annual 或 quarter；SEC 没有这家公司或没有利润表时 404 |
 | GET | `/api/v1/us/financials?code=$AAPL&statement=income&period=annual` | 美股财报的一张报表：`ticker`、`name`、`cik`、`report`（`standard` 会计准则 US GAAP 或 IFRS，`currency`、`currency_name` 列报币种，`lines` 行定义，`periods` 报告期的 `values` 和推算行 `derived`）；statement 为 income、balance、cashflow，period 为 annual 或 quarter；IFRS 公司只有年度报表，季度返回空的报告期 |
 
 新增接口统一沿用 token cookie 鉴权。上游失败返回 502；公司资料为空返回 404；参数无效返回 400；列表为空返回 `{"results":[]}`（附带各接口其他元数据）。写入设置额外限制请求体大小、内容类型、同源与有效证券/偏好字段。

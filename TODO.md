@@ -63,6 +63,7 @@
 数据优先使用 SEC EDGAR 官方接口，见 [命令文档](docs/commands.md) 和 [估值文档](docs/valuation.md)。
 
 - [ ] Desktop 美股财报接口：公司没有 XBRL 财务数据（`edgar.ErrNoXBRL`）时返回 502，前端显示"获取失败"和无效的重试按钮；分红接口已改为 404，财报接口也应该一样处理。
+- [ ] Desktop 美股接口重构：`desktop/us.go` 里财报、分红、财报图表三个接口重复同一段准备代码（代码校验、Lookup、读 XBRL 缓存、错误映射），提示文字和参数名（`period` 和 `freq`）已经不一致，可抽出共用函数。
 - [ ] （暂缓）外国公司估值，包括 IFRS 公司（台积电、诺和诺德、SAP）和以外币列报的 US GAAP 公司（阿里巴巴、ASML）。评估结论是投入大、结果难保证准确，重心先放在美国本土上市公司的估值；目前外国公司估值报"暂不支持"（`valuation.ErrForeign`）。现有做法用 ADS 价格乘 SEC 封面的普通股数，ADS 比例不是 1 时市值出错（网易 1 ADS = 5 股，估出 3871 亿美元，新浪是 774 亿；阿里巴巴封面股数疑似少一位）。调研记录：
   - 汇率：美联储 FRED 的 H.10 日度汇率覆盖所需币种（`DEXTAUS`、`DEXJPUS`、`DEXCHUS`、`DEXDNUS`、`DEXUSEU`、`DEXBZUS`、`DEXUSUK`、`DEXSDUS`、`DEXINUS` 等，多数从 1970—80 年代开始），每周更新、滞后几天，仓库已有 `provider/fred` 客户端。欧洲央行没有台币。口径上宜按当天汇率把市值折成列报币种，再和原币财报比较，不用美元便利折算数。
   - ADS 比例没有统一来源：companyfacts 的 `dei:EntityListingDepositoryReceiptRatio` 多数公司按类别标注，读不到（7 家里只有阿里巴巴有）；20-F 封面第 12(b) 条的证券名称有时写明（"each representing eight Ordinary Shares"），丰田、台积电没有；台积电要用 XBRL 实例里按 ADS 维度的每股收益反推；新浪的 ADS 折算股数可以反解当前比例，但只有当前值，且受库存股影响（丰田算出 11.07，实际为 10）。比例会随拆股变化（丰田 2021 年从 2 变为 10）。存托银行网站是 JS 页面，不适合。
@@ -89,7 +90,7 @@
 
 ## 工程
 
-- [ ] 更新 README：截图已过时，Desktop 功能列表需要补上美股公司、财报、分红、估值和 SEC 申报。
+- [ ] 更新 README：截图已过时，Desktop 功能列表需要补上美股公司、财报（含图表分析）、分红、估值和 SEC 申报。
 
 ## 调研
 

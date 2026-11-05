@@ -59,23 +59,28 @@ type Metrics struct {
 	InvestingCash   *float64 `json:"investing_cash"`
 	FinancingCash   *float64 `json:"financing_cash"`
 	CashToProfit    *float64 `json:"cash_to_profit"` // 经营活动现金流 ÷ 净利润，净利润小于等于 0 时为 nil
+	SGARatio        *float64 `json:"sga_ratio"`      // 只有美股：销售及管理费用 ÷ 营业收入，SEC 报表合并列报
 }
 
-// Period 是一个报告期。
+// Period 是一个报告期。Label 是显示用的报告期名称，美股按财年标注（比如 FY2026Q1），A 股为空、由前端按日期标注。
 type Period struct {
 	Date    string  `json:"date"`
+	Label   string  `json:"label,omitempty"`
 	Income  *Bridge `json:"income"` // 合计科目缺失时为 nil
 	Cash    *Bridge `json:"cash"`
 	Assets  []Item  `json:"assets"` // 资产构成，只有一般企业和银行，拆不平时为 nil
 	Metrics Metrics `json:"metrics"`
 }
 
-// Analysis 是一家公司的多期财务数据，Periods 按日期升序。
+// Analysis 是一家公司的多期财务数据，Periods 按日期升序。Source 是数据来源：A 股为空（东方财富），美股为 sec（见 FromSEC）；
+// CurrencyName 是金额的币种，A 股为空（人民币）。
 type Analysis struct {
-	Code        string   `json:"code"`
-	CompanyType string   `json:"company_type"` // general、bank、securities、insurance
-	Quarterly   bool     `json:"quarterly"`    // 单季时利润表和现金流量表是单季值，资产负债表是期末值
-	Periods     []Period `json:"periods"`
+	Code         string   `json:"code"`
+	CompanyType  string   `json:"company_type"` // general、bank、securities、insurance
+	Quarterly    bool     `json:"quarterly"`    // 单季时利润表和现金流量表是单季值，资产负债表是期末值
+	Source       string   `json:"source,omitempty"`
+	CurrencyName string   `json:"currency_name,omitempty"`
+	Periods      []Period `json:"periods"`
 }
 
 var companyTypeNames = map[eastmoney.CompanyType]string{

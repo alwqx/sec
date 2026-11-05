@@ -55,6 +55,10 @@ export function financialCharts(code: string, freq: 'annual' | 'quarter', signal
   return request(`/api/v1/financials/charts?${new URLSearchParams({ code, freq })}`, signal)
 }
 
+export function usFinancialCharts(code: string, freq: 'annual' | 'quarter', signal?: AbortSignal): Promise<FinancialCharts> {
+  return request(`/api/v1/us/financials/charts?${new URLSearchParams({ code, freq })}`, signal)
+}
+
 export function financials(code: string, report: string, period: string, signal?: AbortSignal): Promise<FinancialReport> {
   return request(`/api/v1/financials?${new URLSearchParams({ code, report, period })}`, signal)
 }

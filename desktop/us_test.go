@@ -257,3 +257,41 @@ func TestUSDividendsSplitWithCurrentShares(t *testing.T) {
 	require.Equal(t, 4.0, body.Splits[0].Factor)
 	require.Equal(t, 1.0, *body.Years[0].PerShare)
 }
+
+// 美股财报图表和 A 股格式相同，数据来自 SEC XBRL；参数无效返回 400，SEC 没有这家公司返回 404。
+func TestUSFinancialCharts(t *testing.T) {
+	defer gock.Off()
+	srv := usServer(t)
+	gock.New("https://www.sec.gov").Get("/files/company_tickers.json").Reply(200).BodyString(usTickers)
+	gock.New("https://data.sec.gov").Get("/api/xbrl/companyfacts/CIK0000320193.json").Reply(200).BodyString(`{"entityName":"Apple Inc.","facts":{"us-gaap":{
+"Revenues":{"units":{"USD":[{"start":"2024-09-29","end":"2025-09-27","val":1000,"form":"10-K","filed":"2025-10-31"}]}},
+"CostOfRevenue":{"units":{"USD":[{"start":"2024-09-29","end":"2025-09-27","val":550,"form":"10-K","filed":"2025-10-31"}]}},
+"NetIncomeLoss":{"units":{"USD":[{"start":"2024-09-29","end":"2025-09-27","val":250,"form":"10-K","filed":"2025-10-31"}]}}}}}`)
+	rr := usRequest(t, srv, "/api/v1/us/financials/charts?code=$AAPL&freq=annual")
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	var body struct {
+		Source  string `json:"source"`
+		Periods []struct {
+			Label   string `json:"label"`
+			Metrics struct {
+				GrossMargin *float64 `json:"gross_margin"`
+			} `json:"metrics"`
+		} `json:"periods"`
+	}
+	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body))
+	require.Equal(t, "sec", body.Source)
+	require.Len(t, body.Periods, 1)
+	require.Equal(t, "2025", body.Periods[0].Label)
+	require.InDelta(t, 45.0, *body.Periods[0].Metrics.GrossMargin, 1e-9)
+
+	require.Equal(t, http.StatusBadRequest, usRequest(t, srv, "/api/v1/us/financials/charts?code=$AAPL&freq=month").Code)
+	require.Equal(t, http.StatusBadRequest, usRequest(t, srv, "/api/v1/us/financials/charts?code=SH600036").Code)
+	require.Equal(t, http.StatusNotFound, usRequest(t, srv, "/api/v1/us/financials/charts?code=$ZZZZ").Code)
+
+	// IFRS 公司没有季度数据，提示和财务报表一致。
+	gock.New("https://data.sec.gov").Get("/api/xbrl/companyfacts/CIK0001046179.json").Reply(200).
+		BodyString(`{"facts":{"ifrs-full":{"Revenue":{"units":{"TWD":[{"start":"2024-01-01","end":"2024-12-31","val":1,"form":"20-F","filed":"2025-04-17"}]}}}}}`)
+	rr = usRequest(t, srv, "/api/v1/us/financials/charts?code=$TSM&freq=quarter")
+	require.Equal(t, http.StatusNotFound, rr.Code)
+	require.Contains(t, rr.Body.String(), "只提交 20-F 年报")
+}
