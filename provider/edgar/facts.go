@@ -118,6 +118,8 @@ type fact struct {
 	Form  string  `json:"form"`
 	Filed string  `json:"filed"`
 	Accn  string  `json:"accn"`
+	// reported 是 pick 选中数值所在申报的日期（同一期间有多份申报时是最新的），Filed 则改成第一次披露的日期。
+	reported string
 }
 
 // Facts 是一家公司的 XBRL 数值（US GAAP 或 IFRS，见 Standard），按科目和单位索引。
@@ -385,6 +387,9 @@ type Period struct {
 	// Filed 是每一行数值第一次披露的日期（推算值取用到的数值中最晚的），在这天之后才能看到；
 	// 估值历史据此避免用到当时还没公布的数据。按行记录，后来才补报的其他行不会推迟这一行。
 	Filed map[string]string `json:"-"`
+	// Reported 是每一行数值所在申报的日期（同一期间有多份申报时取最新的，可能是重述数），只记录年报和资产负债表直接取到的数值。
+	// 早于拆股的申报里的每股数值还没有按拆股调整，比如苹果 2017 财年的每股股息只出现在 2020 年拆股前的年报里。
+	Reported map[string]string `json:"-"`
 }
 
 // Report 是一张报表，报告期从新到旧。
@@ -513,6 +518,7 @@ func (f *Facts) pick(item LineItem, end string, match func(fact) bool) (fact, bo
 		if found {
 			// 数值用最新申报的（可能是重述），Filed 改成同一期间第一次披露的日期：估值历史判断"当时能看到"时，
 			// 不能因为下一年的申报又列出这个比较数，就把它推迟到下一年才可见。
+			best.reported = best.Filed
 			for _, v := range f.concepts[concept][item.Unit] {
 				if v.End == end && v.Start == best.Start && match(v) && v.Filed != "" && v.Filed < best.Filed {
 					best.Filed = v.Filed
@@ -750,7 +756,7 @@ func (f *Facts) Build(statement Statement, quarterly bool, limit int) *Report {
 	}
 	for i := len(ends) - 1; i >= 0; i-- {
 		end := ends[i]
-		period := Period{End: end, Values: map[string]*float64{}, Filed: map[string]string{}}
+		period := Period{End: end, Values: map[string]*float64{}, Filed: map[string]string{}, Reported: map[string]string{}}
 		period.FiscalYear, period.FiscalPeriod = fiscalLabel(end, yearEnds)
 		// 同一财年的上一季度截止日，用于年初累计数相减。
 		fyStart, prevEnd := "", ""
@@ -776,6 +782,7 @@ func (f *Facts) Build(statement Statement, quarterly bool, limit int) *Report {
 				if v, ok := f.pick(item, end, func(v fact) bool { return v.Start == "" }); ok {
 					period.Values[item.Key] = &v.Val
 					period.Filed[item.Key] = v.Filed
+					period.Reported[item.Key] = v.reported
 				}
 				continue
 			}
@@ -784,6 +791,7 @@ func (f *Facts) Build(statement Statement, quarterly bool, limit int) *Report {
 					period.Values[item.Key] = &v.Val
 					period.Start = v.Start
 					period.Filed[item.Key] = v.Filed
+					period.Reported[item.Key] = v.reported
 				}
 				continue
 			}

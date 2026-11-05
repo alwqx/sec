@@ -15,6 +15,7 @@ import (
 	"github.com/alwqx/sec/provider/eastmoney"
 	"github.com/alwqx/sec/provider/edgar"
 	"github.com/alwqx/sec/provider/sina"
+	"github.com/alwqx/sec/usstock"
 )
 
 // ErrStaleShares 表示 SEC 没有最近的流通股数，无法计算市值。
@@ -473,54 +474,19 @@ type split struct {
 	factor float64
 }
 
-// splitFactors 是常见的拆股比例，合股用倒数。
-var splitFactors = []float64{2, 3, 4, 5, 6, 7, 8, 10, 15, 20, 1.5}
-
-// detectSplits 从不复权日线的跳变识别拆股：相邻两天收盘价之比接近常见拆股比例（误差 4% 以内）且变化超过 40%。
-// 还要用前后的股数核对：同一来源（封面或加权股数）在拆股前最后一次和之后第一次的股数（之后还没有申报时用新浪的当前股数 current）
-// 之比与拆股比例相差不超过 25% 才算拆股；没有可核对的股数时不算，避免把真的暴跌一半当成 1 拆 2。
+// detectSplits 识别拆股，规则见 usstock.DetectSplits；sources 里每个来源的股数从 since 那天起可用。
 func detectSplits(bars []*sina.Bar, sources [][]sharePoint, current float64) []split {
+	converted := make([][]usstock.SharePoint, 0, len(sources))
+	for _, points := range sources {
+		list := make([]usstock.SharePoint, 0, len(points))
+		for _, p := range points {
+			list = append(list, usstock.SharePoint{Since: p.since, Shares: p.shares})
+		}
+		converted = append(converted, list)
+	}
 	splits := []split{}
-	for i := 1; i < len(bars); i++ {
-		if bars[i].Close <= 0 || bars[i-1].Close <= 0 {
-			continue
-		}
-		ratio := bars[i-1].Close / bars[i].Close
-		if ratio < 1.4 && ratio > 1/1.4 {
-			continue
-		}
-		factor := 0.0
-		for _, k := range splitFactors {
-			if math.Abs(ratio/k-1) < 0.04 {
-				factor = k
-			} else if math.Abs(ratio*k-1) < 0.04 {
-				factor = 1 / k
-			}
-		}
-		if factor == 0 {
-			continue
-		}
-		date := bars[i].Date
-		for _, points := range sources {
-			var before, after *sharePoint
-			for j := range points {
-				if points[j].since < date {
-					if before == nil || points[j].since >= before.since {
-						before = &points[j]
-					}
-				} else if after == nil || points[j].since < after.since {
-					after = &points[j]
-				}
-			}
-			later := current
-			if after != nil {
-				later = after.shares
-			}
-			if before != nil && later > 0 && math.Abs(later/before.shares/factor-1) <= 0.25 {
-				splits = append(splits, split{date, factor})
-				break
-			}
-		}
+	for _, s := range usstock.DetectSplits(bars, converted, current) {
+		splits = append(splits, split{s.Date, s.Factor})
 	}
 	return splits
 }
