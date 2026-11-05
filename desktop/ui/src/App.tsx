@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
-import { ArrowLeftRight, ChartCandlestick, FilePlusCorner, Newspaper, Coins, Factory, Landmark, Settings as SettingsIcon, RefreshCw, Star, type LucideIcon } from 'lucide-react'
+import { ArrowLeftRight, ChartCandlestick, FilePlusCorner, Newspaper, Coins, Factory, Landmark, Settings as SettingsIcon, RefreshCw, Star, PanelLeftClose, PanelLeftOpen, type LucideIcon } from 'lucide-react'
 import { loadWorkspace, saveWorkspace, search, loadWatchlist, changeWatchlist } from './api'
 import type { BasicSecurity, WorkspaceSettings, WorkspaceState } from './types'
 import SearchBar from './components/SearchBar'
@@ -55,6 +55,9 @@ export default function App() {
   const [searchError, setSearchError] = useState('')
   const [workspace, setWorkspace] = useState(initialWorkspace)
   const [ready, setReady] = useState(false)
+  // 左侧菜单是否隐藏，保存在工作区设置（sidebar_hidden）里：Desktop 每次启动的端口不同，localStorage 记不住。
+  // 读取工作区之后用保存的值，之后以界面上的状态为准，点击时立即切换、在后台保存。
+  const [sidebarHidden, setSidebarHidden] = useState(false)
   const [storeError, setStoreError] = useState('')
   const [saving, setSaving] = useState(false)
   const [storeRetry, setStoreRetry] = useState(0)
@@ -73,6 +76,7 @@ export default function App() {
       if (controller.signal.aborted) return
       setWorkspace(state)
       setSelected(current => current ?? state.watchlist[0] ?? null)
+      setSidebarHidden(state.settings.sidebar_hidden ?? false)
       setReady(true)
     }).catch((e: unknown) => {
       if (!controller.signal.aborted) setStoreError(e instanceof Error ? e.message : String(e))
@@ -160,7 +164,13 @@ export default function App() {
     } catch (e) { setStoreError(e instanceof Error ? e.message : String(e)) }
     finally { savingRef.current = false; setSaving(false) }
   }
-  const saveSettings = (settings: WorkspaceSettings) => persist({ ...workspace, settings })
+  // 设置页的草稿是打开时的副本，保存时保留当前的菜单状态，不用旧值覆盖。
+  const saveSettings = (settings: WorkspaceSettings) => persist({ ...workspace, settings: { ...settings, sidebar_hidden: sidebarHidden } })
+  const toggleSidebar = () => {
+    const hidden = !sidebarHidden
+    setSidebarHidden(hidden)
+    if (ready) void persist({ ...workspace, settings: { ...workspace.settings, sidebar_hidden: hidden } })
+  }
   const currentPage = pages.find(item => item.id === page)!
   const items = listMode === 'watchlist' ? workspace.watchlist : results
   const watchCodes = useMemo(() => workspace.watchlist.map(item => item.ex_code), [workspace.watchlist])
@@ -180,7 +190,7 @@ export default function App() {
 
   return <div className="app">
     <div className="app-shell">
-      <aside className="sidebar">
+      <aside className="sidebar" id="app-sidebar" hidden={sidebarHidden}>
         <div className="brand"><img className="brand-mark" src={secLogo} alt="" width={36} height={36} /><strong>SEC</strong></div>
         <span className="nav-group-label">工作空间</span>
         <nav className="side-nav" aria-label="主导航">{pages.map(item => <button key={item.id}
@@ -191,7 +201,13 @@ export default function App() {
         <div className="sidebar-footer"><span className="status-dot" />本地工作台<span>自选 · 行情 · 研究</span></div>
       </aside>
       <main className="main-body" id="main-content">
-        <header className="app-header"><div className="page-heading"><currentPage.icon size={22} strokeWidth={1.75} aria-hidden="true" /><h1>{currentPage.title}</h1></div><div className="page-actions" id="page-actions">
+        <header className="app-header"><div className="page-heading">
+          {/* 悬停或键盘聚焦时显示提示；不用 title，系统 WebView 不一定显示原生提示，而且要等一会儿。 */}
+          <button className="sidebar-toggle" aria-controls="app-sidebar" aria-expanded={!sidebarHidden} aria-label={sidebarHidden ? '显示左侧菜单' : '隐藏左侧菜单'} aria-describedby="sidebar-toggle-tip" onClick={toggleSidebar}>
+            {sidebarHidden ? <PanelLeftOpen size={18} strokeWidth={1.75} aria-hidden="true" /> : <PanelLeftClose size={18} strokeWidth={1.75} aria-hidden="true" />}
+            <span className="sidebar-toggle-tip" id="sidebar-toggle-tip" role="tooltip">{sidebarHidden ? '点击展开菜单' : '点击隐藏菜单'}</span>
+          </button>
+          <currentPage.icon size={22} strokeWidth={1.75} aria-hidden="true" /><h1>{currentPage.title}</h1></div><div className="page-actions" id="page-actions">
           {selected && page !== 'stocks' && <button className="context-security" onClick={() => setPage('stocks')}>{selected.name} · 返回研究 →</button>}
           </div>
         </header>

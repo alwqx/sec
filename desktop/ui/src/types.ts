@@ -46,6 +46,7 @@ export interface WorkspaceSettings {
   download_directory: string
   refresh_seconds: number
   theme: 'dark' | 'light' | 'system'
+  sidebar_hidden?: boolean // 左侧菜单是否隐藏，旧的工作区文件没有这一项（按展开处理）
   sec_edgar_email?: string // 保存在和 CLI 共用的 ~/.sec/config.json
 }
 

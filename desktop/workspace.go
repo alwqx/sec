@@ -31,6 +31,8 @@ type workspaceSettings struct {
 	DownloadDirectory string `json:"download_directory"`
 	RefreshSeconds    int    `json:"refresh_seconds"`
 	Theme             string `json:"theme"`
+	// SidebarHidden 是左侧菜单是否隐藏；Desktop 每次启动的端口不同，前端的 localStorage 记不住，所以存在工作区里。
+	SidebarHidden bool `json:"sidebar_hidden"`
 	// SECEmail 保存在和 CLI 共用的 ~/.sec/config.json，不写入 workspace.json；保存时留空表示不修改。
 	SECEmail string `json:"sec_edgar_email,omitempty"`
 }
