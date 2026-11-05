@@ -18,14 +18,14 @@ import (
 	"github.com/alwqx/sec/watchlist"
 )
 
-// coverWorkers 是同时下载封面页的数量，总请求速度仍受 wait 限制。
-const coverWorkers = 4
+// filingWorkers 是同时读取申报页面的数量，总请求速度仍受 wait 限制。
+const filingWorkers = 4
 
 // coverCacheVersion 是封面解析结果的缓存版本，解析规则变化时加一，旧缓存不再使用、重新读取。
 const coverCacheVersion = "v2"
 
-// coverRetryDays 内申报的封面读不到（HTTP 404，SEC 刚收到申报时 R 页面可能还没生成）或解析为空时不缓存，以后再读。
-const coverRetryDays = 30
+// filingRetryDays 内申报的页面读不到（HTTP 404，SEC 刚收到申报时 R 页面可能还没生成）或解析为空时不缓存，以后再读。
+const filingRetryDays = 30
 
 // CoverResult 是 CoverShares 的结果。Failed 是读取失败、被跳过的申报数，大于 0 时历史股数可能有缺口。
 type CoverResult struct {
@@ -61,37 +61,15 @@ func (c *Client) CoverShares(ctx context.Context, cik int, since string) (*Cover
 		return nil, err
 	}
 	dir = filepath.Join(dir, "covers", coverCacheVersion, strconv.Itoa(cik))
-	var (
-		mu       sync.Mutex
-		points   []ClassShares
-		failed   int
-		firstErr error
-		wg       sync.WaitGroup
-	)
-	jobs := make(chan Filing)
-	for range coverWorkers {
-		wg.Go(func() {
-			for f := range jobs {
-				p, err := c.coverShares(ctx, cik, dir, f)
-				mu.Lock()
-				if err != nil {
-					failed++
-					if firstErr == nil {
-						firstErr = err
-					}
-				}
-				if p != nil && len(p.Classes) > 0 {
-					points = append(points, *p)
-				}
-				mu.Unlock()
-			}
-		})
+	all, failed, firstErr := readFilings(result.Filings, func(f Filing) (*ClassShares, error) {
+		return c.coverShares(ctx, cik, dir, f)
+	})
+	points := []ClassShares{}
+	for _, p := range all {
+		if p != nil && len(p.Classes) > 0 {
+			points = append(points, *p)
+		}
 	}
-	for _, f := range result.Filings {
-		jobs <- f
-	}
-	close(jobs)
-	wg.Wait()
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -107,36 +85,86 @@ func (c *Client) CoverShares(ctx context.Context, cik int, since string) (*Cover
 	return &CoverResult{Points: points, Failed: failed}, nil
 }
 
-// coverShares 读取一份申报的封面股数，先查缓存。较早的申报没有封面页（HTTP 404）或没有类别股数时也缓存空结果，
-// 不再重复请求；coverRetryDays 内的申报不缓存空结果，R 页面生成后可以读到。
+// coverShares 读取一份申报的封面股数，见 cachedFiling。较早的申报没有封面页（HTTP 404）或没有类别股数时结果为空。
 func (c *Client) coverShares(ctx context.Context, cik int, dir string, f Filing) (*ClassShares, error) {
+	return cachedFiling(dir, f, func() (*ClassShares, bool, error) {
+		body, err := c.get(ctx, filingFile(cik, f, "R1.htm"))
+		var notFound notFoundError
+		if err != nil && !errors.As(err, &notFound) {
+			return nil, false, err
+		}
+		p := &ClassShares{Filed: f.FilingDate, Classes: []ShareClass{}}
+		if err == nil {
+			p.Date, p.Classes = parseCover(string(body))
+		}
+		return p, len(p.Classes) > 0, nil
+	})
+}
+
+// filingFile 返回申报目录里的文件地址。
+func filingFile(cik int, f Filing, name string) string {
+	return archivesURL + strconv.Itoa(cik) + "/" + strings.ReplaceAll(f.Accession, "-", "") + "/" + name
+}
+
+// readFilings 用 filingWorkers 个并发逐份读取申报，返回读到的结果（顺序不定）、失败数和第一个错误。
+func readFilings[T any](filings []Filing, read func(Filing) (T, error)) ([]T, int, error) {
+	var (
+		mu       sync.Mutex
+		results  []T
+		failed   int
+		firstErr error
+		wg       sync.WaitGroup
+	)
+	jobs := make(chan Filing)
+	for range filingWorkers {
+		wg.Go(func() {
+			for f := range jobs {
+				v, err := read(f)
+				mu.Lock()
+				if err != nil {
+					failed++
+					if firstErr == nil {
+						firstErr = err
+					}
+				} else {
+					results = append(results, v)
+				}
+				mu.Unlock()
+			}
+		})
+	}
+	for _, f := range filings {
+		jobs <- f
+	}
+	close(jobs)
+	wg.Wait()
+	return results, failed, firstErr
+}
+
+// cachedFiling 读取一份申报的解析结果，按申报号缓存在 dir 下：申报发布后不再变化。read 的 found 为 false 表示页面不存在
+// 或解析为空，较早的申报也缓存空结果，不再重复请求；filingRetryDays 内的申报不缓存空结果，R 页面生成后可以读到。
+func cachedFiling[T any](dir string, f Filing, read func() (T, bool, error)) (T, error) {
 	path := filepath.Join(dir, f.Accession+".json")
 	if data, err := os.ReadFile(path); err == nil {
-		var cached ClassShares
+		var cached T
 		if json.Unmarshal(data, &cached) == nil {
-			return &cached, nil
+			return cached, nil
 		}
 	}
-	link := archivesURL + strconv.Itoa(cik) + "/" + strings.ReplaceAll(f.Accession, "-", "") + "/R1.htm"
-	body, err := c.get(ctx, link)
-	var notFound notFoundError
-	if err != nil && !errors.As(err, &notFound) {
-		return nil, err
-	}
-	p := &ClassShares{Filed: f.FilingDate, Classes: []ShareClass{}}
-	if err == nil {
-		p.Date, p.Classes = parseCover(string(body))
+	v, found, err := read()
+	if err != nil {
+		return v, err
 	}
 	recent := true
 	if filed, err := time.Parse(time.DateOnly, f.FilingDate); err == nil {
-		recent = time.Since(filed) < coverRetryDays*24*time.Hour
+		recent = time.Since(filed) < filingRetryDays*24*time.Hour
 	}
-	if len(p.Classes) > 0 || !recent {
-		if data, err := json.Marshal(p); err == nil && os.MkdirAll(dir, 0700) == nil {
+	if found || !recent {
+		if data, err := json.Marshal(v); err == nil && os.MkdirAll(dir, 0700) == nil {
 			_ = watchlist.AtomicWrite(path, data)
 		}
 	}
-	return p, nil
+	return v, nil
 }
 
 var (
