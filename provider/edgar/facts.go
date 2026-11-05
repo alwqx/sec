@@ -12,9 +12,6 @@ import (
 
 const companyFactsURL = "https://data.sec.gov/api/xbrl/companyfacts/"
 
-// ErrIFRS 表示公司按国际会计准则（IFRS）申报（比如提交 20-F 的台积电），用于暂不支持 IFRS 的功能，比如估值。
-var ErrIFRS = errors.New("这家公司按国际会计准则（IFRS）申报")
-
 // Standard 是财报的会计准则。
 type Standard string
 
@@ -131,9 +128,11 @@ type Facts struct {
 	// Currency 是报表金额的币种：公司的列报币种，按最近一份年报里数值最多的币种识别。外国公司的年报常常附带
 	// 最近一年的美元便利折算数，不能当成列报币种，否则只能读到零散几年、按各年汇率折算的美元数。
 	Currency string
-	concepts map[string]map[string][]fact
-	dei      map[string]map[string][]fact // 封面信息，比如流通股数
-	resolved map[Statement][]LineItem     // 按 Currency 换好单位的各报表行，见 resolveLines
+	// AnnualForm 是最近一份年报的表格类型（修订也记为原类型，不带 /A），比如 10-K；外国私人发行人提交 20-F、40-F（见 ForeignIssuer）。
+	AnnualForm string
+	concepts   map[string]map[string][]fact
+	dei        map[string]map[string][]fact // 封面信息，比如流通股数
+	resolved   map[Statement][]LineItem     // 按 Currency 换好单位的各报表行，见 resolveLines
 }
 
 type factConcept struct {
@@ -144,6 +143,7 @@ type factConcept struct {
 // 最近一份按申报日取，不按截止日：期后事项的截止日晚于报告期，不能代表报表。
 type annualFiling struct {
 	filed, accn string
+	form        string                     // 表格类型，比如 10-K、20-F
 	end         string                     // 这份年报里最晚的截止日，即报告期
 	counts      map[string]int             // 这份年报里各币种的数值条数
 	years       map[string]map[string]bool // 所有年报中各币种有全年数据的截止日
@@ -189,7 +189,7 @@ func latestAnnualFiling(concepts map[string]factConcept, standard Standard) annu
 					continue
 				}
 				if v.Filed > filing.filed || (v.Filed == filing.filed && v.Accn > filing.accn) {
-					filing.filed, filing.accn = v.Filed, v.Accn
+					filing.filed, filing.accn, filing.form = v.Filed, v.Accn, v.Form
 				}
 				if v.Start != "" && isYear(days(v.Start, v.End)) {
 					if filing.years[unit] == nil {
@@ -268,14 +268,6 @@ func best(fallback string, counts map[string]int) string {
 // isCurrency 判断单位是否是币种代码（ISO 4217 三个大写字母），比如 USD、CNY。
 func isCurrency(unit string) bool {
 	return len(unit) == 3 && strings.ToUpper(unit) == unit
-}
-
-// In 返回按 currency 取数的副本，比如估值的价格是美元，外国公司只用美元便利折算数。
-func (f *Facts) In(currency string) *Facts {
-	g := *f
-	g.Currency = currency
-	g.resolveLines()
-	return &g
 }
 
 // resolveLines 按 Currency 生成各报表的行，Build 和识别报告期时反复用到，只算一次。
@@ -370,7 +362,7 @@ func parseFacts(cik int, body []byte) (*Facts, error) {
 	if accountingStandard(gaapFiling, ifrsFiling, len(gaap) > 0) == IFRS {
 		standard, data, filing = IFRS, ifrs, ifrsFiling
 	}
-	f := &Facts{CIK: cik, Name: raw.EntityName, Standard: standard, Currency: reportingCurrency(filing), concepts: map[string]map[string][]fact{}, dei: map[string]map[string][]fact{}}
+	f := &Facts{CIK: cik, Name: raw.EntityName, Standard: standard, Currency: reportingCurrency(filing), AnnualForm: strings.TrimSuffix(filing.form, "/A"), concepts: map[string]map[string][]fact{}, dei: map[string]map[string][]fact{}}
 	for name, concept := range data {
 		f.concepts[name] = concept.Units
 	}
@@ -435,6 +427,15 @@ func CurrencyName(code string) string {
 // 期间长度：全年约 52-53 周，单季约 13 周，前三季度累计约 39 周。
 func isYear(d int) bool    { return d >= 350 && d <= 380 }
 func isQuarter(d int) bool { return d >= 80 && d <= 100 }
+
+// ForeignIssuer 判断公司是否是外国私人发行人：最近一份年报是 20-F 或 40-F（含修订）。
+func (f *Facts) ForeignIssuer() bool {
+	switch f.AnnualForm {
+	case "20-F", "40-F":
+		return true
+	}
+	return false
+}
 
 func isAnnualForm(form string) bool {
 	switch strings.TrimSuffix(form, "/A") {
@@ -779,6 +780,18 @@ type SharePoint struct {
 	Filed   string
 	Shares  float64
 	Classes int // 封面列出的普通股类别数
+}
+
+// DepositaryReceiptRatio 返回封面上最近申报的存托凭证比例（1 股 ADS 对应的普通股数）。多数公司按证券类别标注，
+// companyfacts 不收录，读不到时 ok 为 false。
+func (f *Facts) DepositaryReceiptRatio() (ratio float64, ok bool) {
+	var latest fact
+	for _, v := range f.dei["EntityListingDepositoryReceiptRatio"]["pure"] {
+		if v.Val > 0 && (!ok || v.Filed > latest.Filed || (v.Filed == latest.Filed && v.End > latest.End)) {
+			latest, ok = v, true
+		}
+	}
+	return latest.Val, ok
 }
 
 // SharesOutstanding 返回各次申报封面上的普通股流通股数，按统计日升序。有多类普通股（比如 A、B、C 股）的公司，

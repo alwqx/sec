@@ -19,6 +19,10 @@ import (
 // ErrStaleShares 表示 SEC 没有最近的流通股数，无法计算市值。
 var ErrStaleShares = fmt.Errorf("%w：SEC 没有最近 15 个月的流通股数（封面股数、按类别申报的封面股数和季度稀释加权股数都没有）", ErrNoData)
 
+// ErrForeign 表示外国公司，美股估值暂不支持：估值用 ADS 价格乘 SEC 封面的普通股数，ADS 和普通股的比例
+// （比如网易 1 股 ADS = 5 股普通股）、财报的汇率换算都没有可靠的数据来源，估出的市值会出错。
+var ErrForeign = errors.New("美股估值暂只支持美国本土公司（按 US GAAP 以美元列报，不提交 20-F、40-F 年报，不以 ADS 上市），外国公司的 ADS 与普通股比例、汇率换算暂未处理")
+
 // usHistoryYears 是美股估值历史的年数，和 A 股的估值历史长度相近。
 const usHistoryYears = 10
 
@@ -36,7 +40,7 @@ func AnalyzeUS(ctx context.Context, client *edgar.Client, exCode string, params 
 	if loadFacts == nil {
 		loadFacts = client.CompanyFacts
 	}
-	// IFRS 公司不估值，财务数据一返回就取消其他请求，不必等日线下载完。
+	// 外国公司不估值，财务数据一返回就取消其他请求，不必等日线下载完。
 	fetchCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	var (
@@ -45,13 +49,17 @@ func AnalyzeUS(ctx context.Context, client *edgar.Client, exCode string, params 
 		quote             *sina.USQuote
 		bars              []*sina.Bar
 		factsErr, barsErr error
+		foreign           string // 不估值的外国公司的原因，见 foreignReason
 		wg                sync.WaitGroup
 	)
 	wg.Add(4)
 	go func() {
 		defer wg.Done()
 		facts, factsErr = loadFacts(fetchCtx, company.CIK)
-		if factsErr != nil || facts.Standard == edgar.IFRS {
+		if factsErr == nil {
+			foreign = foreignReason(facts)
+		}
+		if factsErr != nil || foreign != "" {
 			cancel()
 		}
 	}()
@@ -73,9 +81,8 @@ func AnalyzeUS(ctx context.Context, client *edgar.Client, exCode string, params 
 	if factsErr != nil {
 		return nil, fmt.Errorf("获取 SEC 财务数据失败: %w", factsErr)
 	}
-	// IFRS 公司的财报以外币列报，还要处理 ADR 和普通股的比例，暂不估值；年度财报可以查看。
-	if facts.Standard == edgar.IFRS {
-		return nil, fmt.Errorf("%w，美股估值暂只支持 US GAAP，可以查看这家公司的年度财报", edgar.ErrIFRS)
+	if foreign != "" {
+		return nil, fmt.Errorf("%s：%w；可以查看这家公司的年度财报", foreign, ErrForeign)
 	}
 	if barsErr != nil {
 		return nil, fmt.Errorf("获取美股日线失败: %w", barsErr)
@@ -104,6 +111,23 @@ func AnalyzeUS(ctx context.Context, client *edgar.Client, exCode string, params 
 		result.SharesNote += fmt.Sprintf("有 %d 份申报的封面没有读到（可能被 SEC 限流），对应时期的股数缺失，估值历史有缺口，稍后重试可以补齐。", covers.Failed)
 	}
 	return result, err
+}
+
+// foreignReason 返回不按美国本土公司估值的原因，本土公司返回空字符串。
+func foreignReason(facts *edgar.Facts) string {
+	switch {
+	case facts.Standard == edgar.IFRS:
+		return "这家公司按国际会计准则（IFRS）申报"
+	case facts.ForeignIssuer():
+		return fmt.Sprintf("这家公司是提交 %s 年报的外国公司", facts.AnnualForm)
+	case facts.Currency != "USD":
+		return fmt.Sprintf("这家公司的财报以%s列报", edgar.CurrencyName(facts.Currency))
+	}
+	// 提交 10-K 但以 ADS 上市的公司：价格是 ADS 的，封面股数是普通股，比例不是 1 时市值出错。
+	if ratio, ok := facts.DepositaryReceiptRatio(); ok && ratio != 1 {
+		return fmt.Sprintf("这家公司以 ADS 上市（1 股 ADS = %g 股普通股）", ratio)
+	}
+	return ""
 }
 
 // hasRecentShares 判断 companyfacts 的封面股数或加权股数在 date 当天是否可用（不超过 15 个月），
@@ -440,10 +464,6 @@ func computeUS(code, industry, sic string, facts *edgar.Facts, covers []edgar.Cl
 	if len(bars) == 0 {
 		return nil, ErrNoData
 	}
-	// 价格是美元，金额也只用美元。以外币列报的公司（比如阿里巴巴的人民币）暂不按汇率换算，
-	// 只能用年报附带的美元便利折算数，结果里说明。
-	reported := facts.Currency
-	facts = facts.In("USD")
 	income := ascending(facts.Build(edgar.Income, true, 0).Periods)
 	balance := ascending(facts.Build(edgar.Balance, true, 0).Periods)
 	profit := newAsOf(ttmEntries(income, "net_income"))
@@ -574,9 +594,6 @@ func computeUS(code, industry, sic string, facts *edgar.Facts, covers []edgar.Cl
 	result.Disclaimer = "美股估值由 SEC XBRL 财务数据和新浪不复权日线计算：市值 = 收盘价 × 当时申报的流通股数（封面股数；只按类别申报时从申报封面页读取各类股数，按新浪的当前股数折算成所查这类股票；都没有时用季度稀释加权股数；拆股后按比例调整），PE、PS 用最近四个季度，PB 用最近一期股东权益，股息率用最近一个完整财年支付的现金股息，都只用当天之前已经申报的数值；报告期后来被重述时，历史估值也用重述后的数字。" + result.Disclaimer
 	result.PeersNote = "美股暂无同行业对比，规则汇总未计入行业规则"
 	result.SharesNote = sharesNote
-	if reported != "" && reported != "USD" {
-		result.CurrencyNote = fmt.Sprintf("这家公司的财报以%s列报，暂不按汇率换算，估值只用年报附带的美元便利折算数（通常只有最近一年），历史较短，PE、PS 等指标可能缺失。", edgar.CurrencyName(reported))
-	}
 	result.Dividends, result.DividendsNote = usDividends(years, lastDividend, result, yields, yieldSince, annualCash)
 	// 股息率规则依赖分红数据，Compute 时还没有，补上后重新汇总。
 	if result.Dividends != nil {

@@ -78,7 +78,7 @@ func (s *desktopServer) handleValuation(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
-	if errors.Is(err, edgar.ErrIFRS) {
+	if errors.Is(err, valuation.ErrForeign) {
 		writeError(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}

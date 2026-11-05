@@ -332,15 +332,22 @@ func TestHasRecentShares(t *testing.T) {
 	require.False(t, hasRecentShares(usFactsWith(t, nil, testFact{}), "2026-10-30"), "没有股数")
 }
 
-// 以外币列报的公司估值仍只用美元数，结果里说明；美元列报时不说明。
-func TestComputeUSCurrencyNote(t *testing.T) {
-	now, _ := time.Parse(time.DateOnly, "2026-11-01")
-	bars := usBars("2025-01-01", "2026-10-30", "2026-06-01", 40, 10)
-	usd, err := computeUS("$TEST", "Banks", "6021", usFacts(t), nil, bars, 0, DefaultDCFParams(), now)
+// 外国公司（IFRS、提交 20-F 或 40-F、以外币列报）不按美国本土公司估值。
+func TestForeignReason(t *testing.T) {
+	require.Empty(t, foreignReason(usFacts(t)))
+	ratio1, err := edgar.ParseFacts(1, []byte(`{"facts":{"us-gaap":{"Revenues":{"units":{"USD":[{"start":"2024-01-01","end":"2024-12-31","val":1,"form":"10-K","filed":"2025-04-17"}]}}},
+"dei":{"EntityListingDepositoryReceiptRatio":{"units":{"pure":[{"end":"2025-03-31","val":1,"form":"10-K","filed":"2025-04-17"}]}}}}}`))
 	require.NoError(t, err)
-	require.Empty(t, usd.CurrencyNote)
-	cny, err := computeUS("$TEST", "Banks", "6021", usFacts(t).In("CNY"), nil, bars, 0, DefaultDCFParams(), now)
-	require.NoError(t, err)
-	require.Contains(t, cny.CurrencyNote, "以人民币列报")
-	require.Equal(t, usd.PE, cny.PE, "估值用的仍是美元数")
+	require.Empty(t, foreignReason(ratio1), "1 股 ADS = 1 股普通股时市值不受影响")
+	for _, tt := range []struct{ name, body, want string }{
+		{"IFRS", `{"facts":{"ifrs-full":{"Revenue":{"units":{"TWD":[{"start":"2024-01-01","end":"2024-12-31","val":1,"form":"20-F","filed":"2025-04-17"}]}}}}}`, "IFRS"},
+		{"20-F", `{"facts":{"us-gaap":{"Revenues":{"units":{"USD":[{"start":"2024-01-01","end":"2024-12-31","val":1,"form":"20-F/A","filed":"2025-04-17"}]}}}}}`, "提交 20-F 年报的外国公司"},
+		{"ADS", `{"facts":{"us-gaap":{"Revenues":{"units":{"USD":[{"start":"2024-01-01","end":"2024-12-31","val":1,"form":"10-K","filed":"2025-04-17"}]}}},
+"dei":{"EntityListingDepositoryReceiptRatio":{"units":{"pure":[{"end":"2024-12-31","val":1,"form":"10-K","filed":"2024-04-17"},{"end":"2025-03-31","val":8,"form":"10-K","filed":"2025-04-17"}]}}}}}`, "1 股 ADS = 8 股普通股"},
+		{"外币", `{"facts":{"us-gaap":{"Revenues":{"units":{"CNY":[{"start":"2024-01-01","end":"2024-12-31","val":1,"form":"10-K","filed":"2025-04-17"}]}}}}}`, "以人民币列报"},
+	} {
+		facts, err := edgar.ParseFacts(1, []byte(tt.body))
+		require.NoError(t, err, tt.name)
+		require.Contains(t, foreignReason(facts), tt.want, tt.name)
+	}
 }

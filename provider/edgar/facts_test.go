@@ -116,6 +116,8 @@ func TestBuildForeignAnnualForms(t *testing.T) {
 		t.Run(form, func(t *testing.T) {
 			f, err := parseFacts(1, []byte(strings.ReplaceAll(testFacts, "10-K", form)))
 			require.NoError(t, err)
+			require.Equal(t, strings.TrimSuffix(form, "/A"), f.AnnualForm, "修订记为原类型")
+			require.Equal(t, !strings.HasPrefix(form, "10-KT"), f.ForeignIssuer())
 			for _, statement := range Statements {
 				report := f.Build(statement, false, 1)
 				require.Len(t, report.Periods, 1)
@@ -377,12 +379,6 @@ func TestReportingCurrency(t *testing.T) {
 			require.Equal(t, "CNY/shares", line.Unit)
 		}
 	}
-
-	usd := f.In("USD").Build(Income, false, 0)
-	require.Equal(t, "USD", usd.Currency)
-	require.Len(t, usd.Periods, 1, "美元只有最近一年的便利折算数")
-	require.Equal(t, 137.0, value(t, usd.Periods[0], "revenue"))
-	require.Equal(t, "CNY", f.Currency, "In 返回副本，不改原数据")
 
 	f, err = parseFacts(1, []byte(testFacts))
 	require.NoError(t, err)
