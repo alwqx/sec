@@ -295,3 +295,25 @@ func TestUSFinancialCharts(t *testing.T) {
 	require.Equal(t, http.StatusNotFound, rr.Code)
 	require.Contains(t, rr.Body.String(), "只提交 20-F 年报")
 }
+
+// 三个美股 SEC 接口共用参数校验和错误映射：没有 XBRL 数据的公司都是 404，年度、季度参数无效时说明参数名。
+func TestUSHandlersSharedErrors(t *testing.T) {
+	defer gock.Off()
+	srv := usServer(t)
+	gock.New("https://www.sec.gov").Get("/files/company_tickers.json").Reply(200).BodyString(usTickers)
+	gock.New("https://data.sec.gov").Get("/api/xbrl/companyfacts/CIK0001046179.json").Reply(200).BodyString(`{"facts":{}}`)
+	rr := usRequest(t, srv, "/api/v1/us/financials?code=$TSM&statement=income")
+	require.Equal(t, http.StatusNotFound, rr.Code, rr.Body.String())
+	require.Contains(t, rr.Body.String(), "没有这家公司的财报数据")
+
+	rr = usRequest(t, srv, "/api/v1/us/financials?code=$AAPL&statement=income&period=month")
+	require.Equal(t, http.StatusBadRequest, rr.Code)
+	require.Contains(t, rr.Body.String(), "period 须为 annual 或 quarter")
+	rr = usRequest(t, srv, "/api/v1/us/financials/charts?code=$AAPL&freq=month")
+	require.Equal(t, http.StatusBadRequest, rr.Code)
+	require.Contains(t, rr.Body.String(), "freq 须为 annual 或 quarter")
+	// 先校验代码：代码和其他参数都不对时，提示代码的问题。
+	rr = usRequest(t, srv, "/api/v1/us/financials?code=SH600036")
+	require.Equal(t, http.StatusBadRequest, rr.Code)
+	require.Contains(t, rr.Body.String(), "只支持美股代码")
+}

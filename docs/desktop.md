@@ -272,9 +272,9 @@ macOS 按当前进程架构匹配 `sec-<tag>-desktop-darwin-<arch>.dmg`，不将
 | GET | `/api/v1/us/company?code=$AAPL` | 美股公司资料：`info`（`company` 为 SEC EDGAR 公司信息，`quote` 为新浪行情和估值，失败的一方为 null）和 `notes`（失败原因）；两方都失败时 502 |
 | GET | `/api/v1/us/dividends?code=$AAPL` | 美股按财年的分红表（`usstock.Dividends`）：`ticker`、`name`、`cik`、`currency`、`currency_name`、`splits`（识别出的拆股）、`splits_unchecked`（日线没读到、没有按拆股调整）和 `years`（`fiscal_year`、`end`、`per_share`、`growth`、`paid`、`net_income`、`payout`、`buyback`，从新到旧）；SEC 没有这家公司时 404 |
 | GET | `/api/v1/us/financials/charts?code=$AAPL&freq=annual` | 美股财报的图表数据，格式和 `/api/v1/financials/charts` 相同（`financials.Analysis`），另有 `source`（`sec`）、`currency_name` 和每期的 `label`（财年标注）；freq 为 annual 或 quarter；SEC 没有这家公司或没有利润表时 404 |
-| GET | `/api/v1/us/financials?code=$AAPL&statement=income&period=annual` | 美股财报的一张报表：`ticker`、`name`、`cik`、`report`（`standard` 会计准则 US GAAP 或 IFRS，`currency`、`currency_name` 列报币种，`lines` 行定义，`periods` 报告期的 `values` 和推算行 `derived`）；statement 为 income、balance、cashflow，period 为 annual 或 quarter；IFRS 公司只有年度报表，季度返回空的报告期 |
+| GET | `/api/v1/us/financials?code=$AAPL&statement=income&period=annual` | 美股财报的一张报表：`ticker`、`name`、`cik`、`report`（`standard` 会计准则 US GAAP 或 IFRS，`currency`、`currency_name` 列报币种，`lines` 行定义，`periods` 报告期的 `values` 和推算行 `derived`）；statement 为 income、balance、cashflow，period 为 annual 或 quarter；IFRS 公司只有年度报表，季度返回空的报告期；SEC 没有这家公司或没有 XBRL 数据时 404 |
 
-新增接口统一沿用 token cookie 鉴权。上游失败返回 502；公司资料为空返回 404；参数无效返回 400；列表为空返回 `{"results":[]}`（附带各接口其他元数据）。写入设置额外限制请求体大小、内容类型、同源与有效证券/偏好字段。
+美股 SEC 接口（财报、财报图表、分红）共用 `desktop/us.go` 的 `serveUS`：先校验 `$` 代码（400），再设 30 秒超时、用共享配置的联系邮箱访问 SEC，错误统一映射为 400（其他参数无效，说明参数名）、404（SEC 没有这家公司或没有 XBRL 数据，或数据不足以整理并说明原因）、502（上游失败，日志带请求路径）。新增接口统一沿用 token cookie 鉴权。上游失败返回 502；公司资料为空返回 404；参数无效返回 400；列表为空返回 `{"results":[]}`（附带各接口其他元数据）。写入设置额外限制请求体大小、内容类型、同源与有效证券/偏好字段。
 
 ## 前端
 
