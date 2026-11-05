@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 import { usFinancials } from '../api'
 import { useResource } from '../hooks/useResource'
 import ResourceState from './ResourceState'
+import FinancialCharts from './FinancialCharts'
 import type { USReport } from '../types'
 
 const statements = { income: '利润表', balance: '资产负债表', cashflow: '现金流量表' } as const
@@ -14,8 +15,20 @@ function unitLabel(unit: string, report: USReport): string {
   return unit === report.currency ? `亿${report.currency_name}` : ''
 }
 
-// USFinancials 是美股的财报栏：SEC XBRL 数据整理成三张报表的主要项目，报告期为列，从新到旧。
+// USFinancials 是美股的财报栏：财务报表和图表分析两种视图，图表和 A 股共用 FinancialCharts。
 export default function USFinancials({ code }: { code: string }) {
+  const [view, setView] = useState<'statements' | 'charts'>('statements')
+  return <div className="financials-page">
+    <div className="segmented financial-views" aria-label="财报内容">
+      <button aria-pressed={view === 'statements'} onClick={() => setView('statements')}>财务报表</button>
+      <button aria-pressed={view === 'charts'} onClick={() => setView('charts')}>图表分析</button>
+    </div>
+    {view === 'statements' ? <USStatements code={code} /> : <FinancialCharts code={code} />}
+  </div>
+}
+
+// USStatements 是 SEC XBRL 数据整理成的三张报表的主要项目，报告期为列，从新到旧。
+function USStatements({ code }: { code: string }) {
   const [statement, setStatement] = useState<StatementKey>('income')
   const [quarterly, setQuarterly] = useState(false)
   const load = useCallback((signal: AbortSignal) => usFinancials(code, statement, quarterly ? 'quarter' : 'annual', signal), [code, statement, quarterly])

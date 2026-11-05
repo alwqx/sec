@@ -67,6 +67,6 @@ export default function Financials({ security }: { security: BasicSecurity }) {
       <button aria-pressed={view === 'charts'} onClick={() => setView('charts')}>图表分析</button>
       <button aria-pressed={view === 'annual'} onClick={() => setView('annual')}>定期报告</button>
     </div>
-    {view === 'statements' ? <FinancialStatements security={security} /> : view === 'charts' ? <FinancialCharts security={security} /> : <AnnualReports security={security} />}
+    {view === 'statements' ? <FinancialStatements security={security} /> : view === 'charts' ? <FinancialCharts code={security.ex_code} /> : <AnnualReports security={security} />}
   </div>
 }

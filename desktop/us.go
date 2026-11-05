@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alwqx/sec/financials"
 	"github.com/alwqx/sec/provider/edgar"
 	"github.com/alwqx/sec/usstock"
 )
@@ -195,4 +196,53 @@ func (s *desktopServer) handleUSDividends(w http.ResponseWriter, r *http.Request
 		return
 	}
 	writeJSON(w, dividends)
+}
+
+// handleUSFinancialCharts 返回美股财报的图表数据（financials.FromSEC），格式和 A 股的 /api/v1/financials/charts 相同；
+// XBRL 数据和财报、估值、分红栏目共用缓存。
+func (s *desktopServer) handleUSFinancialCharts(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	code := strings.TrimSpace(query.Get("code"))
+	if !usTicker.MatchString(code) {
+		writeError(w, http.StatusBadRequest, "只支持美股代码，比如 $AAPL")
+		return
+	}
+	freq := query.Get("freq")
+	if freq != "" && freq != "annual" && freq != "quarter" {
+		writeError(w, http.StatusBadRequest, "freq 只能是 annual 或 quarter")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+	client, err := s.edgarClient(ctx)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "读取 SEC 联系邮箱失败，请在设置中检查")
+		return
+	}
+	company, err := client.Lookup(ctx, code)
+	var facts *edgar.Facts
+	if err == nil {
+		facts, err = cachedUSFacts(client)(ctx, company.CIK)
+	}
+	var result *financials.Analysis
+	if err == nil {
+		result, err = financials.FromSEC(company.Ticker, facts, freq == "quarter")
+	}
+	switch {
+	case errors.Is(err, edgar.ErrNotFound) || errors.Is(err, edgar.ErrNoXBRL):
+		writeError(w, http.StatusNotFound, "SEC EDGAR 没有这家公司的财报数据，可能不向 SEC 申报")
+		return
+	case errors.Is(err, financials.ErrNoSECData) || errors.Is(err, financials.ErrIFRSQuarterly):
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	if err != nil {
+		if r.Context().Err() != nil {
+			return
+		}
+		slog.ErrorContext(ctx, "查询美股财报图表失败", "code", code, "error", err)
+		writeError(w, http.StatusBadGateway, "美股财报获取失败："+err.Error())
+		return
+	}
+	writeJSON(w, result)
 }

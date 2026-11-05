@@ -266,9 +266,12 @@ export interface FinancialMetrics {
   revenue: number | null; net_profit: number | null; parent_net_profit: number | null; deduct_net_profit: number | null
   gross_margin: number | null; net_margin: number | null; sale_ratio: number | null; manage_ratio: number | null; research_ratio: number | null; finance_ratio: number | null
   cost_income_ratio: number | null; debt_ratio: number | null; operating_cash: number | null; investing_cash: number | null; financing_cash: number | null; cash_to_profit: number | null
+  sga_ratio?: number | null
 }
-export interface FinancialPeriod { date: string; income: FinancialBridge | null; cash: FinancialBridge | null; assets: FinancialItem[] | null; metrics: FinancialMetrics }
-export interface FinancialCharts { code: string; company_type: 'general' | 'bank' | 'securities' | 'insurance'; quarterly: boolean; periods: FinancialPeriod[] }
+// label 是美股的财年标注（比如 FY2026Q1），A 股没有、按日期标注。
+export interface FinancialPeriod { date: string; label?: string; income: FinancialBridge | null; cash: FinancialBridge | null; assets: FinancialItem[] | null; metrics: FinancialMetrics }
+// source 为 sec 时是美股（SEC XBRL），currency_name 是金额的币种；A 股两者都没有。
+export interface FinancialCharts { code: string; company_type: 'general' | 'bank' | 'securities' | 'insurance'; quarterly: boolean; source?: 'sec'; currency_name?: string; periods: FinancialPeriod[] }
 
 export interface CommodityInfo { id: string; name: string; exchange: string; unit: string; domestic: boolean }
 // 涨跌相对昨日结算价，change_rate 为百分比
