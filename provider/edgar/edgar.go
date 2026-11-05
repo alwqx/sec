@@ -44,6 +44,9 @@ type Client struct {
 	Email string
 	// CacheDir 为空时使用 ~/.sec/cache/edgar。
 	CacheDir string
+
+	mu   sync.Mutex
+	subs map[int]*submissions // 本 Client 已读取的申报列表
 }
 
 var throttle struct {
@@ -69,6 +72,13 @@ func wait(ctx context.Context) error {
 	}
 }
 
+// notFoundError 是 HTTP 404，比如申报没有某个附件。
+type notFoundError string
+
+func (e notFoundError) Error() string {
+	return fmt.Sprintf("SEC EDGAR 找不到 %s（HTTP 404）", string(e))
+}
+
 func (c *Client) userAgent() string { return "alwqx-sec/" + version.Version + " " + c.Email }
 
 // get 请求 EDGAR，返回正文。403 时说明多半是联系邮箱缺失或被拒绝。
@@ -90,7 +100,7 @@ func (c *Client) get(ctx context.Context, link string) ([]byte, error) {
 		return nil, fmt.Errorf("SEC EDGAR 拒绝了请求（HTTP 403），请确认联系邮箱 %s 有效，或稍后再试", c.Email)
 	}
 	if resp.StatusCode == http.StatusNotFound {
-		return nil, fmt.Errorf("SEC EDGAR 找不到 %s（HTTP 404）", link)
+		return nil, notFoundError(link)
 	}
 	if err := utils.CheckStatus(resp); err != nil {
 		return nil, err
@@ -395,7 +405,15 @@ func (data *submissions) profile(cik int) *Profile {
 }
 
 // Profile 返回公司信息。和 Filings 读的是同一个文件，只需要公司信息时用它。
-func (c *Client) Profile(ctx context.Context, cik int) (*Profile, error) {
+// submissions 读取公司的申报列表。同一个 Client 内复用：估值时公司资料和封面股数要读同一份列表，不用下载两次；
+// 每次请求新建 Client，所以不会用到过时的列表。
+func (c *Client) submissions(ctx context.Context, cik int) (*submissions, error) {
+	c.mu.Lock()
+	cached := c.subs[cik]
+	c.mu.Unlock()
+	if cached != nil {
+		return cached, nil
+	}
 	body, err := c.get(ctx, fmt.Sprintf("%sCIK%010d.json", submissionsURL, cik))
 	if err != nil {
 		return nil, err
@@ -403,6 +421,20 @@ func (c *Client) Profile(ctx context.Context, cik int) (*Profile, error) {
 	var data submissions
 	if err := json.Unmarshal(body, &data); err != nil {
 		return nil, fmt.Errorf("SEC 申报列表格式无效：%w", err)
+	}
+	c.mu.Lock()
+	if c.subs == nil {
+		c.subs = map[int]*submissions{}
+	}
+	c.subs[cik] = &data
+	c.mu.Unlock()
+	return &data, nil
+}
+
+func (c *Client) Profile(ctx context.Context, cik int) (*Profile, error) {
+	data, err := c.submissions(ctx, cik)
+	if err != nil {
+		return nil, err
 	}
 	return data.profile(cik), nil
 }
@@ -410,13 +442,9 @@ func (c *Client) Profile(ctx context.Context, cik int) (*Profile, error) {
 // Filings 返回公司的申报，按申报日期从新到旧。SEC 的申报列表默认只有最近约 1000 份或一年，
 // 查询开始日期更早，或按类型筛选后不够 Want 条时，再读取历史分页。
 func (c *Client) Filings(ctx context.Context, cik int, q FilingQuery) (*FilingsResult, error) {
-	body, err := c.get(ctx, fmt.Sprintf("%sCIK%010d.json", submissionsURL, cik))
+	data, err := c.submissions(ctx, cik)
 	if err != nil {
 		return nil, err
-	}
-	var data submissions
-	if err := json.Unmarshal(body, &data); err != nil {
-		return nil, fmt.Errorf("SEC 申报列表格式无效：%w", err)
 	}
 	result := &FilingsResult{Profile: data.profile(cik)}
 	result.Filings = data.Filings.Recent.filings(cik, q)

@@ -44,7 +44,7 @@ func TestLookup(t *testing.T) {
 
 func TestFilings(t *testing.T) {
 	defer gock.Off()
-	gock.New("https://data.sec.gov").Get("/submissions/CIK0000320193.json").Times(2).Reply(200).BodyString(submissionsBody)
+	gock.New("https://data.sec.gov").Get("/submissions/CIK0000320193.json").Reply(200).BodyString(submissionsBody)
 	c := client(t)
 	result, err := c.Filings(context.Background(), 320193, FilingQuery{Forms: []string{"10-k"}})
 	require.NoError(t, err)

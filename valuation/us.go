@@ -17,7 +17,7 @@ import (
 )
 
 // ErrStaleShares 表示 SEC 没有最近的流通股数，无法计算市值。
-var ErrStaleShares = fmt.Errorf("%w：SEC 没有最近 15 个月的流通股数（封面股数和季度稀释加权股数都没有）", ErrNoData)
+var ErrStaleShares = fmt.Errorf("%w：SEC 没有最近 15 个月的流通股数（封面股数、按类别申报的封面股数和季度稀释加权股数都没有）", ErrNoData)
 
 // usHistoryYears 是美股估值历史的年数，和 A 股的估值历史长度相近。
 const usHistoryYears = 10
@@ -78,7 +78,28 @@ func AnalyzeUS(ctx context.Context, client *edgar.Client, exCode string, params 
 	if quote != nil && quote.Shares != nil {
 		current = *quote.Shares
 	}
-	return computeUS(strings.ToUpper(exCode), industry, sic, facts, bars, current, params, time.Now())
+	code, now := strings.ToUpper(exCode), time.Now()
+	// companyfacts 里最后一天没有可用的股数时（比如伯克希尔、Visa 只按类别申报），才逐份读取申报封面页：第一次较慢，之后读缓存。
+	if len(bars) == 0 || hasRecentShares(facts, bars[len(bars)-1].Date) {
+		return computeUS(code, industry, sic, facts, nil, bars, current, params, now)
+	}
+	since := now.AddDate(-usHistoryYears, -15, 0).Format(time.DateOnly)
+	covers, coverErr := client.CoverShares(ctx, company.CIK, since)
+	if coverErr != nil {
+		// 两个错误都包装，调用方能用 errors.Is 识别股数过期、取消和超时。
+		return nil, fmt.Errorf("%w（读取申报封面股数：%w）", ErrStaleShares, coverErr)
+	}
+	result, err := computeUS(code, industry, sic, facts, covers.Points, bars, current, params, now)
+	if err == nil && covers.Failed > 0 {
+		result.SharesNote += fmt.Sprintf("有 %d 份申报的封面没有读到（可能被 SEC 限流），对应时期的股数缺失，估值历史有缺口，稍后重试可以补齐。", covers.Failed)
+	}
+	return result, err
+}
+
+// hasRecentShares 判断 companyfacts 的封面股数或加权股数在 date 当天是否可用（不超过 15 个月），
+// 和 computeUS 选股数的规则一致；不可用时才需要读取申报封面页。
+func hasRecentShares(facts *edgar.Facts, date string) bool {
+	return newUSShares(coverShares(facts.SharesOutstanding()), weightedShares(facts.WeightedDilutedShares())).at(date) != nil
 }
 
 // available 是一个在某天申报后才能看到的数值。
@@ -159,18 +180,28 @@ func ascending(periods []edgar.Period) []edgar.Period {
 	return result
 }
 
+// shareSource 是股数的来源。
+type shareSource int
+
+const (
+	fromCover    shareSource = iota // companyfacts 里的封面股数，多类股票直接相加
+	fromClasses                     // 申报封面页按类别列出的股数，已折算成所查这类股票
+	fromWeighted                    // 单季稀释加权股数
+)
+
 // sharePoint 是一次申报的股数。since 之后发生的拆股还没有反映在 shares 里：封面股数从统计日算起；
 // 加权股数从申报日算起，因为申报前发生的拆股已经追溯调整。
 type sharePoint struct {
 	end, since, filed string
 	shares            float64
 	classes           int // 封面列出的普通股类别数，加权股数为 0
+	source            shareSource
 }
 
 func coverShares(list []edgar.SharePoint) []sharePoint {
 	points := make([]sharePoint, 0, len(list))
 	for _, p := range list {
-		points = append(points, sharePoint{p.Date, p.Date, p.Filed, p.Shares, p.Classes})
+		points = append(points, sharePoint{p.Date, p.Date, p.Filed, p.Shares, p.Classes, fromCover})
 	}
 	return points
 }
@@ -178,7 +209,99 @@ func coverShares(list []edgar.SharePoint) []sharePoint {
 func weightedShares(list []edgar.SharePoint) []sharePoint {
 	points := make([]sharePoint, 0, len(list))
 	for _, p := range list {
-		points = append(points, sharePoint{p.Date, p.Filed, p.Filed, p.Shares, 0})
+		points = append(points, sharePoint{p.Date, p.Filed, p.Filed, p.Shares, 0, fromWeighted})
+	}
+	return points
+}
+
+// symbolKey 去掉交易代码里的分隔符，BRK.B、BRK-B、BRK/B 都是 BRKB。
+func symbolKey(symbol string) string {
+	return strings.Map(func(r rune) rune {
+		if r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' {
+			return r
+		}
+		return -1
+	}, strings.ToUpper(symbol))
+}
+
+// classShares 把申报封面页按类别列出的股数折算成所查这类股票（code）的股数：
+// 股数 = 这类股票的股数 + w × 其他类别股数之和。各类别之间的折算比例不在封面上（比如伯克希尔 1 股 A 折 1500 股 B，
+// Visa 的 B、C 类按不同比例折成 A 类），w 用最近一次申报和新浪的当前股数 current（已按所查这类股票折算）解出，
+// 历史上各类别的构成变化时会有误差。所查这类股票按封面上的交易代码识别，2019 年以前的封面没有交易代码，
+// 按同一个类别成员对应。识别不出、没有当前股数或解出的 w 不是正数时返回 nil 和原因。
+// 新浪的当前股数已经包含最近一次申报之后的拆股，解 w 之前先按 splits 还原到那次申报的统计日。
+func classShares(list []edgar.ClassShares, code string, current float64, splits []split) ([]sharePoint, string) {
+	key := symbolKey(code)
+	member, found := "", false
+	for _, p := range list {
+		for _, c := range p.Classes {
+			if c.Symbol != "" && symbolKey(c.Symbol) == key {
+				member, found = c.Member, true
+			}
+		}
+	}
+	if !found {
+		return nil, ""
+	}
+	type part struct{ own, others float64 }
+	parts := make([]part, len(list))
+	for i, p := range list {
+		for _, c := range p.Classes {
+			if c.Member == member {
+				parts[i].own = c.Shares
+			} else {
+				parts[i].others += c.Shares
+			}
+		}
+	}
+	w := 0.0
+	for i := len(list) - 1; i >= 0; i-- {
+		if parts[i].own > 0 {
+			if parts[i].others > 0 {
+				if current <= 0 {
+					return nil, "没有新浪的当前股本，无法把其他类别的股数折算成所查这类股票"
+				}
+				atCover := current
+				for _, s := range splits {
+					if s.date > list[i].Date {
+						atCover /= s.factor
+					}
+				}
+				if w = (atCover - parts[i].own) / parts[i].others; w <= 0 {
+					return nil, fmt.Sprintf("新浪的当前股本（%.0f）不大于申报封面上这类股票的股数（%.0f），可能只统计了这一类，无法按类别折算", atCover, parts[i].own)
+				}
+			}
+			break
+		}
+	}
+	points := []sharePoint{}
+	for i, p := range list {
+		if parts[i].own <= 0 || p.Date == "" {
+			continue
+		}
+		points = append(points, sharePoint{p.Date, p.Date, p.Filed, parts[i].own + w*parts[i].others, len(p.Classes), fromClasses})
+	}
+	return points, ""
+}
+
+// ownClassShares 返回申报封面页上所查这类股票自身的股数，不折算其他类别，只用来核对拆股：
+// 折算比例要用拆股之后的当前股本解出，识别拆股时还不能用折算后的股数。
+func ownClassShares(list []edgar.ClassShares, code string) []sharePoint {
+	key, member := symbolKey(code), ""
+	for _, p := range list {
+		for _, c := range p.Classes {
+			if c.Symbol != "" && symbolKey(c.Symbol) == key {
+				member = c.Member
+			}
+		}
+	}
+	points := []sharePoint{}
+	for _, p := range list {
+		for _, c := range p.Classes {
+			if member != "" && c.Member == member && c.Shares > 0 && p.Date != "" {
+				points = append(points, sharePoint{p.Date, p.Date, p.Filed, c.Shares, len(p.Classes), fromClasses})
+			}
+		}
 	}
 	return points
 }
@@ -208,23 +331,28 @@ func (a *shareAsOf) at(date string) *sharePoint {
 }
 
 // usShares 选每天用的股数：优先用封面股数；封面股数超过 15 个月没有更新时（比如伯克希尔、谷歌、Meta
-// 只按股票类别申报，companyfacts 里没有），改用最近的单季稀释加权股数；都没有时返回 nil。
-type usShares struct{ cover, weighted *shareAsOf }
+// 只按股票类别申报，companyfacts 里没有），依次改用申报封面页按类别列出的股数、最近的单季稀释加权股数；
+// 都没有时返回 nil。
+type usShares struct{ sources []*shareAsOf }
 
-func newUSShares(cover, weighted []sharePoint) *usShares {
-	return &usShares{newShareAsOf(cover), newShareAsOf(weighted)}
+func newUSShares(sources ...[]sharePoint) *usShares {
+	u := &usShares{}
+	for _, points := range sources {
+		u.sources = append(u.sources, newShareAsOf(points))
+	}
+	return u
 }
 
 func (u *usShares) at(date string) *sharePoint {
 	stale := monthsBefore(date, 15)
-	c, w := u.cover.at(date), u.weighted.at(date)
-	if c != nil && c.end >= stale {
-		return c
+	var found *sharePoint
+	// 每个来源都要扫描到 date，后面的日期才能接着用。
+	for _, source := range u.sources {
+		if p := source.at(date); found == nil && p != nil && p.end >= stale {
+			found = p
+		}
 	}
-	if w != nil && w.end >= stale {
-		return w
-	}
-	return nil
+	return found
 }
 
 // adjusted 返回 date 当天按 p 之后的拆股调整后的股数。
@@ -297,8 +425,8 @@ func detectSplits(bars []*sina.Bar, sources [][]sharePoint, current float64) []s
 }
 
 // computeUS 用 XBRL 数据和日线构造估值序列，交给 Compute 计算分位、PEG、格雷厄姆数、DCF 和规则评估。
-// current 是新浪的当前股数，没有时为 0。
-func computeUS(code, industry, sic string, facts *edgar.Facts, bars []*sina.Bar, current float64, params DCFParams, now time.Time) (*Result, error) {
+// current 是新浪的当前股数，没有时为 0；covers 是申报封面页按类别列出的股数，没有读取时为 nil。
+func computeUS(code, industry, sic string, facts *edgar.Facts, covers []edgar.ClassShares, bars []*sina.Bar, current float64, params DCFParams, now time.Time) (*Result, error) {
 	if len(bars) == 0 {
 		return nil, ErrNoData
 	}
@@ -313,17 +441,29 @@ func computeUS(code, industry, sic string, facts *edgar.Facts, bars []*sina.Bar,
 	fiscalYears := newAsOf(pointEntries(annualCashPeriods, "operating_cash_flow"))
 	equity := newAsOf(pointEntries(balance, "equity"))
 	cover, weighted := coverShares(facts.SharesOutstanding()), weightedShares(facts.WeightedDilutedShares())
-	splits := detectSplits(bars, [][]sharePoint{cover, weighted}, current)
-	// 多类普通股按不同比例折算时（比如伯克希尔 1 股 A 折 1500 股 B），封面股数直接相加没有意义，加权股数按 A 股折算；
-	// 最后一天用的股数和新浪的当前股数（按所查这类股票折算）相差超过 25% 时，同一来源的股数都按新浪校准。
-	// 只有一类普通股的封面股数不校准。
-	scale, scaleWeighted := 1.0, false
-	if last := newUSShares(cover, weighted).at(bars[len(bars)-1].Date); last != nil && current > 0 && last.classes != 1 {
-		if latest := last.adjusted(bars[len(bars)-1].Date, splits); math.Abs(latest/current-1) > 0.25 {
-			scale, scaleWeighted = current/latest, last.classes == 0
+	// 先用不需要折算的股数识别拆股，再用拆股前的当前股本解类别折算比例。
+	splits := detectSplits(bars, [][]sharePoint{cover, weighted, ownClassShares(covers, code)}, current)
+	classes, classNote := classShares(covers, code, current, splits)
+	scale, scaleSource := 1.0, shareSource(-1)
+	var sharesAt *usShares
+	sharesNote := ""
+	if len(classes) > 0 {
+		// 能按类别折算时整段历史只用折算后的股数：其他来源是各类别直接相加或按 A 股折算的，口径不同，混用会让估值序列跳变；
+		// 缺少封面股数的日子不计算。
+		sharesAt = newUSShares(classes)
+		sharesNote = "股数按申报封面上各类别的股数折算成所查这类股票，折算比例由新浪的当前股本推算，历史上各类别构成变化时有误差。"
+	} else {
+		// 多类普通股按不同比例折算时（比如伯克希尔 1 股 A 折 1500 股 B），封面股数直接相加没有意义，加权股数按 A 股折算；
+		// 最后一天用的股数和新浪的当前股数（按所查这类股票折算）相差超过 25% 时，同一来源的股数都按新浪校准。
+		// 只有一类普通股的封面股数不校准。
+		if last := newUSShares(cover, weighted).at(bars[len(bars)-1].Date); last != nil && current > 0 &&
+			!(last.source == fromCover && last.classes == 1) {
+			if latest := last.adjusted(bars[len(bars)-1].Date, splits); math.Abs(latest/current-1) > 0.25 {
+				scale, scaleSource = current/latest, last.source
+			}
 		}
+		sharesAt = newUSShares(cover, weighted)
 	}
-	sharesAt := newUSShares(cover, weighted)
 
 	if strings.HasPrefix(sic, "6") && len(sic) == 4 && sic < "6800" {
 		industry += "（金融业）"
@@ -344,7 +484,7 @@ func computeUS(code, industry, sic string, facts *edgar.Facts, bars []*sina.Bar,
 		}
 		// 申报之后发生的拆股，在下一次申报前按比例调整。
 		shares := sh.adjusted(date, splits)
-		if (sh.classes == 0) == scaleWeighted {
+		if sh.source == scaleSource {
 			shares *= scale
 		}
 		marketCap := bar.Close * shares
@@ -368,6 +508,9 @@ func computeUS(code, industry, sic string, facts *edgar.Facts, bars []*sina.Bar,
 		}
 	}
 	if len(points) == 0 || points[len(points)-1].Date != bars[len(bars)-1].Date {
+		if classNote != "" {
+			return nil, fmt.Errorf("%w；%s", ErrStaleShares, classNote)
+		}
 		return nil, ErrStaleShares
 	}
 
@@ -414,8 +557,9 @@ func computeUS(code, industry, sic string, facts *edgar.Facts, bars []*sina.Bar,
 	result := Compute(points, reports, params)
 	result.Code = code
 	result.Currency = "USD"
-	result.Disclaimer = "美股估值由 SEC XBRL 财务数据和新浪不复权日线计算：市值 = 收盘价 × 当时申报的流通股数（封面股数，没有时用季度稀释加权股数；拆股后按比例调整），PE、PS 用最近四个季度，PB 用最近一期股东权益，股息率用最近一个完整财年支付的现金股息，都只用当天之前已经申报的数值；报告期后来被重述时，历史估值也用重述后的数字。" + result.Disclaimer
+	result.Disclaimer = "美股估值由 SEC XBRL 财务数据和新浪不复权日线计算：市值 = 收盘价 × 当时申报的流通股数（封面股数；只按类别申报时从申报封面页读取各类股数，按新浪的当前股数折算成所查这类股票；都没有时用季度稀释加权股数；拆股后按比例调整），PE、PS 用最近四个季度，PB 用最近一期股东权益，股息率用最近一个完整财年支付的现金股息，都只用当天之前已经申报的数值；报告期后来被重述时，历史估值也用重述后的数字。" + result.Disclaimer
 	result.PeersNote = "美股暂无同行业对比，规则汇总未计入行业规则"
+	result.SharesNote = sharesNote
 	result.Dividends, result.DividendsNote = usDividends(years, lastDividend, result, yields, yieldSince, annualCash)
 	// 股息率规则依赖分红数据，Compute 时还没有，补上后重新汇总。
 	if result.Dividends != nil {
