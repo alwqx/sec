@@ -88,19 +88,21 @@ func TestUSFinancialsIFRS(t *testing.T) {
 	defer gock.Off()
 	srv := usServer(t)
 	gock.New("https://www.sec.gov").Get("/files/company_tickers.json").Reply(200).BodyString(usTickers)
-	gock.New("https://data.sec.gov").Get("/api/xbrl/companyfacts/CIK0001046179.json").Reply(200).BodyString(`{"facts":{"ifrs-full":{"Revenue":{"units":{}}}}}`)
-	rr := usRequest(t, srv, "/api/v1/us/financials?code=$TSM&statement=income")
-	require.Equal(t, http.StatusUnprocessableEntity, rr.Code)
-	require.Contains(t, rr.Body.String(), "IFRS")
-
-	// 同一公司仍保留历史 US GAAP 数据时，最近报表改用 IFRS 也应返回 422，而非陈旧报表。
+	// 最近报表改用 IFRS 时用 IFRS 数据，不返回陈旧的历史 US GAAP 报表。
 	gock.New("https://data.sec.gov").Get("/api/xbrl/companyfacts/CIK0001046179.json").Reply(200).BodyString(`{"facts":{
-"us-gaap":{"NetIncomeLoss":{"units":{"USD":[{"end":"2021-03-31","val":10,"filed":"2026-06-01"}]}}},
-"ifrs-full":{"ProfitLoss":{"units":{"JPY":[{"end":"2025-03-31","val":20,"filed":"2025-06-01"}]}}}
+"us-gaap":{"NetIncomeLoss":{"units":{"USD":[{"start":"2020-04-01","end":"2021-03-31","val":10,"form":"20-F","filed":"2021-06-01"}]}}},
+"ifrs-full":{"ProfitLoss":{"units":{"JPY":[{"start":"2024-04-01","end":"2025-03-31","val":20,"form":"20-F","filed":"2025-06-01"}]}}}
 }}`)
-	rr = usRequest(t, srv, "/api/v1/us/financials?code=$TSM&statement=income")
-	require.Equal(t, http.StatusUnprocessableEntity, rr.Code)
-	require.Contains(t, rr.Body.String(), "IFRS")
+	rr := usRequest(t, srv, "/api/v1/us/financials?code=$TSM&statement=income")
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	var body struct {
+		Report edgar.Report `json:"report"`
+	}
+	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body))
+	require.Equal(t, edgar.IFRS, body.Report.Standard)
+	require.Equal(t, "JPY", body.Report.Currency)
+	require.Len(t, body.Report.Periods, 1)
+	require.Equal(t, "2025-03-31", body.Report.Periods[0].End)
 	require.True(t, gock.IsDone())
 }
 

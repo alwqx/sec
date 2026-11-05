@@ -21,6 +21,7 @@ type usFinancials struct {
 	Ticker     string          `json:"ticker"`
 	Name       string          `json:"name"`
 	CIK        int             `json:"cik"`
+	Standard   edgar.Standard  `json:"standard"` // 会计准则：US GAAP 或 IFRS
 	Quarterly  bool            `json:"quarterly"`
 	Statements []*edgar.Report `json:"statements"`
 }
@@ -75,7 +76,7 @@ func usFinancialsHandler(cmd *cobra.Command, exCode string) error {
 	if err != nil {
 		return err
 	}
-	result := usFinancials{ExCode: exCode, Ticker: company.Ticker, Name: facts.Name, CIK: company.CIK, Quarterly: quarterly}
+	result := usFinancials{ExCode: exCode, Ticker: company.Ticker, Name: facts.Name, CIK: company.CIK, Standard: facts.Standard, Quarterly: quarterly}
 	limit := 5
 	if quarterly {
 		limit = 8
@@ -112,7 +113,9 @@ func printUSFinancials(out io.Writer, result usFinancials) {
 	for _, report := range result.Statements {
 		fmt.Fprintf(out, "\n【%s】", report.Statement.Name())
 		if len(report.Periods) == 0 {
-			if report.Quarterly {
+			if report.Quarterly && report.Standard == edgar.IFRS {
+				fmt.Fprintln(out, "\n没有季度数据；按 IFRS 申报的外国公司在 SEC 只提交 20-F 年报，请查看年度报表。")
+			} else if report.Quarterly {
 				fmt.Fprintln(out, "\n没有季度数据；部分外国公司只披露年报，不提交 10-Q 季报。")
 			} else {
 				fmt.Fprintln(out, "\n没有数据。")
@@ -154,7 +157,7 @@ func printUSFinancials(out io.Writer, result usFinancials) {
 		}
 		table.Render()
 	}
-	fmt.Fprintln(out, "\n数据来自 SEC EDGAR 的 XBRL 财务数据（US GAAP），金额用公司的列报币种，同一报告期有重述时用最新申报的数值；财年按截止日所在年份标注。")
+	fmt.Fprintf(out, "\n数据来自 SEC EDGAR 的 XBRL 财务数据（%s），金额用公司的列报币种，同一报告期有重述时用最新申报的数值；财年按截止日所在年份标注。\n", result.Standard)
 	if derived {
 		fmt.Fprintln(out, "* 推算值：没有单季数时用年初累计数相减（第四季度 = 全年 - 前三季度），自由现金流 = 经营活动现金流 - 资本支出。")
 	}

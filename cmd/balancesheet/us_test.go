@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/alwqx/sec/provider/edgar"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/h2non/gock.v1"
 )
@@ -53,12 +54,14 @@ func TestUSFinancialsJSON(t *testing.T) {
 	require.NoError(t, err)
 	var data struct {
 		Ticker     string `json:"ticker"`
+		Standard   string `json:"standard"`
 		Statements []struct {
 			Statement string `json:"statement"`
 		} `json:"statements"`
 	}
 	require.NoError(t, json.Unmarshal([]byte(output), &data))
 	require.Equal(t, "AAPL", data.Ticker)
+	require.Equal(t, "US GAAP", data.Standard)
 	require.Len(t, data.Statements, 3)
 }
 
@@ -96,4 +99,28 @@ func TestUSFinancialsQuarterlyBeforeAnnual(t *testing.T) {
 	require.Equal(t, 150.0, *periods[0].Values["net_income"])
 	require.Contains(t, periods[0].Derived, "net_income")
 	require.True(t, gock.IsDone())
+}
+
+// 会计准则是公司层面的属性：JSON 顶层给出，页脚用它（没有报表时也一样）。
+func TestUSFinancialsIFRSStandard(t *testing.T) {
+	defer gock.Off()
+	t.Setenv("HOME", t.TempDir())
+	gock.New("https://suggest3.sinajs.cn").Get("/suggest/").Reply(200).
+		BodyString(`var suggestvalue="TSM,41,tsm,tsm,台积电,,台积电,99,1,ESG,,";`)
+	gock.New("https://www.sec.gov").Get("/files/company_tickers.json").Reply(200).
+		BodyString(`{"0":{"cik_str":1,"ticker":"TSM","title":"TSMC"}}`)
+	gock.New("https://data.sec.gov").Get("/api/xbrl/companyfacts/CIK0000000001.json").Reply(200).
+		BodyString(`{"entityName":"TSMC","facts":{"ifrs-full":{"Revenue":{"units":{"TWD":[
+{"start":"2024-01-01","end":"2024-12-31","val":2894,"form":"20-F","filed":"2025-04-17","accn":"t1"}]}}}}}`)
+	output, err := runFinancials(t, "TSM", "-t", "income", "--json")
+	require.NoError(t, err)
+	var data usFinancials
+	require.NoError(t, json.Unmarshal([]byte(output), &data))
+	require.Equal(t, edgar.IFRS, data.Standard)
+	require.True(t, gock.IsDone())
+
+	var out bytes.Buffer
+	data.Statements = nil
+	printUSFinancials(&out, data)
+	require.Contains(t, out.String(), "XBRL 财务数据（IFRS）")
 }
