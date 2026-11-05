@@ -180,7 +180,7 @@ func TestUSValuationErrors(t *testing.T) {
 	gock.New("https://www.sec.gov").Get("/files/company_tickers.json").Reply(200).BodyString(usTickers)
 	require.Equal(t, http.StatusNotFound, usRequest(t, srv, "/api/v1/valuation?code=$ZZZZ").Code)
 
-	// 按 IFRS 申报的外国公司暂不支持。
+	// 按 IFRS 申报的外国公司暂不支持。网易等按 US GAAP 提交 20-F 的外国公司同样不支持，见 valuation.TestForeignReason。
 	gock.New("https://data.sec.gov").Get("/submissions/CIK0001046179.json").Reply(404)
 	gock.New("https://data.sec.gov").Get("/api/xbrl/companyfacts/CIK0001046179.json").Reply(200).BodyString(`{"facts":{"ifrs-full":{"Revenue":{"units":{}}}}}`)
 	gock.New("https://stock.finance.sina.com.cn").Get("/usstock/api/jsonp.php/var.t=/US_MinKService.getDailyK").Reply(200).BodyString(`var t=(null);`)
