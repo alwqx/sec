@@ -39,6 +39,6 @@ export default function USFinancials({ code }: { code: string }) {
         return <td key={period.end} className={raw !== undefined && raw !== null && raw < 0 ? 'down' : undefined} title={mark ? '推算值' : undefined}>{raw === undefined || raw === null ? '—' : value(raw, line.unit) + (mark ? '*' : '')}</td>
       })}</tr>)}</tbody>
     </table></div>)}
-    <p className="data-note">同一报告期有重述时用最新申报的数值；财年按截止日所在年份标注。{derived && '* 推算值：没有单季数时用年初累计数相减（第四季度 = 全年 - 前三季度），自由现金流 = 经营活动现金流 - 资本支出。'}</p>
+    <p className="data-note">同一报告期有重述时用最新申报的数值；财年按截止日所在年份标注。{derived && '* 推算值：没有单季数时用年初累计数相减（第四季度 = 全年 - 前三季度），自由现金流 = 经营活动现金流 - 资本支出，没有申报归母股东权益时 = 股东权益合计 - 少数股东权益。'}</p>
   </section>
 }

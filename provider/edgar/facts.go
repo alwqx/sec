@@ -374,7 +374,7 @@ func parseFacts(cik int, body []byte) (*Facts, error) {
 }
 
 // Period 是一个报告期。Values 中没有的行是公司没有报告或这一期不适用；Derived 列出推算的行：
-// 第四季度的期间数用全年减前三季度累计，自由现金流用经营现金流减资本支出。
+// 第四季度的期间数用全年减前三季度累计，自由现金流用经营现金流减资本支出，没有申报的归母股东权益用合计减少数股东权益。
 type Period struct {
 	End          string              `json:"end"`
 	Start        string              `json:"start,omitempty"` // 期间数的起始日，资产负债表为空
@@ -427,6 +427,32 @@ func CurrencyName(code string) string {
 // 期间长度：全年约 52-53 周，单季约 13 周，前三季度累计约 39 周。
 func isYear(d int) bool    { return d >= 350 && d <= 380 }
 func isQuarter(d int) bool { return d >= 80 && d <= 100 }
+
+// minorityInterest 是少数股东权益，用于没有申报归母股东权益的公司（比如 Visa、AT&T 只申报含少数股东权益的合计）推算归母数。
+var minorityInterest = LineItem{Key: "minority_interest", Unit: "USD", Concepts: []string{"MinorityInterest"}}
+
+// noMinorityInterest 判断公司从哪天起没有少数股东：最后一期少数股东权益之后，又有一份年报没有少数股东权益（Visa 最后一期是 2010 年，
+// 2011 年年报里没有），截止日晚于 last 的报告期视为没有少数股东，从这份年报的申报日 filed 起才能确认。
+// 从没申报过少数股东权益（可能用了别的科目），或之后还没有这样的年报（比如只在年报里标注少数股东权益）时，filed 为空。
+func (f *Facts) noMinorityInterest(yearEnds []string, total LineItem) (last, filed string) {
+	for _, v := range f.concepts["MinorityInterest"][f.Currency] {
+		if v.Start == "" && v.End > last {
+			last = v.End
+		}
+	}
+	if last == "" {
+		return "", ""
+	}
+	for _, end := range yearEnds {
+		if end <= last {
+			continue
+		}
+		if v, ok := f.pick(total, end, func(v fact) bool { return v.Start == "" }); ok {
+			return last, v.Filed
+		}
+	}
+	return last, ""
+}
 
 // ForeignIssuer 判断公司是否是外国私人发行人：最近一份年报是 20-F 或 40-F（含修订）。
 func (f *Facts) ForeignIssuer() bool {
@@ -704,6 +730,20 @@ func (f *Facts) Build(statement Statement, quarterly bool, limit int) *Report {
 		return report
 	}
 	yearEnds := f.fiscalYearEnds()
+	// 没有申报归母股东权益时，用合计减少数股东权益推算（见 noMinorityInterest）。
+	var nciLast, nciNoneFiled string
+	var totalEquity, nci LineItem
+	deriveEquity := statement == Balance && f.Standard == USGAAP
+	if deriveEquity {
+		for _, item := range lines {
+			if item.Key == "total_equity" {
+				totalEquity = item
+			}
+		}
+		nci = minorityInterest
+		nci.Unit = f.unit(nci.Unit)
+		nciLast, nciNoneFiled = f.noMinorityInterest(yearEnds, totalEquity)
+	}
 	ends := yearEnds
 	if quarterly {
 		ends = f.quarterEnds(yearEnds)
@@ -753,6 +793,19 @@ func (f *Facts) Build(statement Statement, quarterly bool, limit int) *Report {
 				if derived {
 					period.Derived = append(period.Derived, item.Key)
 				}
+			}
+		}
+		if total := period.Values["total_equity"]; deriveEquity && period.Values["equity"] == nil && total != nil {
+			if v, ok := f.pick(nci, end, func(v fact) bool { return v.Start == "" }); ok {
+				value := *total - v.Val
+				period.Values["equity"] = &value
+				period.Filed["equity"] = max(period.Filed["total_equity"], v.Filed)
+				period.Derived = append(period.Derived, "equity")
+			} else if nciNoneFiled != "" && end > nciLast {
+				value := *total
+				period.Values["equity"] = &value
+				period.Filed["equity"] = max(period.Filed["total_equity"], nciNoneFiled)
+				period.Derived = append(period.Derived, "equity")
 			}
 		}
 		if statement == CashFlow {
