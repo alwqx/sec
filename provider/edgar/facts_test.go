@@ -3,6 +3,7 @@ package edgar
 import (
 	"context"
 	"encoding/json"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -125,7 +126,7 @@ func TestBuildForeignAnnualForms(t *testing.T) {
 
 func TestQuarterValueMissingOrDifferentConcepts(t *testing.T) {
 	item := Lines[Income][0]
-	f := &Facts{concepts: map[string]map[string][]fact{
+	f := &Facts{Currency: "USD", concepts: map[string]map[string][]fact{
 		"Revenues": {"USD": {
 			{Start: "2025-01-01", End: "2025-12-31", Val: 200},
 		}},
@@ -152,7 +153,7 @@ func TestQuarterValueMissingOrDifferentConcepts(t *testing.T) {
 }
 
 func TestQuarterEndsExcludeStubPeriods(t *testing.T) {
-	f := &Facts{concepts: map[string]map[string][]fact{
+	f := &Facts{Currency: "USD", concepts: map[string]map[string][]fact{
 		"Revenues": {"USD": {
 			{Start: "2025-01-01", End: "2025-12-31", Val: 200, Form: "10-K"},
 			{Start: "2025-01-01", End: "2025-03-31", Val: 40},
@@ -271,7 +272,7 @@ func TestBuildQuarterlyBeforeFirstAnnualReport(t *testing.T) {
 }
 
 func TestBuildQuarterlyWithOnlySingleQuarterFacts(t *testing.T) {
-	f := &Facts{concepts: map[string]map[string][]fact{"Revenues": {"USD": {
+	f := &Facts{Currency: "USD", concepts: map[string]map[string][]fact{"Revenues": {"USD": {
 		{Start: "2025-07-01", End: "2025-09-30", Val: 50, FP: "Q2", Form: "10-Q"},
 	}}}}
 	report := f.Build(Income, true, 0)
@@ -294,7 +295,7 @@ func TestBuildQuarterlyWithOnlySingleQuarterFacts(t *testing.T) {
 }
 
 func TestQuarterlyOnlyMissingPreviousQuarter(t *testing.T) {
-	f := &Facts{concepts: map[string]map[string][]fact{"NetCashProvidedByUsedInOperatingActivities": {"USD": {
+	f := &Facts{Currency: "USD", concepts: map[string]map[string][]fact{"NetCashProvidedByUsedInOperatingActivities": {"USD": {
 		{Start: "2025-01-01", End: "2025-09-30", Val: 110, FP: "Q3", Form: "10-Q"},
 	}}}}
 	require.Empty(t, f.Build(CashFlow, true, 0).Periods, "无上一季度累计数时不能将 9 个月累计数当成单季")
@@ -329,4 +330,88 @@ func TestDividendsPreferCommonStock(t *testing.T) {
 	cash := f.Build(CashFlow, false, 0)
 	require.Equal(t, 100.0, value(t, cash.Periods[0], "dividends"))
 	require.Equal(t, "2025-02-01", cash.Periods[0].Filed["dividends"])
+}
+
+// 以人民币列报的公司（比如阿里巴巴）年报附带最近一年的美元便利折算数：报表用人民币，不能只读到零散的美元数。
+const cnyFacts = `{"entityName":"Alibaba","facts":{"us-gaap":{
+"Revenues":{"units":{
+ "CNY":[{"start":"2024-04-01","end":"2025-03-31","val":996,"fp":"FY","form":"20-F","filed":"2025-05-15"},
+        {"start":"2023-04-01","end":"2024-03-31","val":941,"fp":"FY","form":"20-F","filed":"2024-05-15"}],
+ "USD":[{"start":"2024-04-01","end":"2025-03-31","val":137,"fp":"FY","form":"20-F","filed":"2025-05-15"}]}},
+"NetIncomeLoss":{"units":{"CNY":[{"start":"2024-04-01","end":"2025-03-31","val":130,"fp":"FY","form":"20-F","filed":"2025-05-15"}]}},
+"EarningsPerShareDiluted":{"units":{"CNY/shares":[{"start":"2024-04-01","end":"2025-03-31","val":5.5,"fp":"FY","form":"20-F","filed":"2025-05-15"}]}},
+"Assets":{"units":{"CNY":[{"end":"2025-03-31","val":1800,"fp":"FY","form":"20-F","filed":"2025-05-15"}],
+ "USD":[{"end":"2030-12-31","val":1,"fp":"FY","form":"20-F","filed":"2025-05-15"}]}}
+}}}`
+
+func TestReportingCurrency(t *testing.T) {
+	f, err := parseFacts(1, []byte(cnyFacts))
+	require.NoError(t, err)
+	require.Equal(t, "CNY", f.Currency, "未来承诺金额的美元数不影响识别")
+	income := f.Build(Income, false, 0)
+	require.Equal(t, "CNY", income.Currency)
+	require.Equal(t, "人民币", income.CurrencyName)
+	require.Len(t, income.Periods, 2, "两个财年都有人民币数")
+	require.Equal(t, 996.0, value(t, income.Periods[0], "revenue"))
+	require.Equal(t, 941.0, value(t, income.Periods[1], "revenue"))
+	require.Equal(t, 5.5, value(t, income.Periods[0], "eps_diluted"))
+	for _, line := range income.Lines {
+		if line.Key == "eps_diluted" {
+			require.Equal(t, "CNY/shares", line.Unit)
+		}
+	}
+
+	usd := f.In("USD").Build(Income, false, 0)
+	require.Equal(t, "USD", usd.Currency)
+	require.Len(t, usd.Periods, 1, "美元只有最近一年的便利折算数")
+	require.Equal(t, 137.0, value(t, usd.Periods[0], "revenue"))
+	require.Equal(t, "CNY", f.Currency, "In 返回副本，不改原数据")
+
+	f, err = parseFacts(1, []byte(testFacts))
+	require.NoError(t, err)
+	require.Equal(t, "USD", f.Currency)
+	require.Equal(t, "美元", f.Build(Income, false, 0).CurrencyName)
+	require.Equal(t, "XYZ", CurrencyName("XYZ"))
+}
+
+// 币种识别的几种误判场景。
+func TestReportingCurrencyMisdetection(t *testing.T) {
+	year := func(unit, start, end, filed, accn string, val float64) string {
+		return `"` + unit + `":[{"start":"` + start + `","end":"` + end + `","val":` + strconv.FormatFloat(val, 'f', -1, 64) + `,"fp":"FY","form":"10-K","filed":"` + filed + `","accn":"` + accn + `"}]`
+	}
+	tests := []struct {
+		name, body, want string
+	}{
+		{"期后事项的截止日晚于报告期，不能只凭它判断", `{
+"Revenues":{"units":{` + year("USD", "2024-09-29", "2025-09-27", "2025-10-31", "a1", 100) + `}},
+"NetIncomeLoss":{"units":{` + year("USD", "2024-09-29", "2025-09-27", "2025-10-31", "a1", 10) + `}},
+"LongTermDebt":{"units":{"EUR":[{"end":"2025-10-15","val":500,"fp":"FY","form":"10-K","filed":"2025-10-31","accn":"a1"}]}}}`, "USD"},
+		{"整套报表附带美元折算时，本币有前两年的比较数", `{
+"Revenues":{"units":{"CNY":[
+ {"start":"2024-04-01","end":"2025-03-31","val":996,"form":"20-F","filed":"2025-05-15","accn":"b1"},
+ {"start":"2023-04-01","end":"2024-03-31","val":941,"form":"20-F","filed":"2025-05-15","accn":"b1"},
+ {"start":"2022-04-01","end":"2023-03-31","val":869,"form":"20-F","filed":"2025-05-15","accn":"b1"}],
+ "USD":[{"start":"2024-04-01","end":"2025-03-31","val":137,"form":"20-F","filed":"2025-05-15","accn":"b1"}]}},
+"NetIncomeLoss":{"units":{"CNY":[
+ {"start":"2024-04-01","end":"2025-03-31","val":130,"form":"20-F","filed":"2025-05-15","accn":"b1"},
+ {"start":"2023-04-01","end":"2024-03-31","val":80,"form":"20-F","filed":"2025-05-15","accn":"b1"}],
+ "USD":[{"start":"2024-04-01","end":"2025-03-31","val":18,"form":"20-F","filed":"2025-05-15","accn":"b1"}]}},
+"Cash":{"units":{"USD":[{"end":"2025-03-31","val":5,"form":"20-F","filed":"2025-05-15","accn":"b1"},{"end":"2024-03-31","val":4,"form":"20-F","filed":"2025-05-15","accn":"b1"}]}}}`, "CNY"},
+		{"附注里的外币数值不计入", `{
+"Revenues":{"units":{` + year("USD", "2024-09-29", "2025-09-27", "2025-10-31", "c1", 100) + `}},
+"DebtInstrumentFaceAmount":{"units":{"JPY":[
+ {"end":"2025-09-27","val":1,"form":"10-K","filed":"2025-10-31","accn":"c1"},{"end":"2025-09-27","val":2,"form":"10-K","filed":"2025-10-31","accn":"c1"},
+ {"end":"2025-09-27","val":3,"form":"10-K","filed":"2025-10-31","accn":"c1"}]}}}`, "USD"},
+		{"选出的币种没有全年数据时，退回到全年数据最多的币种", `{
+"Revenues":{"units":{` + year("USD", "2023-10-01", "2024-09-28", "2024-11-01", "d1", 100) + `}},
+"Assets":{"units":{"EUR":[{"end":"2025-09-27","val":9,"form":"10-K","filed":"2025-11-01","accn":"d2"}]}}}`, "USD"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f, err := parseFacts(1, []byte(`{"facts":{"us-gaap":`+tt.body+`}}`))
+			require.NoError(t, err)
+			require.Equal(t, tt.want, f.Currency)
+			require.NotEmpty(t, f.Build(Income, false, 0).Periods, "识别出的币种有利润表数据")
+		})
+	}
 }

@@ -42,7 +42,8 @@ func (s Statement) Name() string {
 
 // LineItem 是报表的一行。Concepts 是候选的 US GAAP 科目，按优先级排列：同一个指标在不同年份可能用不同科目
 // （比如苹果的收入 2018 年前是 Revenues，之后是 RevenueFromContractWithCustomerExcludingAssessedTax），
-// 每个报告期取第一个有值的科目。Unit 是 USD、USD/shares 或 shares。
+// 每个报告期取第一个有值的科目。Unit 是金额的币种、每股金额（币种/shares）或 shares；Lines 里用 USD 表示金额，
+// 报表按公司的列报币种取数（见 Facts.Currency），比如阿里巴巴是 CNY 和 CNY/shares。
 type LineItem struct {
 	Key      string   `json:"key"`
 	Label    string   `json:"label"`
@@ -105,10 +106,14 @@ type fact struct {
 
 // Facts 是一家公司的 US GAAP 数值，按科目和单位索引。
 type Facts struct {
-	CIK      int
-	Name     string
+	CIK  int
+	Name string
+	// Currency 是报表金额的币种：公司的列报币种，按最近一份年报里数值最多的币种识别。外国公司的年报常常附带
+	// 最近一年的美元便利折算数，不能当成列报币种，否则只能读到零散几年、按各年汇率折算的美元数。
+	Currency string
 	concepts map[string]map[string][]fact
 	dei      map[string]map[string][]fact // 封面信息，比如流通股数
+	resolved map[Statement][]LineItem     // 按 Currency 换好单位的各报表行，见 resolveLines
 }
 
 type factConcept struct {
@@ -121,7 +126,7 @@ func latestReportedFact(concepts map[string]factConcept) fact {
 	var latest fact
 	for _, concept := range concepts {
 		for unit, values := range concept.Units {
-			if len(unit) != 3 || strings.ToUpper(unit) != unit {
+			if !isCurrency(unit) {
 				continue
 			}
 			for _, v := range values {
@@ -135,6 +140,131 @@ func latestReportedFact(concepts map[string]factConcept) fact {
 		}
 	}
 	return latest
+}
+
+// reportingCurrency 返回公司的列报币种，只看报表用到的金额科目，不看附注（比如美元公司的欧元债务、日元套期名义金额）：
+//   - 取最近一份年报（按申报日，不按截止日：期后事项的截止日晚于报告期，不能代表报表），统计其中各币种的数值条数。
+//     本币除了当年数还有前两年的比较数，附带的美元便利折算一般只有当年，所以本币明显更多；条数相同时优先 USD。
+//   - 选出的币种没有任何全年数据时，退回到全年数据期数最多的币种，避免报表变空。
+//
+// 没有年报数值时用 USD。
+func reportingCurrency(concepts map[string]factConcept) string {
+	amount := map[string]bool{}
+	for _, lines := range Lines {
+		for _, item := range lines {
+			if item.Unit == "USD" {
+				for _, concept := range item.Concepts {
+					amount[concept] = true
+				}
+			}
+		}
+	}
+	var latest fact
+	years := map[string]map[string]bool{} // 各币种有全年数据的截止日
+	for name := range amount {
+		for unit, values := range concepts[name].Units {
+			if !isCurrency(unit) {
+				continue
+			}
+			for _, v := range values {
+				// 晚于申报日的截止日是未来承诺金额，不是报告期。
+				if !isAnnualForm(v.Form) || (v.Filed != "" && v.End > v.Filed) {
+					continue
+				}
+				if v.Filed > latest.Filed || (v.Filed == latest.Filed && v.Accn > latest.Accn) {
+					latest = v
+				}
+				if v.Start != "" && isYear(days(v.Start, v.End)) {
+					if years[unit] == nil {
+						years[unit] = map[string]bool{}
+					}
+					years[unit][v.End] = true
+				}
+			}
+		}
+	}
+	counts := map[string]int{}
+	for name := range amount {
+		for unit, values := range concepts[name].Units {
+			if !isCurrency(unit) {
+				continue
+			}
+			for _, v := range values {
+				if latest.Filed != "" && v.Filed == latest.Filed && v.Accn == latest.Accn && isAnnualForm(v.Form) {
+					counts[unit]++
+				}
+			}
+		}
+	}
+	currency := best("USD", counts)
+	if len(years[currency]) == 0 {
+		periods := map[string]int{}
+		for unit, ends := range years {
+			periods[unit] = len(ends)
+		}
+		currency = best(currency, periods)
+	}
+	return currency
+}
+
+// best 返回数量最多的币种；数量相同时优先 USD，其次按代码排序，结果不受 map 遍历顺序影响。
+func best(fallback string, counts map[string]int) string {
+	currency := fallback
+	for unit, n := range counts {
+		if n > counts[currency] || (n == counts[currency] && currency != "USD" && (unit == "USD" || unit < currency)) {
+			currency = unit
+		}
+	}
+	return currency
+}
+
+// isCurrency 判断单位是否是币种代码（ISO 4217 三个大写字母），比如 USD、CNY。
+func isCurrency(unit string) bool {
+	return len(unit) == 3 && strings.ToUpper(unit) == unit
+}
+
+// In 返回按 currency 取数的副本，比如估值的价格是美元，外国公司只用美元便利折算数。
+func (f *Facts) In(currency string) *Facts {
+	g := *f
+	g.Currency = currency
+	g.resolveLines()
+	return &g
+}
+
+// resolveLines 按 Currency 生成各报表的行，Build 和识别报告期时反复用到，只算一次。
+func (f *Facts) resolveLines() {
+	f.resolved = map[Statement][]LineItem{}
+	for statement := range Lines {
+		f.resolved[statement] = f.convertLines(statement)
+	}
+}
+
+// unit 把 Lines 里的单位换成报表的币种：USD 换成 Currency，USD/shares 换成 Currency/shares。
+func (f *Facts) unit(unit string) string {
+	switch unit {
+	case "USD":
+		return f.Currency
+	case "USD/shares":
+		return f.Currency + "/shares"
+	}
+	return unit
+}
+
+// lines 返回报表的行，单位换成报表的币种。
+func (f *Facts) lines(statement Statement) []LineItem {
+	if lines, ok := f.resolved[statement]; ok {
+		return lines
+	}
+	return f.convertLines(statement)
+}
+
+func (f *Facts) convertLines(statement Statement) []LineItem {
+	lines := make([]LineItem, len(Lines[statement]))
+	for i, item := range Lines[statement] {
+		item.Unit = f.unit(item.Unit)
+		lines[i] = item
+	}
+	return lines
 }
 
 // CompanyFacts 读取公司的全部 XBRL 数值。
@@ -169,13 +299,14 @@ func parseFacts(cik int, body []byte) (*Facts, error) {
 		}
 		return nil, errors.New("SEC 没有这家公司的 XBRL 财务数据")
 	}
-	f := &Facts{CIK: cik, Name: raw.EntityName, concepts: map[string]map[string][]fact{}, dei: map[string]map[string][]fact{}}
+	f := &Facts{CIK: cik, Name: raw.EntityName, Currency: reportingCurrency(gaap), concepts: map[string]map[string][]fact{}, dei: map[string]map[string][]fact{}}
 	for name, concept := range gaap {
 		f.concepts[name] = concept.Units
 	}
 	for name, concept := range raw.Facts["dei"] {
 		f.dei[name] = concept.Units
 	}
+	f.resolveLines()
 	return f, nil
 }
 
@@ -195,10 +326,13 @@ type Period struct {
 
 // Report 是一张报表，报告期从新到旧。
 type Report struct {
-	Statement Statement  `json:"statement"`
-	Quarterly bool       `json:"quarterly"`
-	Lines     []LineItem `json:"lines"`
-	Periods   []Period   `json:"periods"`
+	Statement Statement `json:"statement"`
+	Quarterly bool      `json:"quarterly"`
+	// Currency 是金额的币种代码，CurrencyName 是中文名，比如 CNY、人民币。
+	Currency     string     `json:"currency"`
+	CurrencyName string     `json:"currency_name"`
+	Lines        []LineItem `json:"lines"`
+	Periods      []Period   `json:"periods"`
 }
 
 func days(start, end string) int {
@@ -208,6 +342,22 @@ func days(start, end string) int {
 		return -1
 	}
 	return int(b.Sub(a).Hours() / 24)
+}
+
+// currencyNames 是常见列报币种的中文名。
+var currencyNames = map[string]string{
+	"USD": "美元", "CNY": "人民币", "HKD": "港元", "TWD": "新台币", "JPY": "日元", "KRW": "韩元",
+	"EUR": "欧元", "GBP": "英镑", "CHF": "瑞士法郎", "DKK": "丹麦克朗", "SEK": "瑞典克朗", "NOK": "挪威克朗",
+	"CAD": "加元", "AUD": "澳元", "SGD": "新加坡元", "INR": "印度卢比", "BRL": "巴西雷亚尔", "MXN": "墨西哥比索",
+	"ILS": "以色列新谢克尔", "ZAR": "南非兰特",
+}
+
+// CurrencyName 返回币种的中文名，不认识的币种返回代码本身。
+func CurrencyName(code string) string {
+	if name, ok := currencyNames[code]; ok {
+		return name
+	}
+	return code
 }
 
 // 期间长度：全年约 52-53 周，单季约 13 周，前三季度累计约 39 周。
@@ -279,7 +429,7 @@ func (f *Facts) pick(item LineItem, end string, match func(fact) bool) (fact, bo
 func (f *Facts) fiscalYearEnds() []string {
 	seen := map[string]bool{}
 	for _, statement := range []Statement{Income, CashFlow} {
-		for _, item := range Lines[statement] {
+		for _, item := range f.lines(statement) {
 			for _, concept := range item.Concepts {
 				for _, v := range f.concepts[concept][item.Unit] {
 					if v.Start != "" && isYear(days(v.Start, v.End)) && isAnnualForm(v.Form) {
@@ -301,7 +451,7 @@ func (f *Facts) quarterEnds(yearEnds []string) []string {
 		seen[end] = true
 	}
 	for _, statement := range []Statement{Income, CashFlow} {
-		for _, item := range Lines[statement] {
+		for _, item := range f.lines(statement) {
 			for _, concept := range item.Concepts {
 				for _, v := range f.concepts[concept][item.Unit] {
 					start, ok := starts[v.End]
@@ -370,7 +520,7 @@ func (f *Facts) fiscalStart(end string, yearEnds []string) string {
 		return day.AddDate(0, 0, 1).Format(time.DateOnly)
 	}
 	for _, statement := range []Statement{Income, CashFlow} {
-		for _, item := range Lines[statement] {
+		for _, item := range f.lines(statement) {
 			for _, concept := range item.Concepts {
 				for _, v := range f.concepts[concept][item.Unit] {
 					if v.Start != "" && v.End >= end && isYear(days(v.Start, v.End)) && v.Start <= end {
@@ -389,7 +539,7 @@ func (f *Facts) quarterlyStart(end string) string {
 	start, latestEnd := "", ""
 	var latest fact
 	for _, statement := range []Statement{Income, CashFlow} {
-		for _, item := range Lines[statement] {
+		for _, item := range f.lines(statement) {
 			for _, concept := range item.Concepts {
 				for _, v := range f.concepts[concept][item.Unit] {
 					q := quarterNumber(v.FP)
@@ -441,7 +591,7 @@ func (f *Facts) quarterValue(item LineItem, end, prevEnd, fyStart string) (float
 		return v.Val, false, true, v.Filed
 	}
 	// 每股收益和股数不能相减。
-	if item.Unit != "USD" || fyStart == "" {
+	if item.Unit != f.Currency || fyStart == "" {
 		return 0, false, false, ""
 	}
 	ytd := func(at string) (fact, bool) {
@@ -474,8 +624,8 @@ func (f *Facts) quarterValue(item LineItem, end, prevEnd, fyStart string) (float
 // Build 生成报表，报告期从新到旧，最多 limit 期（0 表示全部）。年度用年报的全年数；季度用单季数，
 // 没有单季数时用年初累计数相减推算（见 quarterValue），每股收益和股数不能相减，留空。
 func (f *Facts) Build(statement Statement, quarterly bool, limit int) *Report {
-	lines := Lines[statement]
-	report := &Report{Statement: statement, Quarterly: quarterly, Lines: lines, Periods: []Period{}}
+	lines := f.lines(statement)
+	report := &Report{Statement: statement, Quarterly: quarterly, Currency: f.Currency, CurrencyName: CurrencyName(f.Currency), Lines: lines, Periods: []Period{}}
 	yearEnds := f.fiscalYearEnds()
 	ends := yearEnds
 	if quarterly {

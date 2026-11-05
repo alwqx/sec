@@ -161,6 +161,9 @@ func render(out io.Writer, method string, r *shared.Result) {
 	default:
 		printOverview(out, r)
 	}
+	if r.CurrencyNote != "" {
+		fmt.Fprintf(out, "\n币种说明：%s", r.CurrencyNote)
+	}
 	if r.SharesNote != "" {
 		fmt.Fprintf(out, "\n股数说明：%s", r.SharesNote)
 	}

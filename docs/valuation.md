@@ -431,7 +431,7 @@ DCF 是两阶段股权现金流折现：5 年增长期加永续期，现金流�
 
 ### 美股
 
-美股（如 `sec valuation AAPL`、Desktop 中 `$AAPL` 的「估值」栏目）没有现成的每日估值表，由 `valuation/us.go` 用 SEC XBRL（`provider/edgar`）和新浪美股不复权日线计算，金额单位美元，结果的 `currency` 为 `USD`（A 股为 `CNY`）。
+美股（如 `sec valuation AAPL`、Desktop 中 `$AAPL` 的「估值」栏目）没有现成的每日估值表，由 `valuation/us.go` 用 SEC XBRL（`provider/edgar`）和新浪美股不复权日线计算，金额单位美元，结果的 `currency` 为 `USD`（A 股为 `CNY`）。以外币列报的公司（比如阿里巴巴的人民币）暂不按汇率换算，只用年报附带的美元便利折算数，通常只有最近一年，估值可能缺 PE 等指标，结果的 `currency_note` 会说明（命令行和 Desktop 显示为「币种说明」）。
 
 | 指标 | 来源或算法 | 说明 |
 | ---- | ---------- | ---- |

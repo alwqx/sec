@@ -146,7 +146,7 @@ CLI 的根 `main.go` 保持不变；桌面版是独立二进制：`go build ./de
 
 美股（代码以 `$` 开头）的「公司」标签页复用 `usstock` 包：上方是新浪行情和估值（价格、涨跌幅、市盈率和每股收益 TTM、总市值、总股本、52 周区间），下方是 SEC EDGAR 公司资料（名称、CIK、交易所、行业和 SIC、注册地、申报人类别、财年截止日、地址、电话、曾用名）；任一部分失败时照常显示另一部分并说明原因。
 
-「财报」标签页复用 CLI `financials` 的 SEC XBRL 整理（`provider/edgar/facts.go`），可切换利润表、资产负债表、现金流量表和年度、季度，报告期为列、从新到旧（年度最多 10 期，季度最多 12 期），金额单位亿美元，负数标绿，推算值标 `*` 并有说明。XBRL 数据按公司缓存 10 分钟，最多保留 20 家公司，写入时清理过期条目并淘汰最早写入的公司；缓存命中时切换报表和年度、季度无需重新下载。首次年报之前也可读取已披露的 10-Q 季报；按国际会计准则（IFRS）申报或已从 US GAAP 切换为 IFRS 的公司提示暂不支持。美股的「估值」栏目见[估值文档](valuation.md#美股)，股息率在估值栏目里，分红栏目暂不支持。
+「财报」标签页复用 CLI `financials` 的 SEC XBRL 整理（`provider/edgar/facts.go`），可切换利润表、资产负债表、现金流量表和年度、季度，报告期为列、从新到旧（年度最多 10 期，季度最多 12 期），金额单位亿元（公司的列报币种，非美元时在数据来源后注明），负数标绿，推算值标 `*` 并有说明。XBRL 数据按公司缓存 10 分钟，最多保留 20 家公司，写入时清理过期条目并淘汰最早写入的公司；缓存命中时切换报表和年度、季度无需重新下载。首次年报之前也可读取已披露的 10-Q 季报；按国际会计准则（IFRS）申报或已从 US GAAP 切换为 IFRS 的公司提示暂不支持。美股的「估值」栏目见[估值文档](valuation.md#美股)，股息率在估值栏目里，分红栏目暂不支持。
 
 ### 美股 SEC 申报
 
@@ -266,7 +266,7 @@ macOS 按当前进程架构匹配 `sec-<tag>-desktop-darwin-<arch>.dmg`，不将
 | GET | `/api/v1/announcements?page=1&code=SH600036&key=年度报告&type=annual` | code 可省略以查询最新披露，支持分页与标题关键字；type 可省略查询全部，或为 annual/halfyear/q1/q3，对应巨潮公告分类 |
 | GET | `/api/v1/filings?code=$AAPL&type=periodic&page=1` | 美股 SEC 申报：`company`、`ticker`、`total`、`has_more`、`results`；type 为 periodic（10-K/10-Q/20-F/40-F）、current（8-K/6-K）、insider（Form 3/4/5/144）、all，留空为主要申报；`truncated` 为 true 表示更早的申报没有读取；SEC 没有这家公司时 404 |
 | GET | `/api/v1/us/company?code=$AAPL` | 美股公司资料：`info`（`company` 为 SEC EDGAR 公司信息，`quote` 为新浪行情和估值，失败的一方为 null）和 `notes`（失败原因）；两方都失败时 502 |
-| GET | `/api/v1/us/financials?code=$AAPL&statement=income&period=annual` | 美股财报的一张报表：`ticker`、`name`、`cik`、`report`（`lines` 行定义，`periods` 报告期的 `values` 和推算行 `derived`）；statement 为 income、balance、cashflow，period 为 annual 或 quarter；IFRS 公司返回 422 |
+| GET | `/api/v1/us/financials?code=$AAPL&statement=income&period=annual` | 美股财报的一张报表：`ticker`、`name`、`cik`、`report`（`currency`、`currency_name` 列报币种，`lines` 行定义，`periods` 报告期的 `values` 和推算行 `derived`）；statement 为 income、balance、cashflow，period 为 annual 或 quarter；IFRS 公司返回 422 |
 
 新增接口统一沿用 token cookie 鉴权。上游失败返回 502；公司资料为空返回 404；参数无效返回 400；列表为空返回 `{"results":[]}`（附带各接口其他元数据）。写入设置额外限制请求体大小、内容类型、同源与有效证券/偏好字段。
 
