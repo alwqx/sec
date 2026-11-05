@@ -430,6 +430,10 @@ func computeUS(code, industry, sic string, facts *edgar.Facts, covers []edgar.Cl
 	if len(bars) == 0 {
 		return nil, ErrNoData
 	}
+	// 价格是美元，金额也只用美元。以外币列报的公司（比如阿里巴巴的人民币）暂不按汇率换算，
+	// 只能用年报附带的美元便利折算数，结果里说明。
+	reported := facts.Currency
+	facts = facts.In("USD")
 	income := ascending(facts.Build(edgar.Income, true, 0).Periods)
 	balance := ascending(facts.Build(edgar.Balance, true, 0).Periods)
 	profit := newAsOf(ttmEntries(income, "net_income"))
@@ -560,6 +564,9 @@ func computeUS(code, industry, sic string, facts *edgar.Facts, covers []edgar.Cl
 	result.Disclaimer = "美股估值由 SEC XBRL 财务数据和新浪不复权日线计算：市值 = 收盘价 × 当时申报的流通股数（封面股数；只按类别申报时从申报封面页读取各类股数，按新浪的当前股数折算成所查这类股票；都没有时用季度稀释加权股数；拆股后按比例调整），PE、PS 用最近四个季度，PB 用最近一期股东权益，股息率用最近一个完整财年支付的现金股息，都只用当天之前已经申报的数值；报告期后来被重述时，历史估值也用重述后的数字。" + result.Disclaimer
 	result.PeersNote = "美股暂无同行业对比，规则汇总未计入行业规则"
 	result.SharesNote = sharesNote
+	if reported != "" && reported != "USD" {
+		result.CurrencyNote = fmt.Sprintf("这家公司的财报以%s列报，暂不按汇率换算，估值只用年报附带的美元便利折算数（通常只有最近一年），历史较短，PE、PS 等指标可能缺失。", edgar.CurrencyName(reported))
+	}
 	result.Dividends, result.DividendsNote = usDividends(years, lastDividend, result, yields, yieldSince, annualCash)
 	// 股息率规则依赖分红数据，Compute 时还没有，补上后重新汇总。
 	if result.Dividends != nil {

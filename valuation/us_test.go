@@ -331,3 +331,16 @@ func TestHasRecentShares(t *testing.T) {
 	require.False(t, hasRecentShares(facts, "2028-01-02"), "最近的封面股数是 2026-07-20，已超过 15 个月")
 	require.False(t, hasRecentShares(usFactsWith(t, nil, testFact{}), "2026-10-30"), "没有股数")
 }
+
+// 以外币列报的公司估值仍只用美元数，结果里说明；美元列报时不说明。
+func TestComputeUSCurrencyNote(t *testing.T) {
+	now, _ := time.Parse(time.DateOnly, "2026-11-01")
+	bars := usBars("2025-01-01", "2026-10-30", "2026-06-01", 40, 10)
+	usd, err := computeUS("$TEST", "Banks", "6021", usFacts(t), nil, bars, 0, DefaultDCFParams(), now)
+	require.NoError(t, err)
+	require.Empty(t, usd.CurrencyNote)
+	cny, err := computeUS("$TEST", "Banks", "6021", usFacts(t).In("CNY"), nil, bars, 0, DefaultDCFParams(), now)
+	require.NoError(t, err)
+	require.Contains(t, cny.CurrencyNote, "以人民币列报")
+	require.Equal(t, usd.PE, cny.PE, "估值用的仍是美元数")
+}

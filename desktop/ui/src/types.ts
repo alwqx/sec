@@ -257,7 +257,7 @@ export interface ValuationResult {
   eps: number | null; bvps: number | null; profit_ttm: number | null; revenue_ttm: number | null; roe: number | null; roe_year: string
   growth: { rate: number | null; from_year: string; to_year: string; note: string }
   peg: number | null; graham: number | null; graham_margin: number | null
-  annuals: ValuationAnnual[]; peers: ValuationPeers | null; peers_note: string; dividends: ValuationDividends | null; dividends_note: string; shares_note: string; dcf: ValuationDCF; signals: { name: string; level: 'low' | 'neutral' | 'high'; rule: string }[]; assessment: string; disclaimer: string
+  annuals: ValuationAnnual[]; peers: ValuationPeers | null; peers_note: string; dividends: ValuationDividends | null; dividends_note: string; shares_note: string; currency_note: string; dcf: ValuationDCF; signals: { name: string; level: 'low' | 'neutral' | 'high'; rule: string }[]; assessment: string; disclaimer: string
 }
 
 export interface FinancialItem { label: string; value: number }
@@ -288,7 +288,7 @@ export interface SECFilings { company: SECProfile; ticker: string; total: number
 export interface USQuote { name: string; price: number; change_rate: number; time: string; high_52w: number | null; low_52w: number | null; market_cap: number | null; eps: number | null; pe: number | null; shares: number | null }
 export interface USCompanyData { info: { ex_code: string; ticker: string; company: SECProfile | null; quote: USQuote | null }; notes: string[] }
 export interface USReport {
-  statement: string; quarterly: boolean
+  statement: string; quarterly: boolean; currency: string; currency_name: string
   lines: { key: string; label: string; unit: string }[]
   periods: { end: string; start?: string; fiscal_year: number; fiscal_period: string; values: Record<string, number | null>; derived?: string[] }[]
 }

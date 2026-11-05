@@ -169,6 +169,7 @@ type Result struct {
 	Dividends     *Dividends `json:"dividends"`      // 不可用时为 nil，原因见 DividendsNote
 	DividendsNote string     `json:"dividends_note"` // 分红数据不可用时说明原因
 	SharesNote    string     `json:"shares_note"`    // 股数的来源和可能的误差，比如美股按类别折算；没有需要说明的时为空
+	CurrencyNote  string     `json:"currency_note"`  // 以外币列报的美股只用了美元便利折算数时的说明，其他情况为空
 	DCF           DCF        `json:"dcf"`
 	Signals       []Signal   `json:"signals"`
 	Assessment    string     `json:"assessment"`

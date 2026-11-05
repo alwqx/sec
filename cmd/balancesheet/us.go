@@ -15,7 +15,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// usFinancials 是美股 sec financials 的 JSON：报表来自 SEC XBRL，金额单位美元。
+// usFinancials 是美股 sec financials 的 JSON：报表来自 SEC XBRL，金额用公司的列报币种（每张报表的 currency）。
 type usFinancials struct {
 	ExCode     string          `json:"ex_code"`
 	Ticker     string          `json:"ticker"`
@@ -130,7 +130,7 @@ func printUSFinancials(out io.Writer, result usFinancials) {
 		fmt.Fprintln(out)
 		table := termtable.New(out, headers, termtable.LeftHeader, termtable.NoWrap)
 		for _, line := range report.Lines {
-			row := []string{line.Label + unitLabel(line.Unit)}
+			row := []string{line.Label + unitLabel(line.Unit, report.Currency, report.CurrencyName)}
 			has := false
 			for _, p := range report.Periods {
 				value := p.Values[line.Key]
@@ -154,18 +154,19 @@ func printUSFinancials(out io.Writer, result usFinancials) {
 		}
 		table.Render()
 	}
-	fmt.Fprintln(out, "\n数据来自 SEC EDGAR 的 XBRL 财务数据（US GAAP），同一报告期有重述时用最新申报的数值；财年按截止日所在年份标注。")
+	fmt.Fprintln(out, "\n数据来自 SEC EDGAR 的 XBRL 财务数据（US GAAP），金额用公司的列报币种，同一报告期有重述时用最新申报的数值；财年按截止日所在年份标注。")
 	if derived {
 		fmt.Fprintln(out, "* 推算值：没有单季数时用年初累计数相减（第四季度 = 全年 - 前三季度），自由现金流 = 经营活动现金流 - 资本支出。")
 	}
 }
 
-func unitLabel(unit string) string {
+// unitLabel 返回行名后的单位，比如（亿美元）、（人民币）、（亿股）。
+func unitLabel(unit, currency, name string) string {
 	switch unit {
-	case "USD":
-		return "（亿美元）"
-	case "USD/shares":
-		return "（美元）"
+	case currency:
+		return "（亿" + name + "）"
+	case currency + "/shares":
+		return "（" + name + "）"
 	case "shares":
 		return "（亿股）"
 	}
@@ -174,7 +175,7 @@ func unitLabel(unit string) string {
 
 // format 按单位显示：金额和股数用亿，每股收益保留两位小数。
 func format(value float64, unit string) string {
-	if unit == "USD/shares" {
+	if strings.HasSuffix(unit, "/shares") {
 		return fmt.Sprintf("%.2f", value)
 	}
 	return fmt.Sprintf("%.2f", value/1e8)

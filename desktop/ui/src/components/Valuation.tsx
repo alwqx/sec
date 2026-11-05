@@ -213,6 +213,7 @@ export default function Valuation({ code }: { code: string }) {
         <DCFResult data={data} loading={resource.loading} error={resource.error} retry={resource.reload} />
         <p className="data-note">两阶段股权现金流折现：5 年增长期加永续期。现金流用近四个季度归母净利润的 70% 近似，折现结果视为股权价值，未单独扣除净负债。增长率留空时取近 5 年净利润 CAGR，限制在 ±15%；填 0 表示零增长。结果对参数高度敏感。</p></section>
       <Annuals data={data} />
+      {data.currency_note && <p className="data-note">币种说明：{data.currency_note}</p>}
       {data.shares_note && <p className="data-note">股数说明：{data.shares_note}</p>}
       <p className="data-note">{data.disclaimer} 命令行：sec valuation。</p>
     </>}
