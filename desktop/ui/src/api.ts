@@ -1,4 +1,4 @@
-import type { BasicSecurity, SecurityQuote, Company, Dividend, WorkspaceState, PageResult, IPOListing, Announcement, FinancialReport, MetalData, SECFilings, USCompanyData, USFinancialsData, CommodityQuote, CommodityHistory, HistoryQuote, BondData, CompanyMetrics, SavedDownload, AnnualReportsPage, ProspectusPage , MacroCatalog, MacroDataset , FxDataset, FxSpread , HistoryOverlay , StrategyResult, ValuationResult, FinancialCharts } from './types'
+import type { BasicSecurity, SecurityQuote, Company, Dividend, WorkspaceState, PageResult, IPOListing, Announcement, FinancialReport, MetalData, SECFilings, USCompanyData, USFinancialsData, CommodityQuote, CommodityHistory, HistoryQuote, BondData, CompanyMetrics, SavedDownload, AnnualReportsPage, ProspectusPage , MacroCatalog, MacroDataset , FxDataset, FxSpread , HistoryOverlay , StrategyResult, ValuationResult, FinancialCharts, USDividends } from './types'
 
 async function request<T>(path: string, signal?: AbortSignal, options?: RequestInit): Promise<T> {
   const resp = await fetch(path, { ...options, signal })
@@ -167,6 +167,10 @@ export function filings(code: string, type: string, page: number, signal?: Abort
 
 export function usCompany(code: string, signal?: AbortSignal): Promise<USCompanyData> {
   return request(`/api/v1/us/company?${new URLSearchParams({ code })}`, signal)
+}
+
+export function usDividends(code: string, signal?: AbortSignal): Promise<USDividends> {
+  return request(`/api/v1/us/dividends?${new URLSearchParams({ code })}`, signal)
 }
 
 export function usFinancials(code: string, statement: string, period: string, signal?: AbortSignal): Promise<USFinancialsData> {

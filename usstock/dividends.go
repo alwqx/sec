@@ -36,28 +36,43 @@ type Dividends struct {
 	Years           []DividendYear `json:"years"`
 }
 
-// LoadDividends 并发读取 SEC XBRL 数据和新浪不复权日线（识别拆股用），整理分红表；current 是新浪的当前股数，没有时为 0。
-// 日线读取失败时不按拆股调整，SplitsUnchecked 为 true。
-func LoadDividends(ctx context.Context, client *edgar.Client, exCode string, current float64) (*Dividends, error) {
+// LoadDividends 并发读取 SEC XBRL 数据、新浪不复权日线和当前股数（识别拆股用），整理分红表。quote 是调用方已经读到的新浪行情
+// （比如 sec info），为 nil 时自己读取；loadFacts 用来复用调用方缓存的 XBRL 数据（比如 Desktop），为 nil 时直接下载。
+// 日线读取失败时不按拆股调整，SplitsUnchecked 为 true；当前股数读不到时只用申报的股数核对拆股。
+func LoadDividends(ctx context.Context, client *edgar.Client, exCode string, quote *sina.USQuote, loadFacts func(context.Context, int) (*edgar.Facts, error)) (*Dividends, error) {
 	company, err := client.Lookup(ctx, exCode)
 	if err != nil {
 		return nil, err
+	}
+	if loadFacts == nil {
+		loadFacts = client.CompanyFacts
 	}
 	var (
 		facts    *edgar.Facts
 		factsErr error
 		bars     []*sina.Bar
 		barsErr  error
+		current  float64
 		wg       sync.WaitGroup
 	)
-	wg.Add(2)
+	wg.Add(3)
 	go func() {
 		defer wg.Done()
-		facts, factsErr = client.CompanyFacts(ctx, company.CIK)
+		facts, factsErr = loadFacts(ctx, company.CIK)
 	}()
 	go func() {
 		defer wg.Done()
 		bars, barsErr = sina.QueryUSDailyBars(ctx, exCode)
+	}()
+	go func() {
+		defer wg.Done()
+		q := quote
+		if q == nil {
+			q, _ = sina.QueryUSQuote(ctx, exCode)
+		}
+		if q != nil && q.Shares != nil {
+			current = *q.Shares
+		}
 	}()
 	wg.Wait()
 	if factsErr != nil {

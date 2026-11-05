@@ -293,3 +293,10 @@ export interface USReport {
   periods: { end: string; start?: string; fiscal_year: number; fiscal_period: string; values: Record<string, number | null>; derived?: string[] }[]
 }
 export interface USFinancialsData { ticker: string; name: string; cik: number; report: USReport }
+
+// USDividends 是美股按财年的分红表（usstock.Dividends），years 从新到旧；每股股息已按 splits 统一到当前股本，splits_unchecked 表示没有读到日线、没有调整。
+export interface USDividendYear { fiscal_year: number; end: string; per_share: number | null; growth: number | null; paid: number | null; net_income: number | null; payout: number | null; buyback: number | null }
+export interface USDividends {
+  ticker: string; name: string; cik: number; currency: string; currency_name: string
+  splits: { date: string; factor: number }[]; splits_unchecked: boolean; years: USDividendYear[]
+}

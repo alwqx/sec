@@ -166,3 +166,33 @@ func (s *desktopServer) handleUSFinancials(w http.ResponseWriter, r *http.Reques
 	}
 	writeJSON(w, map[string]any{"ticker": company.Ticker, "name": facts.Name, "cik": company.CIK, "report": facts.Build(statement, quarterly, limit)})
 }
+
+// handleUSDividends 返回美股按财年的分红表（usstock.Dividends），和 CLI 的 sec info -d 相同；XBRL 数据和财报、估值栏目共用缓存。
+func (s *desktopServer) handleUSDividends(w http.ResponseWriter, r *http.Request) {
+	code := strings.TrimSpace(r.URL.Query().Get("code"))
+	if !usTicker.MatchString(code) {
+		writeError(w, http.StatusBadRequest, "只支持美股代码，比如 $AAPL")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+	client, err := s.edgarClient(ctx)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "读取 SEC 联系邮箱失败，请在设置中检查")
+		return
+	}
+	dividends, err := usstock.LoadDividends(ctx, client, code, nil, cachedUSFacts(client))
+	if errors.Is(err, edgar.ErrNotFound) || errors.Is(err, edgar.ErrNoXBRL) {
+		writeError(w, http.StatusNotFound, "SEC EDGAR 没有这家公司的分红数据，可能不向 SEC 申报")
+		return
+	}
+	if err != nil {
+		if r.Context().Err() != nil {
+			return
+		}
+		slog.ErrorContext(ctx, "查询美股分红失败", "code", code, "error", err)
+		writeError(w, http.StatusBadGateway, "美股分红获取失败："+err.Error())
+		return
+	}
+	writeJSON(w, dividends)
+}

@@ -16,6 +16,7 @@ import Commodity from './components/Commodity'
 import Filings from './components/Filings'
 import USCompany from './components/USCompany'
 import USFinancials from './components/USFinancials'
+import USDividends from './components/USDividends'
 import WatchQuotes, { type CompareState } from './components/WatchQuotes'
 import { useQuotes } from './hooks/useQuotes'
 import Strategy from './components/Strategy'
@@ -221,7 +222,8 @@ export default function App() {
                   : usStock && tab === 'company' ? <USCompany code={selected.ex_code} />
                   : usStock && tab === 'financials' ? <USFinancials code={selected.ex_code} />
                   : usStock && tab === 'valuation' ? <Valuation code={selected.ex_code} />
-                  : !aShare ? <div className="empty-state">{usStock ? '美股目前支持行情、公司、财报、估值（含股息率）、技术分析和公告（SEC 申报），这个栏目暂不支持；分红数据在估值栏目里。' : '此栏目暂仅支持沪深北 A 股，当前证券可在概览中查看行情。'}</div>
+                  : usStock && tab === 'dividends' ? <USDividends code={selected.ex_code} />
+                  : !aShare ? <div className="empty-state">此栏目暂仅支持沪深北 A 股，当前证券可在概览中查看行情。</div>
                   : tab === 'valuation' ? <Valuation code={selected.ex_code} />
                   : tab === 'financials' ? <Financials security={selected} />
                   : tab === 'announcements' ? <Announcements code={selected.ex_code} compact />
