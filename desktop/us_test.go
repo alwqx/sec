@@ -4,6 +4,8 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -316,4 +318,22 @@ func TestUSHandlersSharedErrors(t *testing.T) {
 	rr = usRequest(t, srv, "/api/v1/us/financials?code=SH600036")
 	require.Equal(t, http.StatusBadRequest, rr.Code)
 	require.Contains(t, rr.Body.String(), "只支持美股代码")
+}
+
+// 公司资料和行情都失败时 502，用公司资料接口自己的提示。
+func TestUSCompanyBothFail(t *testing.T) {
+	defer gock.Off()
+	srv := usServer(t)
+	gock.New("https://www.sec.gov").Get("/files/company_tickers.json").Reply(500)
+	gock.New("https://hq.sinajs.cn").Get("/list=gb_aapl").Reply(502)
+	rr := usRequest(t, srv, "/api/v1/us/company?code=$AAPL")
+	require.Equal(t, http.StatusBadGateway, rr.Code, rr.Body.String())
+	require.Contains(t, rr.Body.String(), "美股公司资料和行情都获取失败")
+}
+
+// usUpstream 不暴露内层错误：内层有 ErrNotFound 时也按 502 返回；没有内层错误时只用提示文字。
+func TestUSUpstream(t *testing.T) {
+	err := error(usUpstream{"都失败了", fmt.Errorf("公司资料：%w", edgar.ErrNotFound)})
+	require.False(t, errors.Is(err, edgar.ErrNotFound))
+	require.Equal(t, "都失败了", usUpstream{"都失败了", nil}.Error())
 }

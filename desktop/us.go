@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -27,38 +28,23 @@ func (s *desktopServer) edgarClient(ctx context.Context) (*edgar.Client, error) 
 
 // handleUSCompany 返回美股公司资料：SEC EDGAR 公司信息和新浪行情，任一失败时照常返回另一部分并说明原因。
 func (s *desktopServer) handleUSCompany(w http.ResponseWriter, r *http.Request) {
-	code := strings.TrimSpace(r.URL.Query().Get("code"))
-	if !usTicker.MatchString(code) {
-		writeError(w, http.StatusBadRequest, "只支持美股代码，比如 $AAPL")
-		return
-	}
-	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
-	defer cancel()
-	client, err := s.edgarClient(ctx)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "读取 SEC 联系邮箱失败，请在设置中检查")
-		return
-	}
-	info, profileErr, quoteErr := usstock.Load(ctx, client, code)
-	if profileErr != nil && quoteErr != nil {
-		if r.Context().Err() != nil {
-			return
+	s.serveUS(w, r, "公司资料", func(ctx context.Context, client *edgar.Client, code string) (any, error) {
+		info, profileErr, quoteErr := usstock.Load(ctx, client, code)
+		if profileErr != nil && quoteErr != nil {
+			return nil, usUpstream{"美股公司资料和行情都获取失败，请稍后重试", fmt.Errorf("公司资料：%w；行情：%w", profileErr, quoteErr)}
 		}
-		slog.ErrorContext(ctx, "查询美股公司资料失败", "code", code, "profile", profileErr, "quote", quoteErr)
-		writeError(w, http.StatusBadGateway, "美股公司资料和行情都获取失败，请稍后重试")
-		return
-	}
-	notes := []string{}
-	switch {
-	case errors.Is(profileErr, edgar.ErrNotFound):
-		notes = append(notes, "SEC EDGAR 没有这个代码，基金、场外交易股票等可能不向 SEC 申报公司资料。")
-	case profileErr != nil:
-		notes = append(notes, "公司资料获取失败："+profileErr.Error())
-	}
-	if quoteErr != nil {
-		notes = append(notes, "行情获取失败："+quoteErr.Error())
-	}
-	writeJSON(w, map[string]any{"info": info, "notes": notes})
+		notes := []string{}
+		switch {
+		case errors.Is(profileErr, edgar.ErrNotFound):
+			notes = append(notes, "SEC EDGAR 没有这个代码，基金、场外交易股票等可能不向 SEC 申报公司资料。")
+		case profileErr != nil:
+			notes = append(notes, "公司资料获取失败："+profileErr.Error())
+		}
+		if quoteErr != nil {
+			notes = append(notes, "行情获取失败："+quoteErr.Error())
+		}
+		return map[string]any{"info": info, "notes": notes}, nil
+	})
 }
 
 // usFactsCache 按 CIK 缓存 XBRL 数据 10 分钟，切换报表和年度、季度时不用重新下载（大公司有几 MB）。
@@ -120,6 +106,20 @@ type usBadRequest string
 
 func (e usBadRequest) Error() string { return string(e) }
 
+// usUpstream 是要用自定义提示返回的上游失败（502），比如公司资料和行情都失败。err 只写进日志，不提供 Unwrap：
+// 内层可能有 edgar.ErrNotFound，不能让 usFail 按 404 处理。
+type usUpstream struct {
+	message string
+	err     error
+}
+
+func (e usUpstream) Error() string {
+	if e.err == nil {
+		return e.message
+	}
+	return e.message + "：" + e.err.Error()
+}
+
 // serveUS 是美股 SEC 接口共用的准备：先校验美股代码（无效时 400），再创建带 30 秒超时的 ctx 和用共享配置联系邮箱的 SEC 客户端
 // （读取失败时 500），交给 handle；handle 的结果写成 JSON，错误按 usFail 映射。cancel 在这里 defer，handle 不用管。
 // what 是数据的名称，比如"财报"，用在错误提示里。
@@ -133,6 +133,7 @@ func (s *desktopServer) serveUS(w http.ResponseWriter, r *http.Request, what str
 	defer cancel()
 	client, err := s.edgarClient(ctx)
 	if err != nil {
+		slog.ErrorContext(ctx, "读取共享配置失败", "path", r.URL.Path, "error", err)
 		writeError(w, http.StatusInternalServerError, "读取 SEC 联系邮箱失败，请在设置中检查")
 		return
 	}
@@ -154,18 +155,22 @@ func usFacts(ctx context.Context, client *edgar.Client, code string) (edgar.Comp
 	return company, facts, err
 }
 
-// usFail 写出错误响应：参数错误 400；SEC 没有这家公司或没有 XBRL 数据时 404；数据不足以整理（没有利润表、IFRS 公司没有季度数据）时
-// 404 并说明原因；请求已取消时不写；其他是上游失败（502），日志带上请求路径，区分是哪个接口。
+// usFail 写出错误响应：参数错误 400；请求已取消时不写；usUpstream 用它的提示返回 502；SEC 没有这家公司或没有 XBRL 数据时 404；
+// 数据不足以整理（没有利润表、IFRS 公司没有季度数据）时 404 并说明原因；其他是上游失败（502）。日志带上请求路径，区分是哪个接口。
 func usFail(w http.ResponseWriter, r *http.Request, err error, what, code string) {
 	var bad usBadRequest
+	var upstream usUpstream
 	switch {
 	case errors.As(err, &bad):
 		writeError(w, http.StatusBadRequest, bad.Error())
+	case r.Context().Err() != nil:
+	case errors.As(err, &upstream):
+		slog.ErrorContext(r.Context(), "查询美股"+what+"失败", "path", r.URL.Path, "code", code, "error", upstream.err)
+		writeError(w, http.StatusBadGateway, upstream.message)
 	case errors.Is(err, edgar.ErrNotFound) || errors.Is(err, edgar.ErrNoXBRL):
 		writeError(w, http.StatusNotFound, "SEC EDGAR 没有这家公司的"+what+"数据，可能不向 SEC 申报")
 	case errors.Is(err, financials.ErrNoSECData) || errors.Is(err, financials.ErrIFRSQuarterly):
 		writeError(w, http.StatusNotFound, err.Error())
-	case r.Context().Err() != nil:
 	default:
 		slog.ErrorContext(r.Context(), "查询美股"+what+"失败", "path", r.URL.Path, "code", code, "error", err)
 		writeError(w, http.StatusBadGateway, "美股"+what+"获取失败："+err.Error())

@@ -94,6 +94,9 @@ func TestFilingsEndpointErrors(t *testing.T) {
 	srv := &desktopServer{dev: true, workspace: workspaceStore{path: filepath.Join(t.TempDir(), "workspace.json")}}
 	require.Equal(t, http.StatusBadRequest, filingsRequest(t, srv, "code=SH600036").Code)
 	require.Equal(t, http.StatusBadRequest, filingsRequest(t, srv, "code=$AAPL&type=x").Code)
+	rr := filingsRequest(t, srv, "code=$AAPL&page=0")
+	require.Equal(t, http.StatusBadRequest, rr.Code)
+	require.Contains(t, rr.Body.String(), "页码必须在 1 到 10000 之间")
 	gock.New("https://www.sec.gov").Get("/files/company_tickers.json").Reply(200).BodyString(`{"0":{"cik_str":320193,"ticker":"AAPL","title":"Apple Inc."}}`)
 	require.Equal(t, http.StatusNotFound, filingsRequest(t, srv, "code=$ZZZZ").Code)
 }
