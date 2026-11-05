@@ -100,7 +100,7 @@ function Summary({ data }: { data: ValuationResult }) {
       <div><dt>格雷厄姆数</dt><dd>{fixed(data.graham)}</dd></div>
       <div><dt>格雷厄姆数相对收盘价</dt><dd>{data.graham_margin === null ? '—' : signed(data.graham_margin)}</dd></div>
     </dl>
-    <p className="data-note">{data.industry || '行业未知'} · 数据日期 {data.trade_date} · {us ? '美股估值由 SEC XBRL 财务数据和新浪不复权日线计算：市值 = 收盘价 × 当时申报的流通股数（封面股数，没有时用季度稀释加权股数；拆股后按比例调整），PE、PS 用最近四个季度，PB 用最近一期股东权益，只用当天之前已经申报的数值，报告期后来被重述时用重述后的数字；美股没有同行业对比。' : 'PE、PB、PS 由东方财富按收盘价计算，'}每股收益和每股净资产由这些倍数反推，与年报披露的{us ? '稀释' : '基本'}每股收益口径不同。{data.growth.rate === null && data.growth.note && ` 增长率不可用：${data.growth.note}。`}</p>
+    <p className="data-note">{data.industry || '行业未知'} · 数据日期 {data.trade_date} · {us ? '美股估值由 SEC XBRL 财务数据和新浪不复权日线计算：市值 = 收盘价 × 当时申报的流通股数（封面股数；只按类别申报时从申报封面页读取各类股数，按新浪的当前股数折算成所查这类股票；都没有时用季度稀释加权股数；拆股后按比例调整），PE、PS 用最近四个季度，PB 用最近一期股东权益，只用当天之前已经申报的数值，报告期后来被重述时用重述后的数字；美股没有同行业对比。' : 'PE、PB、PS 由东方财富按收盘价计算，'}每股收益和每股净资产由这些倍数反推，与年报披露的{us ? '稀释' : '基本'}每股收益口径不同。{data.growth.rate === null && data.growth.note && ` 增长率不可用：${data.growth.note}。`}</p>
   </>
 }
 
@@ -213,6 +213,7 @@ export default function Valuation({ code }: { code: string }) {
         <DCFResult data={data} loading={resource.loading} error={resource.error} retry={resource.reload} />
         <p className="data-note">两阶段股权现金流折现：5 年增长期加永续期。现金流用近四个季度归母净利润的 70% 近似，折现结果视为股权价值，未单独扣除净负债。增长率留空时取近 5 年净利润 CAGR，限制在 ±15%；填 0 表示零增长。结果对参数高度敏感。</p></section>
       <Annuals data={data} />
+      {data.shares_note && <p className="data-note">股数说明：{data.shares_note}</p>}
       <p className="data-note">{data.disclaimer} 命令行：sec valuation。</p>
     </>}
   </div>
