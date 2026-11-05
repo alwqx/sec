@@ -2,25 +2,25 @@
 
 SEC（Security Information Client）提供 CLI 与 Desktop 两种界面，用于查询证券行情、公司资料、财务报表、公告、IPO、宏观数据、汇率、贵金属、大宗商品与美债收益率。两端复用数据源与公共业务能力，并共享同一份自选证券列表。
 
-[下载安装](https://github.com/alwqx/sec/releases) · [Desktop 截图](#desktop-截图) · [CLI 命令](#cli-命令) · [开发计划](#开发计划)
+[下载安装](https://github.com/alwqx/sec/releases) · [Desktop 截图](#desktop-截图） · [CLI 命令](#cli-命令） · [开发计划](#开发计划)
 
 ## 功能概览
 
-| 功能           | Desktop                                                                   | CLI                                           |
-| -------------- | ------------------------------------------------------------------------- | --------------------------------------------- |
-| 证券搜索与自选 | 名称／代码／拼音搜索，自选增删，与 CLI 共享存储                           | `search`、`watch`                             |
-| 实时与历史行情 | 行情自动刷新，日 K 线、成交量与成交额，日期范围、快捷区间和复权选择       | `quote`、`quote-history`、`kline`             |
-| 公司研究       | 公司资料、行业、PE、PB、总市值、流通市值与分红记录                        | `info`                                        |
-| 财务报表       | 资产负债表、利润表、现金流量表，报告期筛选，CSV／JSON 导出；Desktop 有利润桑基图、利润和现金瀑布图及多维趋势图 | `financials`                               |
-| 报告原文       | 年报、半年报、一季报、三季报，年份范围查询、单份／多选 PDF 下载及任务进度 | `annual-report`（年报）              |
-| 公告           | 标题搜索、报告类别筛选、分页与原文查看；美股为 SEC EDGAR 官方申报         | `announcements`、`insider`（增减持公告）、`filings` |
-| IPO            | 新股上市日期筛选，招股说明书查询、原文查看及单份／多选下载                | `ipo list / calendar / prospectus / download` |
-| 贵金属         | 上海黄金交易所 Au99.99 黄金、Ag99.99 白银日行情与蜡烛图                   | `metal`                                       |
-| 大宗商品       | 原油、铜、铁矿石、螺纹钢、豆粕及 WTI、布伦特、COMEX 铜期货行情与日 K 线  | `commodity`                                   |
-| 美债           | 11 个期限收益率、收益率曲线、历史趋势与明细                               | `bond`、`bond-history`                        |
-| 技术分析       | 双均线、MACD、RSI、布林带，参数可调，买卖信号与明细，A 股日线回测         | `strategy`                                    |
-| 估值           | PE、PB、PS 历史分位和同行业对比，股息率，PEG、ROE、格雷厄姆数、规则汇总，可调参数的 DCF | `valuation`                                   |
-| 版本与更新     | 设置页版本、构建时间、提交号，手动检查更新和 Release 下载入口             | `--version`、`upgrade`                        |
+| 功能           | Desktop                                                                                                        | CLI                                                 |
+| -------------- | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| 证券搜索与自选 | 名称／代码／拼音搜索，自选增删，与 CLI 共享存储                                                                | `search`、`watch`                                   |
+| 实时与历史行情 | 行情自动刷新，日 K 线、成交量与成交额，日期范围、快捷区间和复权选择                                            | `quote`、`quote-history`、`kline`                   |
+| 公司研究       | 公司资料、行业、PE、PB、总市值、流通市值与分红记录                                                             | `info`                                              |
+| 财务报表       | 资产负债表、利润表、现金流量表，报告期筛选，CSV／JSON 导出；Desktop 有利润桑基图、利润和现金瀑布图及多维趋势图 | `financials`                                        |
+| 报告原文       | 年报、半年报、一季报、三季报，年份范围查询、单份／多选 PDF 下载及任务进度                                      | `annual-report`（年报）                             |
+| 公告           | 标题搜索、报告类别筛选、分页与原文查看；美股为 SEC EDGAR 官方申报                                              | `announcements`、`insider`（增减持公告）、`filings` |
+| IPO            | 新股上市日期筛选，招股说明书查询、原文查看及单份／多选下载                                                     | `ipo list / calendar / prospectus / download`       |
+| 贵金属         | 上海黄金交易所 Au99.99 黄金、Ag99.99 白银日行情与蜡烛图                                                        | `metal`                                             |
+| 大宗商品       | 原油、铜、铁矿石、螺纹钢、豆粕及 WTI、布伦特、COMEX 铜期货行情与日 K 线                                        | `commodity`                                         |
+| 美债           | 11 个期限收益率、收益率曲线、历史趋势与明细                                                                    | `bond`、`bond-history`                              |
+| 技术分析       | 双均线、MACD、RSI、布林带，参数可调，买卖信号与明细，A 股日线回测                                              | `strategy`                                          |
+| 估值           | PE、PB、PS 历史分位和同行业对比，股息率，PEG、ROE、格雷厄姆数、规则汇总，可调参数的 DCF                        | `valuation`                                         |
+| 版本与更新     | 设置页版本、构建时间、提交号，手动检查更新和 Release 下载入口                                                  | `--version`、`upgrade`                              |
 
 市场覆盖按功能区分：Desktop 搜索与实时行情支持 A 股、港股和美股；证券历史 K 线支持沪深、港股和美股；美股的 `sec info` 公司资料来自 SEC EDGAR；公司资料、核心指标、财报和分红面向沪深北 A 股，美股的公司资料和财报来自 SEC EDGAR；估值支持沪深北 A 股和美股（SEC XBRL 计算，含股息率）；个股公告支持沪深北 A 股（巨潮资讯）和美股（SEC EDGAR 申报）。贵金属为上海黄金交易所 Au99.99、Ag99.99 日行情；大宗商品为新浪期货的国内主力连续合约和国际期货。
 
@@ -32,7 +32,7 @@ SEC（Security Information Client）提供 CLI 与 Desktop 两种界面，用于
 2. 打开 DMG，将应用拖入 `Applications`，启动 SEC。
 3. 在「自选与行情」中搜索证券并加入自选；在「设置」中调整外观、行情刷新间隔和下载目录。
 
-当前 Release 仅提供 Apple Silicon 的 Desktop 安装包，Intel Mac 与 Windows Desktop 安装包尚未提供。macOS 安装包采用 ad-hoc 签名，尚未完成 Developer ID 签名与 Apple 公证；系统拦截时的说明见 [Desktop 构建与发布文档](docs/desktop.md#发布macos)。
+当前 Release 仅提供 Apple Silicon 的 Desktop 安装包，Intel Mac 与 Windows Desktop 安装包尚未提供。macOS 安装包采用 ad-hoc 签名，尚未完成 Developer ID 签名与 Apple 公证；系统拦截时的说明见 [Desktop 构建与发布文档](docs/desktop.md#发布 macos)。
 
 Desktop 支持浅色、深色及跟随系统外观。导出文件与 PDF 默认保存到 `~/Downloads`，可在设置中修改；同名文件自动追加编号，避免覆盖。检查更新后通过官方 Release 下载并手动安装新版。
 
@@ -87,97 +87,97 @@ CLI `sec watch` 与 Desktop「我的自选」统一使用 `~/.sec/watchlist.json
 
 ## CLI 命令
 
-命令按功能的分类及其在 Desktop 中的位置见[命令与 Desktop 功能对照](docs/commands.md)。
+命令按功能的分类及其在 Desktop 中的位置见 [命令与 Desktop 功能对照](docs/commands.md)。
 
-| 命令                                          | 用途                                     |
-| --------------------------------------------- | ---------------------------------------- |
-| `search`                                      | 按代码、名称或拼音搜索证券               |
-| `quote`、`quote-history`                      | 单只／多只证券实时行情、历史行情         |
-| `kline`                                       | 终端蜡烛图，支持 MA、布林带叠加          |
-| `info`                                        | 公司资料、核心指标与分红                 |
-| `watch`、`watch add`、`watch remove`          | 自选行情总览及增删                       |
-| `financials`                               | 三类财务报表查询及 CSV／JSON 导出        |
-| `annual-report`                      | 按单年或年份范围下载年报 PDF             |
-| `announcements`、`insider`                    | 公司公告、增减持公告                     |
-| `filings`                                     | 美股 SEC 申报（10-K、10-Q、8-K 等）      |
-| `config`                                      | CLI 与 Desktop 共用的配置，如 SEC 联系邮箱 |
-| `ipo list / calendar / prospectus / download` | 新股列表、IPO 公告日历、招股书查询与下载 |
-| `metal`                                       | 黄金、白银日行情，`--inst` 选品种、`-b/-e` 查区间 |
-| `commodity`                                   | 大宗商品期货行情，`--inst` 加 `-b/-e` 查日行情 |
-| `fx quote`、`fx history`                     | 在岸／离岸人民币、美元及港币参考行情、来源独立的新浪／FRED日线，见 [汇率文档](docs/forex.md) |
-| `fx fixing`、`fx reference`                  | 人民币中间价、在岸固定时点参考汇率，保留各自价格和时间口径 |
-| `fx cross`、`fx spread`                      | 按同源同口径计算交叉汇率、在岸／离岸报价价差，保留公式、输入及时间对齐状态 |
-| `bond`、`bond-history`                        | 美债收益率与历史                         |
-| `macro us treasury` | 美债收益率全部期限，支持 `--standard-json`，见 [美债文档](docs/bond.md#macro-us-treasury) |
-| `macro cn cpi`、`macro cn core-cpi`、`macro cn ppi` | 国家统计局月度价格指数，见 [NBS 文档](docs/nbs.md) |
-| `macro cn pmi`                                | 国家统计局制造业 PMI 及生产、订单、出口订单、就业分项 |
-| `macro cn nonmanufacturing-pmi` / `macro cn npmi` | 非制造业、服务业、建筑业商务活动指数；`--details` 展示九个全国分项 |
-| `macro cn industrial` / `macro cn ip`          | 规模以上工业增加值单月同比、累计同比及可检索的季调环比 |
-| `macro cn retail`                             | 社会消费品零售总额当月金额、同比、累计金额及累计同比 |
-| `macro cn investment`                         | 固定资产投资总量及制造业、基建、房地产分项的累计口径，见 [投资文档](docs/cn-investment.md) |
-| `macro cn property`                           | 新建商品房销售面积、销售额及房屋新开工面积，见 [房地产文档](docs/cn-property.md) |
-| `macro cn enterprise`                         | 规模以上工业企业利润、总存货/产成品存货及应收账款，区分累计流量与期末余额，见 [工业企业文档](docs/cn-enterprise.md) |
-| `macro cn household` | 全国居民人均累计收入、消费支出及官方实际同比，见 [居民收支文档](docs/cn-household.md) |
-| `macro cn deposits` | 住户人民币存款余额、严格基期计算同比和报告新增额，见 [居民存款文档](docs/cn-deposits.md) |
-| `macro cn fiscal` | 全国一般公共预算、政府性基金累计收支及官方同比，见 [中国财政文档](docs/cn-fiscal.md) |
-| `macro cn trade` | 海关货物进出口人民币/美元月度总量；支持 `--partners-currency cny` 查询人民币伙伴月值及累计值，见 [货物贸易文档](docs/cn-trade.md) |
-| `macro cn services-trade` | 服务贸易人民币/美元月度进出口与官方差额，保留历史缺口，见 [服务贸易文档](docs/cn-services-trade.md) |
-| `macro cn unemployment`                       | 全国城镇调查失业率；`--age-groups` 展示年龄分组并标记口径变化 |
-| `macro cn financing` / `macro cn afre`         | 人民银行社融存量、同比、月度/累计增量；`--details` 展示融资结构，见 [PBC 文档](docs/pbc.md) |
-| `macro cn loans`                              | 金融机构人民币贷款余额、同比和新增；`--details` 展示住户／企事业单位期限结构，近似计算值带 `≈` |
-| `macro cn money`                              | 人民银行 M1、M2 余额及同比；标注 2025 年 M1 口径修订 |
-| `macro cn reverse-repo`                       | 七天逆回购政策利率调整公告，含公布/生效日期及前后值；覆盖自 2024-07-22 起 |
-| `macro cn reverse-repo-history`               | 固定利率机制切换前七天逆回购逐笔中标利率，2015-01-22 至 2024-07-19；与政策调整事件序列分开 |
-| `macro cn lpr`                                | 1 年期、5 年期以上 LPR 月度报价、实际报价日、公布时间及基点变化；覆盖自 2019-08 起 |
-| `macro cn rrr`                                | 人民币存款准备金率调整，内置 2018 年起可逐条核验历史并增量检查新公告；区分全面/定向及分批生效 |
-| `macro cn treasury`                           | 中债国债到期收益率曲线，含 3 个月、6 个月及 1、2、5、10 年期；直接查询指定日期范围，见 [中债文档](docs/chinabond.md) |
-| `macro cn gdp`                                | 国家统计局季度实际 GDP 同比、累计同比、季调环比及分段基期的不变价金额，见 [NBS 文档](docs/nbs.md#实际-gdp) |
-| `macro us cpi`、`macro us core-cpi`             | BLS美国CPI/核心CPI季调与非季调指数、非季调同比及季调环比；保留缺口与脚注，见 [BLS 文档](docs/bls.md) |
-| `macro us pce`、`macro us core-pce`             | BEA经FRED转接的PCE/核心PCE季调链式价格指数、同比与月环比；区别于消费支出金额和实际消费量，见 [FRED 文档](docs/fred.md) |
-| `macro us payrolls`                             | BLS季调非农工资岗位总数、月度变化及本机观测版本，见 [BLS 文档](docs/bls.md) |
-| `macro us earnings`、`macro us weekly-hours`    | BLS私人非农全部雇员季调平均时薪、平均每周工时、月度变化和同比；保留基期与脚注，见 [BLS 文档](docs/bls.md#平均时薪与每周工时) |
-| `macro us unemployment`、`macro us participation` | BLS CPS季调失业率、劳动参与率及百分点变化；保留缺口和修订脚注，见 [BLS 文档](docs/bls.md#失业率与劳动参与率) |
-| `macro us initial-claims`、`macro us continued-claims` | 劳工部ETA经FRED转接的季调初请/续请数量、周变化及四周计算均值；按各自周六所属周对齐，见 [FRED 文档](docs/fred.md#初请与续请失业金) |
-| `macro us real-pce`                           | BEA经FRED转接的实际消费总量、商品及服务分项；保留季调折年水平与未年化增速，见 [FRED 文档](docs/fred.md#实际个人消费支出) |
-| `macro us real-income`                        | BEA经FRED转接的实际可支配个人收入总量、同比与月环比；保留2017年链式美元季调折年水平，见 [实际收入文档](docs/real-income.md) |
-| `macro us industrial-production`、`macro us capacity-utilization` | 美联储经FRED转接的工业生产指数与产能利用率；`--sector total\|manufacturing` 选择总量或NAICS制造业，见 [工业生产文档](docs/us-production.md) |
-| `macro us effr`                               | 纽约联储有效联邦基金利率、所属日期及前一可用观测值的基点变化，见 [纽约联储文档](docs/nyfed.md) |
-| `macro us target-rate`                        | 联邦基金目标利率区间及调整历史；区分政策公布与生效信息，见 [美联储政策利率文档](docs/federalreserve.md) |
-| `macro us gdp`                                | 美国实际GDP季度水平、同比及环比年化增速；`--vintages` 查询BEA官方初值与修订增速档案，见 [美国GDP文档](docs/us-gdp.md) |
-| `macro us money`、`macro us m2`                | 美国M2月度季调余额、同比与月环比，见 [美国货币供应文档](docs/us-money.md) |
-| `macro cn money --standard-json`、`macro us money --standard-json` | 货币指标统一JSON导出：统计口径、来源、缺失状态和原provider结果，见 [统一导出文档](docs/macro-standard.md) |
-| `macro cn retail --standard-json`、`macro cn property --standard-json` | 社零、房地产统一JSON导出：单月／累计所属期、官方同比、历史范围及来源序列，见 [统一导出文档](docs/macro-standard.md) |
-| `macro us gdp --standard-json`、`macro us effr --standard-json` | 季度GDP、日度EFFR统一JSON导出：折年口径、严格基期、交易日和方法边界，见 [统一导出文档](docs/macro-standard.md) |
-| `macro us cpi --standard-json`、`macro us core-cpi --standard-json` | CPI指数与增速统一JSON导出：季调状态、指数基期及严格计算基期，见 [统一导出文档](docs/macro-standard.md) |
-| `macro us initial-claims --standard-json`、`macro us continued-claims --standard-json` | 周度申领统一JSON导出：所属周、前周变化、四周均值和输入窗口，见 [统一导出文档](docs/macro-standard.md) |
-| `macro us pce --standard-json`、`macro us core-pce --standard-json`、`macro us real-pce --standard-json` | PCE价格与实际消费统一JSON导出：指数／金额、折年口径和分项不可加性，见 [统一导出文档](docs/macro-standard.md) |
-| `macro us real-income --standard-json`、`macro us industrial-production --standard-json`、`macro us capacity-utilization --standard-json` | 实际收入与工业统一JSON导出：总体范围、折年口径和百分比／百分点变化，见 [统一导出文档](docs/macro-standard.md) |
-| `macro us unemployment --standard-json`、`macro us participation --standard-json`、`macro us earnings --standard-json`、`macro us weekly-hours --standard-json` | 劳动力比率、时薪工时统一JSON导出：CPS／CES范围、分子分母、变化单位与初步标记，见 [统一导出文档](docs/macro-standard.md) |
-| `macro us fiscal --standard-json`、`macro us corporate-profits --standard-json`、`macro us business-inventories --standard-json`、`macro us new-orders --standard-json` | 财政与企业统一JSON导出：财年累计、赤字符号、利润流量、库存余额和订单口径，见 [统一导出文档](docs/macro-standard.md) |
-| `macro us bank-credit --standard-json`、`macro us lending-standards --standard-json`、`macro us debt-service --standard-json`、`macro us housing-starts --standard-json`、`macro us equipment-investment --standard-json` | 信用与投资统一JSON导出：月平均余额、调查净比例、百分比／百分点变化、折年水平和名义／实际口径，见 [统一导出文档](docs/macro-standard.md) |
-| `macro us payrolls --standard-json`、`macro us housing --standard-json`、`macro us house-price --standard-json`、`macro us trade --standard-json`、`macro us real-trade --standard-json` | 非农、住宅与贸易统一JSON导出：岗位差额、新房／成屋单位、房价指数基期、官方差额和名义／实际口径，见 [统一导出文档](docs/macro-standard.md) |
-| `macro us target-rate --standard-json` | 联邦基金目标区间统一JSON导出：实际调整事件、上下限、基点变化及生效／公布日期，见 [统一导出文档](docs/macro-standard.md) |
-| `macro us debt --standard-json`、`macro us debt-cash --standard-json`、`macro us auctions --standard-json` | 国债统一JSON导出：DTS官方明细、累计值、现金总额与计算净额，逐券拍卖事件及面值分配，见 [统一导出文档](docs/macro-standard.md) |
-| `macro cn pmi --standard-json`、`macro cn nonmanufacturing-pmi --standard-json`、`macro cn industrial --standard-json`、`macro cn unemployment --standard-json` | 中国PMI、工业和失业率统一JSON导出：季调扩散指数、单月／累计／环比增速和年龄分组口径版本，见 [统一导出文档](docs/macro-standard.md) |
-| `macro cn gdp --standard-json`、`macro cn household --standard-json`、`macro cn investment --standard-json`、`macro cn enterprise --standard-json` | 中国GDP、居民收支、投资和工业企业统一JSON导出：不变价金额与官方指数、累计范围、基建统计范围和调查范围断点，见 [统一导出文档](docs/macro-standard.md) |
-| `macro cn financing --standard-json`、`macro cn loans --standard-json`、`macro cn deposits --standard-json` | 中国社融、贷款和住户存款统一JSON导出：存量与流量、官方与近似新增、计算累计和计算同比，见 [统一导出文档](docs/macro-standard.md) |
-| `macro cn fiscal --standard-json`、`macro cn trade --standard-json`、`macro cn services-trade --standard-json` | 中国财政和贸易统一JSON导出：累计范围、另列同比、双币种和主要伙伴，见 [统一导出文档](docs/macro-standard.md) |
-| `macro cn cpi --standard-json`、`macro cn core-cpi --standard-json`、`macro cn ppi --standard-json` | 中国价格统一JSON导出：官方相对指数和计算涨跌幅分开，保留缺口与历史目录来源，见 [统一导出文档](docs/macro-standard.md) |
-| `macro cn lpr --standard-json`、`macro cn reverse-repo --standard-json`、`macro cn reverse-repo-history --standard-json`、`macro cn rrr --standard-json`、`macro cn treasury --standard-json` | 中国利率统一JSON导出：LPR报价与相邻月变化、逆回购调整事件和中标历史、准备金率幅度与机构范围、全部期限国债收益率，见 [统一导出文档](docs/macro-standard.md) |
-| `macro us trade`、`macro us real-trade`        | 月度名义贸易与季度实际贸易，出口、进口及官方差额；支持商品/服务分项，见 [美国进出口文档](docs/us-trade.md) |
-| `macro us housing-starts`、`macro us equipment-investment` | 住宅开工、建筑许可及季度设备投资，分别保留频率、单位和季调折年口径，见 [美国投资文档](docs/us-investment.md) |
-| `macro us bank-credit`、`macro us lending-standards`、`macro us debt-service` | 月平均银行信贷、季度贷款标准及家庭偿债负担，区分百分比和百分点变化，见 [美国信用文档](docs/us-credit.md) |
-| `macro us fiscal` | 联邦月度收入、支出、官方盈余/赤字及计算财年累计，见 [美国财政文档](docs/us-fiscal.md) |
-| `macro us debt` | 财政部每日可流通／非流通国债记账发行、赎回及计算净额，保留调整与累计值，见 [美国国债交易文档](docs/us-debt.md) |
-| `macro us debt-cash` | 国债官方现金发行、现金赎回、计算净现金流及IIIB调整溯源，见 [债务现金流文档](docs/us-debt-cash.md) |
-| `macro us auctions` | 国债逐券发行日期、拍卖面值与分配、SOMA及再发行事件，见 [美国拍卖文档](docs/us-auctions.md) |
-| `macro us corporate-profits`、`macro us business-inventories`、`macro us new-orders` | 企业税前利润、商业库存及制造业新订单，分开保留季度流量、月末余额和月度流量，见 [美国企业文档](docs/us-enterprise.md) |
-| `macro us housing`、`macro us house-price`     | 新房与成屋销售、FHFA季度房价指数，保留各自历史覆盖和统计口径，见 [美国房地产文档](docs/us-housing.md) |
-| `strategy ma / macd / rsi / boll`             | 技术指标与信号，`--backtest` 回测        |
-| `valuation`                                   | 估值指标与 DCF 分析                      |
-| `upgrade`、`--version`                        | CLI 升级与版本信息                       |
+| 命令                                                                                                                                                                                                                      | 用途                                                                                                                                                          |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `search`                                                                                                                                                                                                                  | 按代码、名称或拼音搜索证券                                                                                                                                    |
+| `quote`、`quote-history`                                                                                                                                                                                                  | 单只／多只证券实时行情、历史行情                                                                                                                              |
+| `kline`                                                                                                                                                                                                                   | 终端蜡烛图，支持 MA、布林带叠加                                                                                                                               |
+| `info`                                                                                                                                                                                                                    | 公司资料、核心指标与分红                                                                                                                                      |
+| `watch`、`watch add`、`watch remove`                                                                                                                                                                                      | 自选行情总览及增删                                                                                                                                            |
+| `financials`                                                                                                                                                                                                              | 三类财务报表查询及 CSV／JSON 导出                                                                                                                             |
+| `annual-report`                                                                                                                                                                                                           | 按单年或年份范围下载年报 PDF                                                                                                                                  |
+| `announcements`、`insider`                                                                                                                                                                                                | 公司公告、增减持公告                                                                                                                                          |
+| `filings`                                                                                                                                                                                                                 | 美股 SEC 申报（10-K、10-Q、8-K 等）                                                                                                                           |
+| `config`                                                                                                                                                                                                                  | CLI 与 Desktop 共用的配置，如 SEC 联系邮箱                                                                                                                    |
+| `ipo list / calendar / prospectus / download`                                                                                                                                                                             | 新股列表、IPO 公告日历、招股书查询与下载                                                                                                                      |
+| `metal`                                                                                                                                                                                                                   | 黄金、白银日行情，`--inst` 选品种、`-b/-e` 查区间                                                                                                             |
+| `commodity`                                                                                                                                                                                                               | 大宗商品期货行情，`--inst` 加 `-b/-e` 查日行情                                                                                                                |
+| `fx quote`、`fx history`                                                                                                                                                                                                  | 在岸／离岸人民币、美元及港币参考行情、来源独立的新浪／FRED 日线，见 [汇率文档](docs/forex.md)                                                                 |
+| `fx fixing`、`fx reference`                                                                                                                                                                                               | 人民币中间价、在岸固定时点参考汇率，保留各自价格和时间口径                                                                                                    |
+| `fx cross`、`fx spread`                                                                                                                                                                                                   | 按同源同口径计算交叉汇率、在岸／离岸报价价差，保留公式、输入及时间对齐状态                                                                                    |
+| `bond`、`bond-history`                                                                                                                                                                                                    | 美债收益率与历史                                                                                                                                              |
+| `macro us treasury`                                                                                                                                                                                                       | 美债收益率全部期限，支持 `--standard-json`，见 [美债文档](docs/bond.md#macro-us-treasury)                                                                     |
+| `macro cn cpi`、`macro cn core-cpi`、`macro cn ppi`                                                                                                                                                                       | 国家统计局月度价格指数，见 [NBS 文档](docs/nbs.md)                                                                                                            |
+| `macro cn pmi`                                                                                                                                                                                                            | 国家统计局制造业 PMI 及生产、订单、出口订单、就业分项                                                                                                         |
+| `macro cn nonmanufacturing-pmi` / `macro cn npmi`                                                                                                                                                                         | 非制造业、服务业、建筑业商务活动指数；`--details` 展示九个全国分项                                                                                            |
+| `macro cn industrial` / `macro cn ip`                                                                                                                                                                                     | 规模以上工业增加值单月同比、累计同比及可检索的季调环比                                                                                                        |
+| `macro cn retail`                                                                                                                                                                                                         | 社会消费品零售总额当月金额、同比、累计金额及累计同比                                                                                                          |
+| `macro cn investment`                                                                                                                                                                                                     | 固定资产投资总量及制造业、基建、房地产分项的累计口径，见 [投资文档](docs/cn-investment.md)                                                                    |
+| `macro cn property`                                                                                                                                                                                                       | 新建商品房销售面积、销售额及房屋新开工面积，见 [房地产文档](docs/cn-property.md)                                                                              |
+| `macro cn enterprise`                                                                                                                                                                                                     | 规模以上工业企业利润、总存货/产成品存货及应收账款，区分累计流量与期末余额，见 [工业企业文档](docs/cn-enterprise.md)                                           |
+| `macro cn household`                                                                                                                                                                                                      | 全国居民人均累计收入、消费支出及官方实际同比，见 [居民收支文档](docs/cn-household.md)                                                                         |
+| `macro cn deposits`                                                                                                                                                                                                       | 住户人民币存款余额、严格基期计算同比和报告新增额，见 [居民存款文档](docs/cn-deposits.md)                                                                      |
+| `macro cn fiscal`                                                                                                                                                                                                         | 全国一般公共预算、政府性基金累计收支及官方同比，见 [中国财政文档](docs/cn-fiscal.md)                                                                          |
+| `macro cn trade`                                                                                                                                                                                                          | 海关货物进出口人民币/美元月度总量；支持 `--partners-currency cny` 查询人民币伙伴月值及累计值，见 [货物贸易文档](docs/cn-trade.md)                             |
+| `macro cn services-trade`                                                                                                                                                                                                 | 服务贸易人民币/美元月度进出口与官方差额，保留历史缺口，见 [服务贸易文档](docs/cn-services-trade.md)                                                           |
+| `macro cn unemployment`                                                                                                                                                                                                   | 全国城镇调查失业率；`--age-groups` 展示年龄分组并标记口径变化                                                                                                 |
+| `macro cn financing` / `macro cn afre`                                                                                                                                                                                    | 人民银行社融存量、同比、月度/累计增量；`--details` 展示融资结构，见 [PBC 文档](docs/pbc.md)                                                                   |
+| `macro cn loans`                                                                                                                                                                                                          | 金融机构人民币贷款余额、同比和新增；`--details` 展示住户／企事业单位期限结构，近似计算值带 `≈`                                                                |
+| `macro cn money`                                                                                                                                                                                                          | 人民银行 M1、M2 余额及同比；标注 2025 年 M1 口径修订                                                                                                          |
+| `macro cn reverse-repo`                                                                                                                                                                                                   | 七天逆回购政策利率调整公告，含公布/生效日期及前后值；覆盖自 2024-07-22 起                                                                                     |
+| `macro cn reverse-repo-history`                                                                                                                                                                                           | 固定利率机制切换前七天逆回购逐笔中标利率，2015-01-22 至 2024-07-19；与政策调整事件序列分开                                                                    |
+| `macro cn lpr`                                                                                                                                                                                                            | 1 年期、5 年期以上 LPR 月度报价、实际报价日、公布时间及基点变化；覆盖自 2019-08 起                                                                            |
+| `macro cn rrr`                                                                                                                                                                                                            | 人民币存款准备金率调整，内置 2018 年起可逐条核验历史并增量检查新公告；区分全面/定向及分批生效                                                                 |
+| `macro cn treasury`                                                                                                                                                                                                       | 中债国债到期收益率曲线，含 3 个月、6 个月及 1、2、5、10 年期；直接查询指定日期范围，见 [中债文档](docs/chinabond.md)                                          |
+| `macro cn gdp`                                                                                                                                                                                                            | 国家统计局季度实际 GDP 同比、累计同比、季调环比及分段基期的不变价金额，见 [NBS 文档](docs/nbs.md#实际-gdp)                                                    |
+| `macro us cpi`、`macro us core-cpi`                                                                                                                                                                                       | BLS 美国 CPI/核心 CPI 季调与非季调指数、非季调同比及季调环比；保留缺口与脚注，见 [BLS 文档](docs/bls.md)                                                      |
+| `macro us pce`、`macro us core-pce`                                                                                                                                                                                       | BEA 经 FRED 转接的 PCE/核心 PCE 季调链式价格指数、同比与月环比；区别于消费支出金额和实际消费量，见 [FRED 文档](docs/fred.md)                                  |
+| `macro us payrolls`                                                                                                                                                                                                       | BLS 季调非农工资岗位总数、月度变化及本机观测版本，见 [BLS 文档](docs/bls.md)                                                                                  |
+| `macro us earnings`、`macro us weekly-hours`                                                                                                                                                                              | BLS 私人非农全部雇员季调平均时薪、平均每周工时、月度变化和同比；保留基期与脚注，见 [BLS 文档](docs/bls.md#平均时薪与每周工时)                                 |
+| `macro us unemployment`、`macro us participation`                                                                                                                                                                         | BLS CPS 季调失业率、劳动参与率及百分点变化；保留缺口和修订脚注，见 [BLS 文档](docs/bls.md#失业率与劳动参与率)                                                 |
+| `macro us initial-claims`、`macro us continued-claims`                                                                                                                                                                    | 劳工部 ETA 经 FRED 转接的季调初请/续请数量、周变化及四周计算均值；按各自周六所属周对齐，见 [FRED 文档](docs/fred.md#初请与续请失业金)                         |
+| `macro us real-pce`                                                                                                                                                                                                       | BEA 经 FRED 转接的实际消费总量、商品及服务分项；保留季调折年水平与未年化增速，见 [FRED 文档](docs/fred.md#实际个人消费支出)                                   |
+| `macro us real-income`                                                                                                                                                                                                    | BEA 经 FRED 转接的实际可支配个人收入总量、同比与月环比；保留 2017 年链式美元季调折年水平，见 [实际收入文档](docs/real-income.md)                              |
+| `macro us industrial-production`、`macro us capacity-utilization`                                                                                                                                                         | 美联储经 FRED 转接的工业生产指数与产能利用率；`--sector total\|manufacturing` 选择总量或 NAICS 制造业，见 [工业生产文档](docs/us-production.md)               |
+| `macro us effr`                                                                                                                                                                                                           | 纽约联储有效联邦基金利率、所属日期及前一可用观测值的基点变化，见 [纽约联储文档](docs/nyfed.md)                                                                |
+| `macro us target-rate`                                                                                                                                                                                                    | 联邦基金目标利率区间及调整历史；区分政策公布与生效信息，见 [美联储政策利率文档](docs/federalreserve.md)                                                       |
+| `macro us gdp`                                                                                                                                                                                                            | 美国实际 GDP 季度水平、同比及环比年化增速；`--vintages` 查询 BEA 官方初值与修订增速档案，见 [美国 GDP 文档](docs/us-gdp.md)                                   |
+| `macro us money`、`macro us m2`                                                                                                                                                                                           | 美国 M2 月度季调余额、同比与月环比，见 [美国货币供应文档](docs/us-money.md)                                                                                   |
+| `macro cn money --standard-json`、`macro us money --standard-json`                                                                                                                                                        | 货币指标统一 JSON 导出：统计口径、来源、缺失状态和原 provider 结果，见 [统一导出文档](docs/macro-standard.md)                                                 |
+| `macro cn retail --standard-json`、`macro cn property --standard-json`                                                                                                                                                    | 社零、房地产统一 JSON 导出：单月／累计所属期、官方同比、历史范围及来源序列，见 [统一导出文档](docs/macro-standard.md)                                         |
+| `macro us gdp --standard-json`、`macro us effr --standard-json`                                                                                                                                                           | 季度 GDP、日度 EFFR 统一 JSON 导出：折年口径、严格基期、交易日和方法边界，见 [统一导出文档](docs/macro-standard.md)                                           |
+| `macro us cpi --standard-json`、`macro us core-cpi --standard-json`                                                                                                                                                       | CPI 指数与增速统一 JSON 导出：季调状态、指数基期及严格计算基期，见 [统一导出文档](docs/macro-standard.md)                                                     |
+| `macro us initial-claims --standard-json`、`macro us continued-claims --standard-json`                                                                                                                                    | 周度申领统一 JSON 导出：所属周、前周变化、四周均值和输入窗口，见 [统一导出文档](docs/macro-standard.md)                                                       |
+| `macro us pce --standard-json`、`macro us core-pce --standard-json`、`macro us real-pce --standard-json`                                                                                                                  | PCE 价格与实际消费统一 JSON 导出：指数／金额、折年口径和分项不可加性，见 [统一导出文档](docs/macro-standard.md)                                               |
+| `macro us real-income --standard-json`、`macro us industrial-production --standard-json`、`macro us capacity-utilization --standard-json`                                                                                 | 实际收入与工业统一 JSON 导出：总体范围、折年口径和百分比／百分点变化，见 [统一导出文档](docs/macro-standard.md)                                               |
+| `macro us unemployment --standard-json`、`macro us participation --standard-json`、`macro us earnings --standard-json`、`macro us weekly-hours --standard-json`                                                           | 劳动力比率、时薪工时统一 JSON 导出：CPS／CES 范围、分子分母、变化单位与初步标记，见 [统一导出文档](docs/macro-standard.md)                                    |
+| `macro us fiscal --standard-json`、`macro us corporate-profits --standard-json`、`macro us business-inventories --standard-json`、`macro us new-orders --standard-json`                                                   | 财政与企业统一 JSON 导出：财年累计、赤字符号、利润流量、库存余额和订单口径，见 [统一导出文档](docs/macro-standard.md)                                         |
+| `macro us bank-credit --standard-json`、`macro us lending-standards --standard-json`、`macro us debt-service --standard-json`、`macro us housing-starts --standard-json`、`macro us equipment-investment --standard-json` | 信用与投资统一 JSON 导出：月平均余额、调查净比例、百分比／百分点变化、折年水平和名义／实际口径，见 [统一导出文档](docs/macro-standard.md)                     |
+| `macro us payrolls --standard-json`、`macro us housing --standard-json`、`macro us house-price --standard-json`、`macro us trade --standard-json`、`macro us real-trade --standard-json`                                  | 非农、住宅与贸易统一 JSON 导出：岗位差额、新房／成屋单位、房价指数基期、官方差额和名义／实际口径，见 [统一导出文档](docs/macro-standard.md)                   |
+| `macro us target-rate --standard-json`                                                                                                                                                                                    | 联邦基金目标区间统一 JSON 导出：实际调整事件、上下限、基点变化及生效／公布日期，见 [统一导出文档](docs/macro-standard.md)                                     |
+| `macro us debt --standard-json`、`macro us debt-cash --standard-json`、`macro us auctions --standard-json`                                                                                                                | 国债统一 JSON 导出：DTS 官方明细、累计值、现金总额与计算净额，逐券拍卖事件及面值分配，见 [统一导出文档](docs/macro-standard.md)                               |
+| `macro cn pmi --standard-json`、`macro cn nonmanufacturing-pmi --standard-json`、`macro cn industrial --standard-json`、`macro cn unemployment --standard-json`                                                           | 中国 PMI、工业和失业率统一 JSON 导出：季调扩散指数、单月／累计／环比增速和年龄分组口径版本，见 [统一导出文档](docs/macro-standard.md)                         |
+| `macro cn gdp --standard-json`、`macro cn household --standard-json`、`macro cn investment --standard-json`、`macro cn enterprise --standard-json`                                                                        | 中国 GDP、居民收支、投资和工业企业统一 JSON 导出：不变价金额与官方指数、累计范围、基建统计范围和调查范围断点，见 [统一导出文档](docs/macro-standard.md)       |
+| `macro cn financing --standard-json`、`macro cn loans --standard-json`、`macro cn deposits --standard-json`                                                                                                               | 中国社融、贷款和住户存款统一 JSON 导出：存量与流量、官方与近似新增、计算累计和计算同比，见 [统一导出文档](docs/macro-standard.md)                             |
+| `macro cn fiscal --standard-json`、`macro cn trade --standard-json`、`macro cn services-trade --standard-json`                                                                                                            | 中国财政和贸易统一 JSON 导出：累计范围、另列同比、双币种和主要伙伴，见 [统一导出文档](docs/macro-standard.md)                                                 |
+| `macro cn cpi --standard-json`、`macro cn core-cpi --standard-json`、`macro cn ppi --standard-json`                                                                                                                       | 中国价格统一 JSON 导出：官方相对指数和计算涨跌幅分开，保留缺口与历史目录来源，见 [统一导出文档](docs/macro-standard.md)                                       |
+| `macro cn lpr --standard-json`、`macro cn reverse-repo --standard-json`、`macro cn reverse-repo-history --standard-json`、`macro cn rrr --standard-json`、`macro cn treasury --standard-json`                             | 中国利率统一 JSON 导出：LPR 报价与相邻月变化、逆回购调整事件和中标历史、准备金率幅度与机构范围、全部期限国债收益率，见 [统一导出文档](docs/macro-standard.md) |
+| `macro us trade`、`macro us real-trade`                                                                                                                                                                                   | 月度名义贸易与季度实际贸易，出口、进口及官方差额；支持商品/服务分项，见 [美国进出口文档](docs/us-trade.md)                                                    |
+| `macro us housing-starts`、`macro us equipment-investment`                                                                                                                                                                | 住宅开工、建筑许可及季度设备投资，分别保留频率、单位和季调折年口径，见 [美国投资文档](docs/us-investment.md)                                                  |
+| `macro us bank-credit`、`macro us lending-standards`、`macro us debt-service`                                                                                                                                             | 月平均银行信贷、季度贷款标准及家庭偿债负担，区分百分比和百分点变化，见 [美国信用文档](docs/us-credit.md)                                                      |
+| `macro us fiscal`                                                                                                                                                                                                         | 联邦月度收入、支出、官方盈余/赤字及计算财年累计，见 [美国财政文档](docs/us-fiscal.md)                                                                         |
+| `macro us debt`                                                                                                                                                                                                           | 财政部每日可流通／非流通国债记账发行、赎回及计算净额，保留调整与累计值，见 [美国国债交易文档](docs/us-debt.md)                                                |
+| `macro us debt-cash`                                                                                                                                                                                                      | 国债官方现金发行、现金赎回、计算净现金流及 IIIB 调整溯源，见 [债务现金流文档](docs/us-debt-cash.md)                                                           |
+| `macro us auctions`                                                                                                                                                                                                       | 国债逐券发行日期、拍卖面值与分配、SOMA 及再发行事件，见 [美国拍卖文档](docs/us-auctions.md)                                                                   |
+| `macro us corporate-profits`、`macro us business-inventories`、`macro us new-orders`                                                                                                                                      | 企业税前利润、商业库存及制造业新订单，分开保留季度流量、月末余额和月度流量，见 [美国企业文档](docs/us-enterprise.md)                                          |
+| `macro us housing`、`macro us house-price`                                                                                                                                                                                | 新房与成屋销售、FHFA 季度房价指数，保留各自历史覆盖和统计口径，见 [美国房地产文档](docs/us-housing.md)                                                        |
+| `strategy ma / macd / rsi / boll`                                                                                                                                                                                         | 技术指标与信号，`--backtest` 回测                                                                                                                             |
+| `valuation`                                                                                                                                                                                                               | 估值指标与 DCF 分析                                                                                                                                           |
+| `upgrade`、`--version`                                                                                                                                                                                                    | CLI 升级与版本信息                                                                                                                                            |
 
-只读数据命令都支持 `--json`，K 线和技术分析支持 `--freq day|week|month`，约定见[命令对照文档](docs/commands.md#脚本调用)。
+只读数据命令都支持 `--json`，K 线和技术分析支持 `--freq day|week|month`，约定见 [命令对照文档](docs/commands.md#脚本调用)。
 
 使用 `sec <命令> --help` 查看参数，IPO 等子命令使用 `sec ipo <子命令> --help`。
 
@@ -397,18 +397,6 @@ go build -o sec-desktop ./desktop
 ### TODO：Desktop 功能补齐
 
 已覆盖证券搜索、公司核心指标与分红、自选行情总览与多证券对比、基础行情与蜡烛图（含日期范围、快捷区间、复权选择及 MA、布林带叠加）、三类财报及 CSV/JSON 导出、定期报告（年报／半年报／一季报／三季报）年度范围查询与单份／多选 PDF 下载（含任务进度）、公告查询（含年报／中报／一季报／三季报类别筛选）、增减持公告、技术分析（双均线、MACD、RSI、布林带及信号明细）、估值（PE、PB、PS 历史分位，PEG、ROE、格雷厄姆数及 DCF）、IPO 新股上市日期范围筛选与发行公告日期视图、招股说明书及相关 PDF 查询与单份／多选下载、中美宏观指标（`sec macro` 全部指标）、汇率（`sec fx` 全部命令）、贵金属行情（Au99.99、Ag99.99）、大宗商品行情与日 K 线、美债收益率及设置页版本详情与更新入口。目前 CLI 的数据命令都已有对应的 Desktop 页面。
-
-### TODO：Desktop 构建警告
-
-- [ ] 升级或修补 `github.com/webview/webview_go` 依赖，消除新版 Clang 的 `-Wdeprecated-literal-operator` 警告：将 `operator"" _cls`、`operator"" _sel`、`operator"" _str` 改为后缀紧邻引号的写法（如 `operator""_cls`）。通过依赖升级或仓库内维护补丁处理，不直接修改 Go 模块缓存。
-
-当前这三条警告来自 WebView 的 C++ 代码，不代表构建失败；未将警告视为错误时，可正常生成二进制。临时隐藏该类警告，可在 `desktop` 目录执行：
-
-```shell
-CGO_CXXFLAGS="-O2 -g -Wno-deprecated-literal-operator" go build -o sec-desktop
-```
-
-该参数仅隐藏警告，不替代依赖修复。详见 [Clang 诊断说明](https://clang.llvm.org/docs/DiagnosticsReference.html#wdeprecated-literal-operator)。
 
 ## 致谢
 
