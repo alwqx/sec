@@ -23,6 +23,8 @@ func TestWorkspacePersistsAcrossServers(t *testing.T) {
 	state := defaultWorkspace()
 	state.Settings.RefreshSeconds = 30
 	state.Settings.Theme = "light"
+	// 左侧菜单的隐藏状态存在工作区里，换端口重启后仍然保留（localStorage 做不到）。
+	state.Settings.SidebarHidden = true
 	state.Watchlist = []sina.BasicSecurity{{Name: "招商银行", Code: "600036", ExCode: "SH600036", ExChange: "sse", SecurityType: types.SecurityTypeStock}}
 	data, err := json.Marshal(state)
 	require.NoError(t, err)
@@ -126,4 +128,13 @@ func TestWorkspaceMissingAndCorruptFiles(t *testing.T) {
 	data, err := os.ReadFile(path)
 	require.NoError(t, err)
 	require.Equal(t, "broken", string(data))
+}
+
+// 旧的工作区文件没有 sidebar_hidden，读出来按展开处理。
+func TestWorkspaceWithoutSidebarSetting(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "workspace.json")
+	require.NoError(t, os.WriteFile(path, []byte(`{"watchlist":[],"settings":{"refresh_seconds":5,"theme":"dark"}}`), 0600))
+	state, err := (&workspaceStore{path: path}).load()
+	require.NoError(t, err)
+	require.False(t, state.Settings.SidebarHidden)
 }
