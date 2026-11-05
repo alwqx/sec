@@ -62,12 +62,12 @@
 
 数据优先使用 SEC EDGAR 官方接口，见 [命令文档](docs/commands.md) 和 [估值文档](docs/valuation.md)。
 
+- [ ] Desktop 美股财报接口：公司没有 XBRL 财务数据（`edgar.ErrNoXBRL`）时返回 502，前端显示"获取失败"和无效的重试按钮；分红接口已改为 404，财报接口也应该一样处理。
 - [ ] （暂缓）外国公司估值，包括 IFRS 公司（台积电、诺和诺德、SAP）和以外币列报的 US GAAP 公司（阿里巴巴、ASML）。评估结论是投入大、结果难保证准确，重心先放在美国本土上市公司的估值；目前外国公司估值报"暂不支持"（`valuation.ErrForeign`）。现有做法用 ADS 价格乘 SEC 封面的普通股数，ADS 比例不是 1 时市值出错（网易 1 ADS = 5 股，估出 3871 亿美元，新浪是 774 亿；阿里巴巴封面股数疑似少一位）。调研记录：
   - 汇率：美联储 FRED 的 H.10 日度汇率覆盖所需币种（`DEXTAUS`、`DEXJPUS`、`DEXCHUS`、`DEXDNUS`、`DEXUSEU`、`DEXBZUS`、`DEXUSUK`、`DEXSDUS`、`DEXINUS` 等，多数从 1970—80 年代开始），每周更新、滞后几天，仓库已有 `provider/fred` 客户端。欧洲央行没有台币。口径上宜按当天汇率把市值折成列报币种，再和原币财报比较，不用美元便利折算数。
   - ADS 比例没有统一来源：companyfacts 的 `dei:EntityListingDepositoryReceiptRatio` 多数公司按类别标注，读不到（7 家里只有阿里巴巴有）；20-F 封面第 12(b) 条的证券名称有时写明（"each representing eight Ordinary Shares"），丰田、台积电没有；台积电要用 XBRL 实例里按 ADS 维度的每股收益反推；新浪的 ADS 折算股数可以反解当前比例，但只有当前值，且受库存股影响（丰田算出 11.07，实际为 10）。比例会随拆股变化（丰田 2021 年从 2 变为 10）。存托银行网站是 JS 页面，不适合。
   - IFRS 公司只有 20-F 年报，TTM 只能用最近财年；诺和诺德没有封面股数，要用加权股数。
 - [ ] IFRS 财报补充：丰田等转用 IFRS 之前的 US GAAP 历史不显示；汇丰等在 6-K 里有半年数据，目前只整理 20-F 年报。
-- [ ] 美股分红 Desktop：`sec info -d` 已输出按财年的分红表（`usstock.BuildDividends`，SEC XBRL），Desktop 还没有美股的「分红」栏目（股息率只在估值栏目里），可复用同一个分红表。除权除息日：新浪美股没有找到可用的分红接口，纳斯达克的接口只覆盖纳斯达克上市的股票（KO、JPM 等纽交所股票返回 N/A），暂不显示。
 
 ## 港股
 
@@ -79,7 +79,6 @@
 
 ## Desktop
 
-- [ ] 美股栏目补齐：美股点到公司、财报、估值、技术分析、公告以外的栏目时显示"暂不支持"，随上面美股分红等条目逐项补齐。
 - [ ] 升级或修补 `github.com/webview/webview_go` 依赖，消除新版 Clang 的 `-Wdeprecated-literal-operator` 警告：将 `operator"" _cls`、`operator"" _sel`、`operator"" _str` 改为后缀紧邻引号的写法（如 `operator""_cls`）。通过依赖升级或仓库内维护补丁处理，不直接修改 Go 模块缓存。
   - 当前这三条警告来自 WebView 的 C++ 代码，不代表构建失败；未将警告视为错误时，可正常生成二进制。临时隐藏该类警告，可在 `desktop` 目录执行：
   ```shell
@@ -90,7 +89,7 @@
 
 ## 工程
 
-- [ ] 更新 README：截图已过时，Desktop 功能列表需要补上美股公司、财报、估值和 SEC 申报。
+- [ ] 更新 README：截图已过时，Desktop 功能列表需要补上美股公司、财报、分红、估值和 SEC 申报。
 
 ## 调研
 

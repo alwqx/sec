@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { money } from './format.ts'
+import { money, yi } from './format.ts'
 
 test('money 缺失值显示破折号，0 是真实值', () => {
   assert.equal(money(null), '—')
@@ -17,4 +17,11 @@ test('money 按数量级选择单位', () => {
 
 test('money 亏损按绝对值选择单位', () => {
   assert.equal(money(-2.5e8), '-2.50 亿元')
+})
+
+test('yi 固定按亿显示，缺失值显示破折号', () => {
+  assert.equal(yi(null), '—')
+  assert.equal(yi(13210000000), '132.10')
+  assert.equal(yi(132175000000), '1,321.75')
+  assert.equal(yi(-22759000000), '-227.59')
 })

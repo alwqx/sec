@@ -12,6 +12,9 @@ import (
 
 const companyFactsURL = "https://data.sec.gov/api/xbrl/companyfacts/"
 
+// ErrNoXBRL 表示 SEC 的 companyfacts 里没有这家公司的 US GAAP 或 IFRS 财务数据，比如只有封面信息的公司。
+var ErrNoXBRL = errors.New("SEC 没有这家公司的 XBRL 财务数据")
+
 // Standard 是财报的会计准则。
 type Standard string
 
@@ -357,7 +360,7 @@ func parseFacts(cik int, body []byte) (*Facts, error) {
 	// 最近的报告期按 IFRS 申报时用 IFRS（比如 2021 年转用 IFRS 的丰田），不回退到更早的 US GAAP 数据。
 	gaap, ifrs := raw.Facts["us-gaap"], raw.Facts["ifrs-full"]
 	if len(gaap) == 0 && len(ifrs) == 0 {
-		return nil, errors.New("SEC 没有这家公司的 XBRL 财务数据")
+		return nil, ErrNoXBRL
 	}
 	gaapFiling, ifrsFiling := latestAnnualFiling(gaap, USGAAP), latestAnnualFiling(ifrs, IFRS)
 	standard, data, filing := USGAAP, gaap, gaapFiling

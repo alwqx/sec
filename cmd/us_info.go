@@ -47,11 +47,7 @@ func usInfoHandler(cmd *cobra.Command, exCode string, asJSON, dividend bool) err
 	var dividendsErr error
 	// SEC 没有这个代码（基金、场外交易股票）时也没有分红数据，只输出行情。
 	if dividend && !errors.Is(profileErr, edgar.ErrNotFound) {
-		current := 0.0
-		if info.Quote != nil && info.Quote.Shares != nil {
-			current = *info.Quote.Shares
-		}
-		dividends, dividendsErr = usstock.LoadDividends(cmd.Context(), client, exCode, current)
+		dividends, dividendsErr = usstock.LoadDividends(cmd.Context(), client, exCode, info.Quote, nil)
 	}
 	if asJSON {
 		if dividendsErr != nil {

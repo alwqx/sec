@@ -188,3 +188,72 @@ func TestUSValuationErrors(t *testing.T) {
 	require.Equal(t, http.StatusUnprocessableEntity, rr.Code, rr.Body.String())
 	require.Contains(t, rr.Body.String(), "IFRS")
 }
+
+// 美股分红表和 CLI 的 sec info -d 相同；日线读不到时不按拆股调整并标明；SEC 没有的代码返回 404。
+func TestUSDividends(t *testing.T) {
+	defer gock.Off()
+	srv := usServer(t)
+	gock.New("https://www.sec.gov").Get("/files/company_tickers.json").Reply(200).BodyString(usTickers)
+	gock.New("https://data.sec.gov").Get("/api/xbrl/companyfacts/CIK0000320193.json").Reply(200).BodyString(`{"entityName":"Apple Inc.","facts":{"us-gaap":{
+"CommonStockDividendsPerShareDeclared":{"units":{"USD/shares":[{"start":"2024-09-29","end":"2025-09-27","val":1.02,"form":"10-K","filed":"2025-10-31"}]}},
+"PaymentsOfDividends":{"units":{"USD":[{"start":"2024-09-29","end":"2025-09-27","val":15421000000,"form":"10-K","filed":"2025-10-31"}]}}}}}`)
+	gock.New("https://stock.finance.sina.com.cn").Get("/usstock/api/jsonp.php/var.t=/US_MinKService.getDailyK").Reply(502)
+	gock.New("https://hq.sinajs.cn").Get("/list=gb_aapl").Reply(502)
+	rr := usRequest(t, srv, "/api/v1/us/dividends?code=$AAPL")
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	var body struct {
+		Name            string `json:"name"`
+		SplitsUnchecked bool   `json:"splits_unchecked"`
+		Years           []struct {
+			FiscalYear int      `json:"fiscal_year"`
+			PerShare   *float64 `json:"per_share"`
+			Paid       *float64 `json:"paid"`
+		} `json:"years"`
+	}
+	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body))
+	require.Equal(t, "Apple Inc.", body.Name)
+	require.True(t, body.SplitsUnchecked)
+	require.Len(t, body.Years, 1)
+	require.Equal(t, 2025, body.Years[0].FiscalYear)
+	require.Equal(t, 1.02, *body.Years[0].PerShare)
+	require.Equal(t, 15421000000.0, *body.Years[0].Paid)
+
+	require.Equal(t, http.StatusBadRequest, usRequest(t, srv, "/api/v1/us/dividends?code=SH600036").Code)
+	require.Equal(t, http.StatusNotFound, usRequest(t, srv, "/api/v1/us/dividends?code=$ZZZZ").Code)
+
+	// 没有 XBRL 财务数据的公司也是 404，不是上游失败。
+	gock.New("https://data.sec.gov").Get("/api/xbrl/companyfacts/CIK0001046179.json").Reply(200).BodyString(`{"facts":{}}`)
+	gock.New("https://stock.finance.sina.com.cn").Get("/usstock/api/jsonp.php/var.t=/US_MinKService.getDailyK").Reply(502)
+	gock.New("https://hq.sinajs.cn").Get("/list=gb_tsm").Reply(502)
+	require.Equal(t, http.StatusNotFound, usRequest(t, srv, "/api/v1/us/dividends?code=$TSM").Code)
+}
+
+// 拆股之后还没有申报时，用新浪的当前股数核对日线跳变：拆股前年报的每股股息按 1 拆 4 调整。
+func TestUSDividendsSplitWithCurrentShares(t *testing.T) {
+	defer gock.Off()
+	srv := usServer(t)
+	gock.New("https://www.sec.gov").Get("/files/company_tickers.json").Reply(200).BodyString(usTickers)
+	gock.New("https://data.sec.gov").Get("/api/xbrl/companyfacts/CIK0000320193.json").Reply(200).BodyString(`{"entityName":"Apple Inc.","facts":{"us-gaap":{
+"CommonStockDividendsPerShareDeclared":{"units":{"USD/shares":[{"start":"2024-09-29","end":"2025-09-27","val":4.00,"form":"10-K","filed":"2025-10-31"}]}}},
+"dei":{"EntityCommonStockSharesOutstanding":{"units":{"shares":[{"end":"2025-10-17","val":1000,"form":"10-K","filed":"2025-10-31"}]}}}}}`)
+	gock.New("https://stock.finance.sina.com.cn").Get("/usstock/api/jsonp.php/var.t=/US_MinKService.getDailyK").
+		Reply(200).BodyString(`var t=([{"d":"2026-03-02","o":"400","h":"400","l":"400","c":"400","v":"1"},{"d":"2026-03-03","o":"100","h":"100","l":"100","c":"100","v":"1"}]);`)
+	gock.New("https://hq.sinajs.cn").Get("/list=gb_aapl").
+		Reply(200).BodyString(`var hq_str_gb_aapl="苹果,100.0000,-1.90,2026-11-04 09:14:47,-6.4200,325.5800,334.5000,325.3300,351.7300,242.8900,63160026,45152763,400000,8.30,39.990000,0.00,0.00,0.00,0.00,4000,63,329.800";`)
+	rr := usRequest(t, srv, "/api/v1/us/dividends?code=$AAPL")
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	var body struct {
+		Splits []struct {
+			Date   string  `json:"date"`
+			Factor float64 `json:"factor"`
+		} `json:"splits"`
+		Years []struct {
+			PerShare *float64 `json:"per_share"`
+		} `json:"years"`
+	}
+	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &body))
+	require.Len(t, body.Splits, 1)
+	require.Equal(t, "2026-03-03", body.Splits[0].Date)
+	require.Equal(t, 4.0, body.Splits[0].Factor)
+	require.Equal(t, 1.0, *body.Years[0].PerShare)
+}
