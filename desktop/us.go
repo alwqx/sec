@@ -152,10 +152,6 @@ func (s *desktopServer) handleUSFinancials(w http.ResponseWriter, r *http.Reques
 	if err == nil {
 		facts, err = cachedUSFacts(client)(ctx, company.CIK)
 	}
-	if errors.Is(err, edgar.ErrIFRS) {
-		writeError(w, http.StatusUnprocessableEntity, err.Error())
-		return
-	}
 	if err != nil {
 		if r.Context().Err() != nil {
 			return

@@ -288,7 +288,7 @@ export interface SECFilings { company: SECProfile; ticker: string; total: number
 export interface USQuote { name: string; price: number; change_rate: number; time: string; high_52w: number | null; low_52w: number | null; market_cap: number | null; eps: number | null; pe: number | null; shares: number | null }
 export interface USCompanyData { info: { ex_code: string; ticker: string; company: SECProfile | null; quote: USQuote | null }; notes: string[] }
 export interface USReport {
-  statement: string; quarterly: boolean; currency: string; currency_name: string
+  statement: string; quarterly: boolean; standard: 'US GAAP' | 'IFRS'; currency: string; currency_name: string
   lines: { key: string; label: string; unit: string }[]
   periods: { end: string; start?: string; fiscal_year: number; fiscal_period: string; values: Record<string, number | null>; derived?: string[] }[]
 }

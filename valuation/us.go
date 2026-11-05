@@ -36,6 +36,9 @@ func AnalyzeUS(ctx context.Context, client *edgar.Client, exCode string, params 
 	if loadFacts == nil {
 		loadFacts = client.CompanyFacts
 	}
+	// IFRS 公司不估值，财务数据一返回就取消其他请求，不必等日线下载完。
+	fetchCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	var (
 		facts             *edgar.Facts
 		profile           *edgar.Profile
@@ -47,25 +50,32 @@ func AnalyzeUS(ctx context.Context, client *edgar.Client, exCode string, params 
 	wg.Add(4)
 	go func() {
 		defer wg.Done()
-		facts, factsErr = loadFacts(ctx, company.CIK)
+		facts, factsErr = loadFacts(fetchCtx, company.CIK)
+		if factsErr != nil || facts.Standard == edgar.IFRS {
+			cancel()
+		}
 	}()
 	go func() {
 		defer wg.Done()
 		// 行业只用于显示和判断金融业，获取失败不影响估值。
-		profile, _ = client.Profile(ctx, company.CIK)
+		profile, _ = client.Profile(fetchCtx, company.CIK)
 	}()
 	go func() {
 		defer wg.Done()
 		// 新浪的当前股数用来核对拆股和多类股票的折算，获取失败时不核对。
-		quote, _ = sina.QueryUSQuote(ctx, exCode)
+		quote, _ = sina.QueryUSQuote(fetchCtx, exCode)
 	}()
 	go func() {
 		defer wg.Done()
-		bars, barsErr = sina.QueryUSDailyBars(ctx, exCode)
+		bars, barsErr = sina.QueryUSDailyBars(fetchCtx, exCode)
 	}()
 	wg.Wait()
 	if factsErr != nil {
 		return nil, fmt.Errorf("获取 SEC 财务数据失败: %w", factsErr)
+	}
+	// IFRS 公司的财报以外币列报，还要处理 ADR 和普通股的比例，暂不估值；年度财报可以查看。
+	if facts.Standard == edgar.IFRS {
+		return nil, fmt.Errorf("%w，美股估值暂只支持 US GAAP，可以查看这家公司的年度财报", edgar.ErrIFRS)
 	}
 	if barsErr != nil {
 		return nil, fmt.Errorf("获取美股日线失败: %w", barsErr)

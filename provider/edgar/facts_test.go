@@ -94,8 +94,9 @@ func TestBuildQuarterly(t *testing.T) {
 }
 
 func TestParseFactsErrors(t *testing.T) {
-	_, err := parseFacts(1, []byte(`{"entityName":"TSMC","facts":{"ifrs-full":{"Revenue":{"units":{}}}}}`))
-	require.ErrorIs(t, err, ErrIFRS)
+	f, err := parseFacts(1, []byte(`{"entityName":"TSMC","facts":{"ifrs-full":{"Revenue":{"units":{}}}}}`))
+	require.NoError(t, err)
+	require.Equal(t, IFRS, f.Standard, "只有 IFRS 数据")
 	_, err = parseFacts(1, []byte(`{"facts":{}}`))
 	require.ErrorContains(t, err, "没有这家公司的 XBRL")
 	_, err = parseFacts(1, []byte(`{`))
@@ -193,32 +194,48 @@ func TestParseFactsAccountingStandardChange(t *testing.T) {
 			}})
 			require.NoError(t, err)
 			facts, err := parseFacts(1, body)
+			require.NoError(t, err)
 			if tt.wantIFRS {
-				require.ErrorIs(t, err, ErrIFRS)
-				require.Nil(t, facts)
+				require.Equal(t, IFRS, facts.Standard, "不静默回退到历史 US GAAP 数据")
+				require.Equal(t, "JPY", facts.Currency)
 			} else {
-				require.NoError(t, err)
-				require.NotNil(t, facts)
+				require.Equal(t, USGAAP, facts.Standard)
 			}
 		})
 	}
 }
 
-func TestLatestReportedFactIgnoresFutureAndInvalidPeriods(t *testing.T) {
+func TestLatestAnnualFilingIgnoresFutureAndInvalidPeriods(t *testing.T) {
 	concepts := map[string]factConcept{"Revenues": {Units: map[string][]fact{"USD": {
-		{End: "2025-12-31", Filed: "2026-02-01"},
-		{End: "2028-12-31", Filed: "2026-02-01"},
-		{End: "invalid", Filed: "2026-02-01"},
+		{End: "2025-12-31", Form: "10-K", Filed: "2026-02-01"},
+		{End: "2028-12-31", Form: "10-K", Filed: "2026-02-01"},
+		{End: "invalid", Form: "10-K", Filed: "2026-02-01"},
 	}}}}
-	require.Equal(t, "2025-12-31", latestReportedFact(concepts).End)
+	filing := latestAnnualFiling(concepts, USGAAP)
+	require.Equal(t, "2025-12-31", filing.end)
+	require.Equal(t, 1, filing.total())
 }
 
 func TestAccountingStandardIgnoresGenericShareFacts(t *testing.T) {
-	_, err := parseFacts(1, []byte(`{"facts":{
-"us-gaap":{"CommonStockSharesOutstanding":{"units":{"shares":[{"end":"2026-03-31","val":100,"filed":"2026-06-01"}]}}},
-"ifrs-full":{"Revenue":{"units":{"JPY":[{"start":"2025-01-01","end":"2025-12-31","val":200,"filed":"2026-03-01"}]}}}
+	f, err := parseFacts(1, []byte(`{"facts":{
+"us-gaap":{"CommonStockSharesOutstanding":{"units":{"shares":[{"end":"2026-03-31","val":100,"form":"10-K","filed":"2026-06-01"}]}}},
+"ifrs-full":{"Revenue":{"units":{"JPY":[{"start":"2025-01-01","end":"2025-12-31","val":200,"form":"20-F","filed":"2026-03-01"}]}}}
 }}`))
-	require.ErrorIs(t, err, ErrIFRS, "较新的通用股数不能让 IFRS 报表被误判为 US GAAP")
+	require.NoError(t, err)
+	require.Equal(t, IFRS, f.Standard, "较新的通用股数不能让 IFRS 报表被误判为 US GAAP")
+}
+
+// US GAAP 公司在年报里零星标注了 ifrs-full 数值（哪怕截止日更晚），不能让报表整体切到 IFRS 而变空。
+func TestAccountingStandardIgnoresStrayIFRSFacts(t *testing.T) {
+	f, err := parseFacts(1, []byte(`{"facts":{
+"us-gaap":{
+ "Revenues":{"units":{"USD":[{"start":"2025-01-01","end":"2025-12-31","val":200,"form":"10-K","filed":"2026-02-01","accn":"a1"}]}},
+ "Assets":{"units":{"USD":[{"end":"2025-12-31","val":900,"form":"10-K","filed":"2026-02-01","accn":"a1"}]}}},
+"ifrs-full":{"Revenue":{"units":{"USD":[{"start":"2025-02-01","end":"2026-01-31","val":5,"form":"10-K","filed":"2026-02-01","accn":"a1"}]}}}
+}}`))
+	require.NoError(t, err)
+	require.Equal(t, USGAAP, f.Standard)
+	require.Equal(t, 200.0, value(t, f.Build(Income, false, 0).Periods[0], "revenue"))
 }
 
 // 首份年报之前的 10-Q：同时包含当前单季、累计值和前一年比较数，fy/fp 仍属于所在申报。
@@ -414,4 +431,61 @@ func TestReportingCurrencyMisdetection(t *testing.T) {
 			require.NotEmpty(t, f.Build(Income, false, 0).Periods, "识别出的币种有利润表数据")
 		})
 	}
+}
+
+// IFRS 公司（比如台积电）：按 ifrs-full 科目和列报币种整理年报，附带的美元便利折算不当作列报币种；
+// 没有对应 IFRS 科目的行不显示；只有 20-F 年报，不整理季度报表。
+const ifrsFacts = `{"entityName":"TSMC","facts":{"ifrs-full":{
+"Revenue":{"units":{
+ "TWD":[{"start":"2024-01-01","end":"2024-12-31","val":2894,"form":"20-F","filed":"2025-04-17","accn":"t1"},
+        {"start":"2023-01-01","end":"2023-12-31","val":2161,"form":"20-F","filed":"2025-04-17","accn":"t1"},
+        {"start":"2023-01-01","end":"2023-12-31","val":2161,"form":"20-F","filed":"2024-04-18","accn":"t0"}],
+ "USD":[{"start":"2024-01-01","end":"2024-12-31","val":88,"form":"20-F","filed":"2025-04-17","accn":"t1"}]}},
+"ProfitLossAttributableToOwnersOfParent":{"units":{"TWD":[{"start":"2024-01-01","end":"2024-12-31","val":1173,"form":"20-F","filed":"2025-04-17","accn":"t1"}]}},
+"ProfitLoss":{"units":{"TWD":[{"start":"2024-01-01","end":"2024-12-31","val":1172,"form":"20-F","filed":"2025-04-17","accn":"t1"},
+ {"start":"2023-01-01","end":"2023-12-31","val":838,"form":"20-F","filed":"2025-04-17","accn":"t1"}]}},
+"DilutedEarningsLossPerShare":{"units":{"TWD/shares":[{"start":"2024-01-01","end":"2024-12-31","val":45.25,"form":"20-F","filed":"2025-04-17","accn":"t1"}]}},
+"Assets":{"units":{"TWD":[{"end":"2024-12-31","val":6691,"form":"20-F","filed":"2025-04-17","accn":"t1"}]}},
+"CashFlowsFromUsedInOperatingActivities":{"units":{"TWD":[{"start":"2024-01-01","end":"2024-12-31","val":1826,"form":"20-F","filed":"2025-04-17","accn":"t1"}]}},
+"PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities":{"units":{"TWD":[{"start":"2024-01-01","end":"2024-12-31","val":956,"form":"20-F","filed":"2025-04-17","accn":"t1"}]}},
+"ProfitLossBeforeTax":{"units":{"TWD":[{"start":"2024-07-01","end":"2024-12-31","val":700,"form":"6-K","filed":"2025-01-16","accn":"t2"}]}}
+},"us-gaap":{"Revenues":{"units":{"USD":[{"start":"2018-01-01","end":"2018-12-31","val":1,"form":"20-F","filed":"2019-04-01","accn":"g1"}]}}}}}`
+
+func TestBuildIFRS(t *testing.T) {
+	f, err := parseFacts(1, []byte(ifrsFacts))
+	require.NoError(t, err)
+	require.Equal(t, IFRS, f.Standard)
+	require.Equal(t, "TWD", f.Currency)
+
+	income := f.Build(Income, false, 0)
+	require.Equal(t, IFRS, income.Standard)
+	require.Equal(t, "新台币", income.CurrencyName)
+	require.Len(t, income.Periods, 2)
+	require.Equal(t, 2894.0, value(t, income.Periods[0], "revenue"))
+	require.Equal(t, 1173.0, value(t, income.Periods[0], "net_income"), "归母净利润优先")
+	require.NotContains(t, income.Periods[1].Values, "net_income", "申报过归母净利润的公司缺个别年份时不用净利润补")
+	require.Equal(t, 45.25, value(t, income.Periods[0], "eps_diluted"))
+	keys := map[string]string{}
+	for _, line := range income.Lines {
+		keys[line.Key] = line.Unit
+	}
+	require.NotContains(t, keys, "credit_loss", "没有对应 IFRS 科目的行不显示")
+	require.Equal(t, "TWD/shares", keys["eps_diluted"])
+
+	cash := f.Build(CashFlow, false, 0)
+	require.Equal(t, 870.0, value(t, cash.Periods[0], "free_cash_flow"), "推算行保留")
+	require.Equal(t, 6691.0, value(t, f.Build(Balance, false, 0).Periods[0], "total_assets"))
+
+	quarterly := f.Build(Income, true, 0)
+	require.True(t, quarterly.Quarterly)
+	require.Empty(t, quarterly.Periods, "IFRS 不整理季度报表")
+}
+
+// 完全不申报归母净利润的 IFRS 公司（比如没有少数股东的诺和诺德）用净利润。
+func TestBuildIFRSNetIncomeFallback(t *testing.T) {
+	f, err := parseFacts(1, []byte(`{"facts":{"ifrs-full":{"ProfitLoss":{"units":{"DKK":[
+{"start":"2024-01-01","end":"2024-12-31","val":101,"form":"20-F","filed":"2025-02-05","accn":"n1"}]}}}}}`))
+	require.NoError(t, err)
+	require.Equal(t, "DKK", f.Currency)
+	require.Equal(t, 101.0, value(t, f.Build(Income, false, 0).Periods[0], "net_income"))
 }
