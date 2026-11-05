@@ -115,61 +115,15 @@ func cacheUSFacts(cik int, facts *edgar.Facts, now time.Time) {
 	}
 }
 
-// handleUSFinancials 返回美股财报的一张报表：年度最多 10 期，季度最多 12 期，从新到旧。
-func (s *desktopServer) handleUSFinancials(w http.ResponseWriter, r *http.Request) {
-	query := r.URL.Query()
-	code := strings.TrimSpace(query.Get("code"))
-	if !usTicker.MatchString(code) {
-		writeError(w, http.StatusBadRequest, "只支持美股代码，比如 $AAPL")
-		return
-	}
-	statement := edgar.Statement(query.Get("statement"))
-	if _, ok := edgar.Lines[statement]; !ok {
-		writeError(w, http.StatusBadRequest, "报表须为 income、balance 或 cashflow")
-		return
-	}
-	quarterly := false
-	switch query.Get("period") {
-	case "", "annual":
-	case "quarter":
-		quarterly = true
-	default:
-		writeError(w, http.StatusBadRequest, "period 须为 annual 或 quarter")
-		return
-	}
-	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
-	defer cancel()
-	client, err := s.edgarClient(ctx)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "读取 SEC 联系邮箱失败，请在设置中检查")
-		return
-	}
-	company, err := client.Lookup(ctx, code)
-	if errors.Is(err, edgar.ErrNotFound) {
-		writeError(w, http.StatusNotFound, "SEC EDGAR 没有这家公司的财报，可能不向 SEC 申报")
-		return
-	}
-	var facts *edgar.Facts
-	if err == nil {
-		facts, err = cachedUSFacts(client)(ctx, company.CIK)
-	}
-	if err != nil {
-		if r.Context().Err() != nil {
-			return
-		}
-		slog.ErrorContext(ctx, "查询美股财报失败", "code", code, "error", err)
-		writeError(w, http.StatusBadGateway, "美股财报获取失败："+err.Error())
-		return
-	}
-	limit := 10
-	if quarterly {
-		limit = 12
-	}
-	writeJSON(w, map[string]any{"ticker": company.Ticker, "name": facts.Name, "cik": company.CIK, "report": facts.Build(statement, quarterly, limit)})
-}
+// usBadRequest 是美股接口的参数错误，返回 400。
+type usBadRequest string
 
-// handleUSDividends 返回美股按财年的分红表（usstock.Dividends），和 CLI 的 sec info -d 相同；XBRL 数据和财报、估值栏目共用缓存。
-func (s *desktopServer) handleUSDividends(w http.ResponseWriter, r *http.Request) {
+func (e usBadRequest) Error() string { return string(e) }
+
+// serveUS 是美股 SEC 接口共用的准备：先校验美股代码（无效时 400），再创建带 30 秒超时的 ctx 和用共享配置联系邮箱的 SEC 客户端
+// （读取失败时 500），交给 handle；handle 的结果写成 JSON，错误按 usFail 映射。cancel 在这里 defer，handle 不用管。
+// what 是数据的名称，比如"财报"，用在错误提示里。
+func (s *desktopServer) serveUS(w http.ResponseWriter, r *http.Request, what string, handle func(ctx context.Context, client *edgar.Client, code string) (any, error)) {
 	code := strings.TrimSpace(r.URL.Query().Get("code"))
 	if !usTicker.MatchString(code) {
 		writeError(w, http.StatusBadRequest, "只支持美股代码，比如 $AAPL")
@@ -182,67 +136,94 @@ func (s *desktopServer) handleUSDividends(w http.ResponseWriter, r *http.Request
 		writeError(w, http.StatusInternalServerError, "读取 SEC 联系邮箱失败，请在设置中检查")
 		return
 	}
-	dividends, err := usstock.LoadDividends(ctx, client, code, nil, cachedUSFacts(client))
-	if errors.Is(err, edgar.ErrNotFound) || errors.Is(err, edgar.ErrNoXBRL) {
-		writeError(w, http.StatusNotFound, "SEC EDGAR 没有这家公司的分红数据，可能不向 SEC 申报")
-		return
-	}
+	result, err := handle(ctx, client, code)
 	if err != nil {
-		if r.Context().Err() != nil {
-			return
-		}
-		slog.ErrorContext(ctx, "查询美股分红失败", "code", code, "error", err)
-		writeError(w, http.StatusBadGateway, "美股分红获取失败："+err.Error())
-		return
-	}
-	writeJSON(w, dividends)
-}
-
-// handleUSFinancialCharts 返回美股财报的图表数据（financials.FromSEC），格式和 A 股的 /api/v1/financials/charts 相同；
-// XBRL 数据和财报、估值、分红栏目共用缓存。
-func (s *desktopServer) handleUSFinancialCharts(w http.ResponseWriter, r *http.Request) {
-	query := r.URL.Query()
-	code := strings.TrimSpace(query.Get("code"))
-	if !usTicker.MatchString(code) {
-		writeError(w, http.StatusBadRequest, "只支持美股代码，比如 $AAPL")
-		return
-	}
-	freq := query.Get("freq")
-	if freq != "" && freq != "annual" && freq != "quarter" {
-		writeError(w, http.StatusBadRequest, "freq 只能是 annual 或 quarter")
-		return
-	}
-	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
-	defer cancel()
-	client, err := s.edgarClient(ctx)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "读取 SEC 联系邮箱失败，请在设置中检查")
-		return
-	}
-	company, err := client.Lookup(ctx, code)
-	var facts *edgar.Facts
-	if err == nil {
-		facts, err = cachedUSFacts(client)(ctx, company.CIK)
-	}
-	var result *financials.Analysis
-	if err == nil {
-		result, err = financials.FromSEC(company.Ticker, facts, freq == "quarter")
-	}
-	switch {
-	case errors.Is(err, edgar.ErrNotFound) || errors.Is(err, edgar.ErrNoXBRL):
-		writeError(w, http.StatusNotFound, "SEC EDGAR 没有这家公司的财报数据，可能不向 SEC 申报")
-		return
-	case errors.Is(err, financials.ErrNoSECData) || errors.Is(err, financials.ErrIFRSQuarterly):
-		writeError(w, http.StatusNotFound, err.Error())
-		return
-	}
-	if err != nil {
-		if r.Context().Err() != nil {
-			return
-		}
-		slog.ErrorContext(ctx, "查询美股财报图表失败", "code", code, "error", err)
-		writeError(w, http.StatusBadGateway, "美股财报获取失败："+err.Error())
+		usFail(w, r, err, what, code)
 		return
 	}
 	writeJSON(w, result)
+}
+
+// usFacts 查到公司并读取 XBRL 数据，和财报、估值、分红栏目共用缓存。
+func usFacts(ctx context.Context, client *edgar.Client, code string) (edgar.Company, *edgar.Facts, error) {
+	company, err := client.Lookup(ctx, code)
+	if err != nil {
+		return company, nil, err
+	}
+	facts, err := cachedUSFacts(client)(ctx, company.CIK)
+	return company, facts, err
+}
+
+// usFail 写出错误响应：参数错误 400；SEC 没有这家公司或没有 XBRL 数据时 404；数据不足以整理（没有利润表、IFRS 公司没有季度数据）时
+// 404 并说明原因；请求已取消时不写；其他是上游失败（502），日志带上请求路径，区分是哪个接口。
+func usFail(w http.ResponseWriter, r *http.Request, err error, what, code string) {
+	var bad usBadRequest
+	switch {
+	case errors.As(err, &bad):
+		writeError(w, http.StatusBadRequest, bad.Error())
+	case errors.Is(err, edgar.ErrNotFound) || errors.Is(err, edgar.ErrNoXBRL):
+		writeError(w, http.StatusNotFound, "SEC EDGAR 没有这家公司的"+what+"数据，可能不向 SEC 申报")
+	case errors.Is(err, financials.ErrNoSECData) || errors.Is(err, financials.ErrIFRSQuarterly):
+		writeError(w, http.StatusNotFound, err.Error())
+	case r.Context().Err() != nil:
+	default:
+		slog.ErrorContext(r.Context(), "查询美股"+what+"失败", "path", r.URL.Path, "code", code, "error", err)
+		writeError(w, http.StatusBadGateway, "美股"+what+"获取失败："+err.Error())
+	}
+}
+
+// usQuarterly 读取年度或季度参数 name：空和 annual 是年度，quarter 是季度，其他值是参数错误。
+func usQuarterly(r *http.Request, name string) (bool, error) {
+	switch r.URL.Query().Get(name) {
+	case "", "annual":
+		return false, nil
+	case "quarter":
+		return true, nil
+	}
+	return false, usBadRequest(name + " 须为 annual 或 quarter")
+}
+
+// handleUSFinancials 返回美股财报的一张报表：年度最多 10 期，季度最多 12 期，从新到旧。
+func (s *desktopServer) handleUSFinancials(w http.ResponseWriter, r *http.Request) {
+	s.serveUS(w, r, "财报", func(ctx context.Context, client *edgar.Client, code string) (any, error) {
+		statement := edgar.Statement(r.URL.Query().Get("statement"))
+		if _, ok := edgar.Lines[statement]; !ok {
+			return nil, usBadRequest("报表须为 income、balance 或 cashflow")
+		}
+		quarterly, err := usQuarterly(r, "period")
+		if err != nil {
+			return nil, err
+		}
+		company, facts, err := usFacts(ctx, client, code)
+		if err != nil {
+			return nil, err
+		}
+		limit := 10
+		if quarterly {
+			limit = 12
+		}
+		return map[string]any{"ticker": company.Ticker, "name": facts.Name, "cik": company.CIK, "report": facts.Build(statement, quarterly, limit)}, nil
+	})
+}
+
+// handleUSDividends 返回美股按财年的分红表（usstock.Dividends），和 CLI 的 sec info -d 相同。
+func (s *desktopServer) handleUSDividends(w http.ResponseWriter, r *http.Request) {
+	s.serveUS(w, r, "分红", func(ctx context.Context, client *edgar.Client, code string) (any, error) {
+		return usstock.LoadDividends(ctx, client, code, nil, cachedUSFacts(client))
+	})
+}
+
+// handleUSFinancialCharts 返回美股财报的图表数据（financials.FromSEC），格式和 A 股的 /api/v1/financials/charts 相同。
+func (s *desktopServer) handleUSFinancialCharts(w http.ResponseWriter, r *http.Request) {
+	s.serveUS(w, r, "财报", func(ctx context.Context, client *edgar.Client, code string) (any, error) {
+		quarterly, err := usQuarterly(r, "freq")
+		if err != nil {
+			return nil, err
+		}
+		company, facts, err := usFacts(ctx, client, code)
+		if err != nil {
+			return nil, err
+		}
+		return financials.FromSEC(company.Ticker, facts, quarterly)
+	})
 }
