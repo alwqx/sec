@@ -67,6 +67,7 @@ var Lines = map[Statement][]LineItem{
 		{"eps_basic", "基本每股收益", "USD/shares", []string{"EarningsPerShareBasic"}},
 		{"eps_diluted", "稀释每股收益", "USD/shares", []string{"EarningsPerShareDiluted", "EarningsPerShareBasicAndDiluted"}},
 		{"diluted_shares", "稀释加权股数", "shares", []string{"WeightedAverageNumberOfDilutedSharesOutstanding"}},
+		{"dps", "每股股息", "USD/shares", []string{"CommonStockDividendsPerShareDeclared", "CommonStockDividendsPerShareCashPaid"}},
 	},
 	Balance: {
 		{"cash", "现金及等价物", "USD", []string{"CashAndCashEquivalentsAtCarryingValue", "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents", "Cash"}},
@@ -85,7 +86,7 @@ var Lines = map[Statement][]LineItem{
 		{"free_cash_flow", "自由现金流", "USD", nil},
 		{"investing_cash_flow", "投资活动现金流", "USD", []string{"NetCashProvidedByUsedInInvestingActivities", "NetCashProvidedByUsedInInvestingActivitiesContinuingOperations"}},
 		{"financing_cash_flow", "筹资活动现金流", "USD", []string{"NetCashProvidedByUsedInFinancingActivities", "NetCashProvidedByUsedInFinancingActivitiesContinuingOperations"}},
-		{"dividends", "支付股息", "USD", []string{"PaymentsOfDividends", "PaymentsOfDividendsCommonStock"}},
+		{"dividends", "支付股息", "USD", []string{"PaymentsOfDividendsCommonStock", "PaymentsOfDividends"}},
 		{"buyback", "回购股票", "USD", []string{"PaymentsForRepurchaseOfCommonStock"}},
 	},
 }
@@ -99,6 +100,7 @@ type fact struct {
 	FP    string  `json:"fp"`
 	Form  string  `json:"form"`
 	Filed string  `json:"filed"`
+	Accn  string  `json:"accn"`
 }
 
 // Facts 是一家公司的 US GAAP 数值，按科目和单位索引。
@@ -106,6 +108,7 @@ type Facts struct {
 	CIK      int
 	Name     string
 	concepts map[string]map[string][]fact
+	dei      map[string]map[string][]fact // 封面信息，比如流通股数
 }
 
 type factConcept struct {
@@ -143,6 +146,9 @@ func (c *Client) CompanyFacts(ctx context.Context, cik int) (*Facts, error) {
 	return parseFacts(cik, body)
 }
 
+// ParseFacts 解析 companyfacts 接口返回的 JSON，例如读取缓存或测试数据。
+func ParseFacts(cik int, body []byte) (*Facts, error) { return parseFacts(cik, body) }
+
 func parseFacts(cik int, body []byte) (*Facts, error) {
 	var raw struct {
 		EntityName string                            `json:"entityName"`
@@ -163,9 +169,12 @@ func parseFacts(cik int, body []byte) (*Facts, error) {
 		}
 		return nil, errors.New("SEC 没有这家公司的 XBRL 财务数据")
 	}
-	f := &Facts{CIK: cik, Name: raw.EntityName, concepts: map[string]map[string][]fact{}}
+	f := &Facts{CIK: cik, Name: raw.EntityName, concepts: map[string]map[string][]fact{}, dei: map[string]map[string][]fact{}}
 	for name, concept := range gaap {
 		f.concepts[name] = concept.Units
+	}
+	for name, concept := range raw.Facts["dei"] {
+		f.dei[name] = concept.Units
 	}
 	return f, nil
 }
@@ -179,6 +188,9 @@ type Period struct {
 	FiscalPeriod string              `json:"fiscal_period"`   // FY、Q1、Q2、Q3、Q4
 	Values       map[string]*float64 `json:"values"`
 	Derived      []string            `json:"derived,omitempty"`
+	// Filed 是每一行数值第一次披露的日期（推算值取用到的数值中最晚的），在这天之后才能看到；
+	// 估值历史据此避免用到当时还没公布的数据。按行记录，后来才补报的其他行不会推迟这一行。
+	Filed map[string]string `json:"-"`
 }
 
 // Report 是一张报表，报告期从新到旧。
@@ -250,6 +262,13 @@ func (f *Facts) pick(item LineItem, end string, match func(fact) bool) (fact, bo
 			}
 		}
 		if found {
+			// 数值用最新申报的（可能是重述），Filed 改成同一期间第一次披露的日期：估值历史判断"当时能看到"时，
+			// 不能因为下一年的申报又列出这个比较数，就把它推迟到下一年才可见。
+			for _, v := range f.concepts[concept][item.Unit] {
+				if v.End == end && v.Start == best.Start && match(v) && v.Filed != "" && v.Filed < best.Filed {
+					best.Filed = v.Filed
+				}
+			}
 			return best, true
 		}
 	}
@@ -416,24 +435,25 @@ func nearStart(a, b string) bool {
 // quarterValue 返回期间数的单季值：有单季数时直接用；没有时用年初累计数相减，
 // 比如现金流量表只报告 6 个月、9 个月累计，第二季度 = 6 个月 - 3 个月，第四季度 = 全年 - 9 个月。
 // prevEnd 是同一财年上一季度的截止日，第一季度为空。
-func (f *Facts) quarterValue(item LineItem, end, prevEnd, fyStart string) (float64, bool, bool) {
+// 第四个返回值是用到的数值中最晚的申报日。
+func (f *Facts) quarterValue(item LineItem, end, prevEnd, fyStart string) (float64, bool, bool, string) {
 	if v, ok := f.pick(item, end, func(v fact) bool { return v.Start != "" && isQuarter(days(v.Start, v.End)) }); ok {
-		return v.Val, false, true
+		return v.Val, false, true, v.Filed
 	}
 	// 每股收益和股数不能相减。
 	if item.Unit != "USD" || fyStart == "" {
-		return 0, false, false
+		return 0, false, false, ""
 	}
 	ytd := func(at string) (fact, bool) {
 		return f.pick(item, at, func(v fact) bool { return v.Start != "" && nearStart(v.Start, fyStart) })
 	}
 	if fiscalQuarter(fyStart, end) == 1 {
 		if current, ok := ytd(end); ok {
-			return current.Val, false, true
+			return current.Val, false, true, current.Filed
 		}
 	}
 	if prevEnd == "" || !isQuarter(days(prevEnd, end)) {
-		return 0, false, false
+		return 0, false, false, ""
 	}
 	// 同一行的候选科目可能口径不同，累计数相减必须在同一个科目内完成。
 	for _, concept := range item.Concepts {
@@ -445,10 +465,10 @@ func (f *Facts) quarterValue(item LineItem, end, prevEnd, fyStart string) (float
 		}
 		previous, ok := f.pick(single, prevEnd, func(v fact) bool { return nearStart(v.Start, current.Start) && nearStart(v.Start, fyStart) })
 		if ok {
-			return current.Val - previous.Val, true, true
+			return current.Val - previous.Val, true, true, max(current.Filed, previous.Filed)
 		}
 	}
-	return 0, false, false
+	return 0, false, false, ""
 }
 
 // Build 生成报表，报告期从新到旧，最多 limit 期（0 表示全部）。年度用年报的全年数；季度用单季数，
@@ -463,7 +483,7 @@ func (f *Facts) Build(statement Statement, quarterly bool, limit int) *Report {
 	}
 	for i := len(ends) - 1; i >= 0; i-- {
 		end := ends[i]
-		period := Period{End: end, Values: map[string]*float64{}}
+		period := Period{End: end, Values: map[string]*float64{}, Filed: map[string]string{}}
 		period.FiscalYear, period.FiscalPeriod = fiscalLabel(end, yearEnds)
 		// 同一财年的上一季度截止日，用于年初累计数相减。
 		fyStart, prevEnd := "", ""
@@ -488,6 +508,7 @@ func (f *Facts) Build(statement Statement, quarterly bool, limit int) *Report {
 			if statement == Balance {
 				if v, ok := f.pick(item, end, func(v fact) bool { return v.Start == "" }); ok {
 					period.Values[item.Key] = &v.Val
+					period.Filed[item.Key] = v.Filed
 				}
 				continue
 			}
@@ -495,11 +516,13 @@ func (f *Facts) Build(statement Statement, quarterly bool, limit int) *Report {
 				if v, ok := f.pick(item, end, func(v fact) bool { return v.Start != "" && isYear(days(v.Start, v.End)) }); ok {
 					period.Values[item.Key] = &v.Val
 					period.Start = v.Start
+					period.Filed[item.Key] = v.Filed
 				}
 				continue
 			}
-			if value, derived, ok := f.quarterValue(item, end, prevEnd, fyStart); ok {
+			if value, derived, ok, filed := f.quarterValue(item, end, prevEnd, fyStart); ok {
 				period.Values[item.Key] = &value
+				period.Filed[item.Key] = filed
 				if derived {
 					period.Derived = append(period.Derived, item.Key)
 				}
@@ -522,4 +545,61 @@ func (f *Facts) Build(statement Statement, quarterly bool, limit int) *Report {
 		}
 	}
 	return report
+}
+
+// SharePoint 是一次申报封面上的流通股数：Date 是股数的统计日，Filed 是申报日。
+type SharePoint struct {
+	Date    string
+	Filed   string
+	Shares  float64
+	Classes int // 封面列出的普通股类别数
+}
+
+// SharesOutstanding 返回各次申报封面上的普通股流通股数，按统计日升序。有多类普通股（比如 A、B、C 股）的公司，
+// 同一次申报会分别列出各类股数，这里直接相加，不知道各类之间的折算比例（比如伯克希尔 1 股 A 折 1500 股 B）。
+func (f *Facts) SharesOutstanding() []SharePoint {
+	type key struct{ accn, end string }
+	sums := map[key]*SharePoint{}
+	for _, v := range f.dei["EntityCommonStockSharesOutstanding"]["shares"] {
+		if v.Val <= 0 || v.End == "" {
+			continue
+		}
+		k := key{v.Accn, v.End}
+		if sums[k] == nil {
+			sums[k] = &SharePoint{Date: v.End, Filed: v.Filed}
+		}
+		sums[k].Shares += v.Val
+		sums[k].Classes++
+	}
+	points := make([]SharePoint, 0, len(sums))
+	for _, p := range sums {
+		points = append(points, *p)
+	}
+	sort.Slice(points, func(i, j int) bool {
+		if points[i].Date != points[j].Date {
+			return points[i].Date < points[j].Date
+		}
+		return points[i].Filed < points[j].Filed
+	})
+	return points
+}
+
+// WeightedDilutedShares 返回各次申报里单季度的稀释加权平均股数，保留每次申报当时的数值（不用后来的重述），按统计日升序。
+// 有些公司封面只按股票类别申报股数（companyfacts 不含），这时用它近似流通股数；Date 是季度截止日，
+// 拆股发生在申报之前时，申报的数值已经按拆股调整。多类股票按各自的折算比例合计（比如伯克希尔折成 A 股）。
+func (f *Facts) WeightedDilutedShares() []SharePoint {
+	points := []SharePoint{}
+	for _, v := range f.concepts["WeightedAverageNumberOfDilutedSharesOutstanding"]["shares"] {
+		if v.Val <= 0 || v.Start == "" || v.Filed == "" || !isQuarter(days(v.Start, v.End)) {
+			continue
+		}
+		points = append(points, SharePoint{Date: v.End, Filed: v.Filed, Shares: v.Val})
+	}
+	sort.Slice(points, func(i, j int) bool {
+		if points[i].Date != points[j].Date {
+			return points[i].Date < points[j].Date
+		}
+		return points[i].Filed < points[j].Filed
+	})
+	return points
 }

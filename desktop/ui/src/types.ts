@@ -252,7 +252,7 @@ export interface ValuationDividends {
   mismatches: { ex_date: string; sina: number; east_money: number | null }[]; mismatch_checked: boolean
 }
 export interface ValuationResult {
-  code: string; name: string; industry: string; trade_date: string; price: number; market_cap: number; shares: number
+  code: string; currency: 'CNY' | 'USD'; name: string; industry: string; trade_date: string; price: number; market_cap: number; shares: number
   pe: ValuationMultiple; pb: ValuationMultiple; ps: ValuationMultiple; dates: string[]
   eps: number | null; bvps: number | null; profit_ttm: number | null; revenue_ttm: number | null; roe: number | null; roe_year: string
   growth: { rate: number | null; from_year: string; to_year: string; note: string }

@@ -15,6 +15,11 @@ const defaultParams: Record<string, string> = { growth: '', terminal: '', wacc: 
 const fixed = (value: number | null | undefined, digits = 2) => value === null || value === undefined ? '—' : value.toFixed(digits)
 const percent = (value: number | null | undefined, digits = 1) => value === null || value === undefined ? '—' : `${value.toFixed(digits)}%`
 const signed = (value: number) => `${value > 0 ? '+' : ''}${value.toFixed(1)}%`
+// unitOf 是金额单位：美股为美元。
+function unitOf(data: ValuationResult) {
+  return data.currency === 'USD' ? '美元' : '元'
+}
+
 function currentMultiple(item: ValuationMultiple) {
   if (item.current !== null) return item.current.toFixed(2)
   return item.raw !== null ? `不适用（上游值 ${item.raw.toFixed(2)}）` : '—'
@@ -79,22 +84,23 @@ function HistoryLines({ dates, item, label, history }: { dates: string[]; item: 
 }
 
 function Summary({ data }: { data: ValuationResult }) {
+  const us = data.currency === 'USD'
   return <>
     <dl className="quote-grid metrics-grid">
-      <div><dt>收盘价</dt><dd>{data.price.toFixed(2)}</dd></div>
-      <div><dt>总市值</dt><dd>{money(data.market_cap)}</dd></div>
+      <div><dt>收盘价{us && '（美元）'}</dt><dd>{data.price.toFixed(2)}</dd></div>
+      <div><dt>总市值</dt><dd>{money(data.market_cap, unitOf(data))}</dd></div>
       <div><dt>PE（TTM）</dt><dd>{currentMultiple(data.pe)}</dd></div>
       <div><dt>PB（MRQ）</dt><dd>{currentMultiple(data.pb)}</dd></div>
       <div><dt>PS（TTM）</dt><dd>{currentMultiple(data.ps)}</dd></div>
       <div><dt>PEG</dt><dd>{fixed(data.peg)}</dd></div>
-      <div><dt>ROE（{data.roe_year || '—'} 年报加权）</dt><dd>{percent(data.roe)}</dd></div>
+      <div><dt>ROE（{data.roe_year || '—'} {us ? '财年，期末权益' : '年报加权'}）</dt><dd>{percent(data.roe)}</dd></div>
       <div><dt>净利润 CAGR{data.growth.rate !== null && `（${data.growth.from_year}–${data.growth.to_year}）`}</dt><dd>{percent(data.growth.rate)}</dd></div>
       <div><dt>每股收益（TTM）</dt><dd>{fixed(data.eps)}</dd></div>
       <div><dt>每股净资产</dt><dd>{fixed(data.bvps)}</dd></div>
       <div><dt>格雷厄姆数</dt><dd>{fixed(data.graham)}</dd></div>
       <div><dt>格雷厄姆数相对收盘价</dt><dd>{data.graham_margin === null ? '—' : signed(data.graham_margin)}</dd></div>
     </dl>
-    <p className="data-note">{data.industry || '行业未知'} · 数据日期 {data.trade_date} · PE、PB、PS 由东方财富按收盘价计算，每股收益和每股净资产由这些倍数反推，与年报披露的基本每股收益口径不同。{data.growth.rate === null && data.growth.note && ` 增长率不可用：${data.growth.note}。`}</p>
+    <p className="data-note">{data.industry || '行业未知'} · 数据日期 {data.trade_date} · {us ? '美股估值由 SEC XBRL 财务数据和新浪不复权日线计算：市值 = 收盘价 × 当时申报的流通股数（封面股数，没有时用季度稀释加权股数；拆股后按比例调整），PE、PS 用最近四个季度，PB 用最近一期股东权益，只用当天之前已经申报的数值，报告期后来被重述时用重述后的数字；美股没有同行业对比。' : 'PE、PB、PS 由东方财富按收盘价计算，'}每股收益和每股净资产由这些倍数反推，与年报披露的{us ? '稀释' : '基本'}每股收益口径不同。{data.growth.rate === null && data.growth.note && ` 增长率不可用：${data.growth.note}。`}</p>
   </>
 }
 
@@ -115,7 +121,7 @@ function Annuals({ data }: { data: ValuationResult }) {
   if (!data.annuals.length) return null
   return <section aria-label="年报数据"><div className="section-caption"><h3>年报</h3></div>
     <div className="table-scroll valuation-annuals"><table className="data-table"><thead><tr><th>年度</th><th>基本每股收益</th><th>每股净资产</th><th>加权 ROE</th><th>营业总收入</th><th>归母净利润</th></tr></thead>
-      <tbody>{data.annuals.map(row => <tr key={row.year}><td>{row.year}</td><td>{fixed(row.eps)}</td><td>{fixed(row.bps)}</td><td>{percent(row.roe)}</td><td>{money(row.revenue)}</td><td>{money(row.profit)}</td></tr>)}</tbody></table></div></section>
+      <tbody>{data.annuals.map(row => <tr key={row.year}><td>{row.year}</td><td>{fixed(row.eps)}</td><td>{fixed(row.bps)}</td><td>{percent(row.roe)}</td><td>{money(row.revenue, unitOf(data))}</td><td>{money(row.profit, unitOf(data))}</td></tr>)}</tbody></table></div></section>
 }
 
 // 默认列出的公司数，按总市值排序。
@@ -136,7 +142,7 @@ function Peers({ peers, note }: { peers: ValuationPeers | null; note: string }) 
   </section>
 }
 
-function Dividends({ dividends, note }: { dividends: ValuationDividends | null; note: string }) {
+function Dividends({ dividends, note, us }: { dividends: ValuationDividends | null; note: string; us: boolean }) {
   if (!dividends) return <section aria-label="分红"><div className="section-caption"><h3>分红</h3></div><div className="empty-state">{note}</div></section>
   const { history, years, pending, mismatches } = dividends
   return <section aria-label="分红"><div className="section-caption"><h3>分红</h3></div>
@@ -149,12 +155,13 @@ function Dividends({ dividends, note }: { dividends: ValuationDividends | null; 
       <div><dt>历史分位</dt><dd>{history?.short ? '样本不足' : percent(history?.percentile, 0)}</dd></div>
       <div><dt>连续分红</dt><dd>{dividends.consecutive_years} 个财年</dd></div>
     </dl>
-    {years.length > 0 ? <div className="table-scroll valuation-annuals"><table className="data-table"><thead><tr><th>财年</th><th>每股现金分红</th><th>基本每股收益</th><th>分红率</th></tr></thead>
+    {years.length > 0 ? <div className="table-scroll valuation-annuals"><table className="data-table"><thead><tr><th>财年</th><th>每股现金分红</th><th>{us ? '稀释每股收益' : '基本每股收益'}</th><th>分红率</th></tr></thead>
       <tbody>{years.map(row => <tr key={row.year}><td>{row.year}</td><td>{row.per_share.toFixed(3)}</td><td>{fixed(row.eps)}</td><td>{percent(row.payout)}</td></tr>)}</tbody></table></div> : <div className="empty-state">有分红记录，但没有实施过现金分红。</div>}
-    {!dividends.mismatch_checked && <p className="data-note">未能和新浪核对，东方财富可能缺少特别分红，股息率可能偏低。</p>}
+    {!us && !dividends.mismatch_checked && <p className="data-note">未能和新浪核对，东方财富可能缺少特别分红，股息率可能偏低。</p>}
     {mismatches.length > 0 && <p className="error" role="note">近 5 年有 {mismatches.length} 次分红和新浪记录不一致，股息率按东方财富计算，可能有偏差：{mismatches.map(item => `${item.ex_date} 新浪 ${item.sina.toFixed(4)}，东方财富 ${item.east_money === null ? '缺少' : item.east_money.toFixed(4)}`).join('；')}</p>}
     {pending.length > 0 && <p className="data-note">未除息，不计入股息率：{pending.map(item => `${item.report} ${item.progress} ${item.plan}`).join('；')}</p>}
-    <p className="data-note">股息率是最近完整财年（年度分红已除息）的税前每股现金分红，按当前股本调整送转后除以收盘价，不含送转、配股和回购。最近一次分红超过 18 个月时按 0 计算。历史分位只比较有分红的交易日。东方财富可能缺少特别分红，近 5 年的记录会尽量和新浪核对，不一致或没能核对时在上方说明。分红可能不持续。财年表按报告期归属，金额和每股收益都是当时的股本口径；没有年度分红或财年内发生送转时不计算分红率。</p>
+    {us ? <p className="data-note">股息率是最近一个完整财年支付的现金股息总额（现金流量表）除以当前市值，不受拆股影响，上方的每股分红是支付总额除以当前股数；财年表的每股现金分红取年报披露的每股宣告股息，没有时用支付总额除以稀释股数；分红率 = 支付的股息 ÷ 归母净利润。历史分位只比较有分红的交易日，只用当天之前已经申报的年报。分红可能不持续。</p>
+    : <p className="data-note">股息率是最近完整财年（年度分红已除息）的税前每股现金分红，按当前股本调整送转后除以收盘价，不含送转、配股和回购。最近一次分红超过 18 个月时按 0 计算。历史分位只比较有分红的交易日。东方财富可能缺少特别分红，近 5 年的记录会尽量和新浪核对，不一致或没能核对时在上方说明。分红可能不持续。财年表按报告期归属，金额和每股收益都是当时的股本口径；没有年度分红或财年内发生送转时不计算分红率。</p>}
   </section>
 }
 
@@ -167,9 +174,9 @@ function DCFResult({ data, loading, error, retry }: { data: ValuationResult; loa
       <div><dt>每股价值</dt><dd>{fixed(dcf.per_share)}</dd></div>
       <div><dt>扣除安全边际后</dt><dd>{fixed(dcf.fair_price)}</dd></div>
       <div><dt>相对收盘价</dt><dd>{dcf.upside === null ? '—' : signed(dcf.upside)}</dd></div>
-      <div><dt>当前现金流（净利润 × 70%）</dt><dd>{money(dcf.base_cash)}</dd></div>
-      <div><dt>增长期现值</dt><dd>{money(dcf.growth_pv)}</dd></div>
-      <div><dt>终值现值（占 {dcf.terminal_share?.toFixed(0) ?? '—'}%）</dt><dd>{money(dcf.terminal_pv)}</dd></div>
+      <div><dt>当前现金流（净利润 × 70%）</dt><dd>{money(dcf.base_cash, unitOf(data))}</dd></div>
+      <div><dt>增长期现值</dt><dd>{money(dcf.growth_pv, unitOf(data))}</dd></div>
+      <div><dt>终值现值（占 {dcf.terminal_share?.toFixed(0) ?? '—'}%）</dt><dd>{money(dcf.terminal_pv, unitOf(data))}</dd></div>
     </dl>
     <p className="data-note">增长率 {percent(dcf.params.growth)}：{dcf.growth_source}。永续增长率 {percent(dcf.params.terminal_growth)}，折现率 {percent(dcf.params.wacc)}，安全边际 {percent(dcf.params.margin_of_safety)}。</p>
   </>
@@ -192,7 +199,7 @@ export default function Valuation({ code }: { code: string }) {
       <Summary data={data} />
       <Multiples data={data} />
       <Peers peers={data.peers} note={data.peers_note} />
-      <Dividends dividends={data.dividends} note={data.dividends_note} />
+      <Dividends dividends={data.dividends} note={data.dividends_note} us={data.currency === 'USD'} />
       <section aria-label="规则汇总"><div className="section-caption"><h3>规则汇总：{data.assessment}</h3></div>
         {data.signals.length > 0 && <div className="table-scroll"><table className="data-table"><thead><tr><th>指标</th><th>判断</th><th>依据</th></tr></thead>
           <tbody>{data.signals.map(row => <tr key={row.name}><td>{row.name}</td><td>{levels[row.level]}</td><td>{row.rule}</td></tr>)}</tbody></table></div>}

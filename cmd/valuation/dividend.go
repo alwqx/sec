@@ -11,7 +11,11 @@ import (
 const dividendYearSize = 5
 
 func printDividend(out io.Writer, r *shared.Result) {
-	fmt.Fprintln(out, "方法: 股息率 = 最近完整财年的税前每股现金分红（按当前股本）÷ 收盘价，不含送转、配股和回购")
+	if us(r) {
+		fmt.Fprintln(out, "方法: 股息率 = 最近一个完整财年支付的现金股息总额 ÷ 当前市值，不受拆股影响；每股分红 = 支付总额 ÷ 当前股数，财年表里的每股分红取年报披露的每股宣告股息")
+	} else {
+		fmt.Fprintln(out, "方法: 股息率 = 最近完整财年的税前每股现金分红（按当前股本）÷ 收盘价，不含送转、配股和回购")
+	}
 	d := r.Dividends
 	if d == nil {
 		fmt.Fprintf(out, "\n【评估】%s\n", r.DividendsNote)
@@ -46,7 +50,11 @@ func printDividend(out io.Writer, r *shared.Result) {
 		{"连续分红", fmt.Sprintf("%d 个财年", d.ConsecutiveYears)},
 	})
 	if len(d.Years) > 0 {
-		fmt.Fprintln(out, "\n【近年现金分红】按报告期归属，金额是当时的股本口径")
+		if us(r) {
+			fmt.Fprintln(out, "\n【近年现金分红】按财年，分红率 = 支付的股息 ÷ 归母净利润")
+		} else {
+			fmt.Fprintln(out, "\n【近年现金分红】按报告期归属，金额是当时的股本口径")
+		}
 		rows := [][]string{}
 		for i, item := range d.Years {
 			if i >= dividendYearSize {
@@ -54,7 +62,7 @@ func printDividend(out io.Writer, r *shared.Result) {
 			}
 			rows = append(rows, []string{item.Year, fmt.Sprintf("%.3f", item.PerShare), ff(item.EPS), fpct(item.Payout)})
 		}
-		richTable(out, []string{"财年", "每股分红", "基本每股收益", "分红率"}, rows)
+		richTable(out, []string{"财年", "每股分红", epsLabel(r), "分红率"}, rows)
 	} else {
 		fmt.Fprintln(out, "\n【评估】有分红记录，但没有实施过现金分红")
 	}
@@ -80,8 +88,29 @@ func printDividend(out io.Writer, r *shared.Result) {
 }
 
 func overviewYield(r *shared.Result) []string {
-	if r.Dividends == nil || r.Dividends.Yield == nil {
-		return []string{"股息率", "-", "-", "最近完整财年的税前现金分红"}
+	basis := "最近完整财年的税前现金分红"
+	if us(r) {
+		basis = "最近完整财年支付的现金股息 ÷ 市值"
 	}
-	return []string{"股息率", fmt.Sprintf("%.2f%%", *r.Dividends.Yield), historyPercentile(r.Dividends.History), "最近完整财年的税前现金分红"}
+	if r.Dividends == nil || r.Dividends.Yield == nil {
+		return []string{"股息率", "-", "-", basis}
+	}
+	return []string{"股息率", fmt.Sprintf("%.2f%%", *r.Dividends.Yield), historyPercentile(r.Dividends.History), basis}
+}
+
+// us 判断是不是美股估值：口径和 A 股不同，ROE 用期末权益，每股收益是稀释口径，股息率按支付总额计算。
+func us(r *shared.Result) bool { return r.Currency == "USD" }
+
+func epsLabel(r *shared.Result) string {
+	if us(r) {
+		return "稀释每股收益"
+	}
+	return "基本每股收益"
+}
+
+func roeLabel(r *shared.Result) string {
+	if us(r) {
+		return r.ROEYear + " 财年，期末权益"
+	}
+	return r.ROEYear + " 年报加权"
 }

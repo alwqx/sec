@@ -46,11 +46,13 @@ type PerformanceReport struct {
 	ROE     *float64 // 加权净资产收益率，单位 %
 	Revenue *float64
 	Profit  *float64 // 归母净利润
+	// Annual 标记年报。A 股按 12 月 31 日判断；美股的财年截止日不一定是年底（苹果在 9 月），由调用方标记。
+	Annual bool
 }
 
 // IsAnnual 判断是否为年报。
 func (r *PerformanceReport) IsAnnual() bool {
-	return strings.HasSuffix(r.Date, "-12-31")
+	return r.Annual || strings.HasSuffix(r.Date, "-12-31")
 }
 
 // secuFilter 按 600036.SH 这样的代码过滤。代码在不同交易所可能重复（上证指数和平安银行都是 000001），不能只按数字查询。
