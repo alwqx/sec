@@ -21,16 +21,28 @@ import (
 )
 
 func requestPage(w http.ResponseWriter, r *http.Request) int {
-	value := r.URL.Query().Get("page")
-	if value == "" {
-		return 1
-	}
-	page, err := strconv.Atoi(value)
-	if err != nil || page < 1 || page > 10000 {
-		writeError(w, http.StatusBadRequest, "页码必须在 1 到 10000 之间")
+	page, ok := pageParam(r)
+	if !ok {
+		writeError(w, http.StatusBadRequest, pageError)
 		return 0
 	}
 	return page
+}
+
+// pageError 是页码无效时的提示。
+const pageError = "页码必须在 1 到 10000 之间"
+
+// pageParam 读取页码参数，不写响应：留空是第 1 页，无效时 ok 为 false。
+func pageParam(r *http.Request) (int, bool) {
+	value := r.URL.Query().Get("page")
+	if value == "" {
+		return 1, true
+	}
+	page, err := strconv.Atoi(value)
+	if err != nil || page < 1 || page > 10000 {
+		return 0, false
+	}
+	return page, true
 }
 
 func (s *desktopServer) handleIPO(w http.ResponseWriter, r *http.Request) {

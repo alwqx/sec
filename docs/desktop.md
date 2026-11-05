@@ -274,7 +274,7 @@ macOS 按当前进程架构匹配 `sec-<tag>-desktop-darwin-<arch>.dmg`，不将
 | GET | `/api/v1/us/financials/charts?code=$AAPL&freq=annual` | 美股财报的图表数据，格式和 `/api/v1/financials/charts` 相同（`financials.Analysis`），另有 `source`（`sec`）、`currency_name` 和每期的 `label`（财年标注）；freq 为 annual 或 quarter；SEC 没有这家公司或没有利润表时 404 |
 | GET | `/api/v1/us/financials?code=$AAPL&statement=income&period=annual` | 美股财报的一张报表：`ticker`、`name`、`cik`、`report`（`standard` 会计准则 US GAAP 或 IFRS，`currency`、`currency_name` 列报币种，`lines` 行定义，`periods` 报告期的 `values` 和推算行 `derived`）；statement 为 income、balance、cashflow，period 为 annual 或 quarter；IFRS 公司只有年度报表，季度返回空的报告期；SEC 没有这家公司或没有 XBRL 数据时 404 |
 
-美股 SEC 接口（财报、财报图表、分红）共用 `desktop/us.go` 的 `serveUS`：先校验 `$` 代码（400），再设 30 秒超时、用共享配置的联系邮箱访问 SEC，错误统一映射为 400（其他参数无效，说明参数名）、404（SEC 没有这家公司或没有 XBRL 数据，或数据不足以整理并说明原因）、502（上游失败，日志带请求路径）。新增接口统一沿用 token cookie 鉴权。上游失败返回 502；公司资料为空返回 404；参数无效返回 400；列表为空返回 `{"results":[]}`（附带各接口其他元数据）。写入设置额外限制请求体大小、内容类型、同源与有效证券/偏好字段。
+美股 SEC 接口（公司资料、财报、财报图表、分红、SEC 申报）共用 `desktop/us.go` 的 `serveUS`（公司资料和行情都失败时用自己的 502 提示）；估值接口同时支持 A 股和美股，超时（美股 40 秒）和错误映射（无数据 404、外国公司 422）不同，不用它。`serveUS` 先校验 `$` 代码（400），再设 30 秒超时、用共享配置的联系邮箱访问 SEC，错误统一映射为 400（其他参数无效，说明参数名）、404（SEC 没有这家公司或没有 XBRL 数据，或数据不足以整理并说明原因）、502（上游失败，日志带请求路径）。新增接口统一沿用 token cookie 鉴权。上游失败返回 502；公司资料为空返回 404；参数无效返回 400；列表为空返回 `{"results":[]}`（附带各接口其他元数据）。写入设置额外限制请求体大小、内容类型、同源与有效证券/偏好字段。
 
 ## 前端
 

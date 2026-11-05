@@ -82,65 +82,41 @@ type filingsEntry struct {
 
 const filingsCacheTTL = 5 * time.Minute
 
-// handleFilings 返回美股公司的 SEC 申报，按申报日期从新到旧分页。
+// handleFilings 返回美股公司的 SEC 申报，按申报日期从新到旧分页；申报列表按代码和类别缓存。
 func (s *desktopServer) handleFilings(w http.ResponseWriter, r *http.Request) {
-	code := strings.TrimSpace(r.URL.Query().Get("code"))
-	if !usTicker.MatchString(code) {
-		writeError(w, http.StatusBadRequest, "SEC 申报只支持美股代码，比如 $AAPL")
-		return
-	}
-	forms, ok := filingGroups[r.URL.Query().Get("type")]
-	if !ok {
-		writeError(w, http.StatusBadRequest, "申报类别必须为 periodic、current、insider、all，留空查询主要申报")
-		return
-	}
-	page := requestPage(w, r)
-	if page == 0 {
-		return
-	}
-	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
-	defer cancel()
-	cfg, err := s.loadConfig(ctx)
-	if err != nil {
-		slog.ErrorContext(ctx, "读取共享配置失败", "error", err)
-		writeError(w, http.StatusInternalServerError, "读取 SEC 联系邮箱失败，请在设置中检查")
-		return
-	}
-	key := strings.ToUpper(code) + "|" + r.URL.Query().Get("type")
-	filingsCache.Lock()
-	entry, cached := filingsCache.entries[key]
-	filingsCache.Unlock()
-	if !cached || time.Since(entry.at) > filingsCacheTTL {
-		client := &edgar.Client{Email: cfg.SECEmail}
-		entry = filingsEntry{at: time.Now()}
-		entry.company, err = client.Lookup(ctx, code)
-		if errors.Is(err, edgar.ErrNotFound) {
-			writeError(w, http.StatusNotFound, "SEC EDGAR 没有这家公司的申报，可能不向 SEC 申报")
-			return
+	s.serveUS(w, r, "申报", func(ctx context.Context, client *edgar.Client, code string) (any, error) {
+		forms, ok := filingGroups[r.URL.Query().Get("type")]
+		if !ok {
+			return nil, usBadRequest("申报类别必须为 periodic、current、insider、all，留空查询主要申报")
 		}
-		if err == nil {
+		page, ok := pageParam(r)
+		if !ok {
+			return nil, usBadRequest(pageError)
+		}
+		key := strings.ToUpper(code) + "|" + r.URL.Query().Get("type")
+		filingsCache.Lock()
+		entry, cached := filingsCache.entries[key]
+		filingsCache.Unlock()
+		if !cached || time.Since(entry.at) > filingsCacheTTL {
+			entry = filingsEntry{at: time.Now()}
+			var err error
+			if entry.company, err = client.Lookup(ctx, code); err != nil {
+				return nil, err
+			}
 			want := filingsWant
 			if forms == nil {
 				want = 0
 			}
-			entry.result, err = client.Filings(ctx, entry.company.CIK, edgar.FilingQuery{Forms: forms, Want: want})
-		}
-		if err == nil {
+			if entry.result, err = client.Filings(ctx, entry.company.CIK, edgar.FilingQuery{Forms: forms, Want: want}); err != nil {
+				return nil, err
+			}
 			filingsCache.Lock()
 			filingsCache.entries[key] = entry
 			filingsCache.Unlock()
 		}
-	}
-	if err != nil {
-		if r.Context().Err() != nil {
-			return
-		}
-		slog.ErrorContext(ctx, "查询 SEC 申报失败", "code", code, "error", err)
-		writeError(w, http.StatusBadGateway, "SEC 申报获取失败："+err.Error())
-		return
-	}
-	filings := entry.result.Filings
-	start := min((page-1)*filingsPageSize, len(filings))
-	end := min(start+filingsPageSize, len(filings))
-	writeJSON(w, map[string]any{"company": entry.result.Profile, "ticker": entry.company.Ticker, "total": len(filings), "has_more": end < len(filings), "truncated": entry.result.Truncated, "results": filings[start:end]})
+		filings := entry.result.Filings
+		start := min((page-1)*filingsPageSize, len(filings))
+		end := min(start+filingsPageSize, len(filings))
+		return map[string]any{"company": entry.result.Profile, "ticker": entry.company.Ticker, "total": len(filings), "has_more": end < len(filings), "truncated": entry.result.Truncated, "results": filings[start:end]}, nil
+	})
 }
