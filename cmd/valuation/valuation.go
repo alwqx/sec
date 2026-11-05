@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/alwqx/sec/cmd/internal/termtable"
+	"github.com/alwqx/sec/config"
+	"github.com/alwqx/sec/provider/edgar"
 	"github.com/alwqx/sec/provider/sina"
 	"github.com/alwqx/sec/types"
 	"github.com/alwqx/sec/utils"
@@ -72,9 +74,25 @@ func ValuationHandler(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(cmd.OutOrStdout(), "未找到证券: %s\n", args[0])
 		return nil
 	}
+	// noData 是第一只候选证券没有估值数据的原因，美股会说明具体原因。
+	noData := fmt.Errorf("%s %s: %w", secs[0].ExCode, secs[0].Name, shared.ErrNoData)
+	first := true
 	for _, sec := range candidates(secs, args[0]) {
-		result, err := shared.Analyze(cmd.Context(), sec.ExCode, params)
+		var result *shared.Result
+		if strings.HasPrefix(sec.ExCode, "$") {
+			// 美股估值来自 SEC XBRL 和新浪日线，访问 SEC 需要共享配置里的联系邮箱。
+			cfg, cfgErr := config.LoadOrWarn(cmd.Context(), cmd.ErrOrStderr())
+			if cfgErr != nil {
+				return cfgErr
+			}
+			result, err = shared.AnalyzeUS(cmd.Context(), &edgar.Client{Email: cfg.SECEmail}, sec.ExCode, params, nil)
+		} else {
+			result, err = shared.Analyze(cmd.Context(), sec.ExCode, params)
+		}
 		if errors.Is(err, shared.ErrNoData) {
+			if first {
+				noData, first = fmt.Errorf("%s %s: %w", sec.ExCode, sec.Name, err), false
+			}
 			continue
 		}
 		if err != nil {
@@ -87,9 +105,9 @@ func ValuationHandler(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 	if asJSON {
-		return fmt.Errorf("%s %s: %w", secs[0].ExCode, secs[0].Name, shared.ErrNoData)
+		return noData
 	}
-	fmt.Fprintf(cmd.OutOrStdout(), "%s %s: %v\n", secs[0].ExCode, secs[0].Name, shared.ErrNoData)
+	fmt.Fprintln(cmd.OutOrStdout(), noData)
 	return nil
 }
 
@@ -114,7 +132,11 @@ func candidates(secs []*sina.BasicSecurity, key string) []*sina.BasicSecurity {
 
 func render(out io.Writer, method string, r *shared.Result) {
 	fmt.Fprintf(out, "\n证券代码: %s  证券名称: %s  行业: %s\n", r.Code, r.Name, r.Industry)
-	fmt.Fprintf(out, "收盘价: %.2f  总市值: %s  日期: %s\n\n", r.Price, humanMoney(r.MarketCap), r.TradeDate)
+	unit := "元"
+	if r.Currency == "USD" {
+		unit = "美元"
+	}
+	fmt.Fprintf(out, "收盘价: %.2f %s  总市值: %s%s  日期: %s\n\n", r.Price, unit, humanMoney(r.MarketCap), unit, r.TradeDate)
 	switch method {
 	case "pe":
 		printMultiple(out, "市盈率法 (P/E TTM)", "PE", r.PE)
@@ -122,7 +144,7 @@ func render(out io.Writer, method string, r *shared.Result) {
 		printGrowth(out, r)
 	case "pb":
 		printMultiple(out, "市净率法 (P/B MRQ)", "PB", r.PB)
-		fmt.Fprintf(out, "每股净资产 (由 PB 反推): %s\nROE (%s 年报加权): %s\n", ff(r.BVPS), r.ROEYear, fpct(r.ROE))
+		fmt.Fprintf(out, "每股净资产 (由 PB 反推): %s\nROE (%s): %s\n", ff(r.BVPS), roeLabel(r), fpct(r.ROE))
 	case "ps":
 		printMultiple(out, "市销率法 (P/S TTM)", "PS", r.PS)
 		fmt.Fprintf(out, "营业收入 (TTM，由 PS 反推): %s\n", moneyOrDash(r.RevenueTTM))
@@ -150,7 +172,7 @@ func printOverview(out io.Writer, r *shared.Result) {
 		{"P/S", ff(r.PS.Current), percentile(r.PS), multipleNote(r.PS, "TTM")},
 		overviewYield(r),
 		{"PEG", ff(r.PEG), "-", "P/E ÷ 净利润 CAGR"},
-		{"ROE", fpct(r.ROE), "-", r.ROEYear + " 年报加权"},
+		{"ROE", fpct(r.ROE), "-", roeLabel(r)},
 		{"每股收益", ff(r.EPS), "-", "TTM，由 PE 反推"},
 		{"每股净资产", ff(r.BVPS), "-", "由 PB 反推"},
 		{"格雷厄姆数", ff(r.Graham), "-", "√(22.5 × 每股收益 × 每股净资产)"},
@@ -169,7 +191,7 @@ func printOverview(out io.Writer, r *shared.Result) {
 			}
 			rows = append(rows, []string{annual.Year, ff(annual.EPS), ff(annual.BPS), fpct(annual.ROE), moneyOrDash(annual.Revenue), moneyOrDash(annual.Profit)})
 		}
-		richTable(out, []string{"年度", "基本每股收益", "每股净资产", "ROE", "营收", "归母净利润"}, rows)
+		richTable(out, []string{"年度", epsLabel(r), "每股净资产", "ROE", "营收", "归母净利润"}, rows)
 	}
 
 	fmt.Fprintf(out, "\n【规则汇总】→ %s\n", r.Assessment)

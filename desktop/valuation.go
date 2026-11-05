@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alwqx/sec/provider/edgar"
 	"github.com/alwqx/sec/valuation"
 )
 
@@ -44,7 +45,9 @@ func parseValuationParams(r *http.Request) (valuation.DCFParams, error) {
 
 // handleValuation 返回完整估值；只有 DCF 参数变化时也重新查询上游，保证数据和日期一致。
 func (s *desktopServer) handleValuation(w http.ResponseWriter, r *http.Request) {
-	if companyCode(w, r) == "" {
+	raw := strings.TrimSpace(r.URL.Query().Get("code"))
+	us := usTicker.MatchString(raw)
+	if !us && companyCode(w, r) == "" {
 		return
 	}
 	params, err := parseValuationParams(r)
@@ -52,12 +55,31 @@ func (s *desktopServer) handleValuation(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+	// 美股要下载 XBRL 和全部日线，比 A 股慢。
+	timeout := 20 * time.Second
+	if us {
+		timeout = 40 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), timeout)
 	defer cancel()
-	code := strings.ToUpper(strings.TrimSpace(r.URL.Query().Get("code")))
-	result, err := valuation.Analyze(ctx, code, params)
+	code := strings.ToUpper(raw)
+	var result *valuation.Result
+	if us {
+		var client *edgar.Client
+		if client, err = s.edgarClient(ctx); err != nil {
+			writeError(w, http.StatusInternalServerError, "读取 SEC 联系邮箱失败，请在设置中检查")
+			return
+		}
+		result, err = valuation.AnalyzeUS(ctx, client, code, params, cachedUSFacts(client))
+	} else {
+		result, err = valuation.Analyze(ctx, code, params)
+	}
 	if errors.Is(err, valuation.ErrNoData) {
 		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+	if errors.Is(err, edgar.ErrIFRS) {
+		writeError(w, http.StatusUnprocessableEntity, err.Error())
 		return
 	}
 	if err != nil {

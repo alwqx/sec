@@ -77,6 +77,23 @@ const (
 )
 
 // cacheUSFacts 写入时清理过期条目，达到上限时移除最早写入的公司。调用方不持有锁。
+// cachedUSFacts 返回先查缓存、过期或没有时再下载的 XBRL 读取函数，财报和估值栏目共用。
+func cachedUSFacts(client *edgar.Client) func(context.Context, int) (*edgar.Facts, error) {
+	return func(ctx context.Context, cik int) (*edgar.Facts, error) {
+		usFactsCache.Lock()
+		entry, ok := usFactsCache.entries[cik]
+		usFactsCache.Unlock()
+		if ok && time.Since(entry.at) < usFactsTTL {
+			return entry.facts, nil
+		}
+		facts, err := client.CompanyFacts(ctx, cik)
+		if err == nil {
+			cacheUSFacts(cik, facts, time.Now())
+		}
+		return facts, err
+	}
+}
+
 func cacheUSFacts(cik int, facts *edgar.Facts, now time.Time) {
 	usFactsCache.Lock()
 	defer usFactsCache.Unlock()
@@ -133,14 +150,7 @@ func (s *desktopServer) handleUSFinancials(w http.ResponseWriter, r *http.Reques
 	}
 	var facts *edgar.Facts
 	if err == nil {
-		usFactsCache.Lock()
-		entry, ok := usFactsCache.entries[company.CIK]
-		usFactsCache.Unlock()
-		if ok && time.Since(entry.at) < usFactsTTL {
-			facts = entry.facts
-		} else if facts, err = client.CompanyFacts(ctx, company.CIK); err == nil {
-			cacheUSFacts(company.CIK, facts, time.Now())
-		}
+		facts, err = cachedUSFacts(client)(ctx, company.CIK)
 	}
 	if errors.Is(err, edgar.ErrIFRS) {
 		writeError(w, http.StatusUnprocessableEntity, err.Error())

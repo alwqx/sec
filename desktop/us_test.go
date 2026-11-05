@@ -125,3 +125,64 @@ func TestUSFactsCacheEviction(t *testing.T) {
 	require.Len(t, usFactsCache.entries, usFactsMaxEntries, "更新已有公司不淘汰其他公司")
 	require.Equal(t, "refreshed", usFactsCache.entries[1].facts.Name)
 }
+
+// 美股估值：SEC XBRL 财务数据 + 新浪不复权日线。
+func TestUSValuation(t *testing.T) {
+	defer gock.Off()
+	srv := usServer(t)
+	gock.New("https://www.sec.gov").Get("/files/company_tickers.json").Reply(200).BodyString(usTickers)
+	gock.New("https://data.sec.gov").Get("/submissions/CIK0000320193.json").Reply(200).BodyString(`{"name":"Apple Inc.","sicDescription":"Electronic Computers","sic":"3571","filings":{"recent":{}}}`)
+	gock.New("https://data.sec.gov").Get("/api/xbrl/companyfacts/CIK0000320193.json").Reply(200).BodyString(`{"entityName":"Apple Inc.","facts":{
+"us-gaap":{
+ "Revenues":{"units":{"USD":[
+  {"start":"2025-01-01","end":"2025-03-31","val":100,"fp":"Q1","form":"10-Q","filed":"2025-04-30"},
+  {"start":"2025-04-01","end":"2025-06-30","val":100,"fp":"Q2","form":"10-Q","filed":"2025-07-30"},
+  {"start":"2025-07-01","end":"2025-09-30","val":100,"fp":"Q3","form":"10-Q","filed":"2025-10-30"},
+  {"start":"2025-01-01","end":"2025-09-30","val":300,"fp":"Q3","form":"10-Q","filed":"2025-10-30"},
+  {"start":"2025-01-01","end":"2025-12-31","val":400,"fp":"FY","form":"10-K","filed":"2026-01-30"}]}},
+ "NetIncomeLoss":{"units":{"USD":[
+  {"start":"2025-01-01","end":"2025-03-31","val":10,"fp":"Q1","form":"10-Q","filed":"2025-04-30"},
+  {"start":"2025-04-01","end":"2025-06-30","val":10,"fp":"Q2","form":"10-Q","filed":"2025-07-30"},
+  {"start":"2025-07-01","end":"2025-09-30","val":10,"fp":"Q3","form":"10-Q","filed":"2025-10-30"},
+  {"start":"2025-01-01","end":"2025-09-30","val":30,"fp":"Q3","form":"10-Q","filed":"2025-10-30"},
+  {"start":"2025-01-01","end":"2025-12-31","val":40,"fp":"FY","form":"10-K","filed":"2026-01-30"}]}},
+ "StockholdersEquity":{"units":{"USD":[{"end":"2025-12-31","val":1000,"fp":"FY","form":"10-K","filed":"2026-01-30"}]}}},
+"dei":{"EntityCommonStockSharesOutstanding":{"units":{"shares":[{"end":"2026-01-20","val":100,"fp":"FY","form":"10-K","filed":"2026-01-30","accn":"a"}]}}}
+}}`)
+	gock.New("https://stock.finance.sina.com.cn").Get("/usstock/api/jsonp.php/var.t=/US_MinKService.getDailyK").MatchParam("symbol", "aapl").Reply(200).
+		BodyString(`var t=([{"d":"2026-03-02","o":"40","h":"40","l":"40","c":"40","v":"1"},{"d":"2026-03-03","o":"40","h":"40","l":"40","c":"40","v":"1"}]);`)
+	rr := usRequest(t, srv, "/api/v1/valuation?code=$aapl")
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	var data struct {
+		Code      string  `json:"code"`
+		Currency  string  `json:"currency"`
+		MarketCap float64 `json:"market_cap"`
+		PE        struct {
+			Current float64 `json:"current"`
+		} `json:"pe"`
+		Dividends any    `json:"dividends"`
+		Note      string `json:"dividends_note"`
+	}
+	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &data))
+	require.Equal(t, "$AAPL", data.Code)
+	require.Equal(t, "USD", data.Currency)
+	require.Equal(t, 4000.0, data.MarketCap)
+	require.Equal(t, 100.0, data.PE.Current)
+	require.Nil(t, data.Dividends)
+	require.Contains(t, data.Note, "可能不分红")
+}
+
+func TestUSValuationErrors(t *testing.T) {
+	defer gock.Off()
+	srv := usServer(t)
+	gock.New("https://www.sec.gov").Get("/files/company_tickers.json").Reply(200).BodyString(usTickers)
+	require.Equal(t, http.StatusNotFound, usRequest(t, srv, "/api/v1/valuation?code=$ZZZZ").Code)
+
+	// 按 IFRS 申报的外国公司暂不支持。
+	gock.New("https://data.sec.gov").Get("/submissions/CIK0001046179.json").Reply(404)
+	gock.New("https://data.sec.gov").Get("/api/xbrl/companyfacts/CIK0001046179.json").Reply(200).BodyString(`{"facts":{"ifrs-full":{"Revenue":{"units":{}}}}}`)
+	gock.New("https://stock.finance.sina.com.cn").Get("/usstock/api/jsonp.php/var.t=/US_MinKService.getDailyK").Reply(200).BodyString(`var t=(null);`)
+	rr := usRequest(t, srv, "/api/v1/valuation?code=$TSM")
+	require.Equal(t, http.StatusUnprocessableEntity, rr.Code, rr.Body.String())
+	require.Contains(t, rr.Body.String(), "IFRS")
+}

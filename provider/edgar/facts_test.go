@@ -50,6 +50,8 @@ func TestBuildAnnual(t *testing.T) {
 	require.Equal(t, 200.0, value(t, income.Periods[0], "revenue"), "2025 财年用 RevenueFromContract…")
 	require.Equal(t, 100.0, value(t, income.Periods[1], "revenue"), "2024 财年用 Revenues")
 	require.Equal(t, 12.0, value(t, income.Periods[1], "net_income"), "重述后用最新申报的数值")
+	require.Equal(t, "2024-11-01", income.Periods[1].Filed["net_income"], "重述后的数值仍按首次披露日期可用")
+	require.Equal(t, "2025-11-01", income.Periods[0].Filed["revenue"])
 
 	cash := f.Build(CashFlow, false, 0)
 	require.Equal(t, 140.0, value(t, cash.Periods[0], "free_cash_flow"))
@@ -131,9 +133,9 @@ func TestQuarterValueMissingOrDifferentConcepts(t *testing.T) {
 			{Start: "2025-01-01", End: "2025-09-30", Val: 120},
 		}},
 	}}
-	_, _, ok := f.quarterValue(item, "2025-09-30", "", "2025-01-01")
+	_, _, ok, _ := f.quarterValue(item, "2025-09-30", "", "2025-01-01")
 	require.False(t, ok, "缺少上一季度时不能把 9 个月累计当成单季")
-	_, _, ok = f.quarterValue(item, "2025-12-31", "2025-09-30", "2025-01-01")
+	_, _, ok, _ = f.quarterValue(item, "2025-12-31", "2025-09-30", "2025-01-01")
 	require.False(t, ok, "不同科目的累计数不能相减")
 
 	// 第一候选科目缺少基期时，允许用另一个同时有当期和基期的科目。
@@ -141,11 +143,11 @@ func TestQuarterValueMissingOrDifferentConcepts(t *testing.T) {
 		f.concepts["RevenueFromContractWithCustomerExcludingAssessedTax"]["USD"],
 		fact{Start: "2025-01-01", End: "2025-12-31", Val: 170},
 	)
-	v, derived, ok := f.quarterValue(item, "2025-12-31", "2025-09-30", "2025-01-01")
+	v, derived, ok, _ := f.quarterValue(item, "2025-12-31", "2025-09-30", "2025-01-01")
 	require.True(t, ok)
 	require.True(t, derived)
 	require.Equal(t, 50.0, v)
-	_, _, ok = f.quarterValue(item, "2025-12-31", "2025-06-30", "2025-01-01")
+	_, _, ok, _ = f.quarterValue(item, "2025-12-31", "2025-06-30", "2025-01-01")
 	require.False(t, ok, "上一条截止日相隔两季时不能推算")
 }
 
@@ -296,4 +298,35 @@ func TestQuarterlyOnlyMissingPreviousQuarter(t *testing.T) {
 		{Start: "2025-01-01", End: "2025-09-30", Val: 110, FP: "Q3", Form: "10-Q"},
 	}}}}
 	require.Empty(t, f.Build(CashFlow, true, 0).Periods, "无上一季度累计数时不能将 9 个月累计数当成单季")
+}
+
+// 封面股数按申报合计各类普通股，同一截止日的多次申报分别保留。
+func TestSharesOutstanding(t *testing.T) {
+	f, err := parseFacts(1, []byte(`{"entityName":"Test Inc.","facts":{
+"us-gaap":{"Revenues":{"units":{"USD":[{"start":"2024-01-01","end":"2024-12-31","val":100,"fp":"FY","form":"10-K","filed":"2025-02-01"}]}}},
+"dei":{"EntityCommonStockSharesOutstanding":{"units":{"shares":[
+ {"end":"2025-04-20","val":60,"fp":"Q1","form":"10-Q","filed":"2025-04-30","accn":"b"},
+ {"end":"2025-04-20","val":40,"fp":"Q1","form":"10-Q","filed":"2025-04-30","accn":"b"},
+ {"end":"2025-01-20","val":90,"fp":"FY","form":"10-K","filed":"2025-02-01","accn":"a"},
+ {"end":"2025-01-20","val":95,"fp":"FY","form":"10-K/A","filed":"2025-03-01","accn":"c"},
+ {"end":"2025-07-20","val":0,"fp":"Q2","form":"10-Q","filed":"2025-07-30","accn":"d"}]}}}
+}}`))
+	require.NoError(t, err)
+	require.Equal(t, []SharePoint{
+		{Date: "2025-01-20", Filed: "2025-02-01", Shares: 90, Classes: 1},
+		{Date: "2025-01-20", Filed: "2025-03-01", Shares: 95, Classes: 1},
+		{Date: "2025-04-20", Filed: "2025-04-30", Shares: 100, Classes: 2},
+	}, f.SharesOutstanding())
+}
+
+// 股息优先取普通股股息，PaymentsOfDividends 可能包含优先股股息和少数股东分红。
+func TestDividendsPreferCommonStock(t *testing.T) {
+	f, err := parseFacts(1, []byte(`{"entityName":"Bank","facts":{"us-gaap":{
+"PaymentsOfDividends":{"units":{"USD":[{"start":"2024-01-01","end":"2024-12-31","val":120,"fp":"FY","form":"10-K","filed":"2025-02-01"}]}},
+"PaymentsOfDividendsCommonStock":{"units":{"USD":[{"start":"2024-01-01","end":"2024-12-31","val":100,"fp":"FY","form":"10-K","filed":"2025-02-01"}]}}
+}}}`))
+	require.NoError(t, err)
+	cash := f.Build(CashFlow, false, 0)
+	require.Equal(t, 100.0, value(t, cash.Periods[0], "dividends"))
+	require.Equal(t, "2025-02-01", cash.Periods[0].Filed["dividends"])
 }

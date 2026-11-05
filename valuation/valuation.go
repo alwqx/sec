@@ -32,7 +32,7 @@ const (
 )
 
 // ErrNoData 表示没有这只证券的估值，通常是指数、基金或港美股。
-var ErrNoData = errors.New("暂无估值数据，估值仅支持沪深北 A 股")
+var ErrNoData = errors.New("暂无估值数据（估值支持沪深北 A 股和美股，不含指数、基金和港股）")
 
 // DCFParams 是 DCF 参数，单位都是 %。Growth 为 nil 时自动取值，0 表示零增长。
 type DCFParams struct {
@@ -142,6 +142,7 @@ type DCF struct {
 // Result 是一只证券的完整估值。无法计算的指标为 nil，不用 0 表示。
 type Result struct {
 	Code          string     `json:"code"`
+	Currency      string     `json:"currency"` // 价格和金额的币种：A 股 CNY，美股 USD
 	Name          string     `json:"name"`
 	Industry      string     `json:"industry"`
 	TradeDate     string     `json:"trade_date"`
@@ -263,7 +264,7 @@ func Analyze(ctx context.Context, exCode string, params DCFParams) (*Result, err
 // Compute 根据按日期升序的估值和按报告期降序的业绩报表计算估值。points 不能为空。
 func Compute(points []*eastmoney.ValuationPoint, reports []*eastmoney.PerformanceReport, params DCFParams) *Result {
 	latest := points[len(points)-1]
-	r := &Result{Name: latest.Name, Industry: latest.Board, TradeDate: latest.Date, Price: latest.Close, MarketCap: latest.MarketCap, Shares: latest.Shares,
+	r := &Result{Currency: "CNY", Name: latest.Name, Industry: latest.Board, TradeDate: latest.Date, Price: latest.Close, MarketCap: latest.MarketCap, Shares: latest.Shares,
 		Annuals: []Annual{}, Disclaimer: "估值结果由规则和假设机械计算，不构成投资建议。"}
 	r.Dates = make([]string, len(points))
 	for i, point := range points {
@@ -400,7 +401,7 @@ func computeGrowth(annuals []Annual) Growth {
 }
 
 // financialBoards 是净利润不能近似现金流的行业。
-var financialBoards = []string{"银行", "保险", "证券", "多元金融"}
+var financialBoards = []string{"银行", "保险", "证券", "多元金融", "金融业"}
 
 // computeDCF 是两阶段股权现金流折现：现金流近似为净利润的 70%，折现结果直接视为股权价值，不再扣净负债。
 func computeDCF(r *Result, params DCFParams) DCF {
