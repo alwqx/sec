@@ -159,7 +159,7 @@ func printUSFinancials(out io.Writer, result usFinancials) {
 	}
 	fmt.Fprintf(out, "\n数据来自 SEC EDGAR 的 XBRL 财务数据（%s），金额用公司的列报币种，同一报告期有重述时用最新申报的数值；财年按截止日所在年份标注。\n", result.Standard)
 	if derived {
-		fmt.Fprintln(out, "* 推算值：没有单季数时用年初累计数相减（第四季度 = 全年 - 前三季度），自由现金流 = 经营活动现金流 - 资本支出。")
+		fmt.Fprintln(out, "* 推算值：没有单季数时用年初累计数相减（第四季度 = 全年 - 前三季度），自由现金流 = 经营活动现金流 - 资本支出，没有申报归母股东权益时 = 股东权益合计 - 少数股东权益。")
 	}
 }
 

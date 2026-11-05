@@ -485,3 +485,55 @@ func TestBuildIFRSNetIncomeFallback(t *testing.T) {
 	require.Equal(t, "DKK", f.Currency)
 	require.Equal(t, 101.0, value(t, f.Build(Income, false, 0).Periods[0], "net_income"))
 }
+
+// 没有申报归母股东权益时用合计减少数股东权益推算，日期用第一次披露的；最后一期少数股东权益之后有一份年报没有少数股东权益时，
+// 之后的报告期等于合计，从这份年报申报后才可见；其他缺数的报告期留空。
+func TestBuildParentEquityFromTotal(t *testing.T) {
+	f, err := parseFacts(1, []byte(`{"facts":{"us-gaap":{
+"Revenues":{"units":{"USD":[
+ {"start":"2021-01-01","end":"2021-12-31","val":1,"form":"10-K","filed":"2022-02-01"},
+ {"start":"2022-01-01","end":"2022-12-31","val":1,"form":"10-K","filed":"2023-02-01"},
+ {"start":"2023-01-01","end":"2023-12-31","val":1,"form":"10-K","filed":"2024-02-01"},
+ {"start":"2024-01-01","end":"2024-12-31","val":1,"form":"10-K","filed":"2025-02-01"},
+ {"start":"2025-01-01","end":"2025-03-31","val":1,"form":"10-Q","filed":"2025-05-01"}]}},
+"StockholdersEquityIncludingPortionAttributableToNoncontrollingInterest":{"units":{"USD":[
+ {"end":"2021-12-31","val":80,"form":"10-K","filed":"2022-02-01"},
+ {"end":"2022-12-31","val":90,"form":"10-K","filed":"2023-02-01"},
+ {"end":"2023-12-31","val":100,"form":"10-K","filed":"2024-02-01"},
+ {"end":"2024-12-31","val":120,"form":"10-K","filed":"2025-02-01"},
+ {"end":"2025-03-31","val":125,"form":"10-Q","filed":"2025-05-01"}]}},
+"MinorityInterest":{"units":{"USD":[
+ {"end":"2022-12-31","val":10,"form":"10-K","filed":"2023-02-01"},
+ {"end":"2022-12-31","val":10,"form":"10-K","filed":"2024-02-01"},
+ {"end":"2023-12-31","val":12,"form":"10-K","filed":"2024-02-01"}]}}
+}}}`))
+	require.NoError(t, err)
+	byEnd := map[string]Period{}
+	for _, p := range f.Build(Balance, true, 0).Periods {
+		byEnd[p.End] = p
+	}
+	require.Equal(t, 80.0, value(t, byEnd["2022-12-31"], "equity"))
+	require.Contains(t, byEnd["2022-12-31"].Derived, "equity")
+	require.Equal(t, "2023-02-01", byEnd["2022-12-31"].Filed["equity"], "下一年作为比较数再申报，不推迟披露日期")
+	require.Equal(t, 88.0, value(t, byEnd["2023-12-31"], "equity"))
+	require.Equal(t, 120.0, value(t, byEnd["2024-12-31"], "equity"), "2024 年年报没有少数股东权益，视为没有少数股东")
+	require.Equal(t, 125.0, value(t, byEnd["2025-03-31"], "equity"))
+	require.Equal(t, "2025-05-01", byEnd["2025-03-31"].Filed["equity"])
+	require.NotContains(t, byEnd["2021-12-31"].Values, "equity", "之后还有少数股东权益，这一期缺数不能当成 0")
+
+	// 只在年报里标注少数股东权益：最近一份年报之后的季度还不能确认没有少数股东，留空。
+	f.concepts["MinorityInterest"]["USD"] = append(f.concepts["MinorityInterest"]["USD"],
+		fact{End: "2024-12-31", Val: 15, Form: "10-K", Filed: "2025-02-01"})
+	byEnd = map[string]Period{}
+	for _, p := range f.Build(Balance, true, 0).Periods {
+		byEnd[p.End] = p
+	}
+	require.Equal(t, 105.0, value(t, byEnd["2024-12-31"], "equity"))
+	require.NotContains(t, byEnd["2025-03-31"].Values, "equity")
+
+	// 从没申报过少数股东权益（可能用了别的科目）时不推算。
+	delete(f.concepts, "MinorityInterest")
+	for _, p := range f.Build(Balance, false, 0).Periods {
+		require.NotContains(t, p.Values, "equity", p.End)
+	}
+}
