@@ -128,7 +128,7 @@ func pointAt(t *testing.T, r *Result, date string) int {
 func TestComputeUS(t *testing.T) {
 	now, _ := time.Parse(time.DateOnly, "2026-11-01")
 	bars := usBars("2025-01-01", "2026-10-30", "2026-06-01", 40, 10)
-	r, err := computeUS("$TEST", "Banks", "6021", usFacts(t), nil, bars, 0, DefaultDCFParams(), now)
+	r, err := computeUS("$TEST", "Banks", "6021", usFacts(t), nil, nil, bars, 0, DefaultDCFParams(), now)
 	require.NoError(t, err)
 	require.Equal(t, "USD", r.Currency)
 	require.Equal(t, "Banks（金融业）", r.Industry)
@@ -176,7 +176,7 @@ func TestDetectSplitsChecksShares(t *testing.T) {
 }
 
 func TestComputeUSNoData(t *testing.T) {
-	_, err := computeUS("$TEST", "", "", usFacts(t), nil, nil, 0, DefaultDCFParams(), time.Now())
+	_, err := computeUS("$TEST", "", "", usFacts(t), nil, nil, nil, 0, DefaultDCFParams(), time.Now())
 	require.ErrorIs(t, err, ErrNoData)
 }
 
@@ -199,7 +199,7 @@ func TestComputeUSDividendStopped(t *testing.T) {
 			{"2026-01-01", "2026-12-31", 50, "FY", "10-K", "2027-01-30", "e"},
 		},
 	})
-	r, err := computeUS("$TEST", "", "", facts, nil, usBars("2025-01-01", "2027-02-26", "", 40, 40), 0, DefaultDCFParams(), now)
+	r, err := computeUS("$TEST", "", "", facts, nil, nil, usBars("2025-01-01", "2027-02-26", "", 40, 40), 0, DefaultDCFParams(), now)
 	require.NoError(t, err)
 	require.NotNil(t, r.Dividends)
 	require.Equal(t, 0.0, *r.Dividends.Yield)
@@ -215,11 +215,11 @@ func TestComputeUSCalibratesShareClasses(t *testing.T) {
 	now, _ := time.Parse(time.DateOnly, "2026-11-01")
 	facts := usFactsWith(t, nil, testFact{"", "2026-10-20", 1, "Q", "10-Q", "2026-10-25", "f"}, testFact{"", "2026-10-20", 99, "Q", "10-Q", "2026-10-25", "f"})
 	bars := usBars("2026-10-01", "2026-10-30", "", 10, 10)
-	r, err := computeUS("$TEST", "", "", facts, nil, bars, 1600, DefaultDCFParams(), now)
+	r, err := computeUS("$TEST", "", "", facts, nil, nil, bars, 1600, DefaultDCFParams(), now)
 	require.NoError(t, err)
 	require.InDelta(t, 1600.0, r.Shares, 1e-9)
 	// 只有一类股票时不校准。
-	r, err = computeUS("$TEST", "", "", usFacts(t), nil, bars, 1600, DefaultDCFParams(), now)
+	r, err = computeUS("$TEST", "", "", usFacts(t), nil, nil, bars, 1600, DefaultDCFParams(), now)
 	require.NoError(t, err)
 	require.InDelta(t, 400.0, r.Shares, 1e-9)
 }
@@ -237,7 +237,7 @@ func TestComputeUSWeightedShares(t *testing.T) {
 			{"2025-01-01", "2025-12-31", 7, "FY", "10-K", "2026-01-30", "a"},
 		},
 	}, testFact{})
-	r, err := computeUS("$TEST", "", "", facts, nil, usBars("2026-01-02", "2026-10-30", "2026-06-01", 40, 10), 0, DefaultDCFParams(), now)
+	r, err := computeUS("$TEST", "", "", facts, nil, nil, usBars("2026-01-02", "2026-10-30", "2026-06-01", 40, 10), 0, DefaultDCFParams(), now)
 	require.NoError(t, err)
 	require.Equal(t, "2026-01-30", r.Dates[0], "第一个加权股数在 2026-01-30 申报")
 	i := pointAt(t, r, "2026-06-02")
@@ -246,7 +246,7 @@ func TestComputeUSWeightedShares(t *testing.T) {
 	require.InDelta(t, 4000.0, r.MarketCap, 1e-9)
 
 	// 封面和加权股数都超过 15 个月没有更新时不估值。
-	_, err = computeUS("$TEST", "", "", usFactsWith(t, nil, testFact{}), nil, usBars("2026-01-02", "2026-10-30", "", 40, 40), 0, DefaultDCFParams(), now)
+	_, err = computeUS("$TEST", "", "", usFactsWith(t, nil, testFact{}), nil, nil, usBars("2026-01-02", "2026-10-30", "", 40, 40), 0, DefaultDCFParams(), now)
 	require.ErrorIs(t, err, ErrStaleShares)
 }
 
@@ -293,19 +293,70 @@ func TestComputeUSClassShares(t *testing.T) {
 	}
 	facts := usFactsWith(t, nil, testFact{})
 	bars := usBars("2026-05-01", "2026-10-30", "", 10, 10)
-	_, err := computeUS("$TEST.B", "", "", facts, nil, bars, 100, DefaultDCFParams(), now)
+	_, err := computeUS("$TEST.B", "", "", facts, nil, nil, bars, 100, DefaultDCFParams(), now)
 	require.ErrorIs(t, err, ErrStaleShares)
-	r, err := computeUS("$TEST.B", "", "", facts, covers, bars, 100, DefaultDCFParams(), now)
+	r, err := computeUS("$TEST.B", "", "", facts, covers, nil, bars, 100, DefaultDCFParams(), now)
 	require.NoError(t, err)
 	require.Equal(t, "2026-05-01", r.Dates[0])
 	require.InDelta(t, 90.0*10/1000, *r.PB.Series[0], 1e-9, "1 股 A 折 40 股 B，市值 = 10 × (50 + 40 × 1)")
 	require.Contains(t, r.SharesNote, "按申报封面上各类别的股数折算")
 
 	// 新浪的当前股本不大于这类股票自身的股数时无法折算，错误里说明原因。
-	_, err = computeUS("$TEST.B", "", "", facts, covers, bars, 50, DefaultDCFParams(), now)
+	_, err = computeUS("$TEST.B", "", "", facts, covers, nil, bars, 50, DefaultDCFParams(), now)
 	require.ErrorIs(t, err, ErrStaleShares)
 	require.ErrorContains(t, err, "不大于申报封面上这类股票的股数")
 	require.InDelta(t, 100.0, r.Shares, 1e-9)
+
+	// 年报缺每股收益和稀释股数时，用 10-K 利润表上这类股票的数；没有的年份留空。
+	earnings := []edgar.ClassEarnings{
+		{End: "2025-12-31", Filed: "2026-01-30", Member: "A", EPS: 20, Shares: 2},
+		{End: "2025-12-31", Filed: "2026-01-30", Member: "B", EPS: 0.5, Shares: 80},
+	}
+	r, err = computeUS("$TEST.B", "", "", facts, covers, earnings, bars, 100, DefaultDCFParams(), now)
+	require.NoError(t, err)
+	byYear := map[string]Annual{}
+	for _, a := range r.Annuals {
+		byYear[a.Year] = a
+	}
+	require.Equal(t, 0.5, *byYear["2025"].EPS)
+	require.Equal(t, 1000.0/80, *byYear["2025"].BPS)
+	require.Nil(t, byYear["2024"].EPS)
+	require.Contains(t, r.SharesNote, "10-K 利润表")
+
+	// 这类股票的股数不是折算后的（每股收益 × 股数和净利润 40 对不上）时只用每股收益，每股净资产留空。
+	earnings[1].Shares = 20
+	r, err = computeUS("$TEST.B", "", "", facts, covers, earnings, bars, 100, DefaultDCFParams(), now)
+	require.NoError(t, err)
+	for _, a := range r.Annuals {
+		if a.Year == "2025" {
+			require.Equal(t, 0.5, *a.EPS)
+			require.Nil(t, a.BPS)
+		}
+	}
+}
+
+// 利润表的类别成员和封面不同时按类别代号对应（伯克希尔封面是 CommonClassBMember，利润表是 EquivalentClassBMember）；
+// 同一年有多份年报时用最新申报的。
+func TestClassEarningsAt(t *testing.T) {
+	list := []edgar.ClassEarnings{
+		{End: "2025-12-31", Filed: "2026-02-28", Member: "brka_EquivalentClassAMember", EPS: 46563, Shares: 1438223},
+		{End: "2025-12-31", Filed: "2026-02-28", Member: "brka_EquivalentClassBMember", EPS: 31.04, Shares: 2157335139},
+		{End: "2025-12-31", Filed: "2027-02-28", Member: "brka_EquivalentClassBMember", EPS: 31.05, Shares: 2157335139},
+		{End: "2025-12-31", Filed: "2026-02-28", Member: "x_CommonClassB1Member", EPS: 1, Shares: 1},
+	}
+	e, ok := classEarningsAt(list, "us-gaap_CommonClassBMember", "2025-12-31")
+	require.True(t, ok)
+	require.Equal(t, 31.05, e.EPS)
+	// 成员相同的优先于只是类别代号相同的，即使申报更早。
+	exact := append(list, edgar.ClassEarnings{End: "2025-12-31", Filed: "2026-01-31", Member: "us-gaap_CommonClassBMember", EPS: 30, Shares: 1})
+	e, _ = classEarningsAt(exact, "us-gaap_CommonClassBMember", "2025-12-31")
+	require.Equal(t, 30.0, e.EPS)
+	_, ok = classEarningsAt(list, "us-gaap_CommonClassBMember", "2024-12-31")
+	require.False(t, ok)
+	_, ok = classEarningsAt(list, "", "2025-12-31")
+	require.False(t, ok, "认不出所查这类股票")
+	e, _ = classEarningsAt(list, "x_CommonClassB1Member", "2025-12-31")
+	require.Equal(t, 1.0, e.EPS, "B1 和 B 是不同的类别")
 }
 
 // 能按类别折算时整段历史只用折算后的股数：封面股数之前的日子即使有加权股数（口径不同）也不用，直接跳过。
@@ -319,7 +370,7 @@ func TestComputeUSClassSharesOnly(t *testing.T) {
 	covers := []edgar.ClassShares{
 		{Date: "2026-04-20", Filed: "2026-04-30", Classes: []edgar.ShareClass{{Member: "A", Symbol: "TEST.A", Shares: 1}, {Member: "B", Symbol: "TEST.B", Shares: 50}}},
 	}
-	r, err := computeUS("$TEST.B", "", "", facts, covers, usBars("2026-02-02", "2026-10-30", "", 10, 10), 90, DefaultDCFParams(), now)
+	r, err := computeUS("$TEST.B", "", "", facts, covers, nil, usBars("2026-02-02", "2026-10-30", "", 10, 10), 90, DefaultDCFParams(), now)
 	require.NoError(t, err)
 	require.Equal(t, "2026-04-30", r.Dates[0], "封面申报之前只有加权股数的日子不计算")
 }

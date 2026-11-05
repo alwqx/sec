@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -98,7 +99,7 @@ func AnalyzeUS(ctx context.Context, client *edgar.Client, exCode string, params 
 	code, now := strings.ToUpper(exCode), time.Now()
 	// companyfacts 里最后一天没有可用的股数时（比如伯克希尔、Visa 只按类别申报），才逐份读取申报封面页：第一次较慢，之后读缓存。
 	if len(bars) == 0 || hasRecentShares(facts, bars[len(bars)-1].Date) {
-		return computeUS(code, industry, sic, facts, nil, bars, current, params, now)
+		return computeUS(code, industry, sic, facts, nil, nil, bars, current, params, now)
 	}
 	since := now.AddDate(-usHistoryYears, -15, 0).Format(time.DateOnly)
 	covers, coverErr := client.CoverShares(ctx, company.CIK, since)
@@ -106,11 +107,31 @@ func AnalyzeUS(ctx context.Context, client *edgar.Client, exCode string, params 
 		// 两个错误都包装，调用方能用 errors.Is 识别股数过期、取消和超时。
 		return nil, fmt.Errorf("%w（读取申报封面股数：%w）", ErrStaleShares, coverErr)
 	}
-	result, err := computeUS(code, industry, sic, facts, covers.Points, bars, current, params, now)
-	if err == nil && covers.Failed > 0 {
+	// 这类公司的每股收益和稀释股数往往也只按类别申报，年报缺这两项时从各份 10-K 的利润表读取；读不到时年报表的这两项留空，不影响估值。
+	var earnings []edgar.ClassEarnings
+	earningsMissing := false
+	if missingAnnualEPS(facts, since) {
+		list, err := client.ClassEarnings(ctx, company.CIK, since)
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		if err == nil {
+			earnings, earningsMissing = list.Earnings, list.Failed > 0
+		} else {
+			earningsMissing = true
+		}
+	}
+	result, err := computeUS(code, industry, sic, facts, covers.Points, earnings, bars, current, params, now)
+	if err != nil {
+		return nil, err
+	}
+	if covers.Failed > 0 {
 		result.SharesNote += fmt.Sprintf("有 %d 份申报的封面没有读到（可能被 SEC 限流），对应时期的股数缺失，估值历史有缺口，稍后重试可以补齐。", covers.Failed)
 	}
-	return result, err
+	if earningsMissing {
+		result.SharesNote += "部分年报的利润表没有读到或无法解析，对应年度的每股收益、每股净资产留空。"
+	}
+	return result, nil
 }
 
 // foreignReason 返回不按美国本土公司估值的原因，本土公司返回空字符串。
@@ -321,14 +342,7 @@ func classShares(list []edgar.ClassShares, code string, current float64, splits 
 // ownClassShares 返回申报封面页上所查这类股票自身的股数，不折算其他类别，只用来核对拆股：
 // 折算比例要用拆股之后的当前股本解出，识别拆股时还不能用折算后的股数。
 func ownClassShares(list []edgar.ClassShares, code string) []sharePoint {
-	key, member := symbolKey(code), ""
-	for _, p := range list {
-		for _, c := range p.Classes {
-			if c.Symbol != "" && symbolKey(c.Symbol) == key {
-				member = c.Member
-			}
-		}
-	}
+	member := classMember(list, code)
 	points := []sharePoint{}
 	for _, p := range list {
 		for _, c := range p.Classes {
@@ -338,6 +352,59 @@ func ownClassShares(list []edgar.ClassShares, code string) []sharePoint {
 		}
 	}
 	return points
+}
+
+// missingAnnualEPS 判断 since 之后的年报是否缺稀释每股收益或稀释股数。
+func missingAnnualEPS(facts *edgar.Facts, since string) bool {
+	for _, p := range facts.Build(edgar.Income, false, 0).Periods {
+		if p.End >= since && (p.Values["eps_diluted"] == nil || p.Values["diluted_shares"] == nil) {
+			return true
+		}
+	}
+	return false
+}
+
+// classMember 按封面上的交易代码找到所查这类股票（code）的类别成员，比如 us-gaap_CommonClassBMember；找不到时为空。
+func classMember(list []edgar.ClassShares, code string) string {
+	key, member := symbolKey(code), ""
+	for _, p := range list {
+		for _, c := range p.Classes {
+			if c.Symbol != "" && symbolKey(c.Symbol) == key {
+				member = c.Member
+			}
+		}
+	}
+	return member
+}
+
+// classLetter 取类别成员名里的类别代号，比如 CommonClassBMember、EquivalentClassBMember 都是 B，CommonClassB1Member 是 B1。
+var classLetter = regexp.MustCompile(`Class([A-Z][0-9]*)Member$`)
+
+// classEarningsAt 返回截止日为 end、所查这类股票（member）的每股收益和稀释股数。利润表的类别成员可能和封面不同
+// （伯克希尔封面是 CommonClassBMember，利润表是 EquivalentClassBMember），成员相同的优先，没有时按类别代号对应；
+// 同一年有多份年报时用最新申报的，同一份里有多个候选时取第一个（list 的顺序固定，见 edgar.ClassEarnings）。
+func classEarningsAt(list []edgar.ClassEarnings, member, end string) (edgar.ClassEarnings, bool) {
+	if member == "" {
+		return edgar.ClassEarnings{}, false
+	}
+	letter := classLetter.FindStringSubmatch(member)
+	var best edgar.ClassEarnings
+	bestRank := 0 // 2 是成员相同，1 是类别代号相同
+	for _, e := range list {
+		if e.End != end {
+			continue
+		}
+		rank := 0
+		if e.Member == member {
+			rank = 2
+		} else if m := classLetter.FindStringSubmatch(e.Member); letter != nil && m != nil && m[1] == letter[1] {
+			rank = 1
+		}
+		if rank > bestRank || (rank > 0 && rank == bestRank && e.Filed > best.Filed) {
+			best, bestRank = e, rank
+		}
+	}
+	return best, bestRank > 0
 }
 
 // shareAsOf 和 asOf 一样按申报日扫描，返回 date 当天能看到的、统计日最新的股数。
@@ -459,8 +526,9 @@ func detectSplits(bars []*sina.Bar, sources [][]sharePoint, current float64) []s
 }
 
 // computeUS 用 XBRL 数据和日线构造估值序列，交给 Compute 计算分位、PEG、格雷厄姆数、DCF 和规则评估。
-// current 是新浪的当前股数，没有时为 0；covers 是申报封面页按类别列出的股数，没有读取时为 nil。
-func computeUS(code, industry, sic string, facts *edgar.Facts, covers []edgar.ClassShares, bars []*sina.Bar, current float64, params DCFParams, now time.Time) (*Result, error) {
+// current 是新浪的当前股数，没有时为 0；covers 是申报封面页按类别列出的股数，earnings 是 10-K 利润表按类别列出的每股收益和稀释股数，
+// 没有读取时为 nil。
+func computeUS(code, industry, sic string, facts *edgar.Facts, covers []edgar.ClassShares, earnings []edgar.ClassEarnings, bars []*sina.Bar, current float64, params DCFParams, now time.Time) (*Result, error) {
 	if len(bars) == 0 {
 		return nil, ErrNoData
 	}
@@ -559,12 +627,26 @@ func computeUS(code, industry, sic string, facts *edgar.Facts, covers []edgar.Cl
 	}
 	reports := []*eastmoney.PerformanceReport{}
 	years := []DividendYear{}
+	member, fromEarnings := classMember(covers, code), false
 	for _, p := range annualIncome {
+		eps, dilutedShares := p.Values["eps_diluted"], p.Values["diluted_shares"]
+		// 只按类别申报每股收益和稀释股数的公司（比如伯克希尔、Visa），两项都用 10-K 利润表上所查这类股票的数，同一行口径一致。
+		// 这类股票的股数是折算后的（每股收益 × 股数 ≈ 归母净利润，比如 Visa 的 A 类、伯克希尔的等值 B 股）时，才用于每股净资产和每股分红；
+		// 各类只列自己股数的公司，用全公司的权益除以一类的股数会偏大，留空。
+		if eps == nil || dilutedShares == nil {
+			if e, ok := classEarningsAt(earnings, member, p.End); ok {
+				eps, dilutedShares = ptr(e.EPS), nil
+				if profit := p.Values["net_income"]; profit != nil && *profit != 0 && math.Abs(e.EPS*e.Shares / *profit - 1) <= 0.1 {
+					dilutedShares = ptr(e.Shares)
+				}
+				fromEarnings = true
+			}
+		}
 		report := &eastmoney.PerformanceReport{Date: fmt.Sprintf("%d%s", p.FiscalYear, p.End[4:]), Annual: true,
-			EPS: p.Values["eps_diluted"], Revenue: p.Values["revenue"], Profit: p.Values["net_income"]}
+			EPS: eps, Revenue: p.Values["revenue"], Profit: p.Values["net_income"]}
 		equity := annualBalance[p.End].Values["equity"]
 		if equity != nil && *equity != 0 {
-			if shares := p.Values["diluted_shares"]; shares != nil && *shares > 0 {
+			if shares := dilutedShares; shares != nil && *shares > 0 {
 				report.BPS = ptr(*equity / *shares)
 			}
 			if profit := p.Values["net_income"]; profit != nil && *equity > 0 {
@@ -576,10 +658,10 @@ func computeUS(code, industry, sic string, facts *edgar.Facts, covers []edgar.Cl
 		if paid == nil || *paid <= 0 {
 			continue
 		}
-		year := DividendYear{Year: strconv.Itoa(p.FiscalYear), EPS: p.Values["eps_diluted"]}
+		year := DividendYear{Year: strconv.Itoa(p.FiscalYear), EPS: eps}
 		if dps := p.Values["dps"]; dps != nil && *dps > 0 {
 			year.PerShare = *dps
-		} else if shares := p.Values["diluted_shares"]; shares != nil && *shares > 0 {
+		} else if shares := dilutedShares; shares != nil && *shares > 0 {
 			year.PerShare = *paid / *shares
 		}
 		if profit := p.Values["net_income"]; profit != nil && *profit > 0 {
@@ -594,6 +676,9 @@ func computeUS(code, industry, sic string, facts *edgar.Facts, covers []edgar.Cl
 	result.Disclaimer = "美股估值由 SEC XBRL 财务数据和新浪不复权日线计算：市值 = 收盘价 × 当时申报的流通股数（封面股数；只按类别申报时从申报封面页读取各类股数，按新浪的当前股数折算成所查这类股票；都没有时用季度稀释加权股数；拆股后按比例调整），PE、PS 用最近四个季度，PB 用最近一期股东权益，股息率用最近一个完整财年支付的现金股息，都只用当天之前已经申报的数值；报告期后来被重述时，历史估值也用重述后的数字。" + result.Disclaimer
 	result.PeersNote = "美股暂无同行业对比，规则汇总未计入行业规则"
 	result.SharesNote = sharesNote
+	if fromEarnings {
+		result.SharesNote += "公司只按类别申报每股收益和稀释股数，年报的每股收益用 10-K 利润表上所查这类股票的稀释每股收益；这类股票的稀释加权股数是折算后的数时，每股净资产也用它计算，否则留空。"
+	}
 	result.Dividends, result.DividendsNote = usDividends(years, lastDividend, result, yields, yieldSince, annualCash)
 	// 股息率规则依赖分红数据，Compute 时还没有，补上后重新汇总。
 	if result.Dividends != nil {
