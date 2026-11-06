@@ -108,7 +108,7 @@ func resolveKeys(ctx context.Context, keys []string) ([]*sina.BasicSecurity, []k
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			secs, err := sina.Search(ctx, key)
+			secs, err := sina.Resolve(ctx, key)
 			results[i] = found{secs, err}
 		}()
 	}
@@ -378,7 +378,7 @@ func quoteJSON(cmd *cobra.Command, keys []string) error {
 	ctx := cmd.Context()
 	secs := make([]*sina.BasicSecurity, 0, len(keys))
 	for _, key := range keys {
-		found, err := sina.Search(ctx, key)
+		found, err := sina.Resolve(ctx, key)
 		if err != nil {
 			return fmt.Errorf("搜索证券失败: %w", err)
 		}

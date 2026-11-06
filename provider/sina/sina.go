@@ -57,6 +57,41 @@ func Search(ctx context.Context, key string) ([]*BasicSecurity, error) {
 	return parseBasicSecurity(string(resBytes)), nil
 }
 
+// fullCode 匹配带市场前缀的完整代码：SH600519、sz000001、BJ920000、HK00700、$AAPL、$BRK.B。
+var fullCode = regexp.MustCompile(`^(?i:(sh|sz|bj)(\d{6})|hk(\d{5})|\$([a-z][a-z0-9.\-]*))$`)
+
+// Resolve 和 Search 一样查询证券，供按第一个结果取数据的命令使用。搜索接口失败时，
+// 如果 key 是带市场前缀的完整代码，就直接按代码返回一个结果，不让一个搜索接口挡住所有命令；
+// 这时没有证券名称，类型一律按股票。
+func Resolve(ctx context.Context, key string) ([]*BasicSecurity, error) {
+	secs, err := Search(ctx, key)
+	if err == nil || ctx.Err() != nil {
+		return secs, err
+	}
+	sec := securityFromCode(strings.TrimSpace(key))
+	if sec == nil {
+		return nil, err
+	}
+	slog.WarnContext(ctx, "搜索证券失败，按代码处理", "key", key, "error", err)
+	return []*BasicSecurity{sec}, nil
+}
+
+// securityFromCode 把完整代码转成和搜索结果一样的格式，不是完整代码时返回 nil。
+func securityFromCode(key string) *BasicSecurity {
+	m := fullCode.FindStringSubmatch(key)
+	switch {
+	case m == nil:
+		return nil
+	case m[2] != "":
+		market := strings.ToLower(m[1])
+		return &BasicSecurity{Code: m[2], ExCode: strings.ToUpper(market) + m[2], ExChange: market, SecurityType: types.SecurityTypeStock}
+	case m[3] != "":
+		return &BasicSecurity{Code: m[3], ExCode: "HK" + m[3], ExChange: types.ExChangeHKex, SecurityType: types.SecurityTypeStock}
+	default:
+		return &BasicSecurity{Code: strings.ToLower(m[4]), ExCode: formatUSCode(m[4]), ExChange: types.ExChangeNasdaq, SecurityType: types.SecurityTypeStock}
+	}
+}
+
 // Profile 根据证券代码获取证券的基本信息，exCode SH600036
 func Profile(ctx context.Context, opts *types.InfoOptions) (*CorpProfile, error) {
 	if opts == nil {
