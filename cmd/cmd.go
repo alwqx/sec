@@ -24,6 +24,7 @@ import (
 	"github.com/alwqx/sec/cmd/upgrade"
 	"github.com/alwqx/sec/cmd/valuation"
 	"github.com/alwqx/sec/cmd/watch"
+	"github.com/alwqx/sec/hkstock"
 	"github.com/alwqx/sec/provider/sina"
 	"github.com/alwqx/sec/types"
 	"github.com/alwqx/sec/utils"
@@ -162,7 +163,13 @@ func InfoHandler(cmd *cobra.Command, args []string) error {
 	}
 	opts.Code = sec.Code
 	opts.ExCode = sec.ExCode
-	profile, err := sina.Profile(cmd.Context(), opts)
+	var profile *sina.CorpProfile
+	// 新浪的公司资料页只有 A 股，港股的公司资料改用东方财富。
+	if types.IsHCode(sec.ExCode) {
+		profile, err = hkstock.Profile(cmd.Context(), sec.ExCode)
+	} else {
+		profile, err = sina.Profile(cmd.Context(), opts)
+	}
 	if err != nil {
 		return err
 	}
@@ -171,10 +178,13 @@ func InfoHandler(cmd *cobra.Command, args []string) error {
 		return printInfoJSON(cmd, sec.ExCode, profile, opts)
 	}
 
-	fmt.Fprintf(cmd.OutOrStdout(), "证券代码\t%s\n简称历史\t%s\n公司名称\t%s\n上市日期\t%s\n发行价格\t%.2f\n行业分类\t%s\n主营业务\t%s\n办公地址\t%s\n公司网址\t%s\n当前价格\t%s\n市净率PB\t%s\n市盈率TTM\t%s\n总市值  \t%s\n流通市值\t%s\n",
-		sec.ExCode, profile.HistoryName, profile.Name, profile.ListingDate, profile.ListingPrice,
+	fmt.Fprintf(cmd.OutOrStdout(), "证券代码\t%s\n简称历史\t%s\n公司名称\t%s\n上市日期\t%s\n发行价格\t%s\n行业分类\t%s\n主营业务\t%s\n办公地址\t%s\n公司网址\t%s\n当前价格\t%s\n市净率PB\t%s\n市盈率TTM\t%s\n总市值  \t%s\n流通市值\t%s\n",
+		sec.ExCode, profile.HistoryName, profile.Name, profile.ListingDate, utils.HumanRatio(profile.ListingPrice),
 		profile.Category, profile.MainBusiness, profile.BusinessAddress, profile.WebSite,
 		profile.PriceText(), utils.HumanRatio(profile.PB), utils.HumanRatio(profile.PeTTM), utils.HumanNum(profile.MarketCap), utils.HumanNum(profile.TradedMarketCap))
+	if profile.Description != "" {
+		fmt.Fprintf(cmd.OutOrStdout(), "公司简介\t%s\n", profile.Description)
+	}
 
 	if opts.Dividend {
 		dids, err := sina.QueryDividends(cmd.Context(), opts.Code)
@@ -198,6 +208,7 @@ type infoRow struct {
 	ListingPrice    *float64        `json:"listing_price"`
 	Category        string          `json:"category"`
 	MainBusiness    string          `json:"main_business"`
+	Description     string          `json:"description"` // 公司简介，目前只有港股有，其他是空字符串
 	BusinessAddress string          `json:"business_address"`
 	RegisterAddress string          `json:"register_address"`
 	WebSite         string          `json:"website"`
@@ -220,7 +231,7 @@ func nonZero(value float64) *float64 {
 func printInfoJSON(cmd *cobra.Command, exCode string, profile *sina.CorpProfile, opts *types.InfoOptions) error {
 	row := infoRow{
 		ExCode: exCode, Name: profile.Name, HistoryName: profile.HistoryName, ListingDate: profile.ListingDate, ListingPrice: nonZero(profile.ListingPrice),
-		Category: profile.Category, MainBusiness: profile.MainBusiness, BusinessAddress: profile.BusinessAddress, RegisterAddress: profile.RegisterAddress, WebSite: profile.WebSite,
+		Category: profile.Category, MainBusiness: profile.MainBusiness, Description: profile.Description, BusinessAddress: profile.BusinessAddress, RegisterAddress: profile.RegisterAddress, WebSite: profile.WebSite,
 		Price: nonZero(profile.Current), PriceIsYClose: profile.PriceIsYClose, PB: nonZero(profile.PB), PETTM: nonZero(profile.PeTTM),
 		MarketCap: nonZero(profile.MarketCap), TradedMarketCap: nonZero(profile.TradedMarketCap),
 	}

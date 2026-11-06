@@ -29,7 +29,7 @@
 | --- | --- | --- |
 | `search` | `results` | 每项 `code`、`ex_code`、`exchange`、`name`、`security_type` |
 | `quote` | `results` | 每项一只证券的行情 |
-| `info`（A 股、港股） | `ex_code`、`name`、`history_name`、`listing_date` 等公司字段 | 一个对象，不在 `results` 里 |
+| `info`（A 股、港股） | `ex_code`、`name`、`history_name`、`listing_date` 等公司字段 | 一个对象，不在 `results` 里；`description` 是公司简介，目前只有港股有 |
 | `info`（美股） | `ex_code`、`ticker`、`company`、`quote` | `company` 或 `quote` 取不到时为 `null` |
 | `kline`、`quote-history` | `ex_code`、`name`、`freq`、`fq`、`source_note`、`results` | `results` 每项一根 K 线 |
 | `financials`（A 股） | `ex_code`、`name`、`results` | |

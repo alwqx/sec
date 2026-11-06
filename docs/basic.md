@@ -76,10 +76,12 @@ sec i <code>
 ```
 cmd/cmd.go (InfoHandler)
 provider/sina/sina.go (Search, Profile, QueryDividends)
+hkstock/hkstock.go (Profile，港股)
+provider/eastmoney/hkprofile.go (GetHKProfile, GetHKValuation)
 ```
 
 1. `sina.Resolve(ctx, key)` — 搜索证券代码，取第一个结果；美股场外交易的外国公司代码（如 TCEHY）排在港股和 A 股后面，所以「腾讯」取到 HK00700
-2. `sina.Profile(ctx, opts)` — 查询公司概况（合并 quote + profile + corp info）
+2. `sina.Profile(ctx, opts)` — 查询公司概况（合并 quote + profile + corp info）。港股改用 `hkstock.Profile`，见下方「港股」
 3. 若 `-d` 指定：`sina.QueryDividends(ctx, code)` — 查询分红历史
 
 ### 输出字段
@@ -92,7 +94,7 @@ provider/sina/sina.go (Search, Profile, QueryDividends)
 | 简称历史   | 历史简称                  |
 | 公司名称   | 公司全称                  |
 | 上市日期   | 上市日期                  |
-| 发行价格   | IPO 发行价                |
+| 发行价格   | IPO 发行价，没有时显示 `-` |
 | 行业分类   | 所属行业                  |
 | 主营业务   | 主营业务描述              |
 | 办公地址   | 公司办公地址              |
@@ -102,6 +104,20 @@ provider/sina/sina.go (Search, Profile, QueryDividends)
 | 市盈率 TTM | 滚动市盈率                |
 | 总市值     | 总市值（亿/万自动换算）   |
 | 流通市值   | 流通市值（亿/万自动换算） |
+| 公司简介   | 公司介绍，目前只有港股有，没有时不显示 |
+
+### 港股
+
+新浪的公司资料页只有 A 股，港股的公司资料改用东方财富。`hkstock.Profile` 同时请求下面几项再合并，`kline` 的抬头也用它；`provider/sina` 只提供新浪的行情部分，不直接调用东方财富：
+
+- 新浪行情：简称、价格、总市值和流通市值，以及证券类型（`_i` 的第一列，`EQTY` 是股本证券，`TRST` 是交易所买卖基金、房地产投资信托等）。
+- 东方财富港股 F10 `RPT_HKF10_INFO_ORGPROFILE`：公司名称、简称、行业、上市日期、网址、办公和注册地址、主营业务、公司简介。
+- 东方财富港股 F10 `RPT_HKF10_INFO_SECURITYINFO`：发行价（港元）。
+- 东方财富行情 `f164`、`f167`：市盈率 TTM 和市净率。东方财富已把人民币等报表货币换算成港元，不用新浪的利润和每股净资产自己算，那样会把人民币利润和港元股价混在一起。亏损时市盈率显示 `-`。
+
+新浪行情失败时报错。东方财富的公司资料和估值分别请求，一项失败或没有数据只留空这一项、记 WARN：公司资料取不到时名称用简称，估值照常显示；发行价取不到时显示 `-`。简介等长文本里的换行和全角空格合并成一个空格。
+
+新浪类型是 `TRST` 的证券（如盈富基金、领展房产基金）不是公司，F10 里的公司名称是基金管理人，只显示行情部分。
 
 分红信息（`-d` 选项，表格输出）：
 

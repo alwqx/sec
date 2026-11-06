@@ -151,6 +151,11 @@ func Profile(ctx context.Context, opts *types.InfoOptions) (*CorpProfile, error)
 		return nil, errors.New("opts is nil")
 	}
 
+	// 新浪的公司资料页只有 A 股，港股只有行情部分，公司资料由 hkstock 包从东方财富补上。
+	if types.IsHCode(opts.ExCode) {
+		return hkQuoteProfile(ctx, opts.ExCode)
+	}
+
 	var (
 		wg          sync.WaitGroup
 		corp        *BasicCorp
@@ -402,6 +407,7 @@ type sinaPartProfile struct {
 	Profit   float64 // 净利润
 	Category string  // 行业分类
 	BShare   bool    // 是否 B 股
+	HKTrust  bool    // 港股交易所买卖基金、房地产投资信托等，新浪类型是 TRST，不是 EQTY
 }
 
 func parseInfoPartProfile(exCode, line string) (*sinaPartProfile, error) {
@@ -458,25 +464,33 @@ func parseInfoPartProfileOfHstock(line string) (*sinaPartProfile, error) {
 		return nil, fmt.Errorf("invalid items %s, num should >= 33 but get %d", line, len(items))
 	}
 
+	// 盈富基金等交易所买卖基金没有每股净资产，这一列为空，按 0 处理。
+	parse := func(text string) (float64, error) {
+		if text == "" {
+			return 0, nil
+		}
+		return strconv.ParseFloat(text, 64)
+	}
 	var err error
 	partProfile := sinaPartProfile{}
-	partProfile.VPS, err = strconv.ParseFloat(items[27], 64)
+	partProfile.VPS, err = parse(items[27])
 	if err != nil {
 		return nil, err
 	}
-	partProfile.Cap, err = strconv.ParseFloat(items[7], 64)
+	partProfile.Cap, err = parse(items[7])
 	if err != nil {
 		return nil, err
 	}
-	partProfile.TradeCap, err = strconv.ParseFloat(items[9], 64)
+	partProfile.TradeCap, err = parse(items[9])
 	if err != nil {
 		return nil, err
 	}
-	partProfile.Profit, err = strconv.ParseFloat(items[12], 64)
+	partProfile.Profit, err = parse(items[12])
 	if err != nil {
 		return nil, err
 	}
 	partProfile.Category = strings.TrimSpace(items[32])
+	partProfile.HKTrust = items[0] == "TRST"
 
 	return &partProfile, nil
 }
