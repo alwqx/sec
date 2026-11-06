@@ -39,7 +39,7 @@ const pages: { id: Page; title: string; icon: LucideIcon }[] = [
   { id: 'settings', title: '设置', icon: SettingsIcon },
 ]
 const tabs: { id: Tab; title: string }[] = [
-  { id: 'overview', title: '概览' }, { id: 'company', title: '公司' }, { id: 'financials', title: '财报' },
+  { id: 'company', title: '概览' }, { id: 'overview', title: '行情' }, { id: 'financials', title: '财报' },
   { id: 'dividends', title: '分红' }, { id: 'announcements', title: '公告' }, { id: 'technical', title: '技术分析' }, { id: 'valuation', title: '估值' },
 ]
 const initialWorkspace: WorkspaceState = { watchlist: [], settings: { refresh_seconds: 5, theme: 'dark', download_directory: '' } }
@@ -246,7 +246,7 @@ export default function App() {
                   : usStock && tab === 'financials' ? <USFinancials code={selected.ex_code} />
                   : usStock && tab === 'valuation' ? <Valuation code={selected.ex_code} />
                   : usStock && tab === 'dividends' ? <USDividends code={selected.ex_code} />
-                  : !aShare ? <div className="empty-state">此栏目暂仅支持沪深北 A 股，当前证券可在概览中查看行情。</div>
+                  : !aShare ? <div className="empty-state">此栏目暂仅支持沪深北 A 股，当前证券可在「行情」中查看行情。</div>
                   : tab === 'valuation' ? <Valuation code={selected.ex_code} />
                   : tab === 'financials' ? <Financials security={selected} />
                   : tab === 'announcements' ? <Announcements code={selected.ex_code} compact />
