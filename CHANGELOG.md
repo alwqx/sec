@@ -1,5 +1,9 @@
 ## sec change log
 
+### v0.4.8
+
+1. Add the AI/LLM design in `docs/ai.md` and its roadmap in `TODO.md`.
+
 ### v0.4.7
 
 1. Fix quotes for US OTC stocks such as `$TCEHY`.
