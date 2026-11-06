@@ -16,8 +16,9 @@ import (
 
 const (
 	// 自选上限是 500，旧列表可能超过上限，这里留出余量。
-	maxQuoteCodes  = 1000
-	quoteBatchSize = 100
+	maxQuoteCodes = 1000
+	// quoteBatchKeys 是每批请求新浪的 key 数。可能上市的基金占两个 key（交易所行情和净值）。
+	quoteBatchKeys = 100
 )
 
 // 与自选列表的代码规则一致：美股是 $AMD，基金等也可以保存。
@@ -63,6 +64,28 @@ func (s *desktopServer) handleQuotes(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{"results": results, "missing": missing})
 }
 
+// quoteBatches 按新浪 key 数分批，每批不超过 quoteBatchKeys 个 key。
+func quoteBatches(codes []string) [][]string {
+	var (
+		batches [][]string
+		batch   []string
+		keys    int
+	)
+	for _, code := range codes {
+		n := sina.QuoteKeyCount(code)
+		if len(batch) > 0 && keys+n > quoteBatchKeys {
+			batches = append(batches, batch)
+			batch, keys = nil, 0
+		}
+		batch = append(batch, code)
+		keys += n
+	}
+	if len(batch) > 0 {
+		batches = append(batches, batch)
+	}
+	return batches
+}
+
 // queryQuoteBatches 分批查询，failed 表示有批次请求失败。
 func queryQuoteBatches(ctx context.Context, codes []string) (map[string]*sina.SecurityQuote, bool) {
 	found := map[string]*sina.SecurityQuote{}
@@ -72,8 +95,7 @@ func queryQuoteBatches(ctx context.Context, codes []string) (map[string]*sina.Se
 		group sync.WaitGroup
 	)
 	limit := make(chan struct{}, 4)
-	for begin := 0; begin < len(codes); begin += quoteBatchSize {
-		batch := codes[begin:min(begin+quoteBatchSize, len(codes))]
+	for _, batch := range quoteBatches(codes) {
 		group.Add(1)
 		go func() {
 			defer group.Done()

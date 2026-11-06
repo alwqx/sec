@@ -9,6 +9,7 @@ export default function Overview({ security, interval }: { security: BasicSecuri
   const [data, setData] = useState<SecurityQuote | null>(null)
   const [error, setError] = useState('')
   const [retry, setRetry] = useState(0)
+  const fund = /^OF\d{6}$/i.test(security.ex_code)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -32,7 +33,8 @@ export default function Overview({ security, interval }: { security: BasicSecuri
     {error && <div className="error" role="alert">{error}<button onClick={() => setRetry(n => n + 1)}>重试</button></div>}
     {data ? <QuoteCard quote={data} /> : !error && <div className="empty-state" role="status">正在获取行情…</div>}
     <CompanyMetrics security={security} refreshSeconds={60} />
-    <PriceHistory code={security.ex_code} />
+    {/* 历史走势接口还不支持 OF 开头的基金代码，先不显示，免得只看到报错。 */}
+    {fund ? <p className="data-note">基金的历史走势暂不支持。</p> : <PriceHistory code={security.ex_code} />}
     <p className="data-note">行情以数据源返回时间为准，港美股可能存在延迟。</p>
   </div>
 }

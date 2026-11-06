@@ -3,12 +3,18 @@ import { quotes as fetchQuotes } from '../api'
 import type { SecurityQuote } from '../types'
 
 // 昨收缺失时无法计算涨跌，不显示为 0。
+// priceDigits 是价格的小数位数：基金净值 4 位，场内基金 3 位（交易所报价精确到 0.001），其他 2 位。
+export function priceDigits(quote: SecurityQuote) {
+  if (quote.nav) return 4
+  return /^OF\d{6}$/i.test(quote.ex_code) ? 3 : 2
+}
+
 export function quoteChange(quote: SecurityQuote) {
   const known = quote.yclose > 0 && quote.current > 0
   const change = quote.current - quote.yclose
   return {
     direction: !known || change === 0 ? 'flat' : change > 0 ? 'up' : 'down',
-    changeText: known ? `${change > 0 ? '+' : ''}${change.toFixed(2)}` : '—',
+    changeText: known ? `${change > 0 ? '+' : ''}${change.toFixed(priceDigits(quote))}` : '—',
     percentText: known ? `${change > 0 ? '+' : ''}${(change / quote.yclose * 100).toFixed(2)}%` : '—',
   }
 }

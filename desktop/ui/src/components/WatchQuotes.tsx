@@ -1,5 +1,5 @@
 import { RefreshCw } from 'lucide-react'
-import { quoteChange, type QuotesState } from '../hooks/useQuotes'
+import { priceDigits, quoteChange, type QuotesState } from '../hooks/useQuotes'
 import type { BasicSecurity } from '../types'
 
 function amount(value: number) {
@@ -10,7 +10,7 @@ function amount(value: number) {
 }
 export interface CompareState { checked: string[]; only: boolean }
 
-const price = (value: number) => value > 0 ? value.toFixed(2) : '—'
+const price = (value: number, digits = 2) => value > 0 ? value.toFixed(digits) : '—'
 
 // 自选页的行情表；勾选后可以只看选中的几只，并排比较，点证券名到研究页打开。自选为空时由调用方显示空状态。
 export default function WatchQuotes({ items, state, onSelect, compare, onCompare, onRefresh, refreshDisabled }: {
@@ -36,8 +36,8 @@ export default function WatchQuotes({ items, state, onSelect, compare, onCompare
           <td><input type="checkbox" aria-label={`对比 ${item.name}`} checked={checked.includes(item.ex_code)} onChange={() => toggle(item.ex_code)} /></td>
           <td><button className="text-link" onClick={() => onSelect(item)}>{item.name}</button><div className="data-note">{item.ex_code}</div></td>
           {quote && change ? <>
-            <td className={change.direction}>{price(quote.current)}</td><td className={change.direction}>{change.changeText}</td><td className={change.direction}>{change.percentText}</td>
-            <td>{price(quote.open)}</td><td>{price(quote.high)}</td><td>{price(quote.low)}</td><td>{price(quote.yclose)}</td><td>{amount(quote.volume)}</td><td>{quote.trade_date} {quote.time}</td>
+            <td className={change.direction}>{price(quote.current, priceDigits(quote))}</td><td className={change.direction}>{change.changeText}</td><td className={change.direction}>{change.percentText}</td>
+            <td>{price(quote.open, priceDigits(quote))}</td><td>{price(quote.high, priceDigits(quote))}</td><td>{price(quote.low, priceDigits(quote))}</td><td>{price(quote.yclose, priceDigits(quote))}</td><td>{amount(quote.volume)}</td><td>{quote.trade_date} {quote.nav ? '净值' : quote.time}</td>
           </> : <td colSpan={9} className="data-note">{state.missing.includes(item.ex_code.toUpperCase()) ? '行情不可用' : '—'}</td>}
         </tr>
       })}</tbody></table></div>

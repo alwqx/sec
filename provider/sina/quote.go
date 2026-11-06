@@ -109,6 +109,16 @@ func formatQuoteKeys(keys []string) []string {
 // QuerySecQuote 查询证券行情
 // exCode SH600036 HK00700 $AMD
 func QuerySecQuote(ctx context.Context, exCode string) (*SecurityQuote, error) {
+	if IsFundCode(exCode) {
+		quotes, err := QueryQuoteList(ctx, []string{exCode})
+		if err != nil {
+			return nil, err
+		}
+		if len(quotes) == 0 {
+			return nil, fmt.Errorf("%w: %s", ErrNotFound, exCode)
+		}
+		return quotes[0], nil
+	}
 	// 复用 formatQuoteKeys 做行情 key 归一化：
 	// 美股 $AMD -> gb_amd，港股 HK00700 -> hk00700，A 股 SH600036 -> sh600036。
 	// 直接 strings.ToLower 会把 $ 前缀漏掉，导致新浪返回空行情。
@@ -362,10 +372,18 @@ var (
 // exCode SH600036 HK00700
 // exCodes = {"$AMD", "SH600036", "HK09992"}
 func QueryQuoteList(ctx context.Context, exCodes []string) ([]*SecurityQuote, error) {
-	formatKeys := formatQuoteKeys(exCodes)
-	keys := strings.Join(formatKeys, ",")
-	reqUrl := fmt.Sprintf("https://hq.sinajs.cn/list=%s", keys)
-	slog.DebugContext(ctx, "QueryQuoteList", "exCodes", strings.Join(exCodes, ", "), "search_keys", keys, "req_url", reqUrl)
+	// 基金和其他证券放在同一次请求里：基金的交易所行情和净值行单独挑出来，其余行照常解析。
+	funds, others := splitFundCodes(exCodes)
+	keys := formatQuoteKeys(others)
+	fundKeys := map[string]bool{}
+	for _, exCode := range funds {
+		for _, key := range fundQuoteKeys(exCode) {
+			keys = append(keys, key)
+			fundKeys[key] = true
+		}
+	}
+	reqUrl := fmt.Sprintf("https://hq.sinajs.cn/list=%s", strings.Join(keys, ","))
+	slog.DebugContext(ctx, "QueryQuoteList", "exCodes", strings.Join(exCodes, ", "), "req_url", reqUrl)
 	resp, err := utils.MakeRequest(ctx, http.MethodGet, reqUrl, defaultHTTPHeaders(), nil, 0)
 	if err != nil {
 		return nil, err
@@ -383,8 +401,29 @@ func QueryQuoteList(ctx context.Context, exCodes []string) ([]*SecurityQuote, er
 	if err != nil {
 		return nil, err
 	}
+	if len(funds) == 0 {
+		return parseQuoteListBody(string(body))
+	}
 
-	return parseQuoteListBody(string(body))
+	fundLines := map[string]string{}
+	var rest strings.Builder
+	for _, line := range strings.Split(string(body), "\n") {
+		if key, value, ok := quoteLineKey(line); ok && fundKeys[key] {
+			fundLines[key] = value
+			continue
+		}
+		rest.WriteString(line + "\n")
+	}
+	res, err := parseQuoteListBody(rest.String())
+	if err != nil && len(fundLines) == 0 {
+		return nil, err
+	}
+	for _, exCode := range funds {
+		if quote := fundQuote(exCode, fundLines); quote != nil {
+			res = append(res, quote)
+		}
+	}
+	return inCodeOrder(res, exCodes), nil
 }
 
 // parseQuoteListBody 解析 QueryQuoteList 返回结果

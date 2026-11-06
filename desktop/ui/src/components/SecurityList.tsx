@@ -1,5 +1,5 @@
 import type { BasicSecurity, SecurityQuote } from '../types'
-import { quoteChange } from '../hooks/useQuotes'
+import { priceDigits, quoteChange } from '../hooks/useQuotes'
 
 interface Props {
   items: BasicSecurity[]
@@ -16,7 +16,7 @@ export default function SecurityList({ items, selected, onSelect, emptyText = '�
       aria-pressed={selected?.ex_code === security.ex_code} onClick={() => onSelect(security)}>
       <span className="security-item-top"><span className="name">{security.name}</span><span className="exchange">{security.exchange}</span></span>
       <span className="code">{security.ex_code}</span>
-      {quote && change && <span className={`security-item-quote ${change.direction}`}><span>{quote.current > 0 ? quote.current.toFixed(2) : '—'}</span><span>{change.percentText}</span></span>}
+      {quote && change && <span className={`security-item-quote ${change.direction}`}><span>{quote.current > 0 ? quote.current.toFixed(priceDigits(quote)) : '—'}</span><span>{change.percentText}</span></span>}
     </button>
   </li> })}</ul>
 }

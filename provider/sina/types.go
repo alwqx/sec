@@ -70,6 +70,9 @@ type SecurityQuote struct {
 	Time      string  `json:"time"`     // 行情时间 "15:00:01"
 	// TradeDate 和 Time 是交易所当地时间，Timezone 是它的 IANA 时区：A 股 Asia/Shanghai、港股 Asia/Hong_Kong、美股 America/New_York。
 	Timezone string `json:"timezone"`
+	// NAV 表示价格是基金单位净值：场外基金或没有交易所行情的场内基金。这时 TradeDate 是净值日期，
+	// YClose 是上一日单位净值，没有时间、开高低和成交。
+	NAV bool `json:"nav"`
 }
 
 // EffectivePrice 返回可用的价格。没有成交价（如开盘前）时用昨收，并把第二个返回值设为 true；都没有时返回 0。

@@ -292,4 +292,19 @@ func TestRetryKeepsOrderAndDedupesCase(t *testing.T) {
 func TestQuoteTime(t *testing.T) {
 	require.Equal(t, "2024-09-30 15:00:01", quoteTime(&sina.SecurityQuote{TradeDate: "2024-09-30", Time: "15:00:01", Timezone: types.TimezoneShanghai}))
 	require.Equal(t, "2026-11-05 20:45:05 美东", quoteTime(&sina.SecurityQuote{TradeDate: "2026-11-05", Time: "20:45:05", Timezone: types.TimezoneNewYork}))
+	require.Equal(t, "2026-11-05 净值", quoteTime(&sina.SecurityQuote{TradeDate: "2026-11-05", Timezone: types.TimezoneShanghai, NAV: true}))
+}
+
+// 基金净值没有开高低，JSON 是 null、表格显示 -，并标出 nav。
+func TestQuoteRowNAV(t *testing.T) {
+	quote := &sina.SecurityQuote{ExCode: "OF005827", Name: "易方达蓝筹精选混合", Current: 1.4164, YClose: 1.4009, TradeDate: "2026-11-05", NAV: true}
+	row := newQuoteRow(quote)
+	require.True(t, row.NAV)
+	require.Nil(t, row.Open)
+	require.InDelta(t, 1.1064, *row.ChangePct, 1e-4)
+
+	var out bytes.Buffer
+	printQuote(&out, []*sina.SecurityQuote{quote})
+	require.Contains(t, out.String(), "2026-11-05 净值")
+	require.NotContains(t, out.String(), "| 0 ", "没有的开高低不显示成 0")
 }
