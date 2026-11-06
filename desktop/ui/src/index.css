@@ -369,7 +369,7 @@ h1, h2, h3 { font-weight: 600; }
 .security-item-quote { display: flex; justify-content: space-between; gap: 8px; margin-top: 4px; font-size: 12px; font-variant-numeric: tabular-nums; }
 .watch-quotes .section-toolbar { justify-content: space-between; margin-bottom: 12px; }
 .watch-quotes .text-link { border: 0; background: transparent; padding: 0; text-align: left; }
-.watch-quotes tr[aria-selected='true'] { background: var(--accent-soft); }
+.watch-quotes-status { display: flex; align-items: center; gap: 8px; }
 .history-indicators { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 10px 0; font-size: 12px; }
 .history-indicators label { display: flex; align-items: center; gap: 4px; color: var(--muted); }
 .overlay-line { fill: none; stroke-width: 1.25; pointer-events: none; }

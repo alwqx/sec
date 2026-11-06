@@ -25,10 +25,11 @@ import Macro from './components/Macro'
 import Fx from './components/Fx'
 import secLogo from '../../assets/sec-logo.png'
 
-type Page = 'stocks' | 'ipo' | 'announcements' | 'macro' | 'fx' | 'metal' | 'commodity' | 'settings'
-type Tab = 'overview' | 'company' | 'financials' | 'dividends' | 'announcements' | 'technical' | 'valuation' | 'quotes'
+type Page = 'watch' | 'research' | 'ipo' | 'announcements' | 'macro' | 'fx' | 'metal' | 'commodity' | 'settings'
+type Tab = 'overview' | 'company' | 'financials' | 'dividends' | 'announcements' | 'technical' | 'valuation'
 const pages: { id: Page; title: string; icon: LucideIcon }[] = [
-  { id: 'stocks', title: '自选与行情', icon: ChartCandlestick },
+  { id: 'watch', title: '自选', icon: Star },
+  { id: 'research', title: '研究', icon: ChartCandlestick },
   { id: 'ipo', title: 'IPO', icon: FilePlusCorner },
   { id: 'announcements', title: '公告中心', icon: Newspaper },
   { id: 'macro', title: '宏观', icon: Landmark },
@@ -39,12 +40,12 @@ const pages: { id: Page; title: string; icon: LucideIcon }[] = [
 ]
 const tabs: { id: Tab; title: string }[] = [
   { id: 'overview', title: '概览' }, { id: 'company', title: '公司' }, { id: 'financials', title: '财报' },
-  { id: 'dividends', title: '分红' }, { id: 'announcements', title: '公告' }, { id: 'technical', title: '技术分析' }, { id: 'valuation', title: '估值' }, { id: 'quotes', title: '自选行情' },
+  { id: 'dividends', title: '分红' }, { id: 'announcements', title: '公告' }, { id: 'technical', title: '技术分析' }, { id: 'valuation', title: '估值' },
 ]
 const initialWorkspace: WorkspaceState = { watchlist: [], settings: { refresh_seconds: 5, theme: 'dark', download_directory: '' } }
 
 export default function App() {
-  const [page, setPage] = useState<Page>('stocks')
+  const [page, setPage] = useState<Page>('watch')
   const [tab, setTab] = useState<Tab>('overview')
   const [announcementScope, setAnnouncementScope] = useState<'latest' | 'selected'>('latest')
   const [listMode, setListMode] = useState<'watchlist' | 'search'>('watchlist')
@@ -96,7 +97,7 @@ export default function App() {
   useEffect(() => { pageContentRef.current?.scrollTo(0, 0) }, [page])
 
   useEffect(() => {
-    if (!ready || page !== 'stocks') return
+    if (!ready || (page !== 'watch' && page !== 'research')) return
     const controller = new AbortController()
     let requestSequence = 0
     const refresh = () => {
@@ -132,7 +133,7 @@ export default function App() {
     setSearching(true)
     setSearchError('')
     setSearchedKey(key)
-    setPage('stocks')
+    setPage('research')
     setListMode('search')
     setResults([])
     try {
@@ -146,10 +147,13 @@ export default function App() {
   }, [])
 
   const onSelect = (security: BasicSecurity) => { setSelected(security) }
+  // 在自选页点一只证券，到研究页打开它。
+  // 左侧切回自选列表，刚点的证券在列表里高亮。
+  const openResearch = (security: BasicSecurity) => { setSelected(security); setListMode('watchlist'); setPage('research') }
   const openIPO = (security: BasicSecurity) => {
     setSelected(security)
     setTab('overview')
-    setPage('stocks')
+    setPage('research')
   }
   const watched = selected !== null && workspace.watchlist.some(item => item.ex_code.toUpperCase() === selected.ex_code.toUpperCase())
   const toggleWatch = async () => {
@@ -174,8 +178,8 @@ export default function App() {
   const currentPage = pages.find(item => item.id === page)!
   const items = listMode === 'watchlist' ? workspace.watchlist : results
   const watchCodes = useMemo(() => workspace.watchlist.map(item => item.ex_code), [workspace.watchlist])
-  // 只在能看到行情时轮询：自选列表或自选行情栏目。
-  const watchQuotes = useQuotes(watchCodes, workspace.settings.refresh_seconds, ready && page === 'stocks' && (listMode === 'watchlist' || tab === 'quotes'))
+  // 只在能看到行情时轮询：自选页，或研究页左侧显示自选列表时。
+  const watchQuotes = useQuotes(watchCodes, workspace.settings.refresh_seconds, ready && (page === 'watch' || (page === 'research' && listMode === 'watchlist')))
   const aShare = selected?.security_type === 'stock' && /^(SH|SZ|BJ)\d{6}$/i.test(selected.ex_code)
   const usStock = selected?.ex_code.startsWith('$') ?? false
 
@@ -208,13 +212,17 @@ export default function App() {
             <span className="sidebar-toggle-tip" id="sidebar-toggle-tip" role="tooltip">{sidebarHidden ? '点击展开菜单' : '点击隐藏菜单'}</span>
           </button>
           <currentPage.icon size={22} strokeWidth={1.75} aria-hidden="true" /><h1>{currentPage.title}</h1></div><div className="page-actions" id="page-actions">
-          {selected && page !== 'stocks' && <button className="context-security" onClick={() => setPage('stocks')}>{selected.name} · 返回研究 →</button>}
+          {selected && page !== 'research' && page !== 'watch' && <button className="context-security" onClick={() => setPage('research')}>{selected.name} · 返回研究 →</button>}
           </div>
         </header>
-        <div ref={pageContentRef} className={page === 'stocks' ? 'page-content page-content--workspace' : 'page-content'}>
+        <div ref={pageContentRef} className={page === 'research' ? 'page-content page-content--workspace' : 'page-content'}>
         {storeError && <div className="error" role="alert">{storeError}{!ready && <button onClick={() => setStoreRetry(n => n + 1)}>重新加载</button>}</div>}
         {!ready && !storeError && <div className="data-note" role="status">正在读取本地自选与设置…</div>}
-        {page === 'stocks' && <div className="workspace-grid">
+        {page === 'watch' && ready && <div className="page-panel watch-page">
+          {workspace.watchlist.length ? <WatchQuotes items={workspace.watchlist} state={watchQuotes} onSelect={openResearch} compare={compare} onCompare={setCompare} onRefresh={() => { setWatchRefresh(n => n + 1); watchQuotes.reload() }} refreshDisabled={!ready || saving} />
+            : <div className="empty-state"><span>暂无自选证券。在研究页搜索并选中证券后，点击“加入自选”。</span><button onClick={() => setPage('research')}>去研究页搜索</button></div>}
+        </div>}
+        {page === 'research' && <div className="workspace-grid">
           <section className="security-browser" aria-label="证券列表">
             <div className="browser-search"><SearchBar onSearch={onSearch} loading={searching} initialKey={searchedKey} /></div>
             <div className="browser-toolbar"><div className="browser-tabs segmented"><button aria-pressed={listMode === 'watchlist'} onClick={() => setListMode('watchlist')}>我的自选 <span>{workspace.watchlist.length}</span></button><button aria-pressed={listMode === 'search'} onClick={() => setListMode('search')}>搜索结果</button></div>
@@ -233,7 +241,6 @@ export default function App() {
               <div className="research-panel" role="tabpanel" id="research-panel" aria-labelledby={`tab-${tab}`} key={`${selected.ex_code}-${tab}`}>
                 <ErrorBoundary>{tab === 'overview' ? <Overview security={selected} interval={workspace.settings.refresh_seconds} />
                   : tab === 'technical' ? <Strategy code={selected.ex_code} />
-                  : tab === 'quotes' ? <WatchQuotes items={workspace.watchlist} state={watchQuotes} selected={selected} onSelect={onSelect} compare={compare} onCompare={setCompare} />
                   : usStock && tab === 'announcements' ? <Filings code={selected.ex_code} />
                   : usStock && tab === 'company' ? <USCompany code={selected.ex_code} />
                   : usStock && tab === 'financials' ? <USFinancials code={selected.ex_code} />
