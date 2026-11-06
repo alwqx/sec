@@ -8,6 +8,7 @@
 4. Show US quote times in New York time and add `timezone` to quotes. **JSON change:** US `trade_date` and `time` are now New York time.
 5. Add `scripts/live-smoke.sh` to check every command against live data by hand.
 6. Find HK codes written with a prefix, such as `hk00700`.
+7. Split the Desktop 自选与行情 page into 自选, a full-page watchlist quote table that opens by default, and 研究, the security research page.
 
 ### v0.4.6
 

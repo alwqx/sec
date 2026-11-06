@@ -1,3 +1,4 @@
+import { RefreshCw } from 'lucide-react'
 import { quoteChange, type QuotesState } from '../hooks/useQuotes'
 import type { BasicSecurity } from '../types'
 
@@ -11,26 +12,27 @@ export interface CompareState { checked: string[]; only: boolean }
 
 const price = (value: number) => value > 0 ? value.toFixed(2) : '—'
 
-// 自选证券的行情表；勾选后可以只看选中的几只，并排比较。
-export default function WatchQuotes({ items, state, selected, onSelect, compare, onCompare }: {
-  items: BasicSecurity[]; state: QuotesState; selected: BasicSecurity; onSelect: (security: BasicSecurity) => void
+// 自选页的行情表；勾选后可以只看选中的几只，并排比较，点证券名到研究页打开。自选为空时由调用方显示空状态。
+export default function WatchQuotes({ items, state, onSelect, compare, onCompare, onRefresh, refreshDisabled }: {
+  items: BasicSecurity[]; state: QuotesState; onSelect: (security: BasicSecurity) => void
   compare: CompareState; onCompare: (compare: CompareState) => void
+  onRefresh: () => void; refreshDisabled: boolean
 }) {
   // 已移出自选的证券不再计入。
   const checked = compare.checked.filter(code => items.some(item => item.ex_code === code))
   const onlyChecked = compare.only && checked.length > 0
-  if (!items.length) return <div className="empty-state">暂无自选证券。搜索并选中证券后，点击“加入自选”。</div>
   const toggle = (code: string) => onCompare({ ...compare, checked: checked.includes(code) ? checked.filter(item => item !== code) : [...checked, code] })
   const rows = onlyChecked ? items.filter(item => checked.includes(item.ex_code)) : items
   return <div className="watch-quotes">
     <div className="section-toolbar"><label><input type="checkbox" checked={onlyChecked} disabled={!checked.length} onChange={event => onCompare({ ...compare, only: event.target.checked })} />只看选中（{checked.length}）</label>
-      <span className="data-note">{state.updatedAt ? `更新于 ${state.updatedAt.toLocaleTimeString('zh-CN', { hour12: false })}` : '正在读取行情…'}</span></div>
+      <span className="watch-quotes-status"><span className="data-note">{state.updatedAt ? `更新于 ${state.updatedAt.toLocaleTimeString('zh-CN', { hour12: false })}` : '正在读取行情…'}</span>
+      <button className="watchlist-refresh icon-button" aria-label="刷新自选" title="刷新自选" disabled={refreshDisabled} onClick={onRefresh}><RefreshCw size={15} aria-hidden="true" /></button></span></div>
     {state.error && <div className="error" role="alert">行情刷新失败，显示的是上一次结果：{state.error}<button onClick={state.reload}>重试</button></div>}
     <div className="table-scroll"><table className="data-table"><thead><tr><th>对比</th><th>证券</th><th>最新</th><th>涨跌</th><th>涨跌幅</th><th>今开</th><th>最高</th><th>最低</th><th>昨收</th><th>成交额</th><th>行情时间</th></tr></thead>
       <tbody>{rows.map(item => {
         const quote = state.quotes.get(item.ex_code.toUpperCase())
         const change = quote && quoteChange(quote)
-        return <tr key={item.ex_code} aria-selected={item.ex_code === selected.ex_code}>
+        return <tr key={item.ex_code}>
           <td><input type="checkbox" aria-label={`对比 ${item.name}`} checked={checked.includes(item.ex_code)} onChange={() => toggle(item.ex_code)} /></td>
           <td><button className="text-link" onClick={() => onSelect(item)}>{item.name}</button><div className="data-note">{item.ex_code}</div></td>
           {quote && change ? <>

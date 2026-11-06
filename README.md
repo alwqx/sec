@@ -30,7 +30,7 @@ SEC（Security Information Client）提供 CLI 与 Desktop 两种界面，用于
 
 1. 打开 [Releases](https://github.com/alwqx/sec/releases)，下载 `sec-<版本>-desktop-darwin-arm64.dmg`，例如 `sec-v0.3.16-desktop-darwin-arm64.dmg`（以实际发布资源为准）。
 2. 打开 DMG，将应用拖入 `Applications`，启动 SEC。
-3. 在「自选与行情」中搜索证券并加入自选；在「设置」中调整外观、行情刷新间隔和下载目录。
+3. 在「研究」中搜索证券并加入自选，在「自选」中查看全部自选的行情；在「设置」中调整外观、行情刷新间隔和下载目录。
 
 当前 Release 仅提供 Apple Silicon 的 Desktop 安装包，Intel Mac 与 Windows Desktop 安装包尚未提供。macOS 安装包采用 ad-hoc 签名，尚未完成 Developer ID 签名与 Apple 公证；系统拦截时的说明见 [Desktop 构建与发布文档](docs/desktop.md#发布 macos)。
 
@@ -53,9 +53,9 @@ CLI 命令名和可执行文件名保持小写 `sec`。
 
 以下为当前 Desktop 前端界面，使用演示数据生成；证券列表、行情和报表数值不代表实时数据。
 
-### 自选与行情
+### 自选与研究
 
-侧栏切换工作空间，证券列表与研究区并列展示；个股研究包含概览、公司、财报、分红与公告。K 线支持日期范围、复权选择、成交量副图和逐日量额查看。
+「自选」整页显示全部自选证券的行情，可勾选对比；「研究」中证券列表与研究区并列展示；个股研究包含概览、公司、财报、分红与公告。K 线支持日期范围、复权选择、成交量副图和逐日量额查看。
 
 ![SEC Desktop 浅色主题：自选证券、核心指标与历史 K 线](https://raw.githubusercontent.com/alwqx/picx-images-hosting/refs/heads/master/blog/2026/sec-quote.3rc18xtfai.webp)
 
@@ -83,7 +83,7 @@ CLI `sec watch` 与 Desktop「我的自选」统一使用 `~/.sec/watchlist.json
 
 首次使用新版 CLI 或 Desktop 时，自动合并原 CLI 列表与 Desktop 自选，保留证券类型、交易所和已有添加时间；有旧数据的源文件先生成同目录 `*.pre-shared-*.bak` 备份，再写入带版本的共享文档并移除 Desktop 旧自选字段。迁移失败时返回错误，不用空列表覆盖损坏数据。两端应使用支持共享格式的新版程序；旧版 CLI 不支持新的版本化文档。
 
-跨进程文件锁与同目录临时文件原子替换保护增删操作。Desktop 返回「自选与行情」、窗口重新获得焦点或点击「刷新自选」时读取最新共享列表。迁移时不截断超过 500 只的历史列表，此时可删除但不能继续新增。
+跨进程文件锁与同目录临时文件原子替换保护增删操作。Desktop 打开「自选」或「研究」、窗口重新获得焦点或点击「刷新自选」时读取最新共享列表。迁移时不截断超过 500 只的历史列表，此时可删除但不能继续新增。
 
 ## CLI 命令
 
