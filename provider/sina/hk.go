@@ -21,6 +21,7 @@ func hkQuoteProfile(ctx context.Context, exCode string) (*CorpProfile, error) {
 		PriceIsYClose:   metrics.PriceIsYClose,
 		MarketCap:       metrics.MarketCap,
 		TradedMarketCap: metrics.TradedMarketCap,
-		HKTrust:         part.HKTrust,
+		HKType:          part.HKType,
+		Currency:        part.Currency,
 	}, nil
 }

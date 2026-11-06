@@ -291,6 +291,14 @@ export interface SECProfile {
 export interface SECFilings { company: SECProfile; ticker: string; total: number; has_more: boolean; truncated: boolean; results: SECFiling[] }
 
 export interface USQuote { name: string; price: number; change_rate: number; time: string; high_52w: number | null; low_52w: number | null; market_cap: number | null; eps: number | null; pe: number | null; shares: number | null }
+// HKCompanyData 是港股公司概况：东方财富公司资料和估值，新浪价格和市值（交易币种 currency，人民币柜台是 CNY）；
+// equity 为 false 时是基金、信托、权证等，没有公司资料；取不到的值是 null 或空字符串，原因在 notes。
+export interface HKCompanyData {
+  ex_code: string; short_name: string; name: string; industry: string; listing_date: string; issue_price: number | null
+  website: string; business_address: string; register_address: string; main_business: string; description: string
+  price: number | null; price_is_yclose: boolean; pe_ttm: number | null; pb: number | null
+  market_cap: number | null; float_market_cap: number | null; currency: string; equity: boolean; notes: string[]
+}
 export interface USCompanyData { info: { ex_code: string; ticker: string; company: SECProfile | null; quote: USQuote | null }; notes: string[] }
 export interface USReport {
   statement: string; quarterly: boolean; standard: 'US GAAP' | 'IFRS'; currency: string; currency_name: string

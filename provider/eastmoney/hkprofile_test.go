@@ -48,6 +48,7 @@ func TestGetHKProfileOptionalAndMissing(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "腾讯控股有限公司", p.Name)
 	require.Nil(t, p.IssuePrice)
+	require.ErrorContains(t, p.IssuePriceErr, "503", "发行价失败的原因交给调用方")
 
 	mockHKReport("RPT_HKF10_INFO_ORGPROFILE").Reply(200).BodyString(emptyBody)
 	mockHKReport("RPT_HKF10_INFO_SECURITYINFO").Reply(200).BodyString(emptyBody)

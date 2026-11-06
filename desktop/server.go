@@ -44,6 +44,7 @@ func (s *desktopServer) Handler() http.Handler {
 	mux.Handle("PUT /api/v1/workspace", s.withAuth(http.HandlerFunc(s.handleWorkspace)))
 	mux.Handle("GET /api/v1/bond", s.withAuth(s.withCORS(http.HandlerFunc(s.handleBond))))
 	mux.Handle("GET /api/v1/metal", s.withAuth(s.withCORS(http.HandlerFunc(s.handleMetal))))
+	mux.Handle("GET /api/v1/hk/company", s.withAuth(s.withCORS(http.HandlerFunc(s.handleHKCompany))))
 	mux.Handle("GET /api/v1/us/company", s.withAuth(s.withCORS(http.HandlerFunc(s.handleUSCompany))))
 	mux.Handle("GET /api/v1/us/financials", s.withAuth(s.withCORS(http.HandlerFunc(s.handleUSFinancials))))
 	mux.Handle("GET /api/v1/us/financials/charts", s.withAuth(s.withCORS(http.HandlerFunc(s.handleUSFinancialCharts))))
