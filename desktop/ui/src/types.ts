@@ -292,6 +292,16 @@ export interface SECProfile {
 export interface SECFilings { company: SECProfile; ticker: string; total: number; has_more: boolean; truncated: boolean; results: SECFiling[] }
 
 export interface USQuote { name: string; price: number; change_rate: number; time: string; high_52w: number | null; low_52w: number | null; market_cap: number | null; eps: number | null; pe: number | null; shares: number | null }
+// FundOverview 是基金概况（fund.Info）：天天基金 App 接口的净值和收益率，网页档案的全称、托管人和业绩比较基准等。
+// 货币基金的 nav、acc_nav、day_change 为 null，改用 yield_10k（每万份收益，元）和 yield_7d（七日年化，%）；收益率单位都是 %。
+export interface FundReturns { '1w': number | null; '1m': number | null; '3m': number | null; '6m': number | null; '1y': number | null; '2y': number | null; '3y': number | null; ytd: number | null; since_launch: number | null }
+export interface FundOverview {
+  ex_code: string; code: string; name: string; full_name: string; type: string; money_market: boolean; listed: boolean; risk_level: string
+  company: string; custodian: string; managers: string; launch_date: string; launch_size: string; net_assets: number | null; net_assets_note: string
+  management_fee: string; custody_fee: string; benchmark: string; tracking: string; objective: string
+  nav: number | null; acc_nav: number | null; day_change: number | null; yield_10k: number | null; yield_7d: number | null; nav_date: string
+  returns: FundReturns | null; notes: string[]
+}
 // HKCompanyData 是港股公司概况：东方财富公司资料和估值，新浪价格和市值（交易币种 currency，人民币柜台是 CNY）；
 // equity 为 false 时是基金、信托、权证等，没有公司资料；取不到的值是 null 或空字符串，原因在 notes。
 export interface HKCompanyData {

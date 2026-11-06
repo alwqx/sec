@@ -161,6 +161,10 @@ func InfoHandler(cmd *cobra.Command, args []string) error {
 	if strings.HasPrefix(sec.ExCode, "$") {
 		return usInfoHandler(cmd, sec.ExCode, asJSON, opts.Dividend)
 	}
+	// 基金没有公司资料，改用天天基金的基金信息。
+	if sina.IsFundCode(sec.ExCode) {
+		return fundInfoHandler(cmd, sec.ExCode, asJSON, opts.Dividend)
+	}
 	opts.Code = sec.Code
 	opts.ExCode = sec.ExCode
 	var profile *sina.CorpProfile
