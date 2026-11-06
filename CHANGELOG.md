@@ -10,6 +10,7 @@
 6. Find HK codes written with a prefix, such as `hk00700`.
 7. Split the Desktop 自选与行情 page into 自选, a full-page watchlist quote table that opens by default, and 研究, the security research page.
 8. Rename the Desktop 研究 tabs 概览 to 行情 and 公司 to 概览, with 概览 first.
+9. Open the Desktop 研究 page on the 概览 tab.
 
 ### v0.4.6
 

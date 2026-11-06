@@ -46,7 +46,7 @@ const initialWorkspace: WorkspaceState = { watchlist: [], settings: { refresh_se
 
 export default function App() {
   const [page, setPage] = useState<Page>('watch')
-  const [tab, setTab] = useState<Tab>('overview')
+  const [tab, setTab] = useState<Tab>('company')
   const [announcementScope, setAnnouncementScope] = useState<'latest' | 'selected'>('latest')
   const [listMode, setListMode] = useState<'watchlist' | 'search'>('watchlist')
   const [results, setResults] = useState<BasicSecurity[]>([])
@@ -152,7 +152,7 @@ export default function App() {
   const openResearch = (security: BasicSecurity) => { setSelected(security); setListMode('watchlist'); setPage('research') }
   const openIPO = (security: BasicSecurity) => {
     setSelected(security)
-    setTab('overview')
+    setTab('company')
     setPage('research')
   }
   const watched = selected !== null && workspace.watchlist.some(item => item.ex_code.toUpperCase() === selected.ex_code.toUpperCase())
