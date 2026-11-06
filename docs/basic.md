@@ -78,7 +78,7 @@ cmd/cmd.go (InfoHandler)
 provider/sina/sina.go (Search, Profile, QueryDividends)
 ```
 
-1. `sina.Search(ctx, key)` — 搜索证券代码，取第一个结果
+1. `sina.Resolve(ctx, key)` — 搜索证券代码，取第一个结果；美股场外交易的外国公司代码（如 TCEHY）排在港股和 A 股后面，所以「腾讯」取到 HK00700
 2. `sina.Profile(ctx, opts)` — 查询公司概况（合并 quote + profile + corp info）
 3. 若 `-d` 指定：`sina.QueryDividends(ctx, code)` — 查询分红历史
 
