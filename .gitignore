@@ -8,7 +8,7 @@
 *.so
 *.dylib
 main
-sec
+/sec
 sec-desktop
 
 # Test binary, built with `go test -c`

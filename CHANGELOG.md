@@ -3,6 +3,7 @@
 ### v0.4.8
 
 1. Add the AI/LLM design in `docs/ai.md` and its roadmap in `TODO.md`.
+2. Add an Agent Skill (`skills/sec/SKILL.md`) so AI agents such as Claude Code can query sec, with setup in `docs/agent-skill.md`.
 
 ### v0.4.7
 

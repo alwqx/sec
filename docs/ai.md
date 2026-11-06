@@ -312,7 +312,7 @@ CLI 和 Desktop 共用一份配置，在任意一边设置后另一边直接可�
 
 | 顺序 | PR | 完成标准 |
 | --- | --- | --- |
-| 1 | Agent Skill 与文档 | 一份 SKILL.md，说明各命令用 `--json`、macro 用 `--standard-json`，以及口径说明和不给建议的要求；不改 Go 代码 |
+| 1 | Agent Skill 与文档（已完成，见[使用说明](agent-skill.md)） | 一份 SKILL.md，说明各命令用 `--json`、macro 用 `--standard-json`，以及口径说明和不给建议的要求；不改 Go 代码 |
 | 2 | `aitool` 注册表与 `sec mcp` | 7 类工具的精简输出带 golden 测试；`sec mcp` 能在 Claude Code 里列出并调用工具；`docs/mcp.md` |
 | 3 | 共用 AI 配置 | `config.json` 的 `ai` 段和多个模型配置、Key 加密存储和 `secret.key`、`sec config ai` 子命令（`test` 除外）；不调用模型 |
 | 4 | `llm` 抽象 | 两种接口的适配器和假客户端、数字核对模块、`sec config ai test` 测试连接、各命令的 `--ai` 参数 |

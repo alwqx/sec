@@ -98,7 +98,7 @@
 
 设计方案见 [AI/LLM 接入设计](docs/ai.md)。按以下顺序拆分，一项一个 PR：
 
-- [ ] Agent Skill 与文档：写一份 SKILL.md，说明如何在 Claude Code、Cursor 等工具里配合 sec CLI 使用：各命令用 `--json`，macro 命令用 `--standard-json`；不改 Go 代码。
+- [x] Agent Skill 与文档（[使用说明](docs/agent-skill.md)）：写一份 SKILL.md，说明如何在 Claude Code、Cursor 等工具里配合 sec CLI 使用：各命令用 `--json`，macro 命令用 `--standard-json`；不改 Go 代码。
 - [ ] `sec mcp`：stdio MCP server，第一个 PR 先提供 7 类只读工具（search、quote、kline 摘要、financials、valuation、filings / announcements、macro），复用现有 provider；工具输出另定精简格式，避免把 10 年财报 JSON 原样塞给模型，每条结果带来源、截止日期和口径说明，并直接给出同比、变化量等派生值，不让模型自己计算。工具注册表独立成 `aitool/` 包，放在 `cmd/`、`desktop/` 之外，保证跨平台编译，供 `sec ask` 和 Desktop 对话复用。
 - [ ] 共用 AI 配置：CLI 和 Desktop 共用 `~/.sec/config.json` 的 `ai` 段，可以保存多个模型配置（`providers`，按名字区分，各自有接口类型、`base_url`、模型和 Key），`default` 指定默认配置；`sec config ai list/add/edit/set-key/use/remove` 管理；Key 可以用环境变量，或用 AES-256-GCM 加密保存在 `config.json`，加密密钥单独存在 `~/.sec/secret.key`（`0600`）；`set-key` 隐藏输入或从 stdin 读取，不接受命令行参数。
 - [ ] `llm/` 模型接入抽象：支持 Anthropic 和 OpenAI 兼容接口（覆盖 DeepSeek、通义、本地 Ollama），含回答数字核对、`sec config ai test` 测试连接和各命令的 `--ai <配置名>` 参数；CLI 和 Desktop 共用。
