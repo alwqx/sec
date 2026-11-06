@@ -445,3 +445,5 @@ h1, h2, h3 { font-weight: 600; }
 .us-financials-table td, .us-financials-table thead th { text-align: right; white-space: nowrap; }
 .us-financials-table th:first-child { text-align: left; }
 .us-company-table th { width: 140px; color: var(--muted); font-weight: 400; }
+.hk-company-table td { white-space: normal; line-height: 1.6; }
+.company-description { margin: 16px 0 0; line-height: 1.7; max-width: 72ch; }

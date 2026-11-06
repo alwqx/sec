@@ -50,7 +50,8 @@ type CorpProfile struct {
 	PeTTM           float64 // 市盈率TTM
 	MarketCap       float64 // 总市值
 	TradedMarketCap float64 // 流通市值
-	HKTrust         bool    // 港股交易所买卖基金、房地产投资信托等，不是公司，没有公司资料
+	HKType          string  // 港股证券类型：EQTY 股本证券，TRST 交易所买卖基金、房地产投资信托等，WRNT 权证；只有 EQTY 有公司资料
+	Currency        string  // 港股交易币种 HKD、CNY、USD，价格和市值都是这个币种
 }
 
 // SecurityQuote 证券行情

@@ -34,8 +34,17 @@ func TestProfileHK(t *testing.T) {
 	require.Zero(t, p.PeTTM)
 	require.EqualValues(t, 416.6, p.Current)
 	require.InDelta(t, 416.6*9092644829, p.MarketCap, 1)
-	require.False(t, p.HKTrust)
+	require.Equal(t, "EQTY", p.HKType)
+	require.Equal(t, "HKD", p.Currency)
 	require.True(t, gock.IsDone())
+}
+
+// 代码不存在时新浪返回空字符串。
+func TestProfileHKNotFound(t *testing.T) {
+	defer gock.Off()
+	gock.New("https://hq.sinajs.cn").Get("/list=hk99999,hk99999_i").Reply(200).BodyString("var hq_str_hk99999=\"\";\nvar hq_str_hk99999_i=\"\";\n")
+	_, err := Profile(context.Background(), &types.InfoOptions{Code: "99999", ExCode: "HK99999"})
+	require.ErrorIs(t, err, ErrNotFound)
 }
 
 // 盈富基金等交易所买卖基金没有每股净资产，这一列为空。
@@ -45,5 +54,6 @@ func TestParseInfoPartProfileOfHstockEmptyFields(t *testing.T) {
 	require.NoError(t, err)
 	require.Zero(t, p.VPS)
 	require.Equal(t, "62", p.Category)
-	require.True(t, p.HKTrust)
+	require.Equal(t, "TRST", p.HKType)
+	require.Equal(t, "HKD", p.Currency)
 }

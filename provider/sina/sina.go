@@ -31,6 +31,9 @@ func defaultHTTPHeaders() http.Header {
 	return headers
 }
 
+// ErrNotFound 表示新浪没有这只证券的行情，代码不存在或已退市。
+var ErrNotFound = errors.New("没有这只证券的行情")
+
 // hkCode 匹配带 HK 前缀的港股代码，如 hk00700、HK700。
 var hkCode = regexp.MustCompile(`^(?i)hk(\d{1,5})$`)
 
@@ -303,6 +306,10 @@ func Info(ctx context.Context, exCode string) (*SecurityQuote, *sinaPartProfile,
 		slog.ErrorContext(ctx, "invalid body", "url", reqUrl, "body", body)
 		return nil, nil, errors.New("invalid body, should have 2 lines but not")
 	}
+	// 代码不存在时新浪返回空字符串。
+	if string(lines[0]) == `""` {
+		return nil, nil, fmt.Errorf("%w: %s", ErrNotFound, exCode)
+	}
 
 	quote, err := parseSecQuote(exCode, string(lines[0]))
 	if err != nil {
@@ -407,7 +414,8 @@ type sinaPartProfile struct {
 	Profit   float64 // 净利润
 	Category string  // 行业分类
 	BShare   bool    // 是否 B 股
-	HKTrust  bool    // 港股交易所买卖基金、房地产投资信托等，新浪类型是 TRST，不是 EQTY
+	HKType   string  // 港股证券类型：EQTY 股本证券，TRST 交易所买卖基金、房地产投资信托等，WRNT 权证
+	Currency string  // 港股交易币种：HKD、CNY、USD
 }
 
 func parseInfoPartProfile(exCode, line string) (*sinaPartProfile, error) {
@@ -490,7 +498,10 @@ func parseInfoPartProfileOfHstock(line string) (*sinaPartProfile, error) {
 		return nil, err
 	}
 	partProfile.Category = strings.TrimSpace(items[32])
-	partProfile.HKTrust = items[0] == "TRST"
+	partProfile.HKType = items[0]
+	if len(items) > 33 {
+		partProfile.Currency = items[33]
+	}
 
 	return &partProfile, nil
 }

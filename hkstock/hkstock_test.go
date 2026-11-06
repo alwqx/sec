@@ -18,8 +18,12 @@ var hq_str_hk00700_i="TRST,MAIN,28.320,22.920,0,0,0,0,0,0,0,0.00,0.00,0.00,1,盈
 `
 	orgBody     = `{"result":{"data":[{"SECURITY_NAME_ABBR":"腾讯控股","ORG_NAME":"腾讯控股有限公司","BELONG_INDUSTRY":"软件服务","LISTING_DATE":"2004-06-16 00:00:00","ORG_WEB":"www.tencent.com","ORG_PROFILE":"腾讯是一家互联网科技公司。","MAIN_BUSINESS":"增值服务"}]},"success":true,"code":0}`
 	fundOrgBody = `{"result":{"data":[{"SECURITY_NAME_ABBR":"盈富基金","ORG_NAME":"恒生投资管理有限公司","ORG_WEB":"www.hangseng.com"}]},"success":true,"code":0}`
-	secBody     = `{"result":{"data":[{"ISSUE_PRICE":3.7}]},"success":true,"code":0}`
-	quoteBody   = `{"rc":0,"data":{"f164":1432,"f167":292}}`
+	emptyBody   = `{"result":null,"success":false,"message":"返回数据为空","code":9201}`
+	warrantInfo = `var hq_str_hk00700="TENCENT UBS@EC2701A,腾讯瑞银七乙沽A,0.100,0.101,0.105,0.095,0.100,-0.001,-0.990,0.099,0.100,100000,1000000,0.000,0.000,0.320,0.050,2026/11/06,16:08";
+var hq_str_hk00700_i="WRNT,MAIN,0.320,0.050,0,0,0,0,0,0,0,0.00,0.00,0.00,1,腾讯瑞银七乙沽A,0.000,0.001,10000,腾讯瑞银七乙沽A,0.000,0.000,0.000,0.000,,,,,,0.1|0.1|0.1|0.1|0.1,,,,,,0";
+`
+	secBody   = `{"result":{"data":[{"ISSUE_PRICE":3.7}]},"success":true,"code":0}`
+	quoteBody = `{"rc":0,"data":{"f164":1432,"f167":292}}`
 )
 
 func mockSina(t *testing.T, body string) {
@@ -101,7 +105,7 @@ func TestProfileTrust(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "盈富基金", p.Name)
 	require.Empty(t, p.WebSite)
-	require.True(t, p.HKTrust)
+	require.False(t, Equity(p))
 }
 
 func TestProfileQuoteFails(t *testing.T) {
@@ -113,4 +117,38 @@ func TestProfileQuoteFails(t *testing.T) {
 
 	_, err := Profile(context.Background(), "HK00700")
 	require.ErrorContains(t, err, "503", "行情失败要报错")
+}
+
+// Load 分别报告东方财富各部分的错误，没有数据时是 ErrNoData；权证等不是股本证券，不报错。
+func TestLoadErrors(t *testing.T) {
+	defer gock.Off()
+	mockSina(t, tencentInfo)
+	mockF10("RPT_HKF10_INFO_ORGPROFILE").Reply(200).BodyString(orgBody)
+	mockF10("RPT_HKF10_INFO_SECURITYINFO").Reply(503)
+	mockValuation().Reply(200).BodyString(`{"rc":0,"data":null}`)
+	res, err := Load(context.Background(), "HK00700")
+	require.NoError(t, err)
+	require.NoError(t, res.ProfileErr)
+	require.ErrorContains(t, res.IssuePriceErr, "503")
+	require.ErrorIs(t, res.ValuationErr, ErrNoData)
+
+	mockSina(t, tencentInfo)
+	mockF10("RPT_HKF10_INFO_ORGPROFILE").Reply(200).BodyString(emptyBody)
+	mockF10("RPT_HKF10_INFO_SECURITYINFO").Reply(200).BodyString(emptyBody)
+	mockValuation().Reply(200).BodyString(quoteBody)
+	res, err = Load(context.Background(), "HK00700")
+	require.NoError(t, err)
+	require.ErrorIs(t, res.ProfileErr, ErrNoData)
+	require.NoError(t, res.IssuePriceErr)
+	require.NoError(t, res.ValuationErr)
+
+	mockSina(t, warrantInfo)
+	mockF10("RPT_HKF10_INFO_ORGPROFILE").Reply(200).BodyString(emptyBody)
+	mockF10("RPT_HKF10_INFO_SECURITYINFO").Reply(200).BodyString(emptyBody)
+	mockValuation().Reply(200).BodyString(`{"rc":0,"data":null}`)
+	res, err = Load(context.Background(), "HK00700")
+	require.NoError(t, err)
+	require.False(t, Equity(res.Profile))
+	require.NoError(t, res.ProfileErr, "权证没有公司资料不算错误")
+	require.NoError(t, res.ValuationErr)
 }

@@ -14,6 +14,7 @@ import Settings from './components/Settings'
 import Metal from './components/Metal'
 import Commodity from './components/Commodity'
 import Filings from './components/Filings'
+import HKCompany from './components/HKCompany'
 import USCompany from './components/USCompany'
 import USFinancials from './components/USFinancials'
 import USDividends from './components/USDividends'
@@ -182,6 +183,7 @@ export default function App() {
   const watchQuotes = useQuotes(watchCodes, workspace.settings.refresh_seconds, ready && (page === 'watch' || (page === 'research' && listMode === 'watchlist')))
   const aShare = selected?.security_type === 'stock' && /^(SH|SZ|BJ)\d{6}$/i.test(selected.ex_code)
   const usStock = selected?.ex_code.startsWith('$') ?? false
+  const hkStock = selected?.security_type === 'stock' && /^HK\d{5}$/i.test(selected.ex_code)
 
   const tabKey = (e: KeyboardEvent<HTMLButtonElement>, index: number) => {
     const direction = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0
@@ -243,6 +245,7 @@ export default function App() {
                   : tab === 'technical' ? <Strategy code={selected.ex_code} />
                   : usStock && tab === 'announcements' ? <Filings code={selected.ex_code} />
                   : usStock && tab === 'company' ? <USCompany code={selected.ex_code} />
+                  : hkStock && tab === 'company' ? <HKCompany code={selected.ex_code} />
                   : usStock && tab === 'financials' ? <USFinancials code={selected.ex_code} />
                   : usStock && tab === 'valuation' ? <Valuation code={selected.ex_code} />
                   : usStock && tab === 'dividends' ? <USDividends code={selected.ex_code} />

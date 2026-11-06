@@ -300,7 +300,7 @@ func parseHistoryQuery(w http.ResponseWriter, r *http.Request) (historyQuery, bo
 		if strings.HasPrefix(code, "SH") {
 			market = 1
 		}
-	} else if regexp.MustCompile(`^HK[0-9]{5}$`).MatchString(code) {
+	} else if hkCode.MatchString(code) {
 		symbol = code[2:]
 		market = 116
 	} else if usTicker.MatchString(code) {

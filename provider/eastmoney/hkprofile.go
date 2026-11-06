@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"net/url"
 	"strings"
 	"sync"
@@ -31,10 +30,11 @@ type HKProfile struct {
 	RegisterAddress string   // 注册地址
 	Description     string   // 公司简介
 	MainBusiness    string   // 主营业务
+	IssuePriceErr   error    // 发行价获取失败的原因，IssuePrice 为 nil
 }
 
 // GetHKProfile 查询港股公司资料，code 是 5 位港股代码，如 00700。没有这只证券时返回 nil 和 nil。
-// 发行价是补充数据，取不到时为 nil，不影响公司资料。
+// 发行价是补充数据，请求失败时 IssuePrice 为 nil、原因在 IssuePriceErr，不影响公司资料。
 // 交易所买卖基金也有一行，但公司名称是基金管理人，调用方应先按证券类型排除。
 func GetHKProfile(ctx context.Context, code string) (*HKProfile, error) {
 	filter := fmt.Sprintf(`(SECUCODE="%s.HK")`, code)
@@ -72,9 +72,8 @@ func GetHKProfile(ctx context.Context, code string) (*HKProfile, error) {
 		Description:     rowText(row, "ORG_PROFILE"),
 		MainBusiness:    rowText(row, "MAIN_BUSINESS"),
 	}
-	if secErr != nil {
-		slog.WarnContext(ctx, "港股证券资料获取失败，发行价留空", "code", code, "error", secErr)
-	} else if len(secRows) > 0 {
+	p.IssuePriceErr = secErr
+	if secErr == nil && len(secRows) > 0 {
 		p.IssuePrice = RowNumber(secRows[0], "ISSUE_PRICE")
 	}
 	return p, nil
