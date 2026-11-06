@@ -15,6 +15,7 @@
 11. Fill HK `info` with company name, industry, listing date, description, PE and PB from East Money. **JSON change:** HK `category` is now an industry name, and `listing_date` is a date or empty instead of `--`.
 12. Show HK company info, PE and PB on the Desktop 概览 tab.
 13. Fix quotes for funds such as `易方达蓝筹`: listed ETFs and LOFs use exchange quotes, other funds show the latest NAV.
+14. Add fund `info` and a fund 概览 tab in Desktop with NAV, returns and the fund profile.
 
 ### v0.4.6
 

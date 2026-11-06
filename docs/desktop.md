@@ -160,6 +160,10 @@ CLI 的根 `main.go` 保持不变；桌面版是独立二进制：`go build ./de
 
 公司资料、市盈率和市净率来自东方财富（港股 F10 和行情，已把人民币等报表货币换算成港元），价格和市值来自新浪行情。代码不存在时返回 404，新浪行情失败时返回 502；东方财富的公司资料、发行价和估值分别报告，一项失败或没有数据时照常返回其他内容，`notes` 说明是「获取失败，请稍后重试」还是「东方财富没有这只证券的…」，显示在页面上。新浪类型不是 `EQTY` 的交易所买卖基金、房地产投资信托、权证（如盈富基金、领展房产基金）不是公司，只显示价格并说明原因；前端只对 `security_type` 为 `stock` 的港股代码显示这个栏目。
 
+### 基金概览
+
+基金（`security_type` 为 `fund`、代码 `OF` 加 6 位）的「概览」标签页调用 `GET /api/v1/fund/overview?code=OF005827`，复用 CLI `info` 的 `fund.Load`：上方是单位净值、累计净值、日涨幅、净值日期和净资产（货币基金是万份收益和七日年化），中间是近 1 周到成立来的阶段收益率，下方是全称、类型、风险等级、管理人、托管人、基金经理、成立日期、费率、业绩比较基准和跟踪标的，最后是投资目标。没有这只基金时返回 404，两个数据源都失败时 502，一个失败时照常返回并在页面说明，见[基础信息文档](basic.md#基金)。
+
 ### 美股 SEC 申报
 
 美股（代码以 `$` 开头）的「公告」标签页显示 SEC EDGAR 官方申报，复用 CLI `filings` 的 `provider/edgar`：公司名称、CIK、交易所、行业和财年截止日，按「主要申报 / 年报和季报 / 重大事项 / 内部人交易 / 全部」筛选，每页 20 条，显示申报日、类型、报告期和中文说明（8-K 附事项），可在系统浏览器打开原文或复制链接；打开原文只允许 `https://www.sec.gov/Archives/edgar/data/` 下的申报文件，路径须已规范化、不含 `..`。按公司和类别缓存 5 分钟，翻页不重新下载；按类型筛选时最多再读 10 页历史申报凑够 100 条，还不够时用 EDGAR 全文检索按类型补全，全文检索最多 20 页，凑够所需条数即停止；达到上限仍不足或检索失败（包括超时）时保留已有结果，页面提示结果可能不全。共享配置无效时用默认邮箱，不影响工作台。美股的分红栏目暂不支持，股息率见估值栏目。访问 SEC 使用设置 → 数据源中的联系邮箱。
@@ -277,6 +281,7 @@ macOS 按当前进程架构匹配 `sec-<tag>-desktop-darwin-<arch>.dmg`，不将
 | GET | `/api/v1/ipo?page=1&since=2024-01-01&until=2024-12-31` | 每页 30 条新股，since/until 为可选上市日期边界（YYYY-MM-DD），返回筛选后的 total 与 has_more |
 | GET | `/api/v1/announcements?page=1&code=SH600036&key=年度报告&type=annual` | code 可省略以查询最新披露，支持分页与标题关键字；type 可省略查询全部，或为 annual/halfyear/q1/q3，对应巨潮公告分类 |
 | GET | `/api/v1/filings?code=$AAPL&type=periodic&page=1` | 美股 SEC 申报：`company`、`ticker`、`total`、`has_more`、`results`；type 为 periodic（10-K/10-Q/20-F/40-F）、current（8-K/6-K）、insider（Form 3/4/5/144）、all，留空为主要申报；`truncated` 为 true 表示更早的申报没有读取；SEC 没有这家公司时 404 |
+| GET | `/api/v1/fund/overview?code=OF005827` | 基金概况（`fund.Info`）：净值或货币基金收益、阶段收益率、基金档案和 `notes`；没有这只基金时 404，两个数据源都失败时 502 |
 | GET | `/api/v1/hk/company?code=HK00700` | 港股公司概况：公司资料、价格、市盈率、市净率和市值，`currency` 是交易币种，`equity` 为 false 时是基金、信托、权证等，`notes` 是东方财富失败或没有数据的说明；代码不存在时 404，新浪行情失败时 502 |
 | GET | `/api/v1/us/company?code=$AAPL` | 美股公司资料：`info`（`company` 为 SEC EDGAR 公司信息，`quote` 为新浪行情和估值，失败的一方为 null）和 `notes`（失败原因）；两方都失败时 502 |
 | GET | `/api/v1/us/dividends?code=$AAPL` | 美股按财年的分红表（`usstock.Dividends`）：`ticker`、`name`、`cik`、`currency`、`currency_name`、`splits`（识别出的拆股）、`splits_unchecked`（日线没读到、没有按拆股调整）和 `years`（`fiscal_year`、`end`、`per_share`、`growth`、`paid`、`net_income`、`payout`、`buyback`，从新到旧）；SEC 没有这家公司时 404 |
