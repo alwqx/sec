@@ -34,6 +34,9 @@ staticcheck ./...   # optional, not in CI
 # Smoke-test a command (network required)
 go run . bond
 go run . ipo list
+
+# Live smoke test of every command against real upstreams (network required, run by hand, not in CI)
+go build -o sec . && scripts/live-smoke.sh ./sec
 ```
 
 CI only runs `go test -v ./...` on every push. Release builds (linux/windows/darwin × amd64/arm64) trigger on GitHub Release creation via ldflags-injected version.
