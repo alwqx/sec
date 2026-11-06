@@ -348,6 +348,7 @@ type quoteRow struct {
 	ChangePct     *float64 `json:"change_pct"`
 	Volume        int64    `json:"volume"` // 成交量，单位：股或份
 	Amount        float64  `json:"amount"` // 成交额
+	NAV           bool     `json:"nav"`    // 价格是基金单位净值，trade_date 是净值日期，没有时间和开高低
 }
 
 func positive(value float64) *float64 {
@@ -362,7 +363,7 @@ func newQuoteRow(quote *sina.SecurityQuote) quoteRow {
 	row := quoteRow{
 		ExCode: quote.ExCode, Code: quote.Code, Name: quote.Name, TradeDate: quote.TradeDate, Time: quote.Time, Timezone: quote.Timezone,
 		Price: positive(price), PriceIsYClose: isYClose, YClose: positive(quote.YClose), Open: positive(quote.Open),
-		High: positive(quote.High), Low: positive(quote.Low), Volume: quote.TurnOver, Amount: quote.Volume,
+		High: positive(quote.High), Low: positive(quote.Low), Volume: quote.TurnOver, Amount: quote.Volume, NAV: quote.NAV,
 	}
 	if quote.Current > 0 && quote.YClose > 0 {
 		change := quote.Current - quote.YClose
@@ -427,11 +428,23 @@ func currentText(quote *sina.SecurityQuote) (string, float64) {
 
 // quoteTime 是表格里的行情时间。A 股、港股是北京时间，美股是美东时间，混在一张表里时要标出来。
 func quoteTime(quote *sina.SecurityQuote) string {
+	// 场外基金只有每天的单位净值，没有时间。
+	if quote.NAV {
+		return quote.TradeDate + " 净值"
+	}
 	text := quote.TradeDate + " " + quote.Time
 	if quote.Timezone == types.TimezoneNewYork {
 		text += " 美东"
 	}
 	return text
+}
+
+// priceText 是表格里的开高低价，基金净值等没有时显示 -。
+func priceText(value float64) string {
+	if value == 0 {
+		return "-"
+	}
+	return strconv.FormatFloat(value, 'g', -1, 64)
 }
 
 // printQuote 打印 quote 信息
@@ -452,9 +465,9 @@ func printQuote(out io.Writer, quotes []*sina.SecurityQuote) {
 			quote.Name,
 			curWithRate,
 			strconv.FormatFloat(quote.YClose, 'g', -1, 64),
-			strconv.FormatFloat(quote.Open, 'g', -1, 64),
-			strconv.FormatFloat(quote.High, 'g', -1, 64),
-			strconv.FormatFloat(quote.Low, 'g', -1, 64),
+			priceText(quote.Open),
+			priceText(quote.High),
+			priceText(quote.Low),
 			utils.HumanNum(float64(quote.TurnOver)),
 			utils.HumanNum(quote.Volume),
 			quote.ExCode,

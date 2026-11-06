@@ -56,6 +56,20 @@ func TestPrintWatchQuotesMissingValues(t *testing.T) {
 	require.NotContains(t, text, "-100")
 	require.NotContains(t, text, "0.00", "缺失不能显示成 0")
 	require.Contains(t, text, "+9.50%")
+
+	out.Reset()
+	printWatchQuotes(&out, []quoteRow{
+		{item: WatchItem{ExCode: "OF005827", Name: "易方达蓝筹精选混合"}, digits: 4, price: 1.4164, hasChange: true, chg: 0.0155, chgPct: 1.106},
+		{item: WatchItem{ExCode: "OF510300", Name: "沪深300ETF"}, digits: 3, price: 4.125, priceIsYClose: true, high: 4.169, low: 4.095},
+	})
+	text = out.String()
+	require.Contains(t, text, "1.4164", "基金净值保留 4 位小数")
+	require.Contains(t, text, "+0.0155")
+	require.Contains(t, text, "4.125（昨收）", "场内基金的昨收也保留 3 位小数")
+	require.Contains(t, text, "4.169")
+	require.Equal(t, 4, priceDigits(&sina.SecurityQuote{ExCode: "OF005827", NAV: true}))
+	require.Equal(t, 3, priceDigits(&sina.SecurityQuote{ExCode: "OF510300"}))
+	require.Equal(t, 2, priceDigits(&sina.SecurityQuote{ExCode: "SH600519"}))
 }
 
 func TestWatchAddContinuesAfterSearchFailure(t *testing.T) {

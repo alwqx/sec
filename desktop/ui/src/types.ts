@@ -20,6 +20,7 @@ export interface SecurityQuote {
   turnover: number // 成交数量（股）
   time: string
   timezone: string // trade_date 和 time 所在的交易所时区，美股是 America/New_York
+  nav?: boolean // 价格是基金单位净值：trade_date 是净值日期，yclose 是上一日净值，没有时间、开高低和成交
 }
 
 export interface Company {

@@ -63,6 +63,7 @@ func NewWatchCLI() *cobra.Command {
 type quoteRow struct {
 	priceIsYClose bool
 	hasChange     bool
+	digits        int // 价格的小数位数：基金净值 4 位，场内基金 3 位，其他 2 位
 	item          WatchItem
 	price         float64
 	chg           float64
@@ -117,6 +118,7 @@ func runWatchShow(cmd *cobra.Command, args []string) error {
 		if q, ok := quoteMap[item.ExCode]; ok {
 			// 开盘前当前价是 0，显示昨收，不计算涨跌。
 			r.price, r.priceIsYClose = q.EffectivePrice()
+			r.digits = priceDigits(q)
 			if q.Current > 0 && q.YClose > 0 {
 				r.hasChange = true
 				r.chg = q.Current - q.YClose
@@ -171,11 +173,34 @@ func newWatchJSONRow(r quoteRow) watchJSONRow {
 	return row
 }
 
+// priceDigits 是价格的小数位数：基金净值 4 位，场内基金 3 位（交易所报价精确到 0.001），其他 2 位。
+func priceDigits(q *sina.SecurityQuote) int {
+	switch {
+	case q.NAV:
+		return 4
+	case sina.IsFundCode(q.ExCode):
+		return 3
+	}
+	return 2
+}
+
+// format 返回按价格小数位数格式化的 format，sign 为 true 时带正负号。
+func (r quoteRow) format(sign bool) string {
+	digits := r.digits
+	if digits == 0 {
+		digits = 2
+	}
+	if sign {
+		return fmt.Sprintf("%%+.%df", digits)
+	}
+	return fmt.Sprintf("%%.%df", digits)
+}
+
 func (r quoteRow) priceText() string {
 	if r.priceIsYClose {
-		return fmt.Sprintf("%.2f（昨收）", r.price)
+		return fmt.Sprintf(r.format(false)+"（昨收）", r.price)
 	}
-	return changeText("%.2f", r.price, r.price > 0)
+	return changeText(r.format(false), r.price, r.price > 0)
 }
 
 // changeText 在数值可用时按 format 格式化，否则显示 —，不把缺失显示成 0。
@@ -199,9 +224,9 @@ func printWatchQuotes(out io.Writer, rows []quoteRow) {
 			r.item.Name,
 			r.priceText(),
 			changeText("%+.2f%%", r.chgPct, r.hasChange),
-			changeText("%+.2f", r.chg, r.hasChange),
-			changeText("%.2f", r.high, r.high > 0),
-			changeText("%.2f", r.low, r.low > 0),
+			changeText(r.format(true), r.chg, r.hasChange),
+			changeText(r.format(false), r.high, r.high > 0),
+			changeText(r.format(false), r.low, r.low > 0),
 		}
 		data = append(data, row)
 

@@ -189,3 +189,18 @@ func TestHistoryRejectsInvalidOverlays(t *testing.T) {
 		require.Equal(t, http.StatusBadRequest, rr.Code, query)
 	}
 }
+
+// 可能上市的基金占两个 key，每批 key 数不超过 quoteBatchKeys。
+func TestQuoteBatches(t *testing.T) {
+	codes := []string{}
+	for i := 0; i < 60; i++ {
+		codes = append(codes, fmt.Sprintf("OF51%04d", i))
+	}
+	codes = append(codes, "SH600519", "OF005827")
+	batches := quoteBatches(codes)
+	require.Len(t, batches, 2)
+	require.Len(t, batches[0], 50, "50 只场内基金正好 100 个 key")
+	require.Equal(t, []string{"OF510050", "OF510051", "OF510052", "OF510053", "OF510054", "OF510055", "OF510056", "OF510057", "OF510058", "OF510059", "SH600519", "OF005827"}, batches[1])
+	require.Len(t, quoteBatches([]string{"SH600519"}), 1)
+	require.Empty(t, quoteBatches(nil))
+}
