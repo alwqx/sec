@@ -19,6 +19,7 @@ import (
 
 	"github.com/alwqx/sec/cmd/internal/termtable"
 	"github.com/alwqx/sec/provider/sina"
+	"github.com/alwqx/sec/types"
 	"github.com/alwqx/sec/utils"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
@@ -336,6 +337,7 @@ type quoteRow struct {
 	Name          string   `json:"name"`
 	TradeDate     string   `json:"trade_date"`
 	Time          string   `json:"time"`
+	Timezone      string   `json:"timezone"` // trade_date 和 time 所在的交易所时区
 	Price         *float64 `json:"price"`
 	PriceIsYClose bool     `json:"price_is_yclose"`
 	YClose        *float64 `json:"yclose"`
@@ -358,7 +360,7 @@ func positive(value float64) *float64 {
 func newQuoteRow(quote *sina.SecurityQuote) quoteRow {
 	price, isYClose := quote.EffectivePrice()
 	row := quoteRow{
-		ExCode: quote.ExCode, Code: quote.Code, Name: quote.Name, TradeDate: quote.TradeDate, Time: quote.Time,
+		ExCode: quote.ExCode, Code: quote.Code, Name: quote.Name, TradeDate: quote.TradeDate, Time: quote.Time, Timezone: quote.Timezone,
 		Price: positive(price), PriceIsYClose: isYClose, YClose: positive(quote.YClose), Open: positive(quote.Open),
 		High: positive(quote.High), Low: positive(quote.Low), Volume: quote.TurnOver, Amount: quote.Volume,
 	}
@@ -423,6 +425,15 @@ func currentText(quote *sina.SecurityQuote) (string, float64) {
 	return fmt.Sprintf("%-.5g %-.5g %-.2g%s", price, diffPrice, rate, "%"), rate
 }
 
+// quoteTime 是表格里的行情时间。A 股、港股是北京时间，美股是美东时间，混在一张表里时要标出来。
+func quoteTime(quote *sina.SecurityQuote) string {
+	text := quote.TradeDate + " " + quote.Time
+	if quote.Timezone == types.TimezoneNewYork {
+		text += " 美东"
+	}
+	return text
+}
+
 // printQuote 打印 quote 信息
 func printQuote(out io.Writer, quotes []*sina.SecurityQuote) {
 	if len(quotes) == 0 {
@@ -437,7 +448,7 @@ func printQuote(out io.Writer, quotes []*sina.SecurityQuote) {
 		curWithRate, rate := currentText(quote)
 
 		row := []string{
-			fmt.Sprintf("%s %s", quote.TradeDate, quote.Time),
+			quoteTime(quote),
 			quote.Name,
 			curWithRate,
 			strconv.FormatFloat(quote.YClose, 'g', -1, 64),

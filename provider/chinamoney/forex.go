@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/alwqx/sec/provider/forex"
+	"github.com/alwqx/sec/types"
 )
 
 const fixingURL = "https://www.chinamoney.com.cn/ags/ms/cm-u-bk-ccpr/CcprHisNew"
@@ -235,7 +236,7 @@ func headers() http.Header {
 	return http.Header{"Referer": {"https://www.chinamoney.com.cn/chinese/bkccpr/"}}
 }
 func newResult(req *forex.Request, kind, at, basis string) *forex.Result {
-	return &forex.Result{Provider: "CFETS", PriceType: kind, Frequency: "daily", Timezone: "Asia/Shanghai", ObservationTime: at, DateBasis: basis, Begin: req.Begin, End: req.End, DataVersion: "current-visible-release", Observations: []forex.Observation{}}
+	return &forex.Result{Provider: "CFETS", PriceType: kind, Frequency: "daily", Timezone: types.TimezoneShanghai, ObservationTime: at, DateBasis: basis, Begin: req.Begin, End: req.End, DataVersion: "current-visible-release", Observations: []forex.Observation{}}
 }
 func sortRates(items []forex.Observation) {
 	sort.Slice(items, func(i, j int) bool {

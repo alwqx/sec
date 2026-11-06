@@ -45,3 +45,10 @@ func IsMCode(exCode string) (res bool) {
 	res = strings.HasPrefix(lowCode, "$")
 	return
 }
+
+// 行情时间所在的时区。
+const (
+	TimezoneShanghai = "Asia/Shanghai"
+	TimezoneHongKong = "Asia/Hong_Kong"
+	TimezoneNewYork  = "America/New_York"
+)

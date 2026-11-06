@@ -11,6 +11,10 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
+
+	// 内置时区数据，Windows 等没有系统时区库的机器也能换算美东时间。
+	_ "time/tzdata"
 
 	"github.com/alwqx/sec/types"
 	"github.com/alwqx/sec/utils"
@@ -215,6 +219,7 @@ func parseSecQuoteOfAstock(quoteLine string) (*SecurityQuote, error) {
 	}
 	res.TradeDate = strings.TrimSpace(items[30])
 	res.Time = strings.TrimSpace(items[31])
+	res.Timezone = types.TimezoneShanghai
 
 	return res, nil
 }
@@ -273,6 +278,7 @@ func parseSecQuoteOfHstock(quoteLine string) (*SecurityQuote, error) {
 	// 港股日期是 2025/05/27，统一成和其他市场一样的格式。
 	res.TradeDate = strings.ReplaceAll(strings.TrimSpace(items[17]), "/", "-")
 	res.Time = strings.TrimSpace(items[18])
+	res.Timezone = types.TimezoneHongKong
 
 	return res, nil
 }
@@ -334,15 +340,23 @@ func parseSecQuoteOfMstock(quoteLine string) (*SecurityQuote, error) {
 		return nil, err
 	}
 
-	tks := strings.Split(strings.TrimSpace(items[3]), " ")
-	if len(tks) < 2 {
+	// 第 3 列是北京时间，换成美东时间，交易日期才和 K 线的日期一致。
+	at, err := time.ParseInLocation(utils.StandardTimeLayout, strings.TrimSpace(items[3]), beijing)
+	if err != nil {
 		return nil, fmt.Errorf("invalid US stock quote date: %q", quoteLine)
 	}
-	res.TradeDate = tks[0]
-	res.Time = tks[1]
+	at = at.In(newYork)
+	res.TradeDate = at.Format(utils.LayoutYYMMDD)
+	res.Time = at.Format("15:04:05")
+	res.Timezone = types.TimezoneNewYork
 
 	return res, nil
 }
+
+var (
+	beijing    = time.FixedZone("CST", 8*60*60)
+	newYork, _ = time.LoadLocation(types.TimezoneNewYork)
+)
 
 // QueryQuoteList 查询多个证券行情
 // exCode SH600036 HK00700

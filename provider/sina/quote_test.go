@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/alwqx/sec/types"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/h2non/gock.v1"
 )
@@ -183,7 +184,7 @@ func TestParseSecQuoteOTC(t *testing.T) {
 	require.Equal(t, 54.26, q.Current)
 	require.Equal(t, 52.41, q.YClose)
 	require.Equal(t, 54.86, q.Open)
-	require.Equal(t, "2026-11-06", q.TradeDate)
+	require.Equal(t, "2026-11-05", q.TradeDate) // 直接搜 `腾讯` 是美股，搜 `腾讯控股` 才是港股
 
 	_, err = parseSecQuote("$TCEHY", `"腾讯,54.2600,0.00,2026-11-06 05:09:07"`)
 	require.Error(t, err, "少于 31 列仍然报错")
@@ -212,4 +213,32 @@ func TestParseQuoteListBodySkipsBadLines(t *testing.T) {
 
 	_, err = parseQuoteListBody("<html>error</html>\n")
 	require.ErrorContains(t, err, "invalid quote list body")
+}
+
+// 美股行情的北京时间换成美东时间，夏令时和冬令时都要对；A 股、港股保持交易所时间。
+func TestParseSecQuoteTimezone(t *testing.T) {
+	summer := `"AMD,144.5500,4.44,2025-07-10 22:55:35,6.1400,143.0000,145.8200,141.8500,187.1100,76.4800,32285637,47105949,234373976387,1.37,105.510000,0.00,0.00,0.00,0.00,1621404195,73,0.0000,0.00,0.00,,Jul 10 10:55AM EDT,138.4100,0,1,2025,4641781226.0000,0.0000,0.0000,0.0000,0.0000,138.4100"`
+	q, err := parseSecQuote("$AMD", summer)
+	require.NoError(t, err)
+	require.Equal(t, "2025-07-10", q.TradeDate)
+	require.Equal(t, "10:55:35", q.Time, "和第 25 列的 10:55AM EDT 一致")
+	require.Equal(t, types.TimezoneNewYork, q.Timezone)
+
+	winter := `"苹果,344.1700,-1.53,2026-11-06 09:45:05,-5.3400,353.8900,355.3800,342.0600,360.0000,200.0000,75678945,60000000,5100000000000,7.00,49.00,0.00,0.00,0.00,0.00,14800000000,0,0.0000,0.00,0.00,,Nov 05 04:00PM EST,349.5100,0,1,2026,26236189155.0000,0.0000,0.0000,0.0000,0.0000,349.5100"`
+	q, err = parseSecQuote("$AAPL", winter)
+	require.NoError(t, err)
+	require.Equal(t, "2026-11-05", q.TradeDate, "北京时间第二天上午仍是美东前一个交易日")
+	require.Equal(t, "20:45:05", q.Time)
+
+	_, err = parseSecQuote("$AAPL", strings.Replace(winter, "2026-11-06 09:45:05", "2026-11-06", 1))
+	require.ErrorContains(t, err, "invalid US stock quote date")
+
+	q, err = parseSecQuote("SH688047", `"龙芯中科,106.000,99.680,119.620,119.620,104.500,119.620,0.000,8256723,938310086.000,25600,119.620,7255,119.610,3033,119.600,1767,119.570,6300,119.550,0,0.000,0,0.000,0,0.000,0,0.000,0,0.000,2024-09-30,15:00:01,00,"`)
+	require.NoError(t, err)
+	require.Equal(t, "15:00:01", q.Time)
+	require.Equal(t, types.TimezoneShanghai, q.Timezone)
+
+	q, err = parseSecQuote("HK00700", `"TENCENT,腾讯控股,508.500,510.000,514.500,507.000,512.000,2.000,0.392,512.00000,512.50000,7662280393,14986877,0.000,0.000,542.266,345.980,2025/05/27,16:08"`)
+	require.NoError(t, err)
+	require.Equal(t, types.TimezoneHongKong, q.Timezone)
 }

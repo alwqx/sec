@@ -70,7 +70,7 @@ export default function QuoteCard({ quote: q }: Props) {
         </div>
         <div>
           <dt>时间</dt>
-          <dd>{q.time}</dd>
+          <dd>{q.time}{q.timezone === 'America/New_York' ? ' 美东' : ''}</dd>
         </div>
         <div>
           <dt>日期</dt>
