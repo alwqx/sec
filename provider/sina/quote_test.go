@@ -174,6 +174,21 @@ func TestQuerySecQuoteUSCode(t *testing.T) {
 	require.True(t, gock.IsDone())
 }
 
+// OTC 证券的行情只有 31 列，昨收取第 26 列。
+func TestParseSecQuoteOTC(t *testing.T) {
+	line := `"腾讯,54.2600,0.00,2026-11-06 05:09:07,0.0000,54.8600,54.9000,52.7200,85.3930,48.1300,12770378,7474890,487419408996.08,3.65,14.87,0.00,0.00,0.00,0.00,8983033708,0,54.1914,0.11,0.0614,Nov 5 8:01PM EST,Nov 5 04:00PM EST,52.4100,0,1,2026,691003000"`
+	q, err := parseSecQuote("$TCEHY", line)
+	require.NoError(t, err)
+	require.Equal(t, "$TCEHY", q.ExCode)
+	require.Equal(t, 54.26, q.Current)
+	require.Equal(t, 52.41, q.YClose)
+	require.Equal(t, 54.86, q.Open)
+	require.Equal(t, "2026-11-06", q.TradeDate)
+
+	_, err = parseSecQuote("$TCEHY", `"腾讯,54.2600,0.00,2026-11-06 05:09:07"`)
+	require.Error(t, err, "少于 31 列仍然报错")
+}
+
 // TestParseSecQuoteInvalidLine 空/畸形行情行应返回错误而非越界 panic。
 func TestParseSecQuoteInvalidLine(t *testing.T) {
 	for _, exCode := range []string{"SH600036", "HK00700", "$AMD"} {

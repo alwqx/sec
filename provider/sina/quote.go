@@ -280,12 +280,13 @@ func parseSecQuoteOfHstock(quoteLine string) (*SecurityQuote, error) {
 // parseSecQuoteOfMstock 从美股返回结果解析到结构化数据
 // "AMD,144.5500,4.44,2025-07-10 22:55:35,6.1400,143.0000,145.8200,141.8500,187.1100,76.4800,32285637,47105949,234373976387,1.37,105.510000,0.00,0.00,0.00,0.00,1621404195,73,0.0000,0.00,0.00,,Jul 10 10:55AM EDT,138.4100,0,1,2025,4641781226.0000,0.0000,0.0000,0.0000,0.0000,138.4100"
 // 0name 1cur    2rate 3 date            4 change 5open   6 high   7 low    8        9       10 成交量 11 成交额 12 总市值     13   14         15    16   17  18   19 总股本   20  21    22    23 24  25               26yclose 27 28 29   30 成交额      31    32     33     34     35 yclose
+// OTC 证券（如 TCEHY）只有前 31 列，没有第 35 列，昨收用第 26 列。
 func parseSecQuoteOfMstock(quoteLine string) (*SecurityQuote, error) {
 	// 将首尾的双引号去掉
 	newQuote := strings.TrimPrefix(quoteLine, "\"")
 	newQuote = strings.TrimSuffix(newQuote, "\"")
 	items := strings.Split(newQuote, ",")
-	if len(items) < 36 {
+	if len(items) < 31 {
 		return nil, fmt.Errorf("invalid US stock quote line: %q", quoteLine)
 	}
 	res := new(SecurityQuote)
@@ -303,7 +304,11 @@ func parseSecQuoteOfMstock(quoteLine string) (*SecurityQuote, error) {
 		slog.Error(err.Error())
 		return nil, err
 	}
-	res.YClose, err = strconv.ParseFloat(strings.TrimSpace(items[35]), 64)
+	yclose := items[26]
+	if len(items) > 35 {
+		yclose = items[35]
+	}
+	res.YClose, err = strconv.ParseFloat(strings.TrimSpace(yclose), 64)
 	if err != nil {
 		slog.Error(err.Error())
 		return nil, err
