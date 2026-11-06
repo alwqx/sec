@@ -39,7 +39,11 @@ var hkCode = regexp.MustCompile(`^(?i)hk(\d{1,5})$`)
 func Search(ctx context.Context, key string) ([]*BasicSecurity, error) {
 	m := hkCode.FindStringSubmatch(strings.TrimSpace(key))
 	if m == nil {
-		return search(ctx, key)
+		secs, err := search(ctx, key)
+		if err != nil {
+			return nil, err
+		}
+		return otcLast(key, secs), nil
 	}
 	code := strings.Repeat("0", 5-len(m[1])) + m[1]
 	secs, err := search(ctx, code)
@@ -53,6 +57,32 @@ func Search(ctx context.Context, key string) ([]*BasicSecurity, error) {
 		}
 	}
 	return res, nil
+}
+
+// usOTC 匹配美股场外交易的外国公司代码：5 个字母，以 F（普通股）或 Y（ADR）结尾，如 TCEHY、TCTZF。
+var usOTC = regexp.MustCompile(`^[A-Z]{4}[FY]$`)
+
+// otcLast 把美股场外交易的外国公司代码排到其他结果后面，其余顺序不变。
+// 新浪搜索「腾讯」时 TCEHY 排在港股 00700 前面，按第一个结果取数据的命令会拿到场外 ADR。
+// 直接搜索场外代码本身时不调整。
+func otcLast(key string, secs []*BasicSecurity) []*BasicSecurity {
+	key = strings.ToUpper(strings.TrimPrefix(strings.TrimSpace(key), "$"))
+	isOTC := func(sec *BasicSecurity) bool {
+		code := strings.TrimPrefix(sec.ExCode, "$")
+		return sec.ExChange == types.ExChangeNasdaq && usOTC.MatchString(code) && code != key
+	}
+	res := make([]*BasicSecurity, 0, len(secs))
+	for _, sec := range secs {
+		if !isOTC(sec) {
+			res = append(res, sec)
+		}
+	}
+	for _, sec := range secs {
+		if isOTC(sec) {
+			res = append(res, sec)
+		}
+	}
+	return res
 }
 
 func search(ctx context.Context, key string) ([]*BasicSecurity, error) {

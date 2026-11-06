@@ -230,6 +230,27 @@ func TestSearchHKPrefix(t *testing.T) {
 	}
 }
 
+// 美股场外交易的外国公司代码排到港股和 A 股后面，交易所上市的美股和直接搜索的场外代码不动。
+func TestSearchOTCLast(t *testing.T) {
+	defer gock.Off()
+	body := `var suggestvalue="腾讯,41,tcehy,tcehy,腾讯(ADR),,腾讯(ADR),99,1,ADR|ESG,,,;腾讯,41,tctzf,tctzf,腾讯,,腾讯,99,1,,,,;腾讯控股,31,00700,00700,腾讯控股,,腾讯控股,99,1,ESG,,,;腾讯音乐,41,tme,tme,腾讯音乐,,腾讯音乐,99,1,ESG,,,;腾讯济安,11,000847,sh000847,腾讯济安,,腾讯济安,99,1,,,,";`
+	searchURL().Reply(200).BodyString(body)
+	secs, err := Search(context.Background(), "腾讯")
+	require.NoError(t, err)
+	var got []string
+	for _, sec := range secs {
+		got = append(got, sec.ExCode)
+	}
+	require.Equal(t, []string{"HK00700", "$TME", "SH000847", "$TCEHY", "$TCTZF"}, got)
+
+	for _, key := range []string{"tcehy", "$TCEHY", " TCEHY "} {
+		searchURL().Reply(200).BodyString(body)
+		secs, err = Search(context.Background(), key)
+		require.NoError(t, err, key)
+		require.Equal(t, "$TCEHY", secs[0].ExCode, "直接搜索场外代码时保持在前面：%s", key)
+	}
+}
+
 // 关键字里的 & 和 = 不能变成新的参数。
 func TestSearchEscapesKeyword(t *testing.T) {
 	defer gock.Off()
