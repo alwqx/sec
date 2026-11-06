@@ -18,6 +18,7 @@ commands=(
 	"search 茅台 --json"
 	"quote sh600519 --json"
 	"quote 00700 --json"
+	"quote hk00700 --json"
 	"quote AAPL --json"
 	"quote TCEHY --json"
 	"info sh600519 --json"

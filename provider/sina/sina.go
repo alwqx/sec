@@ -31,8 +31,31 @@ func defaultHTTPHeaders() http.Header {
 	return headers
 }
 
+// hkCode 匹配带 HK 前缀的港股代码，如 hk00700、HK700。
+var hkCode = regexp.MustCompile(`^(?i)hk(\d{1,5})$`)
+
 // Search 根据关键字查询证券信息。没有匹配时返回空列表和 nil，请求失败时返回错误。
+// 新浪搜索不认 hk00700 这样带前缀的港股代码，这时改用补足 5 位的数字搜索，只留下代码完全相同的港股。
 func Search(ctx context.Context, key string) ([]*BasicSecurity, error) {
+	m := hkCode.FindStringSubmatch(strings.TrimSpace(key))
+	if m == nil {
+		return search(ctx, key)
+	}
+	code := strings.Repeat("0", 5-len(m[1])) + m[1]
+	secs, err := search(ctx, code)
+	if err != nil {
+		return nil, err
+	}
+	var res []*BasicSecurity
+	for _, sec := range secs {
+		if sec.ExCode == "HK"+code {
+			res = append(res, sec)
+		}
+	}
+	return res, nil
+}
+
+func search(ctx context.Context, key string) ([]*BasicSecurity, error) {
 	// 这个接口的参数写在路径里，& 和 = 也必须转义；空格用 %20，不用查询串的 +。
 	reqUrl := "https://suggest3.sinajs.cn/suggest/type=11,12,15,21,22,23,24,25,26,31,33,41&key=" + strings.ReplaceAll(url.QueryEscape(key), "+", "%20")
 	resp, err := utils.MakeRequest(ctx, http.MethodGet, reqUrl, defaultHTTPHeaders(), nil, 0)

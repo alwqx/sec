@@ -189,6 +189,47 @@ func TestSearch(t *testing.T) {
 	require.Error(t, err, "网络失败不能当成没有结果")
 }
 
+// 带 HK 前缀的港股代码改用数字搜索，只留下代码相同的港股，不要同数字的 A 股和基金。
+func TestSearchHKPrefix(t *testing.T) {
+	defer gock.Off()
+	body := `var suggestvalue="00700,31,00700,00700,腾讯控股,,腾讯控股,99,1,ESG,,,;sz000700,11,000700,sz000700,模塑科技,,模塑科技,99,1,,,,;of007002,21,007002,of007002,某基金,,某基金,99,1,,,,";`
+	for _, key := range []string{"hk00700", "HK00700", " Hk700 ", "hk0700"} {
+		var got string
+		searchURL().AddMatcher(func(req *http.Request, _ *gock.Request) (bool, error) {
+			got = req.URL.EscapedPath()
+			return true, nil
+		}).Reply(200).BodyString(body)
+		secs, err := Search(context.Background(), key)
+		require.NoError(t, err, key)
+		require.True(t, strings.HasSuffix(got, "key=00700"), "%s -> %s", key, got)
+		require.Len(t, secs, 1, key)
+		require.Equal(t, "HK00700", secs[0].ExCode, key)
+		require.Equal(t, "腾讯控股", secs[0].Name, key)
+	}
+
+	searchURL().Reply(200).BodyString(`var suggestvalue="sz000700,11,000700,sz000700,模塑科技,,模塑科技,99,1,,,,";`)
+	secs, err := Search(context.Background(), "hk00700")
+	require.NoError(t, err)
+	require.Empty(t, secs, "没有这只港股时不能返回同数字的 A 股")
+
+	searchURL().Reply(503)
+	_, err = Search(context.Background(), "hk00700")
+	require.ErrorContains(t, err, "HTTP 503", "搜索失败仍然报错")
+
+	// 不是 hk 加数字的关键字照常搜索。
+	for _, key := range []string{"hk", "hk123456", "hkd", "腾讯"} {
+		var got string
+		searchURL().AddMatcher(func(req *http.Request, _ *gock.Request) (bool, error) {
+			got = req.URL.EscapedPath()
+			return true, nil
+		}).Reply(200).BodyString(`var suggestvalue="";`)
+		_, err := Search(context.Background(), key)
+		require.NoError(t, err, key)
+		require.False(t, strings.HasSuffix(got, "key=00700"), key)
+		require.Contains(t, got, "key=", key)
+	}
+}
+
 // 关键字里的 & 和 = 不能变成新的参数。
 func TestSearchEscapesKeyword(t *testing.T) {
 	defer gock.Off()
