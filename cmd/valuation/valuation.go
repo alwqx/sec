@@ -62,7 +62,7 @@ func ValuationHandler(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	secs, err := sina.Search(cmd.Context(), args[0])
+	secs, err := sina.Resolve(cmd.Context(), args[0])
 	if err != nil {
 		return fmt.Errorf("搜索证券失败: %w", err)
 	}

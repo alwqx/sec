@@ -47,7 +47,7 @@ func QuoteHistoryHandler(cmd *cobra.Command, args []string) error {
 
 	// 查询参数由逗号分隔
 	key := args[0]
-	secs, err := sina.Search(cmd.Context(), key)
+	secs, err := sina.Resolve(cmd.Context(), key)
 	if err != nil {
 		return fmt.Errorf("搜索证券失败: %w", err)
 	}

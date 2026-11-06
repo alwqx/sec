@@ -203,3 +203,39 @@ func TestSearchEscapesKeyword(t *testing.T) {
 		require.True(t, strings.HasSuffix(got, want), "%s -> %s", key, got)
 	}
 }
+
+// 搜索接口失败时，完整代码按代码处理；名称、简称等不是完整代码的关键字仍然报错。
+func TestResolveFallsBackToCode(t *testing.T) {
+	defer gock.Off()
+	ctx := context.Background()
+	for _, tc := range []struct {
+		key  string
+		want BasicSecurity
+	}{
+		{"sh600519", BasicSecurity{Code: "600519", ExCode: "SH600519", ExChange: "sh", SecurityType: types.SecurityTypeStock}},
+		{" SZ000001 ", BasicSecurity{Code: "000001", ExCode: "SZ000001", ExChange: "sz", SecurityType: types.SecurityTypeStock}},
+		{"BJ920000", BasicSecurity{Code: "920000", ExCode: "BJ920000", ExChange: "bj", SecurityType: types.SecurityTypeStock}},
+		{"hk00700", BasicSecurity{Code: "00700", ExCode: "HK00700", ExChange: types.ExChangeHKex, SecurityType: types.SecurityTypeStock}},
+		{"$brk.b", BasicSecurity{Code: "brk.b", ExCode: "$BRK.B", ExChange: types.ExChangeNasdaq, SecurityType: types.SecurityTypeStock}},
+	} {
+		gock.New("https://suggest3.sinajs.cn").Reply(503)
+		secs, err := Resolve(ctx, tc.key)
+		require.NoError(t, err, tc.key)
+		require.Len(t, secs, 1, tc.key)
+		require.Equal(t, tc.want, *secs[0], tc.key)
+	}
+
+	for _, key := range []string{"茅台", "mt", "AAPL", "600519", "SH60051", "HK0070"} {
+		gock.New("https://suggest3.sinajs.cn").Reply(503)
+		_, err := Resolve(ctx, key)
+		require.ErrorContains(t, err, "HTTP 503", key)
+	}
+
+	// 搜索正常时用搜索结果，带名称。
+	gock.New("https://suggest3.sinajs.cn").Reply(200).
+		BodyString(`var suggestvalue="贵州茅台,11,600519,sh600519,贵州茅台,,贵州茅台,99,1,ESG,,,";`)
+	secs, err := Resolve(ctx, "sh600519")
+	require.NoError(t, err)
+	require.Equal(t, "贵州茅台", secs[0].Name)
+	require.True(t, gock.IsDone())
+}

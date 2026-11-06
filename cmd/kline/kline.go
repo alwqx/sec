@@ -52,7 +52,7 @@ func NewKLineCLI() *cobra.Command {
 // KLineHandler is the handler for sec kline command.
 func KLineHandler(cmd *cobra.Command, args []string) error {
 	key := args[0]
-	secs, err := sina.Search(cmd.Context(), key)
+	secs, err := sina.Resolve(cmd.Context(), key)
 	if err != nil {
 		return fmt.Errorf("搜索证券失败: %w", err)
 	}

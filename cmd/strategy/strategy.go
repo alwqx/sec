@@ -191,7 +191,7 @@ func fetchOHLCV(cmd *cobra.Command, code string, required int) (*analysis, error
 		return nil, err
 	}
 
-	secs, err := sina.Search(cmd.Context(), code)
+	secs, err := sina.Resolve(cmd.Context(), code)
 	if err != nil {
 		return nil, fmt.Errorf("搜索证券失败: %w", err)
 	}
