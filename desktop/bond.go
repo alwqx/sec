@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/alwqx/sec/provider/bond"
+	"github.com/alwqx/sec/types"
 )
 
 type bondDay struct {
@@ -35,7 +36,7 @@ var bondTenors = []bondTenor{
 
 // handleBond 按所需年份的并集抓取数据，最新行情与历史范围独立；每个年份只请求一次。
 func (s *desktopServer) handleBond(w http.ResponseWriter, r *http.Request) {
-	location, err := time.LoadLocation("America/New_York")
+	location, err := time.LoadLocation(types.TimezoneNewYork)
 	if err != nil {
 		writeError(w, 500, "无法读取美东时区")
 		return

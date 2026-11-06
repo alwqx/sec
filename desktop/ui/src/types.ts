@@ -19,6 +19,7 @@ export interface SecurityQuote {
   volume: number // 成交金额（元）
   turnover: number // 成交数量（股）
   time: string
+  timezone: string // trade_date 和 time 所在的交易所时区，美股是 America/New_York
 }
 
 export interface Company {

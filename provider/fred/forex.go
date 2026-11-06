@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/alwqx/sec/provider/forex"
+	"github.com/alwqx/sec/types"
 )
 
 const forexCSVURL = "https://fred.stlouisfed.org/graph/fredgraph.csv?id=DEXCHUS,DEXHKUS"
@@ -73,7 +74,7 @@ func (c *Client) ForexHistory(ctx context.Context, req *forex.Request) (*forex.R
 	if err != nil {
 		return nil, err
 	}
-	result := &forex.Result{Provider: "Federal Reserve via FRED", PriceType: "noon-buying-rate", Frequency: "daily", Timezone: "America/New_York", ObservationTime: "12:00", DateBasis: "observation-date", Begin: req.Begin, End: req.End, DataVersion: "current-visible-revision", Observations: []forex.Observation{}, SnapshotCoverage: map[string][2]string{}, Notes: []string{"美联储H.10纽约中午电汇买入汇率，按周发布日度观测；不是人民币中间价或中国市场收盘价。", "不进行季调，缺失值保留为null；各币种历史起点独立，不补周末、不拼接不同来源。"}}
+	result := &forex.Result{Provider: "Federal Reserve via FRED", PriceType: "noon-buying-rate", Frequency: "daily", Timezone: types.TimezoneNewYork, ObservationTime: "12:00", DateBasis: "observation-date", Begin: req.Begin, End: req.End, DataVersion: "current-visible-revision", Observations: []forex.Observation{}, SnapshotCoverage: map[string][2]string{}, Notes: []string{"美联储H.10纽约中午电汇买入汇率，按周发布日度观测；不是人民币中间价或中国市场收盘价。", "不进行季调，缺失值保留为null；各币种历史起点独立，不补周末、不拼接不同来源。"}}
 	selected := map[string]bool{}
 	for _, pair := range req.Pairs {
 		selected[pair] = true

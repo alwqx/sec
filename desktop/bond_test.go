@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alwqx/sec/types"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/h2non/gock.v1"
 )
@@ -32,7 +33,7 @@ func treasuryEntry(date string, yield float64, other string) string {
 }
 func bondToday(t *testing.T) time.Time {
 	t.Helper()
-	location, err := time.LoadLocation("America/New_York")
+	location, err := time.LoadLocation(types.TimezoneNewYork)
 	require.NoError(t, err)
 	today, err := time.Parse("2006-01-02", time.Now().In(location).Format("2006-01-02"))
 	require.NoError(t, err)

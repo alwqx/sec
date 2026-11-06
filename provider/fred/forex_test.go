@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/alwqx/sec/provider/forex"
+	"github.com/alwqx/sec/types"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/h2non/gock.v1"
 )
@@ -45,7 +46,7 @@ func TestForexHistorySelectionCachingAndSource(t *testing.T) {
 	require.Len(t, result.Observations, 2)
 	require.Nil(t, result.Observations[0].Value)
 	require.Equal(t, 1.5518, *result.Observations[1].Value)
-	require.Equal(t, "America/New_York", result.Timezone)
+	require.Equal(t, types.TimezoneNewYork, result.Timezone)
 	require.Equal(t, "12:00", result.ObservationTime)
 	require.Equal(t, "noon-buying-rate", result.PriceType)
 	require.Len(t, result.SnapshotCoverage, 1)

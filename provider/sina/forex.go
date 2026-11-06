@@ -12,6 +12,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/alwqx/sec/provider/forex"
+	"github.com/alwqx/sec/types"
 	"golang.org/x/text/encoding/simplifiedchinese"
 )
 
@@ -110,7 +111,7 @@ func (c *ForexClient) ForexQuotes(ctx context.Context, req *forex.Request) (*for
 	for i := range items {
 		items[i].Source, items[i].FetchedAt = address, fetched
 	}
-	return &forex.Result{Provider: "Sina", PriceType: "indicative-quote", Frequency: "snapshot", Timezone: "Asia/Shanghai", DateBasis: "provider-quote-time", DataVersion: "current-visible-quote", Observations: items, Notes: []string{"最近一次上游参考行情，可能延迟或为休市时的旧报价；观测时间与抓取时间分开保存。", "部分在岸及交叉汇率由新浪计算得出，逐条保留上游说明；报价并非银行承诺的实际兑换价格。"}}, nil
+	return &forex.Result{Provider: "Sina", PriceType: "indicative-quote", Frequency: "snapshot", Timezone: types.TimezoneShanghai, DateBasis: "provider-quote-time", DataVersion: "current-visible-quote", Observations: items, Notes: []string{"最近一次上游参考行情，可能延迟或为休市时的旧报价；观测时间与抓取时间分开保存。", "部分在岸及交叉汇率由新浪计算得出，逐条保留上游说明；报价并非银行承诺的实际兑换价格。"}}, nil
 }
 
 func parseForexHistory(raw []byte, pair string) ([]forex.Observation, error) {

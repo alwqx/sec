@@ -6,6 +6,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/alwqx/sec/types"
 )
 
 type QuotePolicy struct {
@@ -81,14 +83,14 @@ func sourceSpec(input *Result) (crossSpec, error) {
 		return crossSpec{}, fmt.Errorf("汇率输入不能为空")
 	}
 	switch {
-	case input.Provider == "Federal Reserve via FRED" && input.PriceType == "noon-buying-rate" && input.Frequency == "daily" && input.Timezone == "America/New_York" && input.ObservationTime == "12:00" && input.DateBasis == "observation-date":
+	case input.Provider == "Federal Reserve via FRED" && input.PriceType == "noon-buying-rate" && input.Frequency == "daily" && input.Timezone == types.TimezoneNewYork && input.ObservationTime == "12:00" && input.DateBasis == "observation-date":
 		return crossSpec{pivot: "USD", pairs: map[string]string{"CNY": "USD/CNY", "HKD": "USD/HKD"}}, nil
-	case input.Provider == "CFETS" && input.PriceType == "onshore-reference" && input.Frequency == "daily" && input.Timezone == "Asia/Shanghai" && input.DateBasis == "observation-date":
+	case input.Provider == "CFETS" && input.PriceType == "onshore-reference" && input.Frequency == "daily" && input.Timezone == types.TimezoneShanghai && input.DateBasis == "observation-date":
 		switch input.ObservationTime {
 		case "10:00", "11:00", "14:00", "15:00", "16:00":
 			return crossSpec{pivot: "CNY", pairs: map[string]string{"USD": "USD/CNY", "HKD": "HKD/CNY"}, inverse: true}, nil
 		}
-	case input.Provider == "Sina" && input.PriceType == "indicative-quote" && input.Frequency == "snapshot" && input.Timezone == "Asia/Shanghai" && input.DateBasis == "provider-quote-time":
+	case input.Provider == "Sina" && input.PriceType == "indicative-quote" && input.Frequency == "snapshot" && input.Timezone == types.TimezoneShanghai && input.DateBasis == "provider-quote-time":
 		return crossSpec{pivot: "USD", pairs: map[string]string{"CNY": "USD/CNY", "CNH": "USD/CNH", "HKD": "USD/HKD"}, snapshot: true}, nil
 	}
 	return crossSpec{}, fmt.Errorf("交叉汇率仅接受FRED纽约中午价、CFETS固定时点参考汇率或新浪带时间戳报价；不能从未知收盘时间的日线或中间价推算即期交叉价")
@@ -129,7 +131,7 @@ func fixedAlignment(input *Result, items []Observation) (Alignment, bool) {
 	for _, item := range items {
 		if item.ObservedAt != "" {
 			zone := Beijing
-			if input.Timezone != "Asia/Shanghai" {
+			if input.Timezone != types.TimezoneShanghai {
 				var err error
 				zone, err = time.LoadLocation(input.Timezone)
 				if err != nil {

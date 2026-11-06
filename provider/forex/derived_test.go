@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alwqx/sec/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -16,10 +17,10 @@ func leg(pair, date string, value float64, stamp string) Observation {
 	return item
 }
 func dailyInput() *Result {
-	return &Result{Provider: "Federal Reserve via FRED", PriceType: "noon-buying-rate", Frequency: "daily", Timezone: "America/New_York", ObservationTime: "12:00", DateBasis: "observation-date", Begin: "20240102", End: "20240103", Observations: []Observation{leg("USD/HKD", "2024-01-02", 7.8, ""), leg("USD/CNY", "2024-01-02", 7.2, "")}}
+	return &Result{Provider: "Federal Reserve via FRED", PriceType: "noon-buying-rate", Frequency: "daily", Timezone: types.TimezoneNewYork, ObservationTime: "12:00", DateBasis: "observation-date", Begin: "20240102", End: "20240103", Observations: []Observation{leg("USD/HKD", "2024-01-02", 7.8, ""), leg("USD/CNY", "2024-01-02", 7.2, "")}}
 }
 func quoteInput() *Result {
-	return &Result{Provider: "Sina", PriceType: "indicative-quote", Frequency: "snapshot", Timezone: "Asia/Shanghai", DateBasis: "provider-quote-time", Observations: []Observation{leg("USD/CNY", "2024-01-02", 7.2, "2024-01-02T16:00:00+08:00"), leg("USD/CNH", "2024-01-02", 7.21, "2024-01-02T16:00:00+08:00")}}
+	return &Result{Provider: "Sina", PriceType: "indicative-quote", Frequency: "snapshot", Timezone: types.TimezoneShanghai, DateBasis: "provider-quote-time", Observations: []Observation{leg("USD/CNY", "2024-01-02", 7.2, "2024-01-02T16:00:00+08:00"), leg("USD/CNH", "2024-01-02", 7.21, "2024-01-02T16:00:00+08:00")}}
 }
 func strictPolicy() QuotePolicy {
 	return QuotePolicy{Now: time.Date(2024, 1, 2, 8, 1, 0, 0, time.UTC), MaxAge: 15 * time.Minute}
@@ -40,7 +41,7 @@ func TestCrossRatesDirectionsAndInputProvenance(t *testing.T) {
 		require.NotEmpty(t, item.Inputs[0].RawValues)
 	}
 	require.Equal(t, "USD/CNY / USD/HKD", result.Observations[0].Formula)
-	require.Equal(t, "America/New_York", result.Timezone)
+	require.Equal(t, types.TimezoneNewYork, result.Timezone)
 	require.Equal(t, "noon-buying-rate", result.Derivation.InputPriceType)
 	input.Observations[0], input.Observations[1] = input.Observations[1], input.Observations[0]
 	again, err := CrossRates(input, []string{"HKD/CNY", "CNY/HKD", "CNY/USD", "USD/CNY"}, QuotePolicy{})
@@ -49,7 +50,7 @@ func TestCrossRatesDirectionsAndInputProvenance(t *testing.T) {
 }
 
 func TestCrossCFETSFixedTimeAndMissingDates(t *testing.T) {
-	input := &Result{Provider: "CFETS", PriceType: "onshore-reference", Frequency: "daily", Timezone: "Asia/Shanghai", DateBasis: "observation-date", ObservationTime: "16:00", Observations: []Observation{leg("USD/CNY", "2024-01-02", 7.2, "2024-01-02T16:00:00+08:00"), leg("HKD/CNY", "2024-01-02", 0.9, "2024-01-02T16:00:00+08:00"), leg("USD/CNY", "2024-01-03", 7.2, "2024-01-03T16:00:00+08:00")}}
+	input := &Result{Provider: "CFETS", PriceType: "onshore-reference", Frequency: "daily", Timezone: types.TimezoneShanghai, DateBasis: "observation-date", ObservationTime: "16:00", Observations: []Observation{leg("USD/CNY", "2024-01-02", 7.2, "2024-01-02T16:00:00+08:00"), leg("HKD/CNY", "2024-01-02", 0.9, "2024-01-02T16:00:00+08:00"), leg("USD/CNY", "2024-01-03", 7.2, "2024-01-03T16:00:00+08:00")}}
 	result, err := CrossRates(input, []string{"USD/HKD", "HKD/USD"}, QuotePolicy{})
 	require.NoError(t, err)
 	require.Len(t, result.Observations, 4)

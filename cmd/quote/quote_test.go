@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/alwqx/sec/provider/sina"
+	"github.com/alwqx/sec/types"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/h2non/gock.v1"
 )
@@ -286,4 +287,9 @@ func TestRetryKeepsOrderAndDedupesCase(t *testing.T) {
 
 	ordered := inKeyOrder([]keyProblem{{"nosuch", "", false}, {"broken", "", true}}, []string{"broken", "nosuch"})
 	require.Equal(t, "broken", ordered[0].key)
+}
+
+func TestQuoteTime(t *testing.T) {
+	require.Equal(t, "2024-09-30 15:00:01", quoteTime(&sina.SecurityQuote{TradeDate: "2024-09-30", Time: "15:00:01", Timezone: types.TimezoneShanghai}))
+	require.Equal(t, "2026-11-05 20:45:05 美东", quoteTime(&sina.SecurityQuote{TradeDate: "2026-11-05", Time: "20:45:05", Timezone: types.TimezoneNewYork}))
 }
