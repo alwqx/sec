@@ -16,6 +16,7 @@
 - 日期都是 `YYYY-MM-DD`。
 - 涨跌幅、换手率、振幅的单位都是 %；K 线的 `volume` 单位是股或份，`amount` 是成交额。
 - 备用数据的提示写到 stderr，并放在 `source_note`，不影响解析。
+- 哪些字段稳定、怎样算破坏性变更、各命令的顶层结构和已知的不一致，见 [JSON 输出约定](json.md)。
 
 ```shell
 sec valuation 600036 --json          # 完整估值，不受 --method 影响
