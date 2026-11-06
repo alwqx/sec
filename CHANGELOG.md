@@ -12,6 +12,7 @@
 8. Rename the Desktop 研究 tabs 概览 to 行情 and 公司 to 概览, with 概览 first.
 9. Open the Desktop 研究 page on the 概览 tab.
 10. Rank US OTC tickers such as `$TCEHY` after HK and A-share results, so `腾讯` picks `HK00700`.
+11. Fill HK `info` with company name, industry, listing date, description, PE and PB from East Money. **JSON change:** HK `category` is now an industry name, and `listing_date` is a date or empty instead of `--`.
 
 ### v0.4.6
 

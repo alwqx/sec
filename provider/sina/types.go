@@ -43,12 +43,14 @@ type CorpProfile struct {
 	RegisterAddress string  // 注册地址
 	BusinessAddress string  // 办公地址
 	MainBusiness    string  // 主营业务
+	Description     string  // 公司简介，目前只有港股有
 	Current         float64 // 当前价格，没有成交价时是昨收
 	PriceIsYClose   bool    // Current 是否为昨收
 	PB              float64 // 市净率
 	PeTTM           float64 // 市盈率TTM
 	MarketCap       float64 // 总市值
 	TradedMarketCap float64 // 流通市值
+	HKTrust         bool    // 港股交易所买卖基金、房地产投资信托等，不是公司，没有公司资料
 }
 
 // SecurityQuote 证券行情

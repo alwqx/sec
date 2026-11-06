@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/alwqx/sec/hkstock"
 	"github.com/alwqx/sec/indicator"
 	"github.com/alwqx/sec/provider/eastmoney"
 	"github.com/alwqx/sec/provider/history"
@@ -139,7 +140,11 @@ func KLineHandler(cmd *cobra.Command, args []string) error {
 	opts.ExCode = sec.ExCode
 	go func() {
 		defer wg.Done()
-		profile, err1 = sina.Profile(cmd.Context(), opts)
+		if types.IsHCode(sec.ExCode) {
+			profile, err1 = hkstock.Profile(cmd.Context(), sec.ExCode)
+		} else {
+			profile, err1 = sina.Profile(cmd.Context(), opts)
+		}
 	}()
 	go func() {
 		defer wg.Done()
@@ -166,9 +171,9 @@ func KLineHandler(cmd *cobra.Command, args []string) error {
 	}
 
 	// 打印基本信息
-	fmt.Fprintf(cmd.OutOrStdout(), "证券代码\t%s\n公司名称\t%s\n主营业务\t%s\n发行价格\t%.2f\n当前价格\t%s\n市净率PB\t%s\n市盈率TTM\t%s\n总市值  \t%s\n流通市值\t%s\n",
+	fmt.Fprintf(cmd.OutOrStdout(), "证券代码\t%s\n公司名称\t%s\n主营业务\t%s\n发行价格\t%s\n当前价格\t%s\n市净率PB\t%s\n市盈率TTM\t%s\n总市值  \t%s\n流通市值\t%s\n",
 		sec.ExCode, profile.Name, profile.MainBusiness,
-		profile.ListingPrice, profile.PriceText(), utils.HumanRatio(profile.PB), utils.HumanRatio(profile.PeTTM),
+		utils.HumanRatio(profile.ListingPrice), profile.PriceText(), utils.HumanRatio(profile.PB), utils.HumanRatio(profile.PeTTM),
 		utils.HumanNum(profile.MarketCap), utils.HumanNum(profile.TradedMarketCap))
 
 	return drawChart(cmd, sec, quotes)
