@@ -92,8 +92,30 @@
 
 - [ ] 更新 README：截图已过时，Desktop 功能列表需要补上美股公司、财报（含图表分析）、分红、估值和 SEC 申报。
 
+## AI/LLM
+
+原则：数字只来自 sec 的确定性计算，LLM 只负责选择调用、串联结果和解释，不产出数值；推导标记 `*`、`shares_note`、`dividends_note` 等口径说明和数据截止日期原样交给模型，并要求回答保留；只解释数据，不给买卖建议（国内证券投资咨询需持牌）。agent mode 调研（[#99](https://github.com/alwqx/sec/issues/99)）并入本节推进。
+
+设计方案见 [AI/LLM 接入设计](docs/ai.md)。按以下顺序拆分，一项一个 PR：
+
+- [ ] Agent Skill 与文档：写一份 SKILL.md，说明如何在 Claude Code、Cursor 等工具里配合 sec CLI 使用：各命令用 `--json`，macro 命令用 `--standard-json`；不改 Go 代码。
+- [ ] `sec mcp`：stdio MCP server，第一个 PR 先提供 7 类只读工具（search、quote、kline 摘要、financials、valuation、filings / announcements、macro），复用现有 provider；工具输出另定精简格式，避免把 10 年财报 JSON 原样塞给模型，每条结果带来源、截止日期和口径说明，并直接给出同比、变化量等派生值，不让模型自己计算。工具注册表独立成 `aitool/` 包，放在 `cmd/`、`desktop/` 之外，保证跨平台编译，供 `sec ask` 和 Desktop 对话复用。
+- [ ] 共用 AI 配置：CLI 和 Desktop 共用 `~/.sec/config.json` 的 `ai` 段，可以保存多个模型配置（`providers`，按名字区分，各自有接口类型、`base_url`、模型和 Key），`default` 指定默认配置；`sec config ai list/add/edit/set-key/use/remove` 管理；Key 可以用环境变量，或用 AES-256-GCM 加密保存在 `config.json`，加密密钥单独存在 `~/.sec/secret.key`（`0600`）；`set-key` 隐藏输入或从 stdin 读取，不接受命令行参数。
+- [ ] `llm/` 模型接入抽象：支持 Anthropic 和 OpenAI 兼容接口（覆盖 DeepSeek、通义、本地 Ollama），含回答数字核对、`sec config ai test` 测试连接和各命令的 `--ai <配置名>` 参数；CLI 和 Desktop 共用。
+- [ ] Desktop 模型设置：设置页管理同一份 `ai` 配置（新增、编辑、删除、设为默认）、保存 Key、测试连接，AI 功能旁边可以临时切换配置；说明自选股和查询内容会发给模型厂商，本地模型可不出本机。
+- [ ] 估值解读：`sec valuation <code> --explain`，把估值精简输出和口径说明交给模型生成一段说明，范围有限、便于测试。
+- [ ] Desktop 估值 tab「解读」按钮：复用上一项。
+- [ ] 申报与公告摘要：CLI 用 `--summary`，Desktop 在列表行上加按钮，两边共用 `llm/` 里的实现。拆成以下几个 PR：
+  - [ ] 巨潮公告摘要。
+  - [ ] 美股 8-K 事项摘要。
+  - [ ] 10-K 的 Risk Factors 和 MD&A 摘要，逐年对比风险因素的增删。
+  - [ ] 招股书 PDF 问答（`sec ipo ask`），回答附页码引用。
+- [ ] `sec ask`：单次问答，agent loop 复用 `aitool/` 工具注册表；混合多个工具结果时带上各自截止日期，避免拼接不同时点的数据。
+- [ ] Desktop 对话面板：复用 `sec ask` 的 agent loop。
+
+测试：CI 不调用真实模型，用假的模型客户端测试工具调用与提示词组装；回答质量用离线评测集手动运行。
+
 ## 调研
 
-- [ ] agent mode（[#99](https://github.com/alwqx/sec/issues/99)）：需求待补充。
 - [ ] 专业金融数据源（[#73](https://github.com/alwqx/sec/issues/73)）：评估 tickflow.org 等来源的数据范围和使用条件。
 - [ ] 新浪财经接口梳理（[#23](https://github.com/alwqx/sec/issues/23)）、数据输出方案（[#22](https://github.com/alwqx/sec/issues/22)）：2024 年开的，大部分已经实现（新浪接口已在使用，有 Desktop 和终端表格），核对后决定是否关闭。
