@@ -102,8 +102,12 @@ func UserAgent() string {
 	return fmt.Sprintf("sec/%s (%s %s) Go/%s", version.Version, runtime.GOARCH, runtime.GOOS, runtime.Version())
 }
 
+// retryDelay 是请求失败后重试前的等待时间，测试时调小。
+var retryDelay = 500 * time.Millisecond
+
 // MakeRequest 发送 http 请求，返回 *http.Response
-// timeout 为请求超时时间（含响应体读取），0 表示不设置超时
+// timeout 为请求超时时间（含响应体读取），0 表示使用默认的 10 秒。
+// 没有请求体的 GET、HEAD 在连接失败或超时时重试一次；POST 等请求和 HTTP 错误状态不重试。
 func MakeRequest(ctx context.Context, method, reqURL string, headers http.Header, body io.Reader, timeout time.Duration) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, method, reqURL, body)
 	if err != nil {
@@ -124,11 +128,25 @@ func MakeRequest(ctx context.Context, method, reqURL string, headers http.Header
 		client = &http.Client{Timeout: defaultHttpTimeout}
 	}
 	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
+	if err == nil || !retryable(req) {
+		return resp, err
 	}
+	slog.DebugContext(ctx, "请求失败，稍后重试", "url", reqURL, "error", err)
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-time.After(retryDelay):
+	}
+	return client.Do(req)
+}
 
-	return resp, nil
+// retryable 判断失败的请求能不能重发：没有请求体的 GET、HEAD，且调用方的 context 没有取消或到期。
+// 只重试连接失败和单次超时，HTTP 错误状态多半不是一两秒内能恢复的，直接交给调用方。
+func retryable(req *http.Request) bool {
+	if req.Body != nil || (req.Method != http.MethodGet && req.Method != http.MethodHead) {
+		return false
+	}
+	return req.Context().Err() == nil
 }
 
 // CheckStatus 在响应不是 200 时返回错误，避免把错误页当成数据解析。

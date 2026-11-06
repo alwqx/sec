@@ -3,6 +3,7 @@ package utils
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"math"
 	"net/http"
@@ -51,6 +52,53 @@ func TestMakeRequestKeepsUserAgent(t *testing.T) {
 	resp, err = MakeRequest(context.Background(), http.MethodGet, "http://abc.xyz/bar", headers, nil, 0)
 	require.NoError(t, err, "调用方指定时用调用方的")
 	resp.Body.Close()
+}
+
+func TestMakeRequestRetry(t *testing.T) {
+	defer gock.Off()
+	defer func(d time.Duration) { retryDelay = d }(retryDelay)
+	retryDelay = time.Millisecond
+	get := func(ctx context.Context, path string) (*http.Response, error) {
+		return MakeRequest(ctx, http.MethodGet, "http://abc.xyz"+path, nil, nil, 0)
+	}
+
+	gock.New("http://abc.xyz").Get("/reset").ReplyError(errors.New("connection reset"))
+	gock.New("http://abc.xyz").Get("/reset").Reply(200).BodyString("OK")
+	resp, err := get(context.Background(), "/reset")
+	require.NoError(t, err, "连接失败后重试一次")
+	body, err := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	require.NoError(t, err)
+	require.Equal(t, "OK", string(body))
+	require.True(t, gock.IsDone())
+
+	gock.New("http://abc.xyz").Get("/down").Times(2).ReplyError(errors.New("connection refused"))
+	_, err = get(context.Background(), "/down")
+	require.ErrorContains(t, err, "connection refused", "只重试一次，返回第二次的错误")
+	require.True(t, gock.IsDone())
+
+	gock.New("http://abc.xyz").Get("/busy").Reply(503)
+	gock.New("http://abc.xyz").Get("/busy").Reply(200)
+	resp, err = get(context.Background(), "/busy")
+	require.NoError(t, err)
+	resp.Body.Close()
+	require.Equal(t, 503, resp.StatusCode, "HTTP 错误状态不重试")
+	gock.Off()
+
+	gock.New("http://abc.xyz").Post("/form").ReplyError(errors.New("connection reset"))
+	gock.New("http://abc.xyz").Post("/form").Reply(200)
+	_, err = MakeRequest(context.Background(), http.MethodPost, "http://abc.xyz/form", nil, bytes.NewReader([]byte("a=1")), 0)
+	require.ErrorContains(t, err, "connection reset", "POST 不重试")
+	gock.Off()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	gock.Observe(func(*http.Request, gock.Mock) { cancel() })
+	defer gock.Observe(nil)
+	gock.New("http://abc.xyz").Get("/cancel").ReplyError(errors.New("connection reset"))
+	gock.New("http://abc.xyz").Get("/cancel").Reply(200)
+	_, err = get(ctx, "/cancel")
+	require.Error(t, err)
+	require.True(t, gock.IsPending(), "取消后不再发第二次")
 }
 
 func TestCheckStatus(t *testing.T) {
