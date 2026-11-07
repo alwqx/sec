@@ -193,19 +193,25 @@ func TestQuoteJSONSameNameKeepsCodes(t *testing.T) {
 	require.Equal(t, "2026-10-30", second["trade_date"], "港股日期和其他市场格式一致")
 }
 
-// 搜到同一只证券的关键字各输出一行，和输入一一对应，不去重。
-func TestQuoteJSONKeepsDuplicateKeys(t *testing.T) {
+// 搜到同一只证券的关键字合并为一行，说明放在 notes 里；没有合并时 notes 是空数组。
+func TestQuoteJSONMergesDuplicateKeys(t *testing.T) {
 	defer gock.Off()
 	mockSearchKey("600036").BodyString(suggestBody)
 	mockSearchKey("cmb").BodyString(suggestBody)
-	gock.New("https://hq.sinajs.cn").Get("/list=sh600036,sh600036").Reply(200).BodyString(cmbA)
+	gock.New("https://hq.sinajs.cn").Get("/list=sh600036").Reply(200).BodyString(cmbA)
 	data, _, err := runJSON(t, "quote", "600036,cmb", "--json")
 	require.NoError(t, err)
 	results := data["results"].([]any)
-	require.Len(t, results, 2)
-	for _, result := range results {
-		require.Equal(t, "SH600036", result.(map[string]any)["ex_code"])
-	}
+	require.Len(t, results, 1)
+	require.Equal(t, "SH600036", results[0].(map[string]any)["ex_code"])
+	require.Equal(t, []any{"cmb 和 600036 是同一只证券（SH600036），已合并为一条"}, data["notes"])
+	gock.Off()
+
+	mockSearchKey("600036").BodyString(suggestBody)
+	gock.New("https://hq.sinajs.cn").Get("/list=sh600036").Reply(200).BodyString(cmbA)
+	data, _, err = runJSON(t, "quote", "600036", "--json")
+	require.NoError(t, err)
+	require.Equal(t, []any{}, data["notes"])
 }
 
 func TestQuoteJSONFailsOnPartialResults(t *testing.T) {

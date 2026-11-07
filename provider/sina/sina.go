@@ -146,6 +146,19 @@ type ResolvedKey struct {
 // NotFound 表示搜索成功但没有结果。
 func (r ResolvedKey) NotFound() bool { return r.Err == nil && r.Security == nil }
 
+// DuplicateNote 说明这个关键字和 DuplicateOf 搜到同一只证券、已经合并；不是重复时返回空。
+func (r ResolvedKey) DuplicateNote() string {
+	if r.DuplicateOf == "" || r.Security == nil {
+		return ""
+	}
+	return MergeNote(r.Key, r.DuplicateOf, r.Security.ExCode)
+}
+
+// MergeNote 是重复关键字合并为一条时的说明，sec quote 的表格、--json 和 get_quote 用同一种写法。
+func MergeNote(key, first, exCode string) string {
+	return fmt.Sprintf("%s 和 %s 是同一只证券（%s），已合并为一条", key, first, exCode)
+}
+
 // ResolveAll 对每个关键字并发调用 Resolve，结果和 keys 一一对应、顺序相同，并按证券代码（不区分大小写）标出重复。
 // ctx 被取消时仍返回全部结果，没完成的关键字 Err 是 ctx 的错误，调用方用 ctx.Err() 判断。
 func ResolveAll(ctx context.Context, keys []string) []ResolvedKey {
