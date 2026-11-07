@@ -135,6 +135,7 @@ func (r *Registry) Lookup(name string) (Tool, bool) {
 // Default 返回 sec 提供的全部工具。新工具在这里注册。
 func Default() *Registry {
 	r, err := NewRegistry(
+		SearchTool(),
 		QuoteTool(),
 	)
 	if err != nil {
