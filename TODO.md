@@ -102,7 +102,9 @@
 - [ ] `sec mcp`：stdio MCP server，第一个 PR 先提供 7 类只读工具（search、quote、kline 摘要、financials、valuation、filings / announcements、macro），复用现有 provider；工具输出另定精简格式，避免把 10 年财报 JSON 原样塞给模型，每条结果带来源、截止日期和口径说明，并直接给出同比、变化量等派生值，不让模型自己计算。工具注册表独立成 `aitool/` 包，放在 `cmd/`、`desktop/` 之外，保证跨平台编译，供 `sec ask` 和 Desktop 对话复用。一个工具一个 PR，添加方法见 [sec mcp 文档](docs/mcp.md#添加工具)：
   - [x] 框架与 `get_quote`：`aitool` 注册表和输出信封、`sec mcp` stdio server、最新行情工具。
   - [ ] `search_security`：搜索证券代码。
-  - [ ] 重构：`aitool/quote.go` 的并发搜索去重（`resolveCodes`）和行情字段映射（`newQuoteItem`）复制自 `cmd/quote`，抽到 `provider/sina`（如 `sina.ResolveAll`）供两边共用；基金净值的 `volume`、`amount` 是否也在 `sec quote --json` 里改成 `null` 另行决定，改了是 JSON change。
+  - [x] 重构：并发搜索去重抽成 `sina.ResolveAll`，涨跌计算抽成 `SecurityQuote.Change`，`cmd/quote`、`cmd/watch` 和 `aitool` 共用。
+  - [ ] 基金净值的 `volume`、`amount` 在 `sec quote --json` 里是 0，`get_quote` 里是 `null`；是否统一成 `null` 另行决定，改了是 JSON change。
+  - [ ] `sec quote` 输入里有搜到同一只证券的关键字时（如 `600036,cmb`）：表格模式静默只保留一行，`--json` 每个关键字各输出一行，`get_quote` 合并并在 notes 里说明。是否统一（表格提示合并、JSON 去重）另行决定，JSON 去重是 JSON change。
   - [ ] `get_kline_summary`：K 线区间统计和最近 20 根。
   - [ ] `get_financials`：最近 5 年或 8 个季度的关键财务项及同比，A 股和美股统一结构。
   - [ ] `get_valuation`：估值、历史分位、`assessment`、全部 `_note` 和 `disclaimer`。

@@ -5,6 +5,7 @@
 1. Add the AI/LLM design in `docs/ai.md` and its roadmap in `TODO.md`.
 2. Add an Agent Skill (`skills/sec/SKILL.md`) so AI agents such as Claude Code can query sec, with setup in `docs/agent-skill.md`.
 3. Add `sec mcp`, a read-only MCP server over stdio for AI agents, with a `get_quote` tool and `scripts/mcp-smoke.py` to check it by hand; see `docs/mcp.md`.
+4. Share security search and quote change code between `sec quote`, `sec watch` and `sec mcp`.
 
 ### v0.4.7
 

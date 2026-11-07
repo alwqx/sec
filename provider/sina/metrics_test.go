@@ -76,6 +76,19 @@ func TestEffectivePrice(t *testing.T) {
 	}
 }
 
+func TestChange(t *testing.T) {
+	change, pct, ok := (&SecurityQuote{Current: 41, YClose: 40}).Change()
+	require.True(t, ok)
+	require.Equal(t, 1.0, change)
+	require.Equal(t, 2.5, pct)
+	for _, quote := range []SecurityQuote{{YClose: 40}, {Current: 41}, {}} {
+		change, pct, ok := quote.Change()
+		require.False(t, ok, "开盘前没有成交价、没有昨收时不计算涨跌")
+		require.Zero(t, change)
+		require.Zero(t, pct)
+	}
+}
+
 func TestQuerySecQuoteUpstreamStatus(t *testing.T) {
 	defer gock.Off()
 	gock.New("https://hq.sinajs.cn").Get("/list=sh600036").Reply(503).BodyString(`<html>"busy"</html>`)

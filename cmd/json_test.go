@@ -33,6 +33,13 @@ func mockSearch(body string) {
 	gock.New("https://suggest3.sinajs.cn").Get("/suggest/").Reply(200).BodyString(body)
 }
 
+const cmbHSuggest = `var suggestvalue="招商银行,31,03968,03968,招商银行,,招商银行,99,1,,,";`
+
+// mockSearchKey 只匹配指定关键字的搜索。sec quote 并发搜索多个关键字，请求顺序不固定，要按关键字区分。
+func mockSearchKey(key string) *gock.Response {
+	return gock.New("https://suggest3.sinajs.cn").Get("/suggest/.*key=" + key + "$").Reply(200)
+}
+
 func klineBody(rows ...string) string {
 	body := `{"data":{"code":"600036","market":1,"name":"招商银行","klines":[`
 	for i, row := range rows {
@@ -170,8 +177,8 @@ const (
 // A 股和 H 股同名时不能互相覆盖代码，否则价格会对到错的证券上。
 func TestQuoteJSONSameNameKeepsCodes(t *testing.T) {
 	defer gock.Off()
-	mockSearch(suggestBody)
-	mockSearch(`var suggestvalue="招商银行,31,03968,03968,招商银行,,招商银行,99,1,,,";`)
+	mockSearchKey("600036").BodyString(suggestBody)
+	mockSearchKey("03968").BodyString(cmbHSuggest)
 	gock.New("https://hq.sinajs.cn").Get("/list=sh600036,hk03968").Reply(200).BodyString(cmbA + "\n" + cmbH)
 	data, _, err := runJSON(t, "quote", "600036,03968", "--json")
 	require.NoError(t, err)
@@ -186,27 +193,42 @@ func TestQuoteJSONSameNameKeepsCodes(t *testing.T) {
 	require.Equal(t, "2026-10-30", second["trade_date"], "港股日期和其他市场格式一致")
 }
 
+// 搜到同一只证券的关键字各输出一行，和输入一一对应，不去重。
+func TestQuoteJSONKeepsDuplicateKeys(t *testing.T) {
+	defer gock.Off()
+	mockSearchKey("600036").BodyString(suggestBody)
+	mockSearchKey("cmb").BodyString(suggestBody)
+	gock.New("https://hq.sinajs.cn").Get("/list=sh600036,sh600036").Reply(200).BodyString(cmbA)
+	data, _, err := runJSON(t, "quote", "600036,cmb", "--json")
+	require.NoError(t, err)
+	results := data["results"].([]any)
+	require.Len(t, results, 2)
+	for _, result := range results {
+		require.Equal(t, "SH600036", result.(map[string]any)["ex_code"])
+	}
+}
+
 func TestQuoteJSONFailsOnPartialResults(t *testing.T) {
 	defer gock.Off()
 	// 其中一个关键字没有匹配。
-	mockSearch(suggestBody)
-	mockSearch(`var suggestvalue="";`)
+	mockSearchKey("600036").BodyString(suggestBody)
+	mockSearchKey("nosuch").BodyString(`var suggestvalue="";`)
 	_, output, err := runJSON(t, "quote", "600036,nosuch", "--json")
 	require.ErrorContains(t, err, "未找到证券: nosuch")
 	require.Empty(t, output)
 	gock.Off()
 
 	// 其中一个关键字搜索失败。
-	mockSearch(suggestBody)
-	gock.New("https://suggest3.sinajs.cn").Get("/suggest/").Reply(500)
+	mockSearchKey("600036").BodyString(suggestBody)
+	gock.New("https://suggest3.sinajs.cn").Get("/suggest/.*key=03968$").Reply(500)
 	_, output, err = runJSON(t, "quote", "600036,03968", "--json")
 	require.ErrorContains(t, err, "HTTP 500")
 	require.Empty(t, output)
 	gock.Off()
 
 	// 行情里少了一只。
-	mockSearch(suggestBody)
-	mockSearch(`var suggestvalue="招商银行,31,03968,03968,招商银行,,招商银行,99,1,,,";`)
+	mockSearchKey("600036").BodyString(suggestBody)
+	mockSearchKey("03968").BodyString(cmbHSuggest)
 	gock.New("https://hq.sinajs.cn").Get("/list=sh600036,hk03968").Reply(200).BodyString(cmbA)
 	_, output, err = runJSON(t, "quote", "600036,03968", "--json")
 	require.ErrorContains(t, err, "HK03968 没有行情数据")

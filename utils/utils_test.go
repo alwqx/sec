@@ -265,3 +265,9 @@ func TestParseRangeToday(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, begin, end)
 }
+
+func TestPositiveOrNil(t *testing.T) {
+	require.Equal(t, 1.5, *PositiveOrNil(1.5))
+	require.Nil(t, PositiveOrNil(0))
+	require.Nil(t, PositiveOrNil(-1))
+}
