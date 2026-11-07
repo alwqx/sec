@@ -136,7 +136,11 @@ func TestCommand(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal([]byte(request(`{"jsonrpc":"2.0","id":2,"method":"tools/list"}`)), &list))
 	require.Equal(t, 2, list.ID)
-	require.Equal(t, "get_quote", list.Result.Tools[0].Name)
+	names := []string{}
+	for _, tool := range list.Result.Tools {
+		names = append(names, tool.Name)
+	}
+	require.Contains(t, names, "get_quote")
 
 	require.NoError(t, inWriter.Close())
 	require.NoError(t, <-done)

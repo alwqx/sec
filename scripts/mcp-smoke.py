@@ -25,6 +25,7 @@ import threading
 SAMPLES = {
     "search_security": {"query": "腾讯"},
     "get_quote": {"codes": ["600519", "00700", "$AAPL", "易方达蓝筹"]},
+    "get_kline_summary": {"code": "SH000300"},
 }
 
 # 单个工具结果的建议上限，见 docs/mcp.md 的「添加工具」。

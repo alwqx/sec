@@ -13,6 +13,8 @@
 9. Add the `search_security` tool to `sec mcp`.
 10. Add a TODO item to mark indexes in search results in the provider.
 11. Share the K-line market mapping between `sec kline` and `sec quote-history`.
+12. Add the `get_kline_summary` tool to `sec mcp`.
+13. Add a TODO item for proportional price adjustment, since East Money's forward adjustment distorts percentages over long ranges.
 
 ### v0.4.7
 
