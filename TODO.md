@@ -77,6 +77,7 @@
 ## CLI
 
 - [ ] `provider/sina/sina.go` 中标注待拆分的函数拆成 2 个函数。
+- [ ] 港股指数行情：搜索能找到恒生指数（`HKhsi`）等港股指数，但 `sec quote` 报 `invalid HK stock quote line`，行情接口和解析都不支持港股指数。
 
 ## Desktop
 
@@ -101,7 +102,7 @@
 - [x] Agent Skill 与文档（[使用说明](docs/agent-skill.md)）：写一份 SKILL.md，说明如何在 Claude Code、Cursor 等工具里配合 sec CLI 使用：各命令用 `--json`，macro 命令用 `--standard-json`；不改 Go 代码。
 - [ ] `sec mcp`：stdio MCP server，第一个 PR 先提供 7 类只读工具（search、quote、kline 摘要、financials、valuation、filings / announcements、macro），复用现有 provider；工具输出另定精简格式，避免把 10 年财报 JSON 原样塞给模型，每条结果带来源、截止日期和口径说明，并直接给出同比、变化量等派生值，不让模型自己计算。工具注册表独立成 `aitool/` 包，放在 `cmd/`、`desktop/` 之外，保证跨平台编译，供 `sec ask` 和 Desktop 对话复用。一个工具一个 PR，添加方法见 [sec mcp 文档](docs/mcp.md#添加工具)：
   - [x] 框架与 `get_quote`：`aitool` 注册表和输出信封、`sec mcp` stdio server、最新行情工具。
-  - [ ] `search_security`：搜索证券代码。
+  - [x] `search_security`：搜索证券代码。
   - [x] 重构：并发搜索去重抽成 `sina.ResolveAll`，涨跌计算抽成 `SecurityQuote.Change`，`cmd/quote`、`cmd/watch` 和 `aitool` 共用。
   - [x] 基金净值的 `volume`、`amount` 在 `sec quote --json` 里也改成 `null`，和 `get_quote` 一致。
   - [x] Desktop 行情接口（`/api/v1/quote`、`/api/v1/quotes`）的基金净值 `volume`、`turnover` 改成 `null`，行情卡片和自选页显示 —。

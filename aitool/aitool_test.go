@@ -60,8 +60,10 @@ func TestNewRegistry(t *testing.T) {
 
 func TestDefault(t *testing.T) {
 	r := Default()
-	_, ok := r.Lookup("get_quote")
-	require.True(t, ok)
+	for _, name := range []string{"search_security", "get_quote"} {
+		_, ok := r.Lookup(name)
+		require.True(t, ok, name)
+	}
 }
 
 func TestResultJSON(t *testing.T) {

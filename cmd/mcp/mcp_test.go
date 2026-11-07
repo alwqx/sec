@@ -53,7 +53,7 @@ func TestListTools(t *testing.T) {
 	for _, tool := range aitool.Default().Tools() {
 		expected = append(expected, tool.Name)
 	}
-	require.Equal(t, expected, names)
+	require.ElementsMatch(t, expected, names, "SDK 按名字排序列出工具，不保留注册顺序")
 }
 
 func TestCallQuote(t *testing.T) {

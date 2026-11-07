@@ -23,6 +23,7 @@ import threading
 
 # 每个工具的示例参数，尽量覆盖不同市场。新增工具时在这里加一条。
 SAMPLES = {
+    "search_security": {"query": "腾讯"},
     "get_quote": {"codes": ["600519", "00700", "$AAPL", "易方达蓝筹"]},
 }
 
