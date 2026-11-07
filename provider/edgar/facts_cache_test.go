@@ -56,3 +56,12 @@ func TestFactsCacheEviction(t *testing.T) {
 	require.Len(t, cache.entries, factsCacheMaxEntries, "更新已有公司不淘汰其他公司")
 	require.Equal(t, "refreshed", cache.entries[1].facts.Name)
 }
+
+func TestFactsCacheLoader(t *testing.T) {
+	var cache FactsCache
+	facts := &Facts{Name: "cached"}
+	cache.put(1, facts, time.Now())
+	got, err := cache.Loader(client(t))(context.Background(), 1)
+	require.NoError(t, err)
+	require.Same(t, facts, got, "通过缓存读取")
+}
