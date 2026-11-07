@@ -87,7 +87,7 @@ CLI 的根 `main.go` 保持不变；桌面版是独立二进制：`go build ./de
 | 方法 | 路径                          | 说明                                                                      |
 | ---- | ----------------------------- | ------------------------------------------------------------------------- |
 | GET  | `/api/v1/search?key=<关键字>` | 搜索证券，返回 `{"results":[{name,code,ex_code,security_type,exchange}]}` |
-| GET  | `/api/v1/quote?code=<exCode>` | 查询单只证券行情，返回 `SecurityQuote`                                    |
+| GET  | `/api/v1/quote?code=<exCode>` | 查询单只证券行情，返回 `SecurityQuote`；基金净值没有成交，`volume`、`turnover` 为 `null`，页面显示 — |
 
 错误统一返回 `{"error": "<msg>"}` + 对应状态码。
 
@@ -264,7 +264,7 @@ macOS 按当前进程架构匹配 `sec-<tag>-desktop-darwin-<arch>.dmg`，不将
 | GET | `/api/v1/financials/charts?code=SH600036&freq=annual` | 财报图表数据；freq 为 annual（最近 10 个年度）或 quarter（最近 12 个单季） |
 | GET | `/api/v1/financials?code=SH600036&report=balance&period=annual` | 财报；report 为 balance/income/cashflow，period 可省略或 annual/halfyear/q1/q3 |
 | GET | `/api/v1/strategy?code=SH600036&kind=macd&begin=2026-01-01&end=2026-10-30&fq=qfq` | 技术指标序列和信号；`kind` 为 ma、macd、rsi、boll，参数 fast、slow、signal、period、overbought、oversold、k 可选；回测参数 cash、commission、min_commission、stamp_tax、slippage 可选（费率以 % 为单位），结果在 `backtest`，不能回测时原因在 `backtest_note` |
-| GET | `/api/v1/quotes?codes=SH600036,HK00700` | 批量行情，最多 1000 只，后端每 100 只分批查询；不可用的代码列在 `missing` |
+| GET | `/api/v1/quotes?codes=SH600036,HK00700` | 批量行情，最多 1000 只，后端每 100 只分批查询；不可用的代码列在 `missing`；字段同 `/api/v1/quote`，基金净值的 `volume`、`turnover` 为 `null` |
 | GET | `/api/v1/announcements?code=SH600036&type=insider` | 当前证券标题含增持或减持的公告：两个关键字各查最多 10 页，按标题严格过滤、去重并倒序；不是结构化交易记录，结果被截断时 `truncated` 为 true |
 | GET | `/api/v1/ipo/announcements?since=2026-10-01&until=2026-10-31` | 按公告日期查询 IPO 相关公告，只填一端时补齐另一端 |
 | GET | `/api/v1/fx/options` | 交叉汇率各来源支持的货币对 |

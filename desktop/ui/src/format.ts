@@ -13,3 +13,19 @@ export function yi(value: number | null | undefined) {
   if (value === null || value === undefined) return '—'
   return (value / 1e8).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
+
+// tradeAmount 是行情卡片的成交额；基金净值没有成交时是 null，显示破折号，0 是真实的 0。
+export function tradeAmount(value: number | null | undefined) {
+  if (value === null || value === undefined) return '—'
+  if (value >= 1e8) return `${(value / 1e8).toFixed(2)} 亿`
+  if (value >= 1e4) return `${(value / 1e4).toFixed(2)} 万`
+  return `${value.toFixed(0)}`
+}
+
+// tradeShares 是行情卡片的成交量，规则同 tradeAmount。
+export function tradeShares(value: number | null | undefined) {
+  if (value === null || value === undefined) return '—'
+  if (value >= 1e8) return `${(value / 1e8).toFixed(2)} 亿股`
+  if (value >= 1e4) return `${(value / 1e4).toFixed(2)} 万股`
+  return `${value} 股`
+}

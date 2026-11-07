@@ -8,6 +8,7 @@
 4. Share security search and quote change code between `sec quote`, `sec watch` and `sec mcp`.
 5. Report no trading for fund NAV quotes. **JSON change:** `sec quote --json` `volume` and `amount` are now `null` instead of 0 when `nav` is `true`.
 6. Merge keys that find the same security, such as `600036,cmb`, into one quote and say so, in the `sec quote` table and in `--json`, as `get_quote` already does. **JSON change:** `sec quote --json` returns one row for such keys instead of one per key, and adds a top-level `notes` array.
+7. Show — instead of 0 for the volume and amount of fund NAV quotes in Desktop: the quote APIs now return `null` for them, as the CLI and `get_quote` do.
 
 ### v0.4.7
 

@@ -2,7 +2,8 @@ import { RefreshCw } from 'lucide-react'
 import { priceDigits, quoteChange, type QuotesState } from '../hooks/useQuotes'
 import type { BasicSecurity } from '../types'
 
-function amount(value: number) {
+// 没有成交（基金净值为 null）或成交额为 0 时显示破折号。
+function amount(value: number | null) {
   if (!value) return '—'
   if (value >= 1e8) return `${(value / 1e8).toFixed(2)} 亿`
   if (value >= 1e4) return `${(value / 1e4).toFixed(2)} 万`

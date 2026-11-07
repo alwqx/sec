@@ -50,5 +50,5 @@
 
 - **证券代码的字段名**：多数命令是 `ex_code`（如 `SH600519`），`valuation` 是 `code`，值的格式和 `ex_code` 相同。
 - **A 股和美股结构不同**：`info`、`financials` 的美股输出是另一套结构，见上表。
-- **成交量和成交额**：`sec quote --json` 的 `volume` 是成交量（股或份）、`amount` 是成交额；Desktop 的行情接口直接输出内部结构，`volume` 是成交额、`turnover` 是成交量，两者正好相反。
+- **成交量和成交额**：`sec quote --json` 的 `volume` 是成交量（股或份）、`amount` 是成交额；Desktop 的行情接口沿用内部结构的字段名，`volume` 是成交额、`turnover` 是成交量，两者正好相反。基金净值没有成交时，两边都是 `null`。
 - **列表字段**：`fx` 用 `observations`，其他命令用 `results`。
