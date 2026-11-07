@@ -9,6 +9,7 @@
 5. Report no trading for fund NAV quotes. **JSON change:** `sec quote --json` `volume` and `amount` are now `null` instead of 0 when `nav` is `true`.
 6. Merge `sec quote` keys that find the same security into one row, with a note. **JSON change:** `--json` returns one row for them instead of one each, and adds `notes`.
 7. Return null volume and turnover for fund NAV quotes in the Desktop API. **JSON change:** `/api/v1/quote` and `/api/v1/quotes` return `null` instead of 0 when `nav` is `true`.
+8. Shorten the v0.4.0–v0.4.6 CHANGELOG entries to one sentence each.
 
 ### v0.4.7
 
@@ -29,201 +30,201 @@
 
 ### v0.4.6
 
-1. Add US stock valuation and dividend yield: `sec valuation <US ticker>` (all methods and `--json`) and the Desktop valuation tab now cover US stocks. With no daily valuation table available, market cap is computed from Sina unadjusted daily closes times the shares outstanding on the latest SEC cover page, falling back to the latest quarterly diluted weighted-average shares as originally reported when cover shares are over 15 months old (Alphabet and Meta report them only per share class); companies with neither are reported as unsupported. Splits are detected from price jumps and accepted only when share counts before and after, or Sina's current shares, confirm them, and multi-class companies whose latest shares differ from Sina's by over 25% are calibrated to Sina. PE and PS use the last four consecutive quarters and PB the latest equity from SEC XBRL, each value only from the day it was first filed, giving 10 years of history and percentiles. The dividend yield uses common dividends paid in the latest complete fiscal year, which is unaffected by splits and 53-week years, drops to zero when the latest fiscal year paid none, and comes with history, a 5-year average and payout by fiscal year; the US cash flow statement's dividends line now prefers common dividends too. Growth, PEG, Graham number, DCF and the rule summary are shared with A-shares; there are no industry peers, SIC 6000–6799 counts as financial, IFRS filers are reported as unsupported, and results carry `currency` (`USD` or `CNY`) with amounts labeled in USD. Desktop reuses the cached XBRL data of the financials tab
-2. Support US valuation for companies that report shares outstanding only per share class, such as Berkshire Hathaway and Visa, whose shares are missing from SEC company facts: when neither cover shares nor weighted shares are recent, the cover page (`R1.htm`) of each 10-K and 10-Q from the last 11 years is read for per-class shares and trading symbols, cached per accession under `~/.sec/cache/edgar/covers/`. Shares are converted into the queried class as its own shares plus a single weight times the other classes, solved from the latest filing and Sina's current as-converted shares, so BRK.A and BRK.B give the same market cap; the class is matched by trading symbol, or by XBRL member for filings before 2019. Visa's varying conversion rates make history accurate only to a few percent. The current share count from Sina is restated to the cover date for later splits before solving the conversion weight, converted class shares are not mixed with other share sources, an impossible weight is reported with both numbers, recent covers that are not yet available are retried, cover parsing is cached under a version, and `shares_note` explains converted shares and any covers that could not be read. Cover header dates are mapped to columns by row and column spans, cover pages are read only when company-facts shares are stale, so the valuation is computed once, and one client reuses the submissions list it already downloaded
+1. Add US stock valuation and dividend yield to `sec valuation` and the Desktop valuation tab, built from Sina prices and SEC XBRL filings.
+2. Support US valuation for companies that report shares only per share class, such as Berkshire Hathaway and Visa.
 3. update todo and readme
-4. Add a one-feature-per-PR rule to `CLAUDE.md` and `AGENTS.md`: each commit and PR implements one feature with its tests, docs and CHANGELOG entry, and complex work is split into smaller features delivered in separate PRs.
-5. Show US financial statements in the company's reporting currency: the currency is detected from the latest annual report instead of assuming USD, so companies such as Alibaba show ten years in RMB instead of the scattered USD convenience translations; `sec financials` and the Desktop financials tab label amounts with the currency, and each report's JSON carries `currency` and `currency_name`. The currency is counted over statement line concepts in the latest annual filing, so note disclosures, subsequent events and USD convenience translations do not decide it, with a fallback to the currency with the most annual periods. **JSON change:** amounts and line `unit` in `sec financials --json` and `-o file.json` are now in the reporting currency rather than always USD; check `currency`.
-6. Support annual financial statements for foreign companies reporting under IFRS, such as TSMC, Novo Nordisk, SAP, HSBC and Toyota: `sec financials` and the Desktop financials tab map the same income, balance sheet and cash flow lines to `ifrs-full` concepts in the reporting currency, hide lines without an IFRS counterpart, and label the source as IFRS (`standard` in the JSON). IFRS filers submit only 20-F annual reports to the SEC, so quarterly views explain that only annual statements are available. The accounting standard is chosen from the line items in the latest annual filing, so stray `ifrs-full` facts in a US GAAP filing no longer switch the statements to IFRS, and companies that switched to IFRS still do not fall back to older US GAAP data. Net income uses profit attributable to owners of the parent, falling back to total profit only for companies that never report the attributable figure. `sec financials --json` also reports `standard` at the top level. Valuation still reports IFRS companies as unsupported, and now cancels its other downloads as soon as the company facts show IFRS.
-7. Report US valuation as unsupported for foreign companies instead of returning wrong numbers: valuation multiplied the ADS price by ordinary shares from the SEC cover page, so NetEase (1 ADS = 5 shares) showed a market cap five times too high, and Alibaba's cover share count looks off by a factor of ten. Companies filing IFRS statements, foreign private issuers whose latest annual report is a 20-F or 40-F, companies reporting in a currency other than USD, and companies whose cover-page depositary receipt ratio (`dei:EntityListingDepositoryReceiptRatio`) is not 1 now return `valuation.ErrForeign` (HTTP 422 in Desktop), which replaces `edgar.ErrIFRS`. Valuation cancels its other downloads as soon as the company facts show a foreign company. The USD-convenience-translation path and `currency_note` are removed. `edgar.Facts` gains `AnnualForm` (without the `/A` suffix), `ForeignIssuer` and `DepositaryReceiptRatio`.
-8. Derive US parent stockholders' equity when a company tags it only by dimension, so it is missing from SEC company facts: equity = total equity including noncontrolling interests minus `MinorityInterest` for the same date, marked `*` as derived and disclosed when both values were first filed. Once an annual report after the last noncontrolling interest has none (Visa after 2010), later periods equal the total, usable in valuation from that report's filing date; otherwise missing periods stay empty, including companies that never tag `MinorityInterest`. Visa, AT&T, Verizon and UnitedHealth now get equity in `sec financials` and the Desktop financials tab and ROE and P/B in valuation; AT&T, Verizon and UnitedHealth also get book value per share (Visa's needs per-class diluted shares).
-9. Fill per-class EPS and book value per share in the US valuation annual table for companies that report diluted EPS and diluted shares only per share class, such as Berkshire Hathaway and Visa: when the annual reports lack them, `edgar.ClassEarnings` reads each 10-K income statement page (found through `FilingSummary.xml`, skipping equity, cash flow and balance sheet statements) for the per-class diluted EPS and weighted diluted shares, cached per accession under `~/.sec/cache/edgar/earnings/v2/<CIK>/`. The queried class is matched by its cover-page member first, then by its class letter when the income statement uses another member (Berkshire's `EquivalentClassBMember`). Both values come from the same class row; the class shares feed BPS and dividends per share only when they are as-converted (EPS × shares within 10% of net income), otherwise only EPS is shown. Values match the filings (Visa class A FY2021 $5.63, Berkshire class B 2025 $31.04); `shares_note` explains the source and any missing years. The cover-page reader shares the new concurrent read and per-accession cache helpers.
-10. Document the measured error of Visa's class conversion in US valuation (within ±2% of the 10-K as-converted diluted shares for FY2015–2025, the same order as the difference between weighted-average diluted and point-in-time shares) and drop the TODO item to solve conversion ratios per filing.
-11. Add US dividends to `sec info -d`: after the company profile, a fiscal-year table from SEC XBRL annual reports shows declared dividends per share and year-over-year growth, dividends paid, net income, payout ratio and buybacks, in the reporting currency (the last 10 years in text, all years and detected splits under `dividends` in `--json`). Per-share dividends from filings made before a stock split are adjusted to the current share basis; splits come from the valuation split detector, now shared as `usstock.DetectSplits` (price jumps in Sina unadjusted daily bars confirmed by share counts, including 3-for-2), so mergers or changes in listed share classes are not mistaken for splits. SEC data has no ex-dividend, record or payment dates. Fiscal years come from both the income and cash flow statements; tickers SEC does not have skip the table and still print their quote with `-d --json`. `edgar.Period` now records the filing each annual value was taken from (`Reported`).
-12. Add the Desktop dividends tab for US stocks: `GET /api/v1/us/dividends` returns the same fiscal-year table as `sec info -d` (`usstock.LoadDividends`, sharing the Desktop XBRL cache), shown with per-share dividends and growth, dividends paid, net income, payout ratio, buybacks and the split note. Every research tab now has a US view, so the US "not supported" placeholder is removed. Companies without XBRL financial data return 404 (`edgar.ErrNoXBRL`, same message as before). `usstock.LoadDividends` now takes an optional quote (read itself when nil, so `sec info -d` reuses the profile's quote) and an optional facts loader.
-13. Add chart analysis to the Desktop US financials tab, next to the statements: `GET /api/v1/us/financials/charts` returns `financials.FromSEC`, which turns SEC XBRL facts into the same chart data as A shares (with `source: sec`, the reporting `currency_name` and fiscal `label`s), so the A-share chart component is reused. The profit Sankey and waterfall go from revenue through cost of revenue, gross profit, R&D and SG&A, operating income, pretax income and income tax to net income attributable to the parent, with other items folded into one; banks split revenue into net interest and noninterest income and deduct credit losses and operating expenses. The cash waterfall runs from the previous period-end cash through the three cash flows, with restricted cash and FX effects folded into one item. Trends cover revenue and net income, margins, SG&A and R&D ratios, debt ratio, asset mix, cash flows and operating cash flow to net income, for 10 fiscal years or 12 quarters.
-14. Refactor the Desktop US SEC handlers (financials, financial charts, dividends) to share their setup: code validation (checked before other parameters), the 30-second timeout and SEC client with cancellation handled in one place (`serveUS` takes a callback), the XBRL lookup through the shared cache, annual/quarter parameter parsing and error mapping, with the request path in upstream-failure logs. As a result the financials endpoint now returns 404 instead of 502 for companies without XBRL data, like the other two, and the not-found, upstream-failure and parameter messages are worded the same way across the three.
-15. Move the Desktop US company and SEC filings handlers onto `serveUS` as well: the company endpoint keeps its own 502 message when both the profile and the quote fail (new `usUpstream` error), and filings parses its type and page as parameter errors (new `pageParam`, shared by `requestPage`). Filings messages now match the other US endpoints: "SEC 申报只支持美股代码，比如 $AAPL" becomes "只支持美股代码，比如 $AAPL", "SEC EDGAR 没有这家公司的申报，可能不向 SEC 申报" becomes "SEC EDGAR 没有这家公司的申报数据，可能不向 SEC 申报", and "SEC 申报获取失败：…" becomes "美股申报获取失败：…". A failed shared-config read is now logged for every US endpoint. Valuation keeps its own setup, since it serves A shares and US stocks with a different timeout and error mapping.
-16. Add a button at the left of the Desktop page header that hides or shows the left navigation; the content then spans the full window, the button stays in the header to bring the menu back, and hovering or focusing it shows a tooltip ("点击隐藏菜单" / "点击展开菜单"). The choice is saved as `sidebar_hidden` in the workspace settings, because the Desktop server listens on a random port each launch and `localStorage` would not survive a restart; older workspace files default to shown. It also hides the horizontal navigation in narrow windows.
+4. Add a one-feature-per-PR rule to `CLAUDE.md` and `AGENTS.md`.
+5. Show US financial statements in the company's reporting currency. **JSON change:** `sec financials --json` amounts are in the reporting currency; check `currency`.
+6. Support annual financial statements for IFRS filers such as TSMC and SAP.
+7. Report US valuation as unsupported for foreign companies instead of returning wrong numbers.
+8. Derive US parent stockholders' equity when a company tags it only by dimension.
+9. Fill per-class EPS and book value per share in the US valuation table for Berkshire Hathaway and Visa.
+10. Document the measured error of Visa's class conversion in US valuation.
+11. Add US dividends by fiscal year to `sec info -d`.
+12. Add the Desktop dividends tab for US stocks.
+13. Add chart analysis to the Desktop US financials tab.
+14. Share setup across the Desktop US SEC handlers; financials now returns 404 for companies without XBRL data.
+15. Move the Desktop US company and filings handlers onto the shared setup, with unified error messages.
+16. Add a button to hide or show the Desktop left navigation.
 
 ### v0.4.5
 
-1. Add US company filings from the official SEC EDGAR API: `sec filings <ticker>` lists 10-K, 10-Q, 8-K, 20-F, 6-K, proxy and registration filings by default (`--form` for others such as Form 4, `--form all` for every form), with filing and report dates, Chinese descriptions including 8-K items, `-b/-e` date filters that reach older filing pages (also used, up to 10 pages, when a form filter finds too few recent filings, as for heavy filers like Goldman Sachs), `-o` to download primary documents, and `--json`. The Desktop announcements tab shows the same filings for US stocks, with categories and links that open in the browser. SEC requires a contact email in the User-Agent, so requests carry the email from a new shared config file, `~/.sec/config.json` (default `sec_dev@example.com`), which `sec config` and the Desktop settings page both update under one file lock, falling back to defaults when the file is invalid; requests stay under SEC's 10 per second limit, and the ticker-to-CIK list is cached for a day
-2. Fill gaps in US stock support: `sec info` for US tickers no longer fails, showing the company profile from SEC EDGAR (name, former names, CIK, exchanges, industry and SIC, state of incorporation, filer category, fiscal year end, address, phone) with price, 52-week range, trailing P/E and EPS, market cap and shares from Sina; either part is still shown when the other fails, so tickers SEC does not list (such as QQQ) show their quote, and `sec kline` for US tickers no longer fails on the missing Sina company page. Share classes such as BRK.B use each source's format. US K-lines retry East Money's NYSE (106) and NYSE American (107) markets when the Nasdaq code (105) has no data, since Sina labels every US stock Nasdaq, and fall back to Sina's unadjusted US daily bars when East Money fails. Desktop price history and technical analysis now accept US tickers, priced in USD; backtests stay A-share only
+1. Add US company filings from SEC EDGAR: `sec filings` and the Desktop announcements tab, with a contact email in the new `~/.sec/config.json`.
+2. Add US support to `sec info` and `sec kline`, and US tickers to Desktop price history and technical analysis.
 3. update default email for SEC EDGAR API
-4. Add US financial statements from SEC XBRL company facts: `sec financials <US ticker>` shows the main lines of the income statement, balance sheet and cash flow statement (`--type`), annual or quarterly (`--period annual|quarter`), in hundreds of millions of USD, with `--json` and `-o file.json` for every period. Each period takes the first reported concept from an ordered list, since companies switch concepts over the years, and the latest restatement. Quarters missing from XBRL, such as Q4 and cash-flow quarters reported only year to date, are derived from year-to-date differences and marked `*`, as is free cash flow. IFRS filers such as TSMC are reported as unsupported. The Desktop company and financials tabs now cover US stocks, with SEC company data and Sina quotes on the company tab and the same statements on the financials tab
-5. Fill in filings for heavy filers: when 10 older pages still leave a form filter short, `sec filings` and the Desktop filings tab fall back to EDGAR full-text search by form, which covers filings since 2001, so JPMorgan's `--form 10-K` returns its 30 annual reports instead of 2
-6. Fix US financial statement and filing edge cases: recognize US GAAP annual facts filed on 20-F, 40-F and 10-KT and their amendments; derive quarters only from adjacent year-to-date values of the same concept, leaving missing quarters blank and excluding stub periods. Preserve partial filings and their incomplete flag on search errors or page limits, apply date filters and stop once enough results are found, and retain upstream descriptions for unknown forms. Bound the Desktop XBRL cache to 20 companies, evict expired entries on writes, and label financial table headers using the displayed report's period type
-7. Detect accounting-standard changes from the latest monetary reporting periods instead of silently serving historical US GAAP facts for current IFRS filers. Support quarterly statements before the first annual filing, infer fiscal periods from 10-Q year-to-date or latest single-quarter data, and preserve missing-quarter safeguards and comparative-period labels
-8. Fix Sina security search after additional trailing fields were introduced: validate only the required columns while preserving legacy responses and active-security filtering, restoring stock lookup and quote commands such as `sec q lxzk`
+4. Add US financial statements from SEC XBRL to `sec financials` and the Desktop company and financials tabs.
+5. Fall back to EDGAR full-text search when filings for heavy filers run short.
+6. Fix edge cases in US financial statements and filings.
+7. Detect accounting-standard changes and support quarterly statements before the first annual filing.
+8. Fix Sina security search after new trailing fields appeared in its responses.
 
 ### v0.4.4
 
-1. Add dividend yield to `sec valuation` (`--method dividend`, the overview and `--json`) and the Desktop valuation tab: the yield on the latest complete fiscal year adjusted for stock dividends and splits, the 5-year average, its historical range and percentile, consecutive years and payout by fiscal year. Plans not yet paid are listed separately. The yield percentile now counts in the rule summary, so assessments can change. If dividend data is unavailable or there are no dividend records at all, the rest of the valuation still works and `dividends_note` and the rule summary say so. Dividends from the last 5 years are checked against Sina, which also tells non-payers apart from missing data, and records missing from East Money or with different amounts are listed
-2. Run `govulncheck` in CI, and skip `TestQuoteWs`, a live websocket test that occasionally failed CI
-3. Add a chart view to the Desktop financials tab, built from East Money's full F10 statements: a profit Sankey diagram, profit and cash waterfalls, and trends for revenue and profit, margins, expense ratios (cost-income ratio for financial companies), debt ratio, asset mix, cash flows and operating cash flow to net profit, over the last 10 years or 12 single quarters. Every step ties to the reported subtotals, with unlisted and small items shown as "other", and banks, securities firms and insurers get their own revenue breakdowns
-4. Fix `macro cn financing` for 2017–2019: 2018 and 2019 failed on the adjusted history tables that the official pages append inside the same table, so parsing now stops at the first "表 N：" title, even when it is not in the first column, and uses the table as published. Merged cells spanning up to 500 columns are accepted, the 2017 stock table's "其中：人民币贷款" counts as RMB loans instead of an "other" item, and month rows such as 2017.01 no longer end up in the notes
-5. Fix `macro cn fiscal` failing for 202406 and 202407: when the release's `PubDate` is up to 180 days earlier than the catalog date, which is then a later edit date, the release date is used and the catalog date is kept in the note; other mismatches still fail
-6. Report partial failures in text mode: `sec quote` and `sec financials` without `--type` show what they got, then list what failed and exit non-zero. `sec quote -r` shows failures below the table, where clearing the screen no longer hides them, and retries failed searches about every 15 seconds; a failed quote request keeps the last quotes and retries instead of ending the session. Keywords are searched concurrently in input order, and keywords that resolve to the same security are shown once. Keywords beyond the fifth are listed as not queried instead of being dropped silently. `sec financials` now fails when no security matches, as it already did with `--json`, `-o` no longer writes a file missing a report type, and Ctrl-C is not reported as a failure
-7. Add strategy backtests. `sec strategy ma|macd|rsi|boll` takes `--begin/--end` (YYYYMMDD) and fetches warm-up history before the range, so long periods such as `ma -s 200` no longer run out of data. `--begin` defaults to 250 days before `--end`. `--backtest` simulates the signals on forward-adjusted daily prices of Shanghai and Shenzhen A-share stocks (indices and funds are refused, and backtest settings are checked before any request): fills at the next open, 100-share lots, T+1, no buys at limit-up or sells at limit-down opens (10%, 20% for ChiNext and STAR), suspended days carried forward, with adjustable commission, minimum commission, stamp tax and slippage. Ranges where adjusted prices turn non-positive fail with a clear error. It reports total and annualized return and max drawdown against buy-and-hold, trades, unfilled signals and, with `--json`, the daily equity curve. The Desktop technical analysis tab shows the same backtest with an equity curve for A-share daily adjusted prices, using the same warm-up length as the CLI
-8. Pin the macOS CI and release runners to `macos-15` instead of `macos-latest`
-9. Add silver to the gold quotes and fold `sec metal-history` into `sec metal`: `sec metal` prints the latest Au99.99 quote on the Shanghai Gold Exchange, `--inst/-i ag999` switches to Ag99.99, and `--begin/--end` print every day in a range (only `--end` starts 30 days earlier). `sec metal-history` (`mh`) is removed; use `sec metal -b/-e` instead. Tables and `--json` include the unit (CNY per gram, per kilogram for silver). The Desktop gold page becomes "Precious metals" with a gold/silver switcher. The exchange blocks bursts of requests for about 10 minutes: blocks are recognized by the firewall page as well as HTTP 403 and reported as such, and Desktop caches each instrument for 10 minutes unless refreshed, caching only responses that parse
-10. Add commodity futures: `sec commodity` (`co`) lists the latest quotes of eight Sina futures, the main continuous contracts of crude oil (INE), copper, iron ore, rebar and soybean meal, plus WTI crude, Brent crude and COMEX copper, with changes against the previous settlement; if some quotes are missing, text mode prints the rest before failing. `--inst/-i` picks one, and with `--begin/--end` prints its daily history, including settlement prices for domestic contracts; changes fall back to the previous close, marked `*` and `basis: "close"`, when the previous settlement is missing, as it often is in older data, and international history always uses the previous close. A new Desktop "Commodities" page shows the quote table and, for the selected commodity, a daily candlestick chart and table, caching each history for 10 minutes. `--begin/--end` parsing is shared with `sec metal` through `utils.ParseRange`, and "today" is the Beijing date, so `-b <today>` works at any hour and in any time zone
-11. Share terminal table styling and red/green change colors across commands in `cmd/internal/termtable`, replacing 18 copies of the same setup; output is unchanged except that rise/fall colors now always use the same ANSI attribute order. East Money K-line, F10 and data center requests share one GET helper, and `financials` reads numeric fields through `eastmoney.RowNumber`
+1. Add dividend yield to `sec valuation` and the Desktop valuation tab.
+2. Run `govulncheck` in CI and skip the flaky live `TestQuoteWs`.
+3. Add a chart view to the Desktop financials tab.
+4. Fix `macro cn financing` for 2017–2019.
+5. Fix `macro cn fiscal` for 202406 and 202407.
+6. Report partial failures in `sec quote` and `sec financials` text mode and exit non-zero.
+7. Add strategy backtests to `sec strategy --backtest` and the Desktop technical analysis tab.
+8. Pin the macOS CI and release runners to `macos-15`.
+9. Add silver to `sec metal` and fold `sec metal-history` into `sec metal -b/-e`.
+10. Add commodity futures: `sec commodity` and a Desktop Commodities page.
+11. Share terminal table styling and East Money request helpers across commands.
 
 ### v0.4.3
 
-1. Report search failures instead of treating them as no results: `sina.Search` and `MultiSearch` now return errors, CLI commands fail with a non-zero exit code, and Desktop search shows an error. Unrecognized responses and failures mixed with no matches also count as failures, and `sec watch add` continues with the remaining keywords before reporting them
-2. Check HTTP status for K-line, all Sina and gold requests, keep the default User-Agent when custom headers are passed, escape search keywords, and fix `MultiSearch` hanging when given more than 8 keywords
-3. Use the previous close for PE, PB and market cap when there is no current price, such as before the market opens, and label it in `sec info`, `sec kline` and Desktop metrics. `sec quote` and `sec watch` show the previous close without a change instead of a -100% drop, and `sec watch` shows `—` for missing values
-4. Run `gofmt` and `go vet` in CI, and add a macOS job that builds the Desktop frontend and vets and tests the `desktop` package
-5. Fall back to Sina daily bars when East Money K-line requests fail, for unadjusted A-share history in `sec kline`, `sec quote-history`, `sec strategy` and Desktop. The fallback is labeled, has no turnover or turnover rate, and fails rather than returning part of a range older than about 4 years or reporting an empty result; warmup data is best effort, and adjusted and HK history have no fallback
-6. Verify `sec upgrade` downloads against the sha256 digest from the GitHub release API and refuse to install on a mismatch or a missing digest. It no longer downgrades or overwrites development builds without the new `--force` flag and exits non-zero when it refuses. Replacement is now atomic: it writes the new binary next to the target and never overwrites it in place, so a binary in a directory the user cannot write to can no longer be upgraded
-7. Add `--json` to read-only data commands: `search`, `info`, `quote`, `quote-history`, `kline`, `financials`, `valuation`, `strategy`, `watch`, `announcements`, `insider`, `ipo list`, `ipo calendar`, `bond`, `bond-history`, `metal` and `metal-history`. Missing values are `null`, dates are `YYYY-MM-DD`, failures leave stdout empty and exit non-zero, and `strategy` includes every date at full precision. `quote --json` and `financials --json` fail rather than returning partial results, and `quote --json` rejects more than 5 keywords instead of dropping the rest
-8. Add weekly and monthly K-lines through `--freq day|week|month` in `sec kline`, `sec quote-history` and `sec strategy`, and a frequency selector in the Desktop chart and technical analysis tab with longer range limits and matching quick ranges. The Sina fallback covers all frequencies, and warmup scales with the frequency
-9. Fix announcement sizes shown 1024 times too small, because CNINFO reports them in KB, and show `sec announcements` and `sec annual-report` dates in Beijing time rather than the local time zone
-10. Fix `sec quote` labeling a security with the wrong code when an A-share and an H-share have the same name, by matching quotes on exchange code instead of name
-11. Reject `sec strategy` periods below 1, and report insufficient data based on the longest period rather than the slow period, instead of printing zeros or empty indicator columns
-12. Show HK quote dates as `YYYY-MM-DD` in `sec quote` and Desktop, and return `null` instead of 0 for DCF values that do not apply in the Desktop valuation API and `sec valuation --json`
-13. Add an industry peer comparison to `sec valuation` (`--method peers`, the overview and `--json`) and the Desktop valuation tab, showing the median, rank, percentile and premium of PE, PB and PS among East Money industry peers on the same trading day. Industry PE and PB percentiles now count in the rule summary when at least 10 companies can be compared, so assessments can change. If peer data is unavailable, the rest of the valuation still works, `peers` is `null` and `peers_note` and the rule summary say the industry rules were not counted
-14. Harden Desktop: a rendering error now shows a retry message instead of a blank window, limited to the affected area when it happens in page content, and the local server rejects requests whose `Host` is not `127.0.0.1` or `localhost`, which blocks DNS rebinding. Add frontend unit tests for formatting, market dates and exchange inference, run in CI
-15. Upgrade `golang.org/x/net` to v0.62.0 to fix GO-2026-6860, quadratic complexity in HTML parsing reachable through dividend page parsing. Require Go 1.26.10, so CI and releases, which took their version from `go.mod` and last built with Go 1.25, include the fixes for standard library vulnerabilities in `net/http`, `crypto/tls`, `crypto/x509` and others that the code reaches
+1. Report search failures as errors instead of no results.
+2. Check HTTP status for K-line, Sina and gold requests, and fix `MultiSearch` hanging with more than 8 keywords.
+3. Use the previous close for PE, PB and market cap when there is no current price.
+4. Run `gofmt` and `go vet` in CI, and add a macOS Desktop job.
+5. Fall back to Sina daily bars when East Money K-line requests fail.
+6. Verify `sec upgrade` downloads by sha256 and replace the binary atomically.
+7. Add `--json` to read-only data commands.
+8. Add weekly and monthly K-lines through `--freq` in the CLI and Desktop.
+9. Fix announcement sizes shown 1024 times too small, and show announcement dates in Beijing time.
+10. Fix `sec quote` showing the wrong code when an A-share and an H-share share a name.
+11. Reject `sec strategy` periods below 1 and check data length against the longest period.
+12. Show HK quote dates as `YYYY-MM-DD`, and return `null` for DCF values that do not apply.
+13. Add an industry peer comparison to `sec valuation` and the Desktop valuation tab.
+14. Harden Desktop with error boundaries and a `Host` check against DNS rebinding.
+15. Upgrade `golang.org/x/net` to v0.62.0 and require Go 1.26.10 for vulnerability fixes.
 
 ### v0.4.2
 
-1. Upgrade the Desktop UI dev dependency Vite from 5.4 to 6.4 and esbuild from 0.21 to 0.25 to resolve open Dependabot alerts on the dev server, and point `package-lock.json` at the official npm registry instead of a mirror so `npm ci` works with npm 12
-2. Replace the CodeQL default setup with a workflow and config file that exclude `testdata` directories, since saved upstream pages are only read as text by tests and raised false alerts for their external scripts
-3. Build the macOS Desktop frontend on Node 24 instead of Node 20 in the release workflow, and upgrade `actions/setup-node` from v4 to v7 so the action itself also runs on Node 24
-4. Pin the Ubuntu jobs in the CI, CodeQL and release workflows to `ubuntu-24.04` instead of `ubuntu-latest`
-5. Keep only open items in `TODO.md`, move the overview of implemented macro indicators to `docs/macro-coverage.md`, split the remaining reserve requirement history gaps into their own open item, and replace outdated TODO references in the docs
-6. Add `macro us treasury` with all 11 yield curve tenors, nullable `--json` output and `--standard-json`; it fails rather than returning partial data when a year cannot be fetched, a past year has no records, or a record or value cannot be parsed, and Treasury yield curve requests now check the HTTP status
-7. Rename `balance-sheet` to `financials`, `balance-sheet-download` to `annual-report` and `macro us investment` to `macro us housing-starts`, keeping the old names as aliases
-8. Add `docs/commands.md` mapping data commands to Desktop features and grouping macro commands by topic
-9. Add a Desktop macro page covering all 61 `sec macro` indicators by country and topic, with a series list, charts and per-period details, served through a generic API that runs each command's `--standard-json` in process; move the US Treasury yields page under it
-10. Add a macro indicator catalog shared by Desktop and `sec macro --help`, which now groups commands by topic, with a test keeping it in sync with the commands
-11. Add a Desktop FX page covering all six `sec fx` commands, showing quotes, daily series with charts and the onshore-offshore spread with their sources, formulas and original inputs, served through an API that runs each command's `--json` in process
-12. Show latest prices and changes in the Desktop watchlist, and add a watchlist quotes tab for comparing selected securities, backed by a batch quotes API where one unavailable security does not affect the others
-13. Add MA and Bollinger Band overlays to Desktop candlestick charts, computed on the backend with warm-up data so the first day of a range has a full window
-14. Add a shared `indicator` package for moving averages and Bollinger Bands, used by `sec kline`, `sec strategy` and Desktop
-15. Skip securities that cannot be parsed in Sina batch quotes, so `sec watch` and `sec quote` still show the others, and report an error for non-200 responses and bodies that are not quote lines
-16. Add insider announcements to Desktop stock announcements and an IPO announcement date view to the Desktop IPO page, stating that they are title matches and announcement dates rather than structured trades or a subscription calendar
-17. Make `sec insider` match titles strictly, remove duplicates, clean highlight tags and fetch beyond the first 30 results of each keyword, through a provider query shared with Desktop
-18. Show CNINFO announcement dates in Beijing time in `sec insider`, `sec ipo calendar` and prospectus queries, regardless of the local time zone
-19. Add a Desktop technical analysis tab for A-share and HK securities with MA crossover, MACD, RSI and Bollinger Bands, adjustable parameters, signal markers and a signal table; it defaults to forward-adjusted prices, while `sec strategy` stays unadjusted
-20. Move the strategy indicators and signal rules into the shared `indicator` package used by `sec strategy` and Desktop
-21. Fix a spurious sell signal in `sec strategy boll` on the first day the Bollinger window is full, caused by comparing the close with an empty previous upper band; signal counts can drop by one
-22. Fix `sec strategy` indicator validity so zero and negative values count as real data: RSI rebounds from 0 now produce buy signals and RSI 0 is shown instead of `-`, and a non-positive lower Bollinger band no longer drops signals
-23. Seed the `sec strategy macd` signal line from the first valid MACD value instead of leading zeros, and emit no MACD signals before the signal line is valid; early signal line values and signals can change
-24. Report RSI as a neutral 50 instead of 100 when prices are completely flat over the window
-25. Reject `NaN` for Desktop strategy and Bollinger overlay parameters with a validation error instead of an empty response
-26. Add a Desktop valuation tab for A-shares with PE, PB and PS history and percentiles, PEG, ROE, Graham number, a rule summary and an adjustable DCF, sharing a new `valuation` package with `sec valuation`
-27. Rework `sec valuation` on East Money daily valuation and performance reports, since financial statements no longer return EPS: historical PE now uses real daily values rather than the current price over past EPS, PB is judged by its own history rather than fixed levels, and growth is a 5-year CAGR that uses actual year spans and does not skip loss years. `sec valuation` now covers A-shares only: HK and US securities and indexes report that they are not supported, and a bare code shared by an index and a stock, such as `000001`, resolves to the stock
-28. Guard the DCF against invalid parameters and loss-making companies, warn for financial companies, and show where the growth rate comes from. Omitting the growth rate uses the historical CAGR, including a negative one, limited to ±15%; `--growth-rate 0` now means zero growth, and `--wacc` defaults to 8 and rejects 0. An unknown `--method` now fails instead of showing the overview
-29. Fix the A-share PE (TTM) in `sec info`, `sec kline` and Desktop metrics, which used cumulative profit of the latest report instead of the last four quarters; show `-` instead of an incorrect PE and PB for HK securities, and instead of an incorrect PE, PB and market cap for B-shares, because their prices and reported figures can use different currencies
-30. Remove the always empty basic EPS row from `sec financials` and Desktop financials. `sec financials` still fails when no report has data, and Desktop financials shows an empty state rather than an upstream error
+1. Upgrade the Desktop UI dev dependencies Vite and esbuild, and use the official npm registry in `package-lock.json`.
+2. Replace the CodeQL default setup with a workflow that excludes `testdata`.
+3. Build the macOS Desktop frontend on Node 24 and upgrade `actions/setup-node` to v7.
+4. Pin the Ubuntu workflow jobs to `ubuntu-24.04`.
+5. Keep only open items in `TODO.md` and move the macro overview to `docs/macro-coverage.md`.
+6. Add `macro us treasury` with all 11 yield curve tenors.
+7. Rename `balance-sheet` to `financials`, `balance-sheet-download` to `annual-report` and `macro us investment` to `macro us housing-starts`, keeping aliases.
+8. Add `docs/commands.md` mapping data commands to Desktop features.
+9. Add a Desktop macro page covering all 61 `sec macro` indicators.
+10. Add a macro indicator catalog shared by Desktop and `sec macro --help`.
+11. Add a Desktop FX page covering all six `sec fx` commands.
+12. Show latest prices in the Desktop watchlist and add a watchlist quotes tab.
+13. Add MA and Bollinger Band overlays to Desktop candlestick charts.
+14. Add a shared `indicator` package for moving averages and Bollinger Bands.
+15. Skip unparsable securities in Sina batch quotes.
+16. Add insider announcements and an IPO announcement date view to Desktop.
+17. Make `sec insider` match titles strictly, deduplicate and fetch past the first 30 results.
+18. Show CNINFO announcement dates in Beijing time.
+19. Add a Desktop technical analysis tab with MA crossover, MACD, RSI and Bollinger Bands.
+20. Move strategy indicators and signal rules into the `indicator` package.
+21. Fix a spurious first-day sell signal in `sec strategy boll`.
+22. Count zero and negative indicator values as real data in `sec strategy`.
+23. Seed the MACD signal line from the first valid MACD value.
+24. Report RSI as 50 instead of 100 for completely flat prices.
+25. Reject `NaN` for Desktop strategy and Bollinger parameters.
+26. Add a Desktop valuation tab for A-shares, sharing a new `valuation` package with `sec valuation`.
+27. Rework `sec valuation` on East Money daily valuation data; it now covers A-shares only.
+28. Guard the DCF against invalid parameters and loss-making companies.
+29. Fix the A-share PE (TTM), and show `-` for unreliable HK and B-share metrics.
+30. Remove the always empty basic EPS row from financials.
 
 ### v0.4.1
 
-1. Unify CLI and Desktop watchlists through a shared store with cross-process locks, atomic mutations, legacy-list merging and backups; separate Desktop settings writes from watchlist changes, refresh shared selections on return/focus, document shared strategy/valuation extraction TODOs, and isolate the JSON utility test temporary directory to prevent deleting other build artifacts
-2. Add inclusive, optional listing-date bounds and reset controls to Desktop New Listings; share date validation and filtering with CLI IPO lists, filter before pagination, and exclude unknown dates only when filtering
-3. Add Desktop version, build time, commit, and platform details with manual update checks and official Release/download links; share GitHub release queries with CLI and match Desktop DMGs by version and architecture
-4. Refresh Desktop layout with a full-height branded sidebar, compact page headers and shared page actions, neutral light/dark themes, denser research summaries, grouped settings, sticky table headers, and responsive stacked layouts inspired by CC Switch
-5. Simplify the Desktop sidebar brand to the logo and SEC label, removing the subtitle and unused styles
-6. Update README with the current CLI and Desktop feature matrix, installation and build instructions, shared watchlist usage, and five Desktop screenshots using hosted images
-7. Add official NBS monthly CPI, core CPI, and PPI collection with dynamic catalog discovery, historical partition handling, original comparison indexes, derived year-over-year/month-over-month changes, and explicit missing values
-8. Add `macro cn` price queries with month filters, JSON output, six-hour raw-response caching, refresh controls, NBS source and methodology documentation, and separate CN/US macro collection TODOs
-9. Add `macro cn pmi` to collect official manufacturing PMI, production, new orders, new export orders, and employment indexes with monthly tables, JSON export, shared cache controls, explicit missing values, and seasonally adjusted diffusion-index metadata
-10. Add `macro cn nonmanufacturing-pmi` (`npmi`) with national, services, and construction business activity indexes plus nine detailed components; share PMI collection and cache controls, distinguish survey types in JSON, and preserve documented historical gaps
-11. Add `macro cn industrial` (`ip`) for real monthly and year-to-date industrial value-added growth, supplement seasonally adjusted monthly growth from official release revision tables, preserve January–February reporting gaps, and document source timestamps, caching, and historical coverage limits
-12. Add `macro cn retail` for national monthly and year-to-date retail sales amounts and nominal growth, preserving CNY 100 million units, January–February reporting gaps, source identifiers, JSON exports, and shared cache controls without mixing in above-designated-size retail series
-13. Add `macro cn unemployment` with optional age groups, explicit student-coverage definitions, separate comparable series keys across the December 2023 methodology change, preserved publication gaps, JSON export, and shared cache controls
-14. Add `macro cn financing` (`afre`) using official PBC annual stock and flow tables, with financing components, normalized CNY 100 million amounts, explicitly derived year-to-date flows, source notes, JSON exports, and six-hour caching
-15. Add `macro cn loans` for PBC financial-institution RMB loan balances, official year-over-year growth, monthly and year-to-date additions, and household/enterprise maturity breakdowns; mark differences of rounded cumulative releases as approximate and preserve report gaps
-16. Add `macro cn money` for official monthly M1 and M2 balances and year-over-year growth, label the 2025 M1 definition change, and retain missing report months as null observations
-17. Add `macro cn reverse-repo` for official seven-day reverse repo policy-rate changes since July 22, 2024, with separate publication and effective dates, before/after rates, calculated basis-point changes, preceding-event context, and JSON exports
-18. Add `macro cn lpr` for official monthly one-year and five-year-plus LPR quotes since August 2019, with actual quote dates, publication metadata, independent adjacent-month basis-point changes, explicit missing values, and JSON exports
-19. Add `macro cn rrr` for RMB reserve requirement adjustments announced since 2020, preserving institution scopes, exemptions, targeted ranges, additional cuts, phased effective dates, and official sources
-20. Embed verified RRR history and persist incremental announcements with same-day checks, deduplication, and atomic checkpoints; serve covered historical queries offline and check only recent news pages for updates
-21. Add `macro cn treasury` for official ChinaBond government bond yield-to-maturity curves at one, two, five, and ten years since March 2006, with annual batch queries, six-hour raw-response caching, Beijing dates, explicit missing tenors, source metadata, and JSON exports
-22. Use pointer requests and results for ChinaBond Treasury collection, reject nil requests, and return nil results on errors
-23. Restore the ChinaBond historyQuery GET collector and request/response structures removed in PR #66; call GetChinaBond directly from macro Treasury queries, output original fields in JSON, display three-month and six-month yields alongside the existing annual tenors, preserve source precision, and remove the unused Treasury wrapper and annual cache controls
-24. Add `macro cn gdp` for official NBS quarterly real GDP levels, quarterly and year-to-date growth indexes, derived year-over-year growth, and seasonally adjusted non-annualized quarter-over-quarter growth; preserve missing values, source annotations, segmented price-base limitations, latest-available revision metadata, and shared cache controls
-25. Add `macro us cpi` and `macro us core-cpi` using official BLS CPI-U series, with seasonally adjusted and unadjusted indexes, explicitly derived growth and comparison baselines, preserved gaps and footnotes, ten-year batch queries, shared six-hour caching, and JSON exports
-26. Add `macro us pce` and `macro us core-pce` for BEA chain-type price indexes distributed by FRED, with seasonally adjusted year-over-year and monthly growth, explicit comparison baselines and missing values, shared full-history CSV caching, and source/version documentation distinct from consumption amounts and volumes
-27. Add `macro us payrolls` for BLS seasonally adjusted nonfarm payroll job levels and adjacent-month changes, preserving preliminary footnotes, missing values, shared six-hour caching, and locally observed version history; document that official first/second/third estimates and historical vintage archives remain pending
-28. Keep payroll monthly changes within a single response across batch boundaries, persist observation timestamps even when values are unchanged to reject late snapshots, and validate existing archives before writing; preserve legacy history through migration and cover revision, concurrency, missing-baseline, and corrupt-archive cases with regression tests
-29. Add `macro us earnings` and `macro us weekly-hours` for BLS seasonally adjusted average hourly earnings and weekly hours of all private nonfarm employees, with explicit units and coverage, monthly level changes, same-response growth baselines, preliminary footnotes, missing values, shared caching, and JSON exports
-30. Add `macro us unemployment` and `macro us participation` for official BLS CPS seasonally adjusted rates, with percentage-point changes, explicit population and denominator definitions, same-response comparison baselines, missing observations and population-control revision footnotes, validated rate bounds, shared caching, and JSON exports
-31. Add `macro us initial-claims` and `macro us continued-claims` for seasonally adjusted ETA data distributed by FRED, preserving each series' Saturday observation dates and release lag, strict weekly changes and calculated four-week averages, missing values and comparison windows; share validated CSV caching with PCE while keeping metric caches separate
-32. Add `macro us real-pce` for BEA real consumption totals and official goods, durable goods, nondurable goods, and services components distributed by FRED; preserve chained 2017 dollar SAAR levels, non-annualized growth, strict comparison baselines, missing values, component non-additivity, and shared snapshot caching with JSON exports
-33. Add `macro us real-income` for BEA real disposable personal income distributed by FRED, preserving chained 2017 dollar SAAR levels, non-annualized growth, strict comparison baselines, missing values, source metadata, and validated snapshot caching
-34. Add `macro us industrial-production` and `macro us capacity-utilization` for Federal Reserve total industry and NAICS manufacturing data distributed by FRED, with separate history coverage, index growth and utilization percentage-point changes, shared caching, and JSON exports
-35. Add `macro us effr` using the New York Fed Markets API, preserving effective dates, prior-observation basis-point changes, revision flags and raw fields; handle the 2016 methodology boundary, omit unpublished dates, and document unavailable publication timestamps and historical vintages
-36. Add `macro us target-rate` to collect Federal Reserve target-range adjustments, with prior-range baselines, basis-point changes, independently verified announcement and effective dates, raw source fields, and validated page caching
-37. Add `macro us gdp` for real GDP levels and official annualized quarterly growth distributed by FRED, with strict non-annualized comparison rates and optional BEA release-vintage growth records from 2002Q1; keep unavailable historical real levels and publication times null
-38. Add `macro us money` / `m2` for Federal Reserve monthly seasonally adjusted M2 balances distributed by FRED, with strict year-over-year and monthly growth, raw values, methodology notes, validated snapshot caching, and updated macro collection documentation and TODO status
-39. Add `macro cn investment` for cumulative total, manufacturing, infrastructure and real estate development investment from official NBS monthly releases, preserving available amounts, comparable-basis notes, publication times and infrastructure scope changes
-40. Add `macro cn property` for cumulative new commercial building sales area, sales value and housing starts area with official growth rates, historical sales scope metadata, missing values and JSON exports
-41. Add `macro us trade` and `macro us real-trade` for monthly nominal and quarterly real exports, imports and official aggregate balances, with goods and services components, distinct units and accounting bases, strict comparison periods and validated FRED snapshot caching
-42. Validate NBS investment release directories and property metadata and observations before caching, preserve valid cached responses on failed refreshes, recover invalid cached responses, and document collection coverage and remaining real trade component balances
-43. Add Chinese industrial enterprise profit, total and finished-goods inventories, and accounts receivable collection, preserving cumulative flows, period-end balances, official comparable growth rates and statistical scope metadata
-44. Add US housing starts, building permits and quarterly equipment investment, preserving nominal and real measures, distinct frequencies, annualized levels and strict calendar comparison baselines
-45. Add US new and existing home sales and the FHFA quarterly house price index, retaining source units, seasonal adjustment, snapshot coverage limits and validated response caching
-46. Simplify the Chinese industrial enterprise terminal table to five columns, keeping survey scope and detailed notes in JSON output and shortening the footer
-47. Add US corporate profits with IVA and CCAdj, total business inventories and manufacturing new orders with distinct frequencies, units and flow or stock definitions, strict comparison bases, validated FRED caching and compact terminal tables
-48. Add US monthly bank credit, quarterly lending standards and household debt service ratios with distinct percentage and percentage-point changes, survey timing, current methodology coverage, validated FRED snapshots and compact terminal output
-49. Add Chinese household per-capita cumulative income and consumption with official real growth, integrated survey coverage, annual own-production scope, raw values, validated NBS response caching and compact terminal output
-50. Add Chinese household RMB deposit balances, demand and time components, strict prior-year calculated growth and reported deposit flows, with explicit approximate monthly differences, source metadata and validated PBC caching
-51. Add Chinese national general public budget and government-managed fund cumulative receipts and expenditures, preserving official, comparable and tax-refund-adjusted growth, combined January-February periods, historical directory gaps and validated MOF page caching
-52. Add US monthly federal receipts, outlays and official surplus or deficit through FRED, with explicit sign conventions, strict calculated fiscal-year totals, missing observations and validated snapshots; keep Treasury issuance and official comparable household deposit growth as separate TODOs
-53. Add `macro cn trade` for separate CNY and USD goods-trade data, `macro cn reverse-repo-history` for verified seven-day reverse repo rates, and extend the embedded RRR archive to 2018; handle MOFCOM TLS compatibility and duplicate directory records with regression tests
-54. Restore both phased city-bank RRR cuts from the September 2019 announcement, retain monthly trade data when partner observations are unavailable, and isolate mocked HTTP transports; add complete-event, missing-partner and cross-page regression coverage
-55. Add `fx quote`, `fx history`, `fx fixing` and `fx reference` for CNY, CNH, USD and HKD using Sina, FRED and CFETS; preserve source-specific price and time definitions, raw values, missing and anomalous observations, validated caching and historical coverage with offline regression tests
-56. Map CFETS central parity values using returned currency columns regardless of request order, retain strict currency-set validation with regression tests, and use English descriptions and flag help for all FX commands
-57. Add derived FX cross rates and CNY/CNH quote spreads with formulas, original inputs, strict timestamp and quote-age checks, and explicit approximate alignment; format terminal spread timestamps in Beijing time and retain regression coverage for currency direction, quote validity and derived outputs
-58. Add monthly Chinese services-trade collection in CNY and USD and optional CNY goods-trade partner reports; preserve official balances, monthly and cumulative definitions, missing periods, overlapping partner scopes and raw source values with pagination, cache and command regression tests
-59. Add `macro us debt` for Treasury DTS daily recorded issues and redemptions by marketability, with explicitly derived daily summaries and net recorded issuance; preserve signed adjustments, official cumulative values, raw rows and missing values with validated pagination, caching and regression tests
-60. Add `macro us auctions` for CUSIP-level issuance and reopening events with separate issue-date and auction-date filters; preserve official par amounts, bidder allocations, SOMA/FIMA inclusion definitions and historical nulls with validated pagination, caching and regression tests, including auction-date pagination and future issue-date boundaries
-61. Add `macro us debt-cash` for official Treasury cash issues and redemptions, explicitly derived net cash flows and original cash-basis adjustment rows; preserve historical labels, signed adjustments, missing values and official cumulative amounts with validated pagination, caching and regression tests
-62. Add opt-in `--standard-json` exports for Chinese M1/M2 and US M2 with a versioned macro series schema, explicit statistical definitions, official versus derived values, missing-value reasons and source provenance; separate Chinese M1 definitions across 2025 and preserve original provider results and strict growth baselines with adapter and CLI regression tests
-63. Extend `--standard-json` to Chinese retail sales and property data with explicit monthly versus year-to-date coverage and upstream series identifiers; retain January-February combined reporting, official growth rates, area versus value units and historical sales scope boundaries without deriving monthly values, with adapter and CLI regression tests
-64. Extend `--standard-json` to US quarterly GDP and daily EFFR with frequency-aware period validation, distinct GDP annualization and reference-year metadata, strict growth baselines and EFFR methodology boundaries; preserve revision flags, unknown out-of-window baseline levels and original GDP vintage records with adapter and CLI regression tests
-65. Extend `--standard-json` to US CPI/core CPI and initial/continued claims with distinct seasonal-adjustment series, explicit index bases, weekly period support and complete four-week calculation inputs; preserve strict growth baselines, separate claims dates, raw values, missing observations and original footnotes with adapter and CLI regression tests
-66. Extend `--standard-json` to PCE/core PCE price indexes and all five real consumption components, distinguishing price indexes from real SAAR amounts and unannualized growth; preserve strict monthly baselines, raw values, original provider results and explicit chain-component nonadditivity with adapter and CLI regression tests
-67. Extend `--standard-json` to real disposable income, industrial production and capacity utilization, preserving real SAAR income totals, separate industrial sector coverage and percentage versus percentage-point changes; retain strict baselines, raw values, missing observations and distinct zero-baseline rules with adapter and CLI regression tests
-68. Extend `--standard-json` to US unemployment, labor force participation, hourly earnings and weekly hours with explicit CPS/CES survey coverage, ratio numerators and denominators, native-unit versus percentage-point changes and optional preliminary flags; preserve strict same-series baselines, per-point fetch times and original footnotes with adapter and CLI regression tests
-69. Extend `--standard-json` to US fiscal flows, corporate profits, business inventories and manufacturing orders; distinguish official balances from derived deficit signs and fiscal-year totals, preserve quarterly SAAR versus monthly stock/flow definitions, strict baselines and nonpositive-base handling with adapter and CLI regression tests
-70. Extend `--standard-json` to US bank credit, lending standards, household debt service, housing starts, building permits and equipment investment; distinguish monthly average balances, survey net shares, current-methodology ratios and SAAR levels, separate percent from percentage-point changes and nominal from real series, and preserve strict baselines, raw values, zero-baseline handling and original provider results with adapter and CLI regression tests
-71. Stop attaching per-row provider diagnostics to available `--standard-json` observations for US money, CPI, claims, labor, PCE, real consumption and income, production, enterprise, credit and investment exports; merge PCE, real consumption and income, production, enterprise, credit and investment onto one periodic adapter that rejects derived values without a usable current level or baseline, and share the CLI flag and output helpers
-72. Extend `--standard-json` to US payrolls, new and existing home sales, the FHFA house price index, and nominal and real trade; keep job counts as level differences, housing units and index bases separate, and official trade balances with native-unit changes, omit uncollected real component net exports, and support multiple series in one periodic dataset with adapter and CLI regression tests
-73. Extend `--standard-json` to the US federal funds target range with a new event frequency that lists only actual adjustments in the window; separate lower and upper bounds from basis-point changes and effective dates from verified release dates, avoid cross-regime changes at the 2008 range start, keep the baseline and current range in the original result, and fail the export when statement or calendar pages cannot be downloaded, with adapter and CLI regression tests
-74. Extend `--standard-json` to US Treasury debt transactions, cash issues and redemptions, and auctions; keep official daily, month-to-date and fiscal-year-to-date amounts apart from derived totals and net values, keep cash adjustments as provenance only, and add an optional `event_id` and top-level `events` so auctions on the same date stay distinct; exclude identical upstream duplicate rows from debt totals, with adapter and CLI regression tests
-75. Extend `--standard-json` to Chinese manufacturing and non-manufacturing PMI, industrial value added and surveyed unemployment; keep seasonally adjusted diffusion indexes by survey, separate monthly, year-to-date and seasonally adjusted month-over-month growth with their own sources, and split unemployment series by definition version with an explicit publication pause, with adapter and CLI regression tests
-76. Extend `--standard-json` to Chinese GDP, household income and consumption, fixed asset investment and industrial enterprises; separate constant-price amounts, official indexes, derived and official growth, keep cumulative ranges, split series across infrastructure, survey scope and receivables reporting breaks, and name distinct missing reasons without filling gaps, with adapter and CLI regression tests
-77. Extend `--standard-json` to Chinese social financing, RMB loans and household deposits; separate stocks, official growth and flows, keep official monthly flows apart from approximate differences of rounded cumulative releases, mark computed cumulative flows and deposit growth as derived, split series at official scope changes, and keep report values when balances or reports are missing, with adapter and CLI regression tests
-78. Extend `--standard-json` to Chinese fiscal revenue and expenditure, goods trade and services trade; keep cumulative ranges and separately published growth rates, list CNY and USD as independent series without conversion, keep official partner rows marked non-additive, and use official totals and balances rather than recomputing them, with adapter and CLI regression tests
-79. Extend `--standard-json` to Chinese LPR, reverse repo adjustments and awarded rate history, reserve requirement adjustments, and Treasury yields; keep quote and effective dates apart from release times, separate same-day events with `event_id`, add an optional `policy_events` list for reserve requirement scopes, and export all yield tenors with source text, treating non-numeric markers as missing in the five tenors the provider does not validate; add the previous month's LPR quotes to plain `macro cn lpr --json` so the first month in a window keeps its base value, with adapter and CLI regression tests
-80. Extend `--standard-json` to Chinese CPI, core CPI and PPI; separate official relative indexes from derived index-minus-100 changes, keep source series IDs across historical catalogs, and mark months with no core CPI series in the catalog apart from missing values, with adapter and CLI regression tests
+1. Share one watchlist between the CLI and Desktop.
+2. Add listing-date filters to Desktop New Listings.
+3. Add version details and update checks to Desktop.
+4. Refresh the Desktop layout and themes.
+5. Simplify the Desktop sidebar brand.
+6. Update README with the feature matrix and Desktop screenshots.
+7. Add NBS monthly CPI, core CPI and PPI collection.
+8. Add `macro cn` price queries with caching.
+9. Add `macro cn pmi`.
+10. Add `macro cn nonmanufacturing-pmi` (`npmi`).
+11. Add `macro cn industrial` (`ip`).
+12. Add `macro cn retail`.
+13. Add `macro cn unemployment`.
+14. Add `macro cn financing` (`afre`).
+15. Add `macro cn loans`.
+16. Add `macro cn money`.
+17. Add `macro cn reverse-repo`.
+18. Add `macro cn lpr`.
+19. Add `macro cn rrr`.
+20. Embed RRR history and update it incrementally.
+21. Add `macro cn treasury`.
+22. Use pointer requests and results for ChinaBond Treasury collection.
+23. Restore the ChinaBond historyQuery collector and show three- and six-month yields.
+24. Add `macro cn gdp`.
+25. Add `macro us cpi` and `macro us core-cpi`.
+26. Add `macro us pce` and `macro us core-pce`.
+27. Add `macro us payrolls`.
+28. Fix payroll change baselines and archive validation.
+29. Add `macro us earnings` and `macro us weekly-hours`.
+30. Add `macro us unemployment` and `macro us participation`.
+31. Add `macro us initial-claims` and `macro us continued-claims`.
+32. Add `macro us real-pce`.
+33. Add `macro us real-income`.
+34. Add `macro us industrial-production` and `macro us capacity-utilization`.
+35. Add `macro us effr`.
+36. Add `macro us target-rate`.
+37. Add `macro us gdp`.
+38. Add `macro us money` (`m2`).
+39. Add `macro cn investment`.
+40. Add `macro cn property`.
+41. Add `macro us trade` and `macro us real-trade`.
+42. Validate NBS investment and property data before caching.
+43. Add Chinese industrial enterprise profits, inventories and receivables.
+44. Add US housing starts, building permits and equipment investment.
+45. Add US new and existing home sales and the FHFA house price index.
+46. Simplify the Chinese industrial enterprise terminal table.
+47. Add US corporate profits, business inventories and manufacturing new orders.
+48. Add US bank credit, lending standards and household debt service ratios.
+49. Add Chinese household per-capita income and consumption.
+50. Add Chinese household RMB deposits.
+51. Add Chinese government budget and fund receipts and expenditures.
+52. Add US monthly federal receipts, outlays and surplus or deficit.
+53. Add `macro cn trade` and `macro cn reverse-repo-history`, and extend the RRR archive to 2018.
+54. Fix September 2019 RRR cuts and keep trade data when partner data is missing.
+55. Add `fx quote`, `fx history`, `fx fixing` and `fx reference`.
+56. Map CFETS central parity values by returned currency columns.
+57. Add derived FX cross rates and CNY/CNH spreads.
+58. Add Chinese services trade and CNY goods-trade partner reports.
+59. Add `macro us debt`.
+60. Add `macro us auctions`.
+61. Add `macro us debt-cash`.
+62. Add `--standard-json` for Chinese M1/M2 and US M2.
+63. Extend `--standard-json` to Chinese retail sales and property.
+64. Extend `--standard-json` to US GDP and EFFR.
+65. Extend `--standard-json` to US CPI and jobless claims.
+66. Extend `--standard-json` to PCE and real consumption.
+67. Extend `--standard-json` to real income, industrial production and capacity utilization.
+68. Extend `--standard-json` to US labor market series.
+69. Extend `--standard-json` to US fiscal flows, profits, inventories and orders.
+70. Extend `--standard-json` to US credit, housing and investment series.
+71. Drop per-row diagnostics from `--standard-json` and share one periodic adapter.
+72. Extend `--standard-json` to US payrolls, home sales, house prices and trade.
+73. Extend `--standard-json` to the US federal funds target range.
+74. Extend `--standard-json` to US Treasury debt, cash flows and auctions.
+75. Extend `--standard-json` to Chinese PMI, industrial value added and unemployment.
+76. Extend `--standard-json` to Chinese GDP, household income, investment and industrial enterprises.
+77. Extend `--standard-json` to Chinese social financing, loans and deposits.
+78. Extend `--standard-json` to Chinese fiscal data and trade.
+79. Extend `--standard-json` to Chinese LPR, reverse repo, RRR and Treasury yields.
+80. Extend `--standard-json` to Chinese CPI, core CPI and PPI.
 
 ### v0.4.0
 
-1. Desktop 新增「黄金行情」，复用 CLI metal / metal-history 的上海黄金交易所 Au99.99 数据，展示最新日行情、涨跌及元/克单位
-2. 支持自定义日期范围、近 1 个月 / 3 个月 / 1 年快捷查询、历史日 K 线蜡烛图与分页明细，提供手动刷新、重试和空数据提示
-3. 新增黄金行情 API 与日期校验，保留区间外昨收基准，未知涨跌显示缺失值；黄金 K 线支持开高低收查看、键盘选择和长区间横向滚动
-4. 修复黄金 K 线长区间滚动后价格刻度不可见的问题，将价格轴固定在滚动区域外，并同步调整鼠标与键盘选择坐标
-5. 「自选与行情」中的证券历史改用日 K 线蜡烛图，历史接口补充开高低收、成交量与成交额，增加成交量副图和逐日量额信息，复用黄金的固定价格轴与交互，保留沪深/港股与不复权口径
-6. Add Desktop Treasury yields with the latest 11-tenor curve, selectable historical trends, date filters, daily basis-point changes, and paginated records
-7. Preserve missing Treasury yields as null values, retain cross-year comparison baselines, and reject incomplete annual responses instead of displaying partial history
-8. Add industry, PE (TTM), PB, total market capitalization, and float market capitalization to Desktop overview and company pages using shared CLI info calculations; load metrics independently, show unavailable values explicitly, and normalize quoted profile fields
-9. Add Desktop financial statement CSV/JSON exports with original fields and units, plus annual report lookup by fiscal year and PDF downloads; save files to a configurable download directory (default ~/Downloads) without overwriting existing downloads
-10. Move Desktop security search into the Stocks and Watchlist page above the security list, keeping search results and the selected security when switching pages
-11. Add Desktop security history date filters, 1/3/6-month and 1-year shortcuts, and unadjusted/forward/backward adjustment choices; retain the full requested range with a five-year limit and default to the last three months
-12. Add Desktop IPO prospectus lookup by security code and disclosure dates, paginated original PDF links, and single or selected downloads with progress, cancellation, per-file failures, and the configured download directory; consolidate the IPO module into New Listings and Prospectuses, removing the duplicate listing timeline
-13. Add annual, half-year, first-quarter, and third-quarter announcement filters to the Desktop announcement center and security research, combining category selection with title search and resetting pagination when categories change; strip upstream search highlight tags from security names
-14. Add Desktop annual report year-range queries and current-page multi-select downloads with sequential task progress, success/failure counts, per-file errors, and cancellation that preserves completed files
-15. Expand Desktop Annual Reports into Periodic Reports with annual, half-year, first-quarter, and third-quarter PDF queries and batch downloads; support current-year interim reports and distinguish report types in downloaded filenames
-16. Replace Desktop sidebar text symbols with statically imported Lucide SVG icons, using consistent sizing and strokes that follow theme and active navigation colors
-17. Replace the Desktop header lettermark with the existing sec PNG logo, keeping it visible and proportionally sized on narrow screens; use uppercase SEC branding in the header, window title, About section, and macOS display name
+1. Desktop 新增「黄金行情」，展示上海黄金交易所 Au99.99 最新日行情
+2. 黄金行情支持日期范围、快捷查询和历史日 K 线
+3. 新增黄金行情 API，K 线支持键盘选择和横向滚动
+4. 修复黄金 K 线长区间滚动后价格刻度不可见
+5. 「自选与行情」的证券历史改用带成交量的日 K 线
+6. Add Desktop Treasury yields.
+7. Keep missing Treasury yields as null and reject incomplete annual responses.
+8. Add industry, PE, PB and market cap to Desktop overview and company pages.
+9. Add Desktop financial statement exports and annual report PDF downloads.
+10. Move Desktop security search into the Stocks and Watchlist page.
+11. Add date filters and adjustment choices to Desktop security history.
+12. Add Desktop IPO prospectus lookup and downloads.
+13. Add periodic report filters to Desktop announcements.
+14. Add Desktop annual report year-range queries and batch downloads.
+15. Expand Desktop Annual Reports into Periodic Reports.
+16. Use Lucide icons in the Desktop sidebar.
+17. Use the sec logo and SEC branding in the Desktop header.
 
 ### v0.3.15
 
