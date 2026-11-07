@@ -99,7 +99,15 @@
 设计方案见 [AI/LLM 接入设计](docs/ai.md)。按以下顺序拆分，一项一个 PR：
 
 - [x] Agent Skill 与文档（[使用说明](docs/agent-skill.md)）：写一份 SKILL.md，说明如何在 Claude Code、Cursor 等工具里配合 sec CLI 使用：各命令用 `--json`，macro 命令用 `--standard-json`；不改 Go 代码。
-- [ ] `sec mcp`：stdio MCP server，第一个 PR 先提供 7 类只读工具（search、quote、kline 摘要、financials、valuation、filings / announcements、macro），复用现有 provider；工具输出另定精简格式，避免把 10 年财报 JSON 原样塞给模型，每条结果带来源、截止日期和口径说明，并直接给出同比、变化量等派生值，不让模型自己计算。工具注册表独立成 `aitool/` 包，放在 `cmd/`、`desktop/` 之外，保证跨平台编译，供 `sec ask` 和 Desktop 对话复用。
+- [ ] `sec mcp`：stdio MCP server，第一个 PR 先提供 7 类只读工具（search、quote、kline 摘要、financials、valuation、filings / announcements、macro），复用现有 provider；工具输出另定精简格式，避免把 10 年财报 JSON 原样塞给模型，每条结果带来源、截止日期和口径说明，并直接给出同比、变化量等派生值，不让模型自己计算。工具注册表独立成 `aitool/` 包，放在 `cmd/`、`desktop/` 之外，保证跨平台编译，供 `sec ask` 和 Desktop 对话复用。一个工具一个 PR，添加方法见 [sec mcp 文档](docs/mcp.md#添加工具)：
+  - [x] 框架与 `get_quote`：`aitool` 注册表和输出信封、`sec mcp` stdio server、最新行情工具。
+  - [ ] `search_security`：搜索证券代码。
+  - [ ] 重构：`aitool/quote.go` 的并发搜索去重（`resolveCodes`）和行情字段映射（`newQuoteItem`）复制自 `cmd/quote`，抽到 `provider/sina`（如 `sina.ResolveAll`）供两边共用；基金净值的 `volume`、`amount` 是否也在 `sec quote --json` 里改成 `null` 另行决定，改了是 JSON change。
+  - [ ] `get_kline_summary`：K 线区间统计和最近 20 根。
+  - [ ] `get_financials`：最近 5 年或 8 个季度的关键财务项及同比，A 股和美股统一结构。
+  - [ ] `get_valuation`：估值、历史分位、`assessment`、全部 `_note` 和 `disclaimer`。
+  - [ ] `list_filings`：巨潮公告和 SEC 申报列表。
+  - [ ] `get_macro_series`：宏观指标的口径和最近 12 期观测。
 - [ ] 共用 AI 配置：CLI 和 Desktop 共用 `~/.sec/config.json` 的 `ai` 段，可以保存多个模型配置（`providers`，按名字区分，各自有接口类型、`base_url`、模型和 Key），`default` 指定默认配置；`sec config ai list/add/edit/set-key/use/remove` 管理；Key 可以用环境变量，或用 AES-256-GCM 加密保存在 `config.json`，加密密钥单独存在 `~/.sec/secret.key`（`0600`）；`set-key` 隐藏输入或从 stdin 读取，不接受命令行参数。
 - [ ] `llm/` 模型接入抽象：支持 Anthropic 和 OpenAI 兼容接口（覆盖 DeepSeek、通义、本地 Ollama），含回答数字核对、`sec config ai test` 测试连接和各命令的 `--ai <配置名>` 参数；CLI 和 Desktop 共用。
 - [ ] Desktop 模型设置：设置页管理同一份 `ai` 配置（新增、编辑、删除、设为默认）、保存 Key、测试连接，AI 功能旁边可以临时切换配置；说明自选股和查询内容会发给模型厂商，本地模型可不出本机。
