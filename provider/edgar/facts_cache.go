@@ -13,6 +13,7 @@ const (
 
 // FactsCache 按 CIK 缓存 CompanyFacts 10 分钟，切换报表、年度和季度或者先查财报再查估值时不用重新下载（大公司有几 MB）。
 // 最多 20 家公司，零值可用，可以并发使用。Desktop 和 sec mcp 各用一个。
+// 返回的 *Facts 和它 Build 出的报表被所有调用方共用，只能读，不能修改。
 type FactsCache struct {
 	mu      sync.Mutex
 	entries map[int]factsEntry
@@ -36,6 +37,11 @@ func (c *FactsCache) Facts(ctx context.Context, client *Client, cik int) (*Facts
 		c.put(cik, facts, time.Now())
 	}
 	return facts, err
+}
+
+// Loader 返回用 client 下载、先查缓存的 XBRL 读取函数，供 valuation.AnalyzeUS、usstock.LoadDividends 等接受读取函数的调用方使用。
+func (c *FactsCache) Loader(client *Client) func(context.Context, int) (*Facts, error) {
+	return func(ctx context.Context, cik int) (*Facts, error) { return c.Facts(ctx, client, cik) }
 }
 
 // put 写入时清理过期条目，达到上限时移除最早写入的公司。

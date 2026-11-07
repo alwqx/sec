@@ -49,11 +49,6 @@ func (s *desktopServer) handleUSCompany(w http.ResponseWriter, r *http.Request) 
 // usFactsCache 缓存 XBRL 数据（见 edgar.FactsCache），财报、分红和估值栏目共用。
 var usFactsCache = &edgar.FactsCache{}
 
-// cachedUSFacts 返回先查缓存、过期或没有时再下载的 XBRL 读取函数。
-func cachedUSFacts(client *edgar.Client) func(context.Context, int) (*edgar.Facts, error) {
-	return func(ctx context.Context, cik int) (*edgar.Facts, error) { return usFactsCache.Facts(ctx, client, cik) }
-}
-
 // usBadRequest 是美股接口的参数错误，返回 400。
 type usBadRequest string
 
@@ -104,7 +99,7 @@ func usFacts(ctx context.Context, client *edgar.Client, code string) (edgar.Comp
 	if err != nil {
 		return company, nil, err
 	}
-	facts, err := cachedUSFacts(client)(ctx, company.CIK)
+	facts, err := usFactsCache.Facts(ctx, client, company.CIK)
 	return company, facts, err
 }
 
@@ -167,7 +162,7 @@ func (s *desktopServer) handleUSFinancials(w http.ResponseWriter, r *http.Reques
 // handleUSDividends 返回美股按财年的分红表（usstock.Dividends），和 CLI 的 sec info -d 相同。
 func (s *desktopServer) handleUSDividends(w http.ResponseWriter, r *http.Request) {
 	s.serveUS(w, r, "分红", func(ctx context.Context, client *edgar.Client, code string) (any, error) {
-		return usstock.LoadDividends(ctx, client, code, nil, cachedUSFacts(client))
+		return usstock.LoadDividends(ctx, client, code, nil, usFactsCache.Loader(client))
 	})
 }
 
