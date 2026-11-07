@@ -41,9 +41,10 @@ args = ["mcp"]
 | `search_security` | 按代码、名称或拼音搜索 A 股、港股、美股、指数和基金，返回 `ex_code`、名称、市场和类型，最多 10 条 |
 | `get_quote` | A 股、港股、美股和基金的最新行情，一次 1 到 5 只，代码或名称都可以 |
 | `get_financials` | 一只 A 股或美股最近 5 个年度或 8 个单季的营业收入、归母净利润、扣非净利润（仅 A 股）、毛利率、净利率、经营现金流、资产负债率及同比；金额单位是亿，A 股来自东方财富，美股来自 SEC EDGAR |
+| `get_valuation` | 一只 A 股或美股的 PE/PB/PS 当前值和历史分位、股息率、PEG、格雷厄姆数、同行业对比（仅 A 股）、DCF 每股价值和规则汇总（`signals`、`assessment`），带 `disclaimer`；可传 DCF 参数 |
 | `get_kline_summary` | 一只沪深、港股或美股证券的 K 线摘要：区间涨跌幅、最高最低、最大回撤、MA5/MA20/MA60、平均成交量和成交额，加最近 20 根 K 线；默认前复权日线、最近 1 年 |
 
-其余工具（估值、公告与申报、宏观等）按 [TODO](../TODO.md) 的 AI/LLM 部分逐个加入。
+其余工具（公告与申报、宏观等）按 [TODO](../TODO.md) 的 AI/LLM 部分逐个加入。
 
 ## 输出格式
 
@@ -69,13 +70,13 @@ args = ["mcp"]
 | `disclaimer` | 结果自带的免责声明，没有时省略 |
 | `data` | 工具自己的数据，`null` 表示缺失或不适用，不是 0 |
 
-工具出错时返回 `isError: true` 的结果，文本是中文原因：参数错误（比如一次超过 5 只，或者给出的代码全都找不到）提示怎么改，上游失败或超时说明哪一步失败。以 `get_quote` 为例，部分证券查不到不算出错，列在 `data.missing` 里；几个输入搜到同一只证券时合并为一条，并在 `notes` 里说明；基金净值没有成交，`volume`、`amount` 是 `null`。`search_security` 没有匹配时不算出错，返回空的 `results` 并在 `notes` 里提示换关键字；结果超过 10 条时截短，`total` 是新浪返回的条数（接口最多约 50 条，不是匹配总数）。`market` 是 `sse`、`szse`、`bse`、`hk`、`us` 或 `fund`，基金不区分场内场外。`get_kline_summary` 默认前复权，东方财富失败时不复权行情改用新浪备用数据并在 `notes` 里说明，前复权没有备用数据，提示可改用 `bfq`；不支持北交所和场外基金。`get_financials` 的同比在上年同期缺失或 ≤ 0 时是 `null`；美股读取 `sec config` 里的 SEC 联系邮箱，按 IFRS 申报的外国公司没有季度数据。
+工具出错时返回 `isError: true` 的结果，文本是中文原因：参数错误（比如一次超过 5 只，或者给出的代码全都找不到）提示怎么改，上游失败或超时说明哪一步失败。以 `get_quote` 为例，部分证券查不到不算出错，列在 `data.missing` 里；几个输入搜到同一只证券时合并为一条，并在 `notes` 里说明；基金净值没有成交，`volume`、`amount` 是 `null`。`search_security` 没有匹配时不算出错，返回空的 `results` 并在 `notes` 里提示换关键字；结果超过 10 条时截短，`total` 是新浪返回的条数（接口最多约 50 条，不是匹配总数）。`market` 是 `sse`、`szse`、`bse`、`hk`、`us` 或 `fund`，基金不区分场内场外。`get_kline_summary` 默认前复权，东方财富失败时不复权行情改用新浪备用数据并在 `notes` 里说明，前复权没有备用数据，提示可改用 `bfq`；不支持北交所和场外基金。`get_financials` 的同比在上年同期缺失或 ≤ 0 时是 `null`；美股读取 `sec config` 里的 SEC 联系邮箱，按 IFRS 申报的外国公司没有季度数据。`get_valuation` 和 `sec valuation` 一样，纯数字代码依次试所有沪深北结果（`000001` 是上证指数也是平安银行）；不返回逐日序列、按历史倍数推算的情景价格和同行业逐家数据；外国公司（IFRS、以 ADS 上市等）返回参数错误。
 
 server 连接时会给模型一段使用规则（只用工具返回的数字、保留口径说明和日期、不给投资建议），见 `cmd/mcp/mcp.go` 的 `instructions`。
 
 ## 日志与排查
 
-stdout 只给 MCP 协议用，日志写到 stderr，默认只记警告和错误；`sec mcp -D` 输出调试日志。单次工具调用 30 秒超时。
+stdout 只给 MCP 协议用，日志写到 stderr，默认只记警告和错误；`sec mcp -D` 输出调试日志。单次工具调用 30 秒超时。美股的 SEC XBRL 数据按公司缓存 10 分钟（最多 20 家），同一家公司先查年度再查季度时不重新下载。
 
 仓库里的 `scripts/mcp-smoke.py` 只用 Python 标准库，按 JSON-RPC 走一遍握手、列出工具和调用，不需要 npm：
 
