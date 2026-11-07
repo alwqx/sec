@@ -10,7 +10,6 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/alwqx/sec/provider/edgar"
 	"github.com/stretchr/testify/require"
@@ -20,7 +19,7 @@ import (
 func usServer(t *testing.T) *desktopServer {
 	t.Helper()
 	t.Setenv("HOME", t.TempDir())
-	t.Cleanup(func() { usFactsCache.entries = map[int]usFactsEntry{} })
+	t.Cleanup(func() { usFactsCache = &edgar.FactsCache{} })
 	return &desktopServer{dev: true, workspace: workspaceStore{path: filepath.Join(t.TempDir(), "workspace.json")}}
 }
 
@@ -106,28 +105,6 @@ func TestUSFinancialsIFRS(t *testing.T) {
 	require.Len(t, body.Report.Periods, 1)
 	require.Equal(t, "2025-03-31", body.Report.Periods[0].End)
 	require.True(t, gock.IsDone())
-}
-
-func TestUSFactsCacheEviction(t *testing.T) {
-	usServer(t)
-	now := time.Now()
-	expired := &edgar.Facts{Name: "expired"}
-	usFactsCache.entries[1] = usFactsEntry{now.Add(-usFactsTTL), expired}
-	usFactsCache.entries[2] = usFactsEntry{now.Add(-time.Minute), &edgar.Facts{Name: "fresh"}}
-	cacheUSFacts(3, &edgar.Facts{Name: "new"}, now)
-	require.NotContains(t, usFactsCache.entries, 1)
-	require.Contains(t, usFactsCache.entries, 2)
-	require.Contains(t, usFactsCache.entries, 3)
-
-	usFactsCache.entries = map[int]usFactsEntry{}
-	for i := 0; i < usFactsMaxEntries+1; i++ {
-		cacheUSFacts(i, &edgar.Facts{CIK: i}, now.Add(time.Duration(i)*time.Second))
-	}
-	require.Len(t, usFactsCache.entries, usFactsMaxEntries)
-	require.NotContains(t, usFactsCache.entries, 0, "淘汰最早写入的公司")
-	cacheUSFacts(1, &edgar.Facts{Name: "refreshed"}, now.Add(time.Minute))
-	require.Len(t, usFactsCache.entries, usFactsMaxEntries, "更新已有公司不淘汰其他公司")
-	require.Equal(t, "refreshed", usFactsCache.entries[1].facts.Name)
 }
 
 // 美股估值：SEC XBRL 财务数据 + 新浪不复权日线。
