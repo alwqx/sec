@@ -295,13 +295,22 @@ func TestQuoteTime(t *testing.T) {
 	require.Equal(t, "2026-11-05 净值", quoteTime(&sina.SecurityQuote{TradeDate: "2026-11-05", Timezone: types.TimezoneShanghai, NAV: true}))
 }
 
-// 基金净值没有开高低，JSON 是 null、表格显示 -，并标出 nav。
+// 基金净值没有开高低和成交，JSON 是 null、表格显示 -，并标出 nav。
 func TestQuoteRowNAV(t *testing.T) {
 	quote := &sina.SecurityQuote{ExCode: "OF005827", Name: "易方达蓝筹精选混合", Current: 1.4164, YClose: 1.4009, TradeDate: "2026-11-05", NAV: true}
 	row := newQuoteRow(quote)
 	require.True(t, row.NAV)
 	require.Nil(t, row.Open)
+	require.Nil(t, row.Volume, "净值没有成交，不是成交 0")
+	require.Nil(t, row.Amount)
 	require.InDelta(t, 1.1064, *row.ChangePct, 1e-4)
+
+	// 交易所行情照常输出成交量和成交额，0 也是真实的 0（比如开盘前）。
+	traded := newQuoteRow(&sina.SecurityQuote{ExCode: "SH600036", Current: 41, YClose: 40, TurnOver: 100, Volume: 4100})
+	require.Equal(t, int64(100), *traded.Volume)
+	require.Equal(t, 4100.0, *traded.Amount)
+	beforeOpen := newQuoteRow(&sina.SecurityQuote{ExCode: "SH600036", YClose: 40})
+	require.Equal(t, int64(0), *beforeOpen.Volume)
 
 	var out bytes.Buffer
 	printQuote(&out, []*sina.SecurityQuote{quote})

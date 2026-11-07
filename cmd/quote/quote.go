@@ -329,9 +329,9 @@ type quoteRow struct {
 	Low           *float64 `json:"low"`
 	Change        *float64 `json:"change"`
 	ChangePct     *float64 `json:"change_pct"`
-	Volume        int64    `json:"volume"` // 成交量，单位：股或份
-	Amount        float64  `json:"amount"` // 成交额
-	NAV           bool     `json:"nav"`    // 价格是基金单位净值，trade_date 是净值日期，没有时间和开高低
+	Volume        *int64   `json:"volume"` // 成交量，单位：股或份；基金净值没有成交，为 null
+	Amount        *float64 `json:"amount"` // 成交额；基金净值没有成交，为 null
+	NAV           bool     `json:"nav"`    // 价格是基金单位净值，trade_date 是净值日期，没有时间、开高低和成交
 }
 
 func newQuoteRow(quote *sina.SecurityQuote) quoteRow {
@@ -339,8 +339,9 @@ func newQuoteRow(quote *sina.SecurityQuote) quoteRow {
 	row := quoteRow{
 		ExCode: quote.ExCode, Code: quote.Code, Name: quote.Name, TradeDate: quote.TradeDate, Time: quote.Time, Timezone: quote.Timezone,
 		Price: utils.PositiveOrNil(price), PriceIsYClose: isYClose, YClose: utils.PositiveOrNil(quote.YClose), Open: utils.PositiveOrNil(quote.Open),
-		High: utils.PositiveOrNil(quote.High), Low: utils.PositiveOrNil(quote.Low), Volume: quote.TurnOver, Amount: quote.Volume, NAV: quote.NAV,
+		High: utils.PositiveOrNil(quote.High), Low: utils.PositiveOrNil(quote.Low), NAV: quote.NAV,
 	}
+	row.Volume, row.Amount = quote.Trade()
 	if change, pct, ok := quote.Change(); ok {
 		row.Change, row.ChangePct = &change, &pct
 	}

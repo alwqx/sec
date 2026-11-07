@@ -103,7 +103,8 @@
   - [x] 框架与 `get_quote`：`aitool` 注册表和输出信封、`sec mcp` stdio server、最新行情工具。
   - [ ] `search_security`：搜索证券代码。
   - [x] 重构：并发搜索去重抽成 `sina.ResolveAll`，涨跌计算抽成 `SecurityQuote.Change`，`cmd/quote`、`cmd/watch` 和 `aitool` 共用。
-  - [ ] 基金净值的 `volume`、`amount` 在 `sec quote --json` 里是 0，`get_quote` 里是 `null`；是否统一成 `null` 另行决定，改了是 JSON change。
+  - [x] 基金净值的 `volume`、`amount` 在 `sec quote --json` 里也改成 `null`，和 `get_quote` 一致。
+  - [ ] Desktop 行情接口（`desktop/quotes.go`）直接输出 `sina.SecurityQuote`，基金净值仍是 `volume: 0, turnover: 0`，`QuoteCard` 显示成 0。改法要连前端一起定：另定接口格式，或前端按 `nav` 显示 `-`。
   - [ ] `sec quote` 输入里有搜到同一只证券的关键字时（如 `600036,cmb`）：表格模式静默只保留一行，`--json` 每个关键字各输出一行，`get_quote` 合并并在 notes 里说明。是否统一（表格提示合并、JSON 去重）另行决定，JSON 去重是 JSON change。
   - [ ] `get_kline_summary`：K 线区间统计和最近 20 根。
   - [ ] `get_financials`：最近 5 年或 8 个季度的关键财务项及同比，A 股和美股统一结构。

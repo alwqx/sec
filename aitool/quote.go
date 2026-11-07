@@ -63,7 +63,7 @@ type quoteItem struct {
 	ChangePct     *float64 `json:"change_pct"` // 涨跌幅，单位 %，保留 2 位小数
 	Volume        *int64   `json:"volume"`     // 成交量，单位：股或份；基金净值没有成交，为 null
 	Amount        *float64 `json:"amount"`     // 成交额，交易所计价币种；基金净值没有成交，为 null
-	NAV           bool     `json:"nav"`        // 价格是基金单位净值，trade_date 是净值日期，没有时间和开高低
+	NAV           bool     `json:"nav"`        // 价格是基金单位净值，trade_date 是净值日期，没有时间、开高低和成交
 }
 
 // missingItem 是一个没有查到行情的输入。
@@ -200,10 +200,7 @@ func newQuoteItem(sec *sina.BasicSecurity, quote *sina.SecurityQuote) quoteItem 
 		Price: utils.PositiveOrNil(price), PriceIsYClose: isYClose, YClose: utils.PositiveOrNil(quote.YClose), Open: utils.PositiveOrNil(quote.Open),
 		High: utils.PositiveOrNil(quote.High), Low: utils.PositiveOrNil(quote.Low), NAV: quote.NAV,
 	}
-	if !quote.NAV {
-		volume, amount := quote.TurnOver, quote.Volume
-		item.Volume, item.Amount = &volume, &amount
-	}
+	item.Volume, item.Amount = quote.Trade()
 	if change, pct, ok := quote.Change(); ok {
 		change, pct = round(change, 4), round(pct, 2)
 		item.Change, item.ChangePct = &change, &pct

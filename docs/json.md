@@ -28,7 +28,7 @@
 | 命令 | 顶层字段 | 说明 |
 | --- | --- | --- |
 | `search` | `results` | 每项 `code`、`ex_code`、`exchange`、`name`、`security_type` |
-| `quote` | `results` | 每项一只证券的行情；`nav` 为 `true` 时价格是基金单位净值，`time` 为空、开高低为 `null` |
+| `quote` | `results` | 每项一只证券的行情；`nav` 为 `true` 时价格是基金单位净值，`time` 为空，开高低、`volume`、`amount` 为 `null` |
 | `info`（A 股、港股） | `ex_code`、`name`、`history_name`、`listing_date` 等公司字段 | 一个对象，不在 `results` 里；`description` 是公司简介，目前只有港股有 |
 | `info`（基金） | `ex_code`、`name`、`full_name`、`type`、`nav`、`returns` 等 | 一个对象，见[基础信息文档](basic.md#基金)；货币基金的 `nav` 等为 `null`，用 `yield_10k`、`yield_7d` |
 | `info`（美股） | `ex_code`、`ticker`、`company`、`quote` | `company` 或 `quote` 取不到时为 `null` |
