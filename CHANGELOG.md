@@ -11,6 +11,7 @@
 7. Return null volume and turnover for fund NAV quotes in the Desktop API. **JSON change:** `/api/v1/quote` and `/api/v1/quotes` return `null` instead of 0 when `nav` is `true`.
 8. Shorten the v0.4.0–v0.4.6 CHANGELOG entries to one sentence each.
 9. Add the `search_security` tool to `sec mcp`.
+10. Add a TODO item to mark indexes in search results in the provider.
 
 ### v0.4.7
 
