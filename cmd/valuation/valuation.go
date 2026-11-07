@@ -11,7 +11,6 @@ import (
 	"github.com/alwqx/sec/config"
 	"github.com/alwqx/sec/provider/edgar"
 	"github.com/alwqx/sec/provider/sina"
-	"github.com/alwqx/sec/types"
 	"github.com/alwqx/sec/utils"
 	shared "github.com/alwqx/sec/valuation"
 	"github.com/spf13/cobra"
@@ -77,7 +76,7 @@ func ValuationHandler(cmd *cobra.Command, args []string) error {
 	// noData 是第一只候选证券没有估值数据的原因，美股会说明具体原因。
 	noData := fmt.Errorf("%s %s: %w", secs[0].ExCode, secs[0].Name, shared.ErrNoData)
 	first := true
-	for _, sec := range candidates(secs, args[0]) {
+	for _, sec := range shared.Candidates(secs, args[0]) {
 		var result *shared.Result
 		if strings.HasPrefix(sec.ExCode, "$") {
 			// 美股估值来自 SEC XBRL 和新浪日线，访问 SEC 需要共享配置里的联系邮箱。
@@ -109,25 +108,6 @@ func ValuationHandler(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Fprintln(cmd.OutOrStdout(), noData)
 	return nil
-}
-
-// candidates 返回要依次尝试的证券。同一数字可能同时是指数和股票（000001 是上证指数和平安银行），
-// 所以纯数字代码要试完所有沪深北结果。其他情况只取搜索的第一条：00700 的第二条是模塑科技（000700），
-// 不能因为腾讯不支持就换成别的公司。
-func candidates(secs []*sina.BasicSecurity, key string) []*sina.BasicSecurity {
-	same := []*sina.BasicSecurity{}
-	for _, sec := range secs {
-		if strings.EqualFold(sec.ExCode, key) {
-			return []*sina.BasicSecurity{sec}
-		}
-		if sec.Code == key && types.IsACode(sec.ExCode) {
-			same = append(same, sec)
-		}
-	}
-	if len(same) > 0 {
-		return same
-	}
-	return secs[:1]
 }
 
 func render(out io.Writer, method string, r *shared.Result) {
