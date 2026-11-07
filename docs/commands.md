@@ -2,7 +2,7 @@
 
 本文按功能列出 `sec` 的取数命令及其在 Desktop 中的位置。“规划”表示 Desktop 尚未提供，表中位置是后续开发的目标。指标的频率、字段和官方来源见[宏观指标一览](macro-coverage.md)。
 
-一共 87 个取数命令：个股 11 个、公告 3 个（含美股 SEC 申报）、IPO 4 个、宏观 61 个、汇率 6 个、贵金属 1 个、大宗商品 1 个、美债 2 个。`strategy` 基于已有行情计算，`upgrade`、`config` 和 `watch add/remove` 不取数，都不计入。
+一共 87 个取数命令：个股 11 个、公告 3 个（含美股 SEC 申报）、IPO 4 个、宏观 61 个、汇率 6 个、贵金属 1 个、大宗商品 1 个、美债 2 个。`strategy` 基于已有行情计算，`upgrade`、`config` 和 `watch add/remove` 不取数，`mcp` 是给 AI agent 调用工具的 server（见 [sec mcp](mcp.md)），都不计入。
 
 ## 脚本调用
 

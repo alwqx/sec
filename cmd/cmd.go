@@ -18,6 +18,7 @@ import (
 	"github.com/alwqx/sec/cmd/ipo"
 	"github.com/alwqx/sec/cmd/kline"
 	"github.com/alwqx/sec/cmd/macro"
+	"github.com/alwqx/sec/cmd/mcp"
 	"github.com/alwqx/sec/cmd/metal"
 	"github.com/alwqx/sec/cmd/quote"
 	"github.com/alwqx/sec/cmd/strategy"
@@ -83,6 +84,7 @@ func NewCLI() *cobra.Command {
 		bond.NewBondCLI(), bond.NewBondHistoryCLI(),
 		kline.NewKLineCLI(),
 		macro.NewMacroCLI(),
+		mcp.NewMCPCLI(),
 		fx.NewFXCLI(),
 		quote.NewQuoteCLI(), quote.NewQuoteHistoryCLI(),
 		metal.NewMetalCLI(),
