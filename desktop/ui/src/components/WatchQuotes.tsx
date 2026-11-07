@@ -1,13 +1,8 @@
 import { RefreshCw } from 'lucide-react'
 import { priceDigits, quoteChange, type QuotesState } from '../hooks/useQuotes'
 import type { BasicSecurity } from '../types'
+import { tradeAmount } from '../format'
 
-function amount(value: number) {
-  if (!value) return '—'
-  if (value >= 1e8) return `${(value / 1e8).toFixed(2)} 亿`
-  if (value >= 1e4) return `${(value / 1e4).toFixed(2)} 万`
-  return value.toFixed(0)
-}
 export interface CompareState { checked: string[]; only: boolean }
 
 const price = (value: number, digits = 2) => value > 0 ? value.toFixed(digits) : '—'
@@ -37,7 +32,7 @@ export default function WatchQuotes({ items, state, onSelect, compare, onCompare
           <td><button className="text-link" onClick={() => onSelect(item)}>{item.name}</button><div className="data-note">{item.ex_code}</div></td>
           {quote && change ? <>
             <td className={change.direction}>{price(quote.current, priceDigits(quote))}</td><td className={change.direction}>{change.changeText}</td><td className={change.direction}>{change.percentText}</td>
-            <td>{price(quote.open, priceDigits(quote))}</td><td>{price(quote.high, priceDigits(quote))}</td><td>{price(quote.low, priceDigits(quote))}</td><td>{price(quote.yclose, priceDigits(quote))}</td><td>{amount(quote.volume)}</td><td>{quote.trade_date} {quote.nav ? '净值' : quote.time}</td>
+            <td>{price(quote.open, priceDigits(quote))}</td><td>{price(quote.high, priceDigits(quote))}</td><td>{price(quote.low, priceDigits(quote))}</td><td>{price(quote.yclose, priceDigits(quote))}</td><td>{tradeAmount(quote.volume)}</td><td>{quote.trade_date} {quote.nav ? '净值' : quote.time}</td>
           </> : <td colSpan={9} className="data-note">{state.missing.includes(item.ex_code.toUpperCase()) ? '行情不可用' : '—'}</td>}
         </tr>
       })}</tbody></table></div>

@@ -24,6 +24,19 @@ const (
 // 与自选列表的代码规则一致：美股是 $AMD，基金等也可以保存。
 var quoteCodePattern = regexp.MustCompile(`^[A-Z0-9$._-]{1,40}$`)
 
+// desktopQuote 是行情接口的输出，字段和 sina.SecurityQuote 相同（volume 是成交金额，turnover 是成交数量），
+// 只是基金净值没有成交时 volume、turnover 为 null，前端显示 —，不显示成 0。外层同名字段覆盖内嵌结构的字段。
+type desktopQuote struct {
+	*sina.SecurityQuote
+	Volume   *float64 `json:"volume"`
+	TurnOver *int64   `json:"turnover"`
+}
+
+func newDesktopQuote(q *sina.SecurityQuote) desktopQuote {
+	shares, amount := q.Trade()
+	return desktopQuote{SecurityQuote: q, Volume: amount, TurnOver: shares}
+}
+
 // handleQuotes 批量查询行情。不可用的证券列入 missing，不影响其他证券。
 func (s *desktopServer) handleQuotes(w http.ResponseWriter, r *http.Request) {
 	codes := []string{}
@@ -48,11 +61,11 @@ func (s *desktopServer) handleQuotes(w http.ResponseWriter, r *http.Request) {
 	if r.Context().Err() != nil {
 		return
 	}
-	results := make([]*sina.SecurityQuote, 0, len(codes))
+	results := make([]desktopQuote, 0, len(codes))
 	missing := []string{}
 	for _, code := range codes {
 		if item := found[code]; item != nil {
-			results = append(results, item)
+			results = append(results, newDesktopQuote(item))
 		} else {
 			missing = append(missing, code)
 		}

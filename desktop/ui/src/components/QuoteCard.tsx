@@ -1,5 +1,6 @@
 import type { SecurityQuote } from '../types'
 import { priceDigits } from '../hooks/useQuotes'
+import { tradeAmount, tradeShares } from '../format'
 
 interface Props {
   quote: SecurityQuote | null
@@ -8,18 +9,6 @@ interface Props {
 function changePct(q: SecurityQuote): number {
   if (!q.yclose) return 0
   return ((q.current - q.yclose) / q.yclose) * 100
-}
-
-function fmtAmount(v: number): string {
-  if (v >= 1e8) return `${(v / 1e8).toFixed(2)} 亿`
-  if (v >= 1e4) return `${(v / 1e4).toFixed(2)} 万`
-  return `${v.toFixed(0)}`
-}
-
-function fmtShares(v: number): string {
-  if (v >= 1e8) return `${(v / 1e8).toFixed(2)} 亿股`
-  if (v >= 1e4) return `${(v / 1e4).toFixed(2)} 万股`
-  return `${v} 股`
 }
 
 export default function QuoteCard({ quote: q }: Props) {
@@ -70,11 +59,11 @@ export default function QuoteCard({ quote: q }: Props) {
         </div>
         <div>
           <dt>成交额</dt>
-          <dd>{fmtAmount(q.volume)}</dd>
+          <dd>{tradeAmount(q.volume)}</dd>
         </div>
         <div>
           <dt>成交量</dt>
-          <dd>{fmtShares(q.turnover)}</dd>
+          <dd>{tradeShares(q.turnover)}</dd>
         </div>
         <div>
           <dt>时间</dt>

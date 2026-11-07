@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { money, yi } from './format.ts'
+import { money, tradeAmount, tradeShares, yi } from './format.ts'
 
 test('money 缺失值显示破折号，0 是真实值', () => {
   assert.equal(money(null), '—')
@@ -24,4 +24,13 @@ test('yi 固定按亿显示，缺失值显示破折号', () => {
   assert.equal(yi(13210000000), '132.10')
   assert.equal(yi(132175000000), '1,321.75')
   assert.equal(yi(-22759000000), '-227.59')
+})
+
+test('tradeAmount、tradeShares 基金净值没有成交时显示破折号，0 是真实值', () => {
+  assert.equal(tradeAmount(null), '—')
+  assert.equal(tradeShares(null), '—')
+  assert.equal(tradeAmount(0), '0')
+  assert.equal(tradeShares(0), '0 股')
+  assert.equal(tradeAmount(3.97e9), '39.70 亿')
+  assert.equal(tradeShares(92954343), '9295.43 万股')
 })

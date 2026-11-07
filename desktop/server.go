@@ -210,7 +210,7 @@ func (s *desktopServer) handleQuote(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, q)
+	writeJSON(w, newDesktopQuote(q))
 }
 
 func writeJSON(w http.ResponseWriter, v any) {
