@@ -95,6 +95,16 @@ func (q *SecurityQuote) Change() (change, pct float64, ok bool) {
 	return change, change / q.YClose * 100, true
 }
 
+// Trade 返回成交量（股或份）和成交额。基金净值没有成交，两者都是 nil；交易所行情照常返回，开盘前的 0 也是真实的 0。
+// 注意新浪字段的名字和含义相反：TurnOver 是成交量，Volume 是成交额。
+func (q *SecurityQuote) Trade() (volume *int64, amount *float64) {
+	if q.NAV {
+		return nil, nil
+	}
+	shares, money := q.TurnOver, q.Volume
+	return &shares, &money
+}
+
 // 分红送转信息
 type Dividend struct {
 	PublicDate     string  `json:"public_date"`     // 公告日期

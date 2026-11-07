@@ -89,6 +89,18 @@ func TestChange(t *testing.T) {
 	}
 }
 
+func TestTrade(t *testing.T) {
+	volume, amount := (&SecurityQuote{TurnOver: 100, Volume: 4100}).Trade()
+	require.Equal(t, int64(100), *volume, "TurnOver 是成交量")
+	require.Equal(t, 4100.0, *amount, "Volume 是成交额")
+	volume, amount = (&SecurityQuote{}).Trade()
+	require.Equal(t, int64(0), *volume, "开盘前的 0 是真实的 0")
+	require.Equal(t, 0.0, *amount)
+	volume, amount = (&SecurityQuote{NAV: true}).Trade()
+	require.Nil(t, volume, "基金净值没有成交")
+	require.Nil(t, amount)
+}
+
 func TestQuerySecQuoteUpstreamStatus(t *testing.T) {
 	defer gock.Off()
 	gock.New("https://hq.sinajs.cn").Get("/list=sh600036").Reply(503).BodyString(`<html>"busy"</html>`)

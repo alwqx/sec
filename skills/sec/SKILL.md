@@ -66,7 +66,7 @@ description: 用 sec 命令行查询 A 股、港股、美股、基金的行情�
 
 - **字段约定**：snake_case，日期是 `YYYY-MM-DD`，列表在 `results` 里（`fx` 用 `observations`）。涨跌幅、换手率的单位是 %。证券代码字段多数叫 `ex_code`，`valuation` 叫 `code`。
 - **A 股和美股结构不同**：`info`、`financials` 的美股输出是另一套结构。字段含义不确定时查 [JSON 输出约定](https://github.com/alwqx/sec/blob/main/docs/json.md)。
-- **行情时间**：`trade_date` 和 `time` 是当地时间，时区在 `timezone`。基金的 `nav` 为 `true` 时，价格是单位净值，不是成交价。
+- **行情时间**：`trade_date` 和 `time` 是当地时间，时区在 `timezone`。基金的 `nav` 为 `true` 时，价格是单位净值，不是成交价；这时没有成交，`sec quote --json` 的 `volume`、`amount` 是 `null`，汇总成交额时要跳过，不能当成 0。
 - **宏观统一格式**：`--standard-json` 的 `series` 说明每条序列的口径，`observations` 通过 `series_id` 关联到 `series`。解释时用 `series` 里的口径（`seasonal_adjustment`、`value_origin`、`coverage` 等），比如区分单月同比和累计同比、季调和未季调。观测的 `status` 不是 `available` 时看 `missing_reason`。`original` 是适配前的原始结果，通常很长，用 `jq 'del(.original)'` 去掉。
 
 ## 回答格式
