@@ -27,6 +27,7 @@ SAMPLES = {
     "get_quote": {"codes": ["600519", "00700", "$AAPL", "易方达蓝筹"]},
     "get_kline_summary": {"code": "SH000300"},
     "get_financials": {"code": "$AAPL", "period": "quarter"},
+    "get_valuation": {"code": "000001"},
 }
 
 # 单个工具结果的建议上限，见 docs/mcp.md 的「添加工具」。

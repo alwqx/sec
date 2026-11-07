@@ -113,7 +113,7 @@
   - [x] 搜到同一只证券的关键字（如 `600036,cmb`）在 `sec quote` 表格、`--json` 和 `get_quote` 里都合并为一条并说明，说明文字由 `sina.MergeNote` 统一生成。
   - [x] `get_kline_summary`：K 线区间统计和最近 20 根。
   - [x] `get_financials`：最近 5 年或 8 个季度的关键财务项及同比，A 股和美股统一结构。
-  - [ ] `get_valuation`：估值、历史分位、`assessment`、全部 `_note` 和 `disclaimer`。
+  - [x] `get_valuation`：估值、历史分位、`assessment`、全部 `_note` 和 `disclaimer`。
   - [ ] `list_filings`：巨潮公告和 SEC 申报列表。
   - [ ] `get_macro_series`：宏观指标的口径和最近 12 期观测。
 - [ ] 共用 AI 配置：CLI 和 Desktop 共用 `~/.sec/config.json` 的 `ai` 段，可以保存多个模型配置（`providers`，按名字区分，各自有接口类型、`base_url`、模型和 Key），`default` 指定默认配置；`sec config ai list/add/edit/set-key/use/remove` 管理；Key 可以用环境变量，或用 AES-256-GCM 加密保存在 `config.json`，加密密钥单独存在 `~/.sec/secret.key`（`0600`）；`set-key` 隐藏输入或从 stdin 读取，不接受命令行参数。
