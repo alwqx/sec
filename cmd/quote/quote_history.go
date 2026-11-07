@@ -11,7 +11,6 @@ import (
 	"github.com/alwqx/sec/provider/eastmoney"
 	"github.com/alwqx/sec/provider/history"
 	"github.com/alwqx/sec/provider/sina"
-	"github.com/alwqx/sec/types"
 	"github.com/alwqx/sec/utils"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
@@ -64,22 +63,11 @@ func QuoteHistoryHandler(cmd *cobra.Command, args []string) error {
 	// 默认选择第一个查询结果
 	sec := secs[0]
 	slog.Debug("QuoteHistoryHandler", "num", num, "excode", sec.ExCode, "code", sec.Code, "exchange", sec.ExChange)
-	req := &eastmoney.GetQuoteHistoryReq{
-		Code: sec.Code,
+	market, err := history.Market(sec)
+	if err != nil {
+		return err
 	}
-	switch sec.ExChange {
-	case "sh":
-		req.MarketCode = 1
-	case "sz":
-		req.MarketCode = 0
-	case types.ExChangeHKex:
-		req.MarketCode = 116
-	case types.ExChangeNasdaq, types.ExChangeNyse:
-		// 新浪搜索把美股都标成纳斯达克；纽交所的股票用 105 查不到时，history 包会换成 106、107 再查。
-		req.MarketCode = 105
-	default:
-		return fmt.Errorf("unsupported exchange: %s", sec.ExChange)
-	}
+	req := &eastmoney.GetQuoteHistoryReq{Code: sec.Code, MarketCode: market}
 
 	// 复权类型
 	fqt, err := cmd.Flags().GetString("fq")

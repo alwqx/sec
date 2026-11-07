@@ -218,3 +218,18 @@ func TestUSFallback(t *testing.T) {
 	_, err = Get(context.Background(), &eastmoney.GetQuoteHistoryReq{Code: "aapl", MarketCode: 105, Freq: eastmoney.FreqWeek})
 	require.ErrorContains(t, err, "只有日线")
 }
+
+func TestMarket(t *testing.T) {
+	for exchange, want := range map[string]eastmoney.MarketType{
+		"sh": eastmoney.MarketTypeSse, "sz": eastmoney.MarketTypeSzSe, "hk": eastmoney.MarketTypeHK,
+		"nasdaq": eastmoney.MarketTypeNasdaq, "ny": eastmoney.MarketTypeNasdaq,
+	} {
+		market, err := Market(&sina.BasicSecurity{ExChange: exchange})
+		require.NoError(t, err, exchange)
+		require.Equal(t, int(want), market, exchange)
+	}
+	for _, exchange := range []string{"bj", ""} {
+		_, err := Market(&sina.BasicSecurity{ExChange: exchange})
+		require.ErrorIs(t, err, ErrUnsupportedMarket, exchange)
+	}
+}
