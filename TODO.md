@@ -79,6 +79,7 @@
 - [ ] `provider/sina/sina.go` 中标注待拆分的函数拆成 2 个函数。
 - [ ] 港股指数行情：搜索能找到恒生指数（`HKhsi`）等港股指数，但 `sec quote` 报 `invalid HK stock quote line`，行情接口和解析都不支持港股指数。
 - [ ] 搜索结果标出指数：`parseBasicSecurity` 把指数都当成 `stock`，`search_security` 只能在 `aitool/search.go` 的 `indexCode` 里按代码规则（`SH000`、`SZ399`、`BJ899` 开头、港股字母代码）判断。港股指数在新浪有单独的类型 33，可以直接用；A 股指数和股票同为 11，仍要按代码判断。把判断移到 provider，新增 `index` 类型（`types.SecurityType`），再删掉 `indexCode`。会改变 `sec search --json` 的 `security_type`，`watchlist/store.go` 目前只接受 `stock` 和 `fund`，要一起改。
+- [ ] 等比复权：东方财富的前复权（`fqt=1`）把分红金额直接从更早的价格里减去，不是按比例缩小，区间越长，早期价格越接近 0 甚至为负，百分比都会失真。例如招商银行（SH600036）2002 年起的前复权月线，第一根收盘价是 −13.24；2007 年高点到 2016 年的回撤按前复权算是 −99.26%，实际 2007—2008 年约 −70%。受影响的有 `get_kline_summary`（默认前复权，目前只在 `notes` 里提示）、`sec strategy` 回测（固定前复权，长区间收益率失真）、`sec kline -f qfq`、`sec quote-history -f qfq` 和 Desktop 的 `fq=qfq`。方案：用不复权价格和分红送转数据（`sina.QueryDividends`、`eastmoney.GetDividendPlans`）按除权除息日自己算等比复权因子；做不到时，百分比统计改用不复权价格并说明除权日的跳变。先核实后复权（`fqt=2`）是不是也按金额调整。美股拆股、港股的复权方式也要一起核实。
 
 ## Desktop
 
@@ -108,7 +109,7 @@
   - [x] 基金净值的 `volume`、`amount` 在 `sec quote --json` 里也改成 `null`，和 `get_quote` 一致。
   - [x] Desktop 行情接口（`/api/v1/quote`、`/api/v1/quotes`）的基金净值 `volume`、`turnover` 改成 `null`，行情卡片和自选页显示 —。
   - [x] 搜到同一只证券的关键字（如 `600036,cmb`）在 `sec quote` 表格、`--json` 和 `get_quote` 里都合并为一条并说明，说明文字由 `sina.MergeNote` 统一生成。
-  - [ ] `get_kline_summary`：K 线区间统计和最近 20 根。
+  - [x] `get_kline_summary`：K 线区间统计和最近 20 根。
   - [ ] `get_financials`：最近 5 年或 8 个季度的关键财务项及同比，A 股和美股统一结构。
   - [ ] `get_valuation`：估值、历史分位、`assessment`、全部 `_note` 和 `disclaimer`。
   - [ ] `list_filings`：巨潮公告和 SEC 申报列表。

@@ -137,6 +137,7 @@ func Default() *Registry {
 	r, err := NewRegistry(
 		SearchTool(),
 		QuoteTool(),
+		KlineSummaryTool(),
 	)
 	if err != nil {
 		// 工具在代码里写死，出错是编程错误，测试会覆盖到。
