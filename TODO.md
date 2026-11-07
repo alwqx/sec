@@ -78,6 +78,7 @@
 
 - [ ] `provider/sina/sina.go` 中标注待拆分的函数拆成 2 个函数。
 - [ ] 港股指数行情：搜索能找到恒生指数（`HKhsi`）等港股指数，但 `sec quote` 报 `invalid HK stock quote line`，行情接口和解析都不支持港股指数。
+- [ ] 搜索结果标出指数：`parseBasicSecurity` 把指数都当成 `stock`，`search_security` 只能在 `aitool/search.go` 的 `indexCode` 里按代码规则（`SH000`、`SZ399`、`BJ899` 开头、港股字母代码）判断。港股指数在新浪有单独的类型 33，可以直接用；A 股指数和股票同为 11，仍要按代码判断。把判断移到 provider，新增 `index` 类型（`types.SecurityType`），再删掉 `indexCode`。会改变 `sec search --json` 的 `security_type`，`watchlist/store.go` 目前只接受 `stock` 和 `fund`，要一起改。
 
 ## Desktop
 
