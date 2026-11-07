@@ -16,6 +16,7 @@
 12. Add the `get_kline_summary` tool to `sec mcp`.
 13. Add a TODO item for proportional price adjustment, since East Money's forward adjustment distorts percentages over long ranges.
 14. Add the `get_financials` tool to `sec mcp`.
+15. Move the 10-minute SEC company facts cache from Desktop to `provider/edgar` and use it in `sec mcp`.
 
 ### v0.4.7
 

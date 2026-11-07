@@ -70,7 +70,7 @@ func (s *desktopServer) handleValuation(w http.ResponseWriter, r *http.Request) 
 			writeError(w, http.StatusInternalServerError, "读取 SEC 联系邮箱失败，请在设置中检查")
 			return
 		}
-		result, err = valuation.AnalyzeUS(ctx, client, code, params, cachedUSFacts(client))
+		result, err = valuation.AnalyzeUS(ctx, client, code, params, usFactsCache.Loader(client))
 	} else {
 		result, err = valuation.Analyze(ctx, code, params)
 	}
