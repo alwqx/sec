@@ -16,6 +16,7 @@
 12. Add the `get_kline_summary` tool to `sec mcp`.
 13. Add a TODO item for proportional price adjustment, since East Money's forward adjustment distorts percentages over long ranges.
 14. Add the `get_financials` tool to `sec mcp`.
+16. Move the valuation candidate selection (`000001` is both an index and a stock) from `sec valuation` to the `valuation` package.
 
 ### v0.4.7
 
