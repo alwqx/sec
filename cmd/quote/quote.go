@@ -13,7 +13,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -99,36 +98,20 @@ type keyProblem struct {
 // resolveKeys 并发搜索关键字，结果保持输入顺序，搜到同一只证券的关键字只保留一个。
 // 找不到或搜索失败的关键字单独返回，不影响其他证券。
 func resolveKeys(ctx context.Context, keys []string) ([]*sina.BasicSecurity, []keyProblem) {
-	type found struct {
-		secs []*sina.BasicSecurity
-		err  error
-	}
-	results := make([]found, len(keys))
-	var wg sync.WaitGroup
-	for i, key := range keys {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			secs, err := sina.Resolve(ctx, key)
-			results[i] = found{secs, err}
-		}()
-	}
-	wg.Wait()
+	results := sina.ResolveAll(ctx, keys)
 	secs := []*sina.BasicSecurity{}
 	problems := []keyProblem{}
 	if ctx.Err() != nil {
 		return secs, problems
 	}
-	seen := map[string]bool{}
-	for i, result := range results {
+	for _, result := range results {
 		switch {
-		case result.err != nil:
-			problems = append(problems, keyProblem{keys[i], fmt.Sprintf("搜索失败（%v）", result.err), true})
-		case len(result.secs) == 0:
-			problems = append(problems, keyProblem{keys[i], "未找到证券", false})
-		case !seen[strings.ToUpper(result.secs[0].ExCode)]:
-			seen[strings.ToUpper(result.secs[0].ExCode)] = true
-			secs = append(secs, result.secs[0])
+		case result.Err != nil:
+			problems = append(problems, keyProblem{result.Key, fmt.Sprintf("搜索失败（%v）", result.Err), true})
+		case result.NotFound():
+			problems = append(problems, keyProblem{result.Key, "未找到证券", false})
+		case result.DuplicateOf == "":
+			secs = append(secs, result.Security)
 		}
 	}
 	return secs, problems
@@ -351,23 +334,14 @@ type quoteRow struct {
 	NAV           bool     `json:"nav"`    // 价格是基金单位净值，trade_date 是净值日期，没有时间和开高低
 }
 
-func positive(value float64) *float64 {
-	if value <= 0 {
-		return nil
-	}
-	return &value
-}
-
 func newQuoteRow(quote *sina.SecurityQuote) quoteRow {
 	price, isYClose := quote.EffectivePrice()
 	row := quoteRow{
 		ExCode: quote.ExCode, Code: quote.Code, Name: quote.Name, TradeDate: quote.TradeDate, Time: quote.Time, Timezone: quote.Timezone,
-		Price: positive(price), PriceIsYClose: isYClose, YClose: positive(quote.YClose), Open: positive(quote.Open),
-		High: positive(quote.High), Low: positive(quote.Low), Volume: quote.TurnOver, Amount: quote.Volume, NAV: quote.NAV,
+		Price: utils.PositiveOrNil(price), PriceIsYClose: isYClose, YClose: utils.PositiveOrNil(quote.YClose), Open: utils.PositiveOrNil(quote.Open),
+		High: utils.PositiveOrNil(quote.High), Low: utils.PositiveOrNil(quote.Low), Volume: quote.TurnOver, Amount: quote.Volume, NAV: quote.NAV,
 	}
-	if quote.Current > 0 && quote.YClose > 0 {
-		change := quote.Current - quote.YClose
-		pct := change / quote.YClose * 100
+	if change, pct, ok := quote.Change(); ok {
 		row.Change, row.ChangePct = &change, &pct
 	}
 	return row
@@ -379,16 +353,16 @@ func quoteJSON(cmd *cobra.Command, keys []string) error {
 		return fmt.Errorf("一次最多查询 %d 只证券，当前 %d 只", maxQuoteKeys, len(keys))
 	}
 	ctx := cmd.Context()
+	// 并发搜索，按输入顺序报第一个问题。搜到同一只证券的关键字各输出一行，不去重。
 	secs := make([]*sina.BasicSecurity, 0, len(keys))
-	for _, key := range keys {
-		found, err := sina.Resolve(ctx, key)
-		if err != nil {
-			return fmt.Errorf("搜索证券失败: %w", err)
+	for _, result := range sina.ResolveAll(ctx, keys) {
+		if result.Err != nil {
+			return fmt.Errorf("搜索证券失败: %w", result.Err)
 		}
-		if len(found) == 0 {
-			return fmt.Errorf("未找到证券: %s", key)
+		if result.NotFound() {
+			return fmt.Errorf("未找到证券: %s", result.Key)
 		}
-		secs = append(secs, found[0])
+		secs = append(secs, result.Security)
 	}
 	quotes, err := queryQuotes(ctx, secs)
 	if err != nil {
@@ -418,11 +392,10 @@ func currentText(quote *sina.SecurityQuote) (string, float64) {
 	if isYClose {
 		return fmt.Sprintf("%-.5g（昨收，当前无成交价）", price), 0
 	}
-	if quote.YClose <= 0 {
+	diffPrice, rate, ok := quote.Change()
+	if !ok {
 		return fmt.Sprintf("%-.5g", price), 0
 	}
-	diffPrice := price - quote.YClose
-	rate := diffPrice / quote.YClose * 100.0
 	return fmt.Sprintf("%-.5g %-.5g %-.2g%s", price, diffPrice, rate, "%"), rate
 }
 

@@ -132,6 +132,57 @@ func Resolve(ctx context.Context, key string) ([]*BasicSecurity, error) {
 	return []*BasicSecurity{sec}, nil
 }
 
+// ResolvedKey 是 ResolveAll 里一个关键字的结果。
+type ResolvedKey struct {
+	Key string
+	// Security 是搜到的第一个结果，没搜到或搜索失败时为 nil。
+	Security *BasicSecurity
+	// Err 是搜索接口的错误，这时 Security 为 nil，可以稍后重试。
+	Err error
+	// DuplicateOf 不为空时，这个关键字和前面的 DuplicateOf 搜到同一只证券，调用方应只保留前面那个。
+	DuplicateOf string
+}
+
+// NotFound 表示搜索成功但没有结果。
+func (r ResolvedKey) NotFound() bool { return r.Err == nil && r.Security == nil }
+
+// ResolveAll 对每个关键字并发调用 Resolve，结果和 keys 一一对应、顺序相同，并按证券代码（不区分大小写）标出重复。
+// ctx 被取消时仍返回全部结果，没完成的关键字 Err 是 ctx 的错误，调用方用 ctx.Err() 判断。
+func ResolveAll(ctx context.Context, keys []string) []ResolvedKey {
+	results := make([]ResolvedKey, len(keys))
+	var wg sync.WaitGroup
+	for i, key := range keys {
+		// 先填 Key，即使以后改成提前返回，没完成的条目也知道是哪个关键字。
+		results[i].Key = key
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			secs, err := Resolve(ctx, key)
+			switch {
+			case err != nil:
+				results[i].Err = err
+			case len(secs) > 0:
+				results[i].Security = secs[0]
+			}
+		}()
+	}
+	wg.Wait()
+
+	first := map[string]string{} // 证券代码 -> 第一个搜到它的关键字
+	for i, result := range results {
+		if result.Security == nil {
+			continue
+		}
+		code := strings.ToUpper(result.Security.ExCode)
+		if key, ok := first[code]; ok {
+			results[i].DuplicateOf = key
+			continue
+		}
+		first[code] = result.Key
+	}
+	return results
+}
+
 // securityFromCode 把完整代码转成和搜索结果一样的格式，不是完整代码时返回 nil。
 func securityFromCode(key string) *BasicSecurity {
 	m := fullCode.FindStringSubmatch(key)

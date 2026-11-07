@@ -119,11 +119,7 @@ func runWatchShow(cmd *cobra.Command, args []string) error {
 			// 开盘前当前价是 0，显示昨收，不计算涨跌。
 			r.price, r.priceIsYClose = q.EffectivePrice()
 			r.digits = priceDigits(q)
-			if q.Current > 0 && q.YClose > 0 {
-				r.hasChange = true
-				r.chg = q.Current - q.YClose
-				r.chgPct = r.chg / q.YClose * 100
-			}
+			r.chg, r.chgPct, r.hasChange = q.Change()
 			r.high = q.High
 			r.low = q.Low
 			r.vol = q.Volume
@@ -157,18 +153,12 @@ type watchJSONRow struct {
 }
 
 func newWatchJSONRow(r quoteRow) watchJSONRow {
-	row := watchJSONRow{ExCode: r.item.ExCode, Name: r.item.Name, PriceIsYClose: r.priceIsYClose}
-	if r.price > 0 {
-		row.Price = &r.price
+	row := watchJSONRow{
+		ExCode: r.item.ExCode, Name: r.item.Name, PriceIsYClose: r.priceIsYClose,
+		Price: utils.PositiveOrNil(r.price), High: utils.PositiveOrNil(r.high), Low: utils.PositiveOrNil(r.low),
 	}
 	if r.hasChange {
 		row.Change, row.ChangePct = &r.chg, &r.chgPct
-	}
-	if r.high > 0 {
-		row.High = &r.high
-	}
-	if r.low > 0 {
-		row.Low = &r.low
 	}
 	return row
 }

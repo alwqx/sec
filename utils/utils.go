@@ -161,6 +161,14 @@ func CheckStatus(resp *http.Response) error {
 	return fmt.Errorf("%s 返回 HTTP %d", host, resp.StatusCode)
 }
 
+// PositiveOrNil 返回 value 的指针，value 不大于 0 时返回 nil。上游用 0 表示缺失的价格、指标，JSON 输出里应为 null。
+func PositiveOrNil(value float64) *float64 {
+	if value <= 0 {
+		return nil
+	}
+	return &value
+}
+
 // PrintJSON 把数据按缩进格式写到 out，供命令的 --json 输出使用。
 func PrintJSON(out io.Writer, data any) error {
 	encoder := json.NewEncoder(out)

@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"math"
 	"strings"
-	"sync"
 
 	"github.com/alwqx/sec/provider/sina"
+	"github.com/alwqx/sec/utils"
 )
 
 // maxQuoteCodes 和 sec quote 一样，一次最多查 5 只。
@@ -172,42 +172,19 @@ type resolvedCodes struct {
 
 // resolveCodes 并发搜索，结果保持输入顺序，搜到同一只证券的输入只保留第一个，并说明合并了哪些。
 func resolveCodes(ctx context.Context, codes []string) resolvedCodes {
-	type found struct {
-		secs []*sina.BasicSecurity
-		err  error
-	}
-	results := make([]found, len(codes))
-	var wg sync.WaitGroup
-	for i, code := range codes {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			secs, err := sina.Resolve(ctx, code)
-			results[i] = found{secs, err}
-		}()
-	}
-	wg.Wait()
-
 	out := resolvedCodes{secs: []*sina.BasicSecurity{}, missing: []missingItem{}}
-	firstInput := map[string]string{} // 证券代码 -> 第一个搜到它的输入
-	for i, result := range results {
-		if result.err != nil {
-			out.missing = append(out.missing, missingItem{codes[i], fmt.Sprintf("搜索失败：%v", result.err)})
+	for _, result := range sina.ResolveAll(ctx, codes) {
+		switch {
+		case result.Err != nil:
+			out.missing = append(out.missing, missingItem{result.Key, fmt.Sprintf("搜索失败：%v", result.Err)})
 			out.searchFailed = true
-			continue
+		case result.NotFound():
+			out.missing = append(out.missing, missingItem{result.Key, "未找到证券"})
+		case result.DuplicateOf != "":
+			out.merged = append(out.merged, fmt.Sprintf("%s 和 %s 是同一只证券（%s），已合并为一条", result.Key, result.DuplicateOf, result.Security.ExCode))
+		default:
+			out.secs = append(out.secs, result.Security)
 		}
-		if len(result.secs) == 0 {
-			out.missing = append(out.missing, missingItem{codes[i], "未找到证券"})
-			continue
-		}
-		sec := result.secs[0]
-		key := strings.ToUpper(sec.ExCode)
-		if first, ok := firstInput[key]; ok {
-			out.merged = append(out.merged, fmt.Sprintf("%s 和 %s 是同一只证券（%s），已合并为一条", codes[i], first, sec.ExCode))
-			continue
-		}
-		firstInput[key] = codes[i]
-		out.secs = append(out.secs, sec)
 	}
 	return out
 }
@@ -220,17 +197,15 @@ func newQuoteItem(sec *sina.BasicSecurity, quote *sina.SecurityQuote) quoteItem 
 	}
 	item := quoteItem{
 		ExCode: sec.ExCode, Name: name, TradeDate: quote.TradeDate, Time: quote.Time, Timezone: quote.Timezone,
-		Price: positive(price), PriceIsYClose: isYClose, YClose: positive(quote.YClose), Open: positive(quote.Open),
-		High: positive(quote.High), Low: positive(quote.Low), NAV: quote.NAV,
+		Price: utils.PositiveOrNil(price), PriceIsYClose: isYClose, YClose: utils.PositiveOrNil(quote.YClose), Open: utils.PositiveOrNil(quote.Open),
+		High: utils.PositiveOrNil(quote.High), Low: utils.PositiveOrNil(quote.Low), NAV: quote.NAV,
 	}
 	if !quote.NAV {
 		volume, amount := quote.TurnOver, quote.Volume
 		item.Volume, item.Amount = &volume, &amount
 	}
-	if quote.Current > 0 && quote.YClose > 0 {
-		change := quote.Current - quote.YClose
-		pct := round(change/quote.YClose*100, 2)
-		change = round(change, 4)
+	if change, pct, ok := quote.Change(); ok {
+		change, pct = round(change, 4), round(pct, 2)
 		item.Change, item.ChangePct = &change, &pct
 	}
 	return item
@@ -262,11 +237,4 @@ func missingText(missing []missingItem) string {
 func round(value float64, digits int) float64 {
 	scale := math.Pow(10, float64(digits))
 	return math.Round(value*scale) / scale
-}
-
-func positive(value float64) *float64 {
-	if value <= 0 {
-		return nil
-	}
-	return &value
 }

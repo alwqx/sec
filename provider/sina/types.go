@@ -86,6 +86,15 @@ func (q *SecurityQuote) EffectivePrice() (float64, bool) {
 	return 0, false
 }
 
+// Change 返回相对昨收的涨跌和涨跌幅（单位 %）。没有成交价（如开盘前）或没有昨收时 ok 为 false，不计算涨跌。
+func (q *SecurityQuote) Change() (change, pct float64, ok bool) {
+	if q.Current <= 0 || q.YClose <= 0 {
+		return 0, 0, false
+	}
+	change = q.Current - q.YClose
+	return change, change / q.YClose * 100, true
+}
+
 // 分红送转信息
 type Dividend struct {
 	PublicDate     string  `json:"public_date"`     // 公告日期

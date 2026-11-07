@@ -301,3 +301,41 @@ func TestResolveFallsBackToCode(t *testing.T) {
 	require.Equal(t, "贵州茅台", secs[0].Name)
 	require.True(t, gock.IsDone())
 }
+
+func TestResolveAll(t *testing.T) {
+	defer gock.Off()
+	cmb := `var suggestvalue="招商银行,11,600036,sh600036,招商银行,,招商银行,99,1,ESG,,";`
+	gock.New("https://suggest3.sinajs.cn").Get("/suggest/.*key=600036$").Reply(200).BodyString(cmb)
+	gock.New("https://suggest3.sinajs.cn").Get("/suggest/.*key=cmb$").Reply(200).BodyString(cmb)
+	gock.New("https://suggest3.sinajs.cn").Get("/suggest/.*key=zsyh$").Reply(200).BodyString(cmb)
+	gock.New("https://suggest3.sinajs.cn").Get("/suggest/.*key=nosuch$").Reply(200).BodyString(`var suggestvalue="";`)
+	gock.New("https://suggest3.sinajs.cn").Get("/suggest/.*key=broken$").Persist().Reply(500)
+
+	results := ResolveAll(context.Background(), []string{"nosuch", "600036", "broken", "cmb", "zsyh"})
+	require.Len(t, results, 5)
+	keys := []string{}
+	for _, result := range results {
+		keys = append(keys, result.Key)
+	}
+	require.Equal(t, []string{"nosuch", "600036", "broken", "cmb", "zsyh"}, keys, "保持输入顺序")
+
+	require.True(t, results[0].NotFound())
+	require.Equal(t, "SH600036", results[1].Security.ExCode)
+	require.Empty(t, results[1].DuplicateOf)
+	require.Error(t, results[2].Err)
+	require.False(t, results[2].NotFound(), "搜索失败不是没找到")
+	// 重复的都指向第一个搜到的关键字，Security 仍然给出，便于说明合并了哪只。
+	require.Equal(t, "600036", results[3].DuplicateOf)
+	require.Equal(t, "600036", results[4].DuplicateOf)
+	require.Equal(t, "SH600036", results[4].Security.ExCode)
+	require.False(t, results[3].NotFound())
+}
+
+func TestResolveAllCanceled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	results := ResolveAll(ctx, []string{"600036"})
+	require.Len(t, results, 1)
+	require.Equal(t, "600036", results[0].Key)
+	require.Error(t, results[0].Err)
+}
