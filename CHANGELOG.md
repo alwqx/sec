@@ -17,6 +17,7 @@
 13. Add a TODO item for proportional price adjustment, since East Money's forward adjustment distorts percentages over long ranges.
 14. Add the `get_financials` tool to `sec mcp`.
 15. Move the 10-minute SEC company facts cache from Desktop to `provider/edgar` and use it in `sec mcp`.
+16. Move the valuation candidate selection (`000001` is both an index and a stock) from `sec valuation` to the `valuation` package.
 
 ### v0.4.7
 
