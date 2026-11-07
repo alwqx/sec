@@ -181,7 +181,7 @@ func resolveCodes(ctx context.Context, codes []string) resolvedCodes {
 		case result.NotFound():
 			out.missing = append(out.missing, missingItem{result.Key, "未找到证券"})
 		case result.DuplicateOf != "":
-			out.merged = append(out.merged, fmt.Sprintf("%s 和 %s 是同一只证券（%s），已合并为一条", result.Key, result.DuplicateOf, result.Security.ExCode))
+			out.merged = append(out.merged, result.DuplicateNote())
 		default:
 			out.secs = append(out.secs, result.Security)
 		}

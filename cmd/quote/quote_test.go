@@ -147,14 +147,15 @@ func TestSearchFailureIsAnError(t *testing.T) {
 func TestRetryProblems(t *testing.T) {
 	defer gock.Off()
 	gock.New("https://suggest3.sinajs.cn").Get("/suggest/").Reply(200).BodyString(`var suggestvalue="招商银行,11,600036,sh600036,招商银行,,招商银行,99,1,ESG,,";`)
-	secs, problems := retryProblems(context.Background(), nil, []keyProblem{{"600036", "搜索失败", true}, {"nosuch", "未找到证券", false}})
-	require.Len(t, secs, 1)
-	require.Equal(t, "SH600036", secs[0].ExCode)
-	require.Equal(t, []keyProblem{{"nosuch", "未找到证券", false}}, problems, "找不到的不再重试")
+	res := retryProblems(context.Background(), resolution{problems: []keyProblem{{"600036", "搜索失败", true}, {"nosuch", "未找到证券", false}}})
+	require.Len(t, res.secs, 1)
+	require.Equal(t, "SH600036", res.secs[0].ExCode)
+	require.Equal(t, []keyProblem{{"nosuch", "未找到证券", false}}, res.problems, "找不到的不再重试")
+	require.Empty(t, res.notes)
 
-	same, kept := retryProblems(context.Background(), secs, []keyProblem{{"nosuch", "未找到证券", false}})
-	require.Equal(t, secs, same)
-	require.Len(t, kept, 1)
+	same := retryProblems(context.Background(), resolution{secs: res.secs, problems: []keyProblem{{"nosuch", "未找到证券", false}}})
+	require.Equal(t, res.secs, same.secs)
+	require.Len(t, same.problems, 1)
 }
 
 func TestProblemText(t *testing.T) {
@@ -187,14 +188,16 @@ func TestResolveKeysKeepsOrderAndDedupes(t *testing.T) {
 	suggestKey("cmb").Reply(200).BodyString(cmbSuggest)
 	suggestKey("nosuch").Reply(200).BodyString(`var suggestvalue="";`)
 	suggestKey("broken").Reply(500)
-	secs, problems := resolveKeys(context.Background(), []string{"nosuch", "600036", "broken", "cmb"})
-	require.Len(t, secs, 1, "搜到同一只证券的关键字只保留一个")
-	require.Equal(t, "SH600036", secs[0].ExCode)
-	require.Len(t, problems, 2)
-	require.Equal(t, "nosuch", problems[0].key, "保持输入顺序")
-	require.False(t, problems[0].retry)
-	require.Equal(t, "broken", problems[1].key)
-	require.True(t, problems[1].retry)
+	res := resolveKeys(context.Background(), []string{"nosuch", "600036", "broken", "cmb"})
+	require.Len(t, res.secs, 1, "搜到同一只证券的关键字只保留一个")
+	require.Equal(t, "SH600036", res.secs[0].ExCode)
+	require.Equal(t, []string{"cmb 和 600036 是同一只证券（SH600036），已合并为一条"}, res.notes)
+	require.Equal(t, "600036", res.firstKey["SH600036"])
+	require.Len(t, res.problems, 2)
+	require.Equal(t, "nosuch", res.problems[0].key, "保持输入顺序")
+	require.False(t, res.problems[0].retry)
+	require.Equal(t, "broken", res.problems[1].key)
+	require.True(t, res.problems[1].retry)
 }
 
 func TestQuoteFailureKeepsSearchProblems(t *testing.T) {
@@ -281,9 +284,10 @@ func TestTooManyKeysIsAnError(t *testing.T) {
 func TestRetryKeepsOrderAndDedupesCase(t *testing.T) {
 	defer gock.Off()
 	suggestKey("broken").Reply(200).BodyString(`var suggestvalue="招商银行,11,600036,sh600036,招商银行,,招商银行,99,1,ESG,,";`)
-	existing := []*sina.BasicSecurity{{ExCode: "sh600036"}}
-	secs, _ := retryProblems(context.Background(), existing, []keyProblem{{"broken", "搜索失败", true}})
-	require.Len(t, secs, 1, "大小写不同也是同一只证券")
+	existing := resolution{secs: []*sina.BasicSecurity{{ExCode: "sh600036"}}, firstKey: map[string]string{"SH600036": "600036"}, problems: []keyProblem{{"broken", "搜索失败", true}}}
+	res := retryProblems(context.Background(), existing)
+	require.Len(t, res.secs, 1, "大小写不同也是同一只证券")
+	require.Equal(t, []string{"broken 和 600036 是同一只证券（SH600036），已合并为一条"}, res.notes, "重试搜到已有证券时也说明合并")
 
 	ordered := inKeyOrder([]keyProblem{{"nosuch", "", false}, {"broken", "", true}}, []string{"broken", "nosuch"})
 	require.Equal(t, "broken", ordered[0].key)
@@ -316,4 +320,32 @@ func TestQuoteRowNAV(t *testing.T) {
 	printQuote(&out, []*sina.SecurityQuote{quote})
 	require.Contains(t, out.String(), "2026-11-05 净值")
 	require.NotContains(t, out.String(), "| 0 ", "没有的开高低不显示成 0")
+}
+
+// 表格模式在表格下方说明合并了哪些关键字，合并不算失败。
+func TestQuoteMergeNote(t *testing.T) {
+	defer gock.Off()
+	suggestKey("600036").Reply(200).BodyString(cmbSuggest)
+	suggestKey("cmb").Reply(200).BodyString(cmbSuggest)
+	gock.New("https://hq.sinajs.cn").Get("/list=sh600036").Reply(200).BodyString(cmbLine)
+	var out bytes.Buffer
+	require.NoError(t, quoteMultiSec(context.Background(), &out, []string{"600036", "cmb"}))
+	require.Equal(t, 1, strings.Count(out.String(), "SH600036  "), "只有一行")
+	require.Contains(t, out.String(), "cmb 和 600036 是同一只证券（SH600036），已合并为一条")
+}
+
+// 实时模式每次刷新都在表格下方保留合并说明。
+func TestRealtimeMergeNote(t *testing.T) {
+	defer gock.Off()
+	fastRefresh(t)
+	suggestKey("600036").Reply(200).BodyString(cmbSuggest)
+	suggestKey("cmb").Reply(200).BodyString(cmbSuggest)
+	gock.New("https://hq.sinajs.cn").Get("/list=sh600036").Persist().Reply(200).BodyString(cmbLine)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
+	defer cancel()
+	var out bytes.Buffer
+	require.NoError(t, quoteMultiSecRealtime(ctx, &out, []string{"600036", "cmb"}))
+	refreshes := strings.Count(out.String(), "招商银行")
+	require.GreaterOrEqual(t, refreshes, 2)
+	require.Equal(t, refreshes, strings.Count(out.String(), "cmb 和 600036 是同一只证券"), "每次刷新都显示")
 }

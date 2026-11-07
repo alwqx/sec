@@ -95,26 +95,44 @@ type keyProblem struct {
 	retry       bool
 }
 
-// resolveKeys 并发搜索关键字，结果保持输入顺序，搜到同一只证券的关键字只保留一个。
+// resolution 是搜索的结果：要查行情的证券、没搜到的关键字，以及重复关键字的合并说明。
+type resolution struct {
+	secs     []*sina.BasicSecurity
+	problems []keyProblem
+	notes    []string
+	// firstKey 记录每只证券（大写代码）是哪个关键字最先搜到的，重试搜到同一只时用来说明合并。
+	firstKey map[string]string
+}
+
+// resolveKeys 并发搜索关键字，结果保持输入顺序，搜到同一只证券的关键字只保留一个，并说明合并了哪些。
 // 找不到或搜索失败的关键字单独返回，不影响其他证券。
-func resolveKeys(ctx context.Context, keys []string) ([]*sina.BasicSecurity, []keyProblem) {
+func resolveKeys(ctx context.Context, keys []string) resolution {
 	results := sina.ResolveAll(ctx, keys)
-	secs := []*sina.BasicSecurity{}
-	problems := []keyProblem{}
+	res := resolution{secs: []*sina.BasicSecurity{}, problems: []keyProblem{}, firstKey: map[string]string{}}
 	if ctx.Err() != nil {
-		return secs, problems
+		return res
 	}
 	for _, result := range results {
 		switch {
 		case result.Err != nil:
-			problems = append(problems, keyProblem{result.Key, fmt.Sprintf("搜索失败（%v）", result.Err), true})
+			res.problems = append(res.problems, keyProblem{result.Key, fmt.Sprintf("搜索失败（%v）", result.Err), true})
 		case result.NotFound():
-			problems = append(problems, keyProblem{result.Key, "未找到证券", false})
-		case result.DuplicateOf == "":
-			secs = append(secs, result.Security)
+			res.problems = append(res.problems, keyProblem{result.Key, "未找到证券", false})
+		case result.DuplicateOf != "":
+			res.notes = append(res.notes, result.DuplicateNote())
+		default:
+			res.secs = append(res.secs, result.Security)
+			res.firstKey[strings.ToUpper(result.Security.ExCode)] = result.Key
 		}
 	}
-	return secs, problems
+	return res
+}
+
+// printNotes 在表格下方列出合并说明。合并不是错误，不影响退出码。
+func printNotes(out io.Writer, notes []string) {
+	if len(notes) > 0 {
+		fmt.Fprintf(out, "\n%s\n", strings.Join(notes, "\n"))
+	}
 }
 
 // missingQuotes 返回搜到了但行情里没有的证券，比如停牌或已退市。
@@ -155,8 +173,8 @@ func limitKeys(keys []string) ([]string, []keyProblem) {
 // quoteMultiSec 显示查到的证券；有关键字找不到、搜索失败或行情获取失败时，在表格后一并报错并以非 0 退出。
 func quoteMultiSec(ctx context.Context, out io.Writer, keys []string) error {
 	keys, skipped := limitKeys(keys)
-	secs, problems := resolveKeys(ctx, keys)
-	problems = append(problems, skipped...)
+	res := resolveKeys(ctx, keys)
+	secs, problems := res.secs, append(res.problems, skipped...)
 	// 按 Ctrl-C 取消不是失败。
 	if ctx.Err() != nil {
 		return nil
@@ -175,6 +193,7 @@ func quoteMultiSec(ctx context.Context, out io.Writer, keys []string) error {
 			return err
 		}
 		printQuote(out, quotes)
+		printNotes(out, res.notes)
 		problems = append(problems, missingQuotes(secs, quotes)...)
 	}
 	if len(problems) > 0 {
@@ -196,21 +215,22 @@ var (
 // 搜索失败的关键字定期重试，行情接口失败时保留上一次的行情，下一轮再试。
 func quoteMultiSecRealtime(ctx context.Context, out io.Writer, keys []string) error {
 	keys, skipped := limitKeys(keys)
-	secs, problems := resolveKeys(ctx, keys)
-	slog.DebugContext(ctx, "quoteMultiSecRealtime", "secs", secs)
+	res := resolveKeys(ctx, keys)
+	slog.DebugContext(ctx, "quoteMultiSecRealtime", "secs", res.secs)
 	var quotes []*sina.SecurityQuote
 	for round := 0; ; round++ {
 		if ctx.Err() != nil {
 			return nil
 		}
 		if round > 0 && round%realtimeRetryEvery == 0 {
-			secs, problems = retryProblems(ctx, secs, problems)
+			res = retryProblems(ctx, res)
 			// 重试时按了 Ctrl-C，搜索结果不完整，不能当成没有可显示的证券。
 			if ctx.Err() != nil {
 				return nil
 			}
-			problems = inKeyOrder(problems, keys)
+			res.problems = inKeyOrder(res.problems, keys)
 		}
+		secs, problems := res.secs, res.problems
 		retrying := false
 		for _, problem := range problems {
 			retrying = retrying || problem.retry
@@ -232,6 +252,7 @@ func quoteMultiSecRealtime(ctx context.Context, out io.Writer, keys []string) er
 		}
 		clearScreen()
 		printQuote(out, quotes)
+		printNotes(out, res.notes)
 		shown := append(append([]keyProblem{}, problems...), skipped...)
 		if quoteErr == nil {
 			shown = append(shown, missingQuotes(secs, quotes)...)
@@ -255,11 +276,11 @@ func quoteMultiSecRealtime(ctx context.Context, out io.Writer, keys []string) er
 	}
 }
 
-// retryProblems 重新搜索失败的关键字，搜到的加入证券列表。找不到的关键字不再重试。
-func retryProblems(ctx context.Context, secs []*sina.BasicSecurity, problems []keyProblem) ([]*sina.BasicSecurity, []keyProblem) {
+// retryProblems 重新搜索失败的关键字，搜到的加入证券列表；和已有证券重复的合并，并加上说明。找不到的关键字不再重试。
+func retryProblems(ctx context.Context, res resolution) resolution {
 	retry := []string{}
 	kept := []keyProblem{}
-	for _, problem := range problems {
+	for _, problem := range res.problems {
 		if problem.retry {
 			retry = append(retry, problem.key)
 		} else {
@@ -267,20 +288,33 @@ func retryProblems(ctx context.Context, secs []*sina.BasicSecurity, problems []k
 		}
 	}
 	if len(retry) == 0 {
-		return secs, problems
+		return res
 	}
-	found, again := resolveKeys(ctx, retry)
+	again := resolveKeys(ctx, retry)
+	if res.firstKey == nil {
+		res.firstKey = map[string]string{}
+	}
 	have := map[string]bool{}
-	for _, sec := range secs {
+	for _, sec := range res.secs {
 		have[strings.ToUpper(sec.ExCode)] = true
 	}
-	for _, sec := range found {
-		if !have[strings.ToUpper(sec.ExCode)] {
-			have[strings.ToUpper(sec.ExCode)] = true
-			secs = append(secs, sec)
+	res.notes = append(res.notes, again.notes...)
+	for _, sec := range again.secs {
+		code := strings.ToUpper(sec.ExCode)
+		if have[code] {
+			first := res.firstKey[code]
+			if first == "" {
+				first = sec.ExCode
+			}
+			res.notes = append(res.notes, sina.MergeNote(again.firstKey[code], first, sec.ExCode))
+			continue
 		}
+		have[code] = true
+		res.firstKey[code] = again.firstKey[code]
+		res.secs = append(res.secs, sec)
 	}
-	return secs, append(kept, again...)
+	res.problems = append(kept, again.problems...)
+	return res
 }
 
 // inKeyOrder 按关键字的输入顺序排列问题，重试后列表顺序不变，刷新时不跳动。
@@ -354,14 +388,19 @@ func quoteJSON(cmd *cobra.Command, keys []string) error {
 		return fmt.Errorf("一次最多查询 %d 只证券，当前 %d 只", maxQuoteKeys, len(keys))
 	}
 	ctx := cmd.Context()
-	// 并发搜索，按输入顺序报第一个问题。搜到同一只证券的关键字各输出一行，不去重。
+	// 并发搜索，按输入顺序报第一个问题。搜到同一只证券的关键字合并为一行，说明放在 notes 里。
 	secs := make([]*sina.BasicSecurity, 0, len(keys))
+	notes := []string{}
 	for _, result := range sina.ResolveAll(ctx, keys) {
 		if result.Err != nil {
 			return fmt.Errorf("搜索证券失败: %w", result.Err)
 		}
 		if result.NotFound() {
 			return fmt.Errorf("未找到证券: %s", result.Key)
+		}
+		if result.DuplicateOf != "" {
+			notes = append(notes, result.DuplicateNote())
+			continue
 		}
 		secs = append(secs, result.Security)
 	}
@@ -381,7 +420,7 @@ func quoteJSON(cmd *cobra.Command, keys []string) error {
 		}
 		rows = append(rows, newQuoteRow(quote))
 	}
-	return utils.PrintJSON(cmd.OutOrStdout(), map[string]any{"results": rows})
+	return utils.PrintJSON(cmd.OutOrStdout(), map[string]any{"results": rows, "notes": notes})
 }
 
 // currentText 返回当前价格和涨跌的文字及涨跌幅。没有成交价时显示昨收，不计算涨跌。
