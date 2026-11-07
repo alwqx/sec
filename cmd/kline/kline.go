@@ -67,22 +67,11 @@ func KLineHandler(cmd *cobra.Command, args []string) error {
 
 	sec := secs[0]
 	slog.Debug("KLineHandler", "excode", sec.ExCode, "code", sec.Code, "exchange", sec.ExChange)
-	req := &eastmoney.GetQuoteHistoryReq{
-		Code: sec.Code,
+	market, err := history.Market(sec)
+	if err != nil {
+		return err
 	}
-	switch sec.ExChange {
-	case "sh":
-		req.MarketCode = 1
-	case "sz":
-		req.MarketCode = 0
-	case types.ExChangeHKex:
-		req.MarketCode = 116
-	case types.ExChangeNasdaq, types.ExChangeNyse:
-		// 新浪搜索把美股都标成纳斯达克；纽交所的股票用 105 查不到时，history 包会换成 106、107 再查。
-		req.MarketCode = 105
-	default:
-		return fmt.Errorf("unsupported exchange: %s", sec.ExChange)
-	}
+	req := &eastmoney.GetQuoteHistoryReq{Code: sec.Code, MarketCode: market}
 
 	fqt, err := cmd.Flags().GetString("fq")
 	if err != nil {

@@ -12,6 +12,7 @@ import (
 
 	"github.com/alwqx/sec/provider/eastmoney"
 	"github.com/alwqx/sec/provider/sina"
+	"github.com/alwqx/sec/types"
 )
 
 // FallbackNote 说明备用数据和东方财富的差异。
@@ -68,6 +69,25 @@ func GetFrom(ctx context.Context, req *eastmoney.GetQuoteHistoryReq, required st
 		return nil, fmt.Errorf("东方财富: %w；新浪备用: %w", err, fallbackErr)
 	}
 	return &Result{Quotes: quotes, Note: FallbackNote}, nil
+}
+
+// ErrUnsupportedMarket 表示东方财富 K 线不支持这只证券所在的市场，如北交所和场外基金。
+var ErrUnsupportedMarket = errors.New("不支持的交易所")
+
+// Market 返回搜索结果对应的东方财富市场代码，用作 GetQuoteHistoryReq.MarketCode。
+// 新浪搜索把美股都标成纳斯达克，这里一律返回 105，纽交所的股票由 Get 换成 106、107 再查。
+func Market(sec *sina.BasicSecurity) (int, error) {
+	switch sec.ExChange {
+	case "sh":
+		return int(eastmoney.MarketTypeSse), nil
+	case "sz":
+		return int(eastmoney.MarketTypeSzSe), nil
+	case types.ExChangeHKex:
+		return int(eastmoney.MarketTypeHK), nil
+	case types.ExChangeNasdaq, types.ExChangeNyse:
+		return int(eastmoney.MarketTypeNasdaq), nil
+	}
+	return 0, fmt.Errorf("%w: %s", ErrUnsupportedMarket, sec.ExChange)
 }
 
 // usMarkets 是东方财富的美股市场代码。新浪搜索把美股都标成纳斯达克，纽交所的股票用 105 查不到，依次换成 106、107。

@@ -12,6 +12,7 @@
 8. Shorten the v0.4.0–v0.4.6 CHANGELOG entries to one sentence each.
 9. Add the `search_security` tool to `sec mcp`.
 10. Add a TODO item to mark indexes in search results in the provider.
+11. Share the K-line market mapping between `sec kline` and `sec quote-history`.
 
 ### v0.4.7
 
