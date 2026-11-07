@@ -15,6 +15,7 @@
 11. Share the K-line market mapping between `sec kline` and `sec quote-history`.
 12. Add the `get_kline_summary` tool to `sec mcp`.
 13. Add a TODO item for proportional price adjustment, since East Money's forward adjustment distorts percentages over long ranges.
+14. Add the `get_financials` tool to `sec mcp`.
 
 ### v0.4.7
 
