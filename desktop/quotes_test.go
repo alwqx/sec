@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/alwqx/sec/provider/sina"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/h2non/gock.v1"
 )
@@ -26,14 +27,38 @@ func TestQuotes(t *testing.T) {
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 	var data struct {
 		Results []struct {
-			ExCode string `json:"ex_code"`
+			ExCode   string   `json:"ex_code"`
+			Volume   *float64 `json:"volume"`
+			TurnOver *int64   `json:"turnover"`
 		} `json:"results"`
 		Missing []string `json:"missing"`
 	}
 	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &data))
 	require.Len(t, data.Results, 2)
 	require.Equal(t, "SH600036", data.Results[0].ExCode)
+	require.Equal(t, 10200.0, *data.Results[0].Volume, "volume 是成交金额")
+	require.Equal(t, int64(1000), *data.Results[0].TurnOver, "turnover 是成交数量")
 	require.Empty(t, data.Missing)
+}
+
+// 基金净值没有成交，volume、turnover 输出 null；其他字段和 sina.SecurityQuote 一样。
+func TestDesktopQuoteJSON(t *testing.T) {
+	nav, err := json.Marshal(newDesktopQuote(&sina.SecurityQuote{ExCode: "OF005827", Current: 1.4, YClose: 1.39, NAV: true}))
+	require.NoError(t, err)
+	var got map[string]any
+	require.NoError(t, json.Unmarshal(nav, &got))
+	require.Nil(t, got["volume"])
+	require.Contains(t, got, "volume", "字段仍然存在，值是 null")
+	require.Nil(t, got["turnover"])
+	require.Equal(t, "OF005827", got["ex_code"])
+	require.Equal(t, 1.4, got["current"])
+	require.Equal(t, true, got["nav"])
+
+	traded, err := json.Marshal(newDesktopQuote(&sina.SecurityQuote{ExCode: "SH600036", TurnOver: 100, Volume: 4100}))
+	require.NoError(t, err)
+	require.Contains(t, string(traded), `"volume":4100`)
+	require.Contains(t, string(traded), `"turnover":100`)
+	require.Equal(t, 1, strings.Count(string(traded), `"volume"`), "外层字段覆盖内嵌字段，不重复输出")
 }
 
 const sinaUSLine = `var hq_str_gb_amd="AMD,144.5500,4.44,2025-07-10 22:55:35,6.1400,143.0000,145.8200,141.8500,187.1100,76.4800,32285637,47105949,234373976387,1.37,105.510000,0.00,0.00,0.00,0.00,1621404195,73,0.0000,0.00,0.00,,Jul 10 10:55AM EDT,138.4100,0,1,2025,4641781226.0000,0.0000,0.0000,0.0000,0.0000,138.4100";`

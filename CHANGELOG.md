@@ -8,6 +8,7 @@
 4. Share security search and quote change code between `sec quote`, `sec watch` and `sec mcp`.
 5. Report no trading for fund NAV quotes. **JSON change:** `sec quote --json` `volume` and `amount` are now `null` instead of 0 when `nav` is `true`.
 6. Merge `sec quote` keys that find the same security into one row, with a note. **JSON change:** `--json` returns one row for them instead of one each, and adds `notes`.
+7. Return null volume and turnover for fund NAV quotes in the Desktop API. **JSON change:** `/api/v1/quote` and `/api/v1/quotes` return `null` instead of 0 when `nav` is `true`.
 
 ### v0.4.7
 
