@@ -90,6 +90,9 @@ type financialsData struct {
 	Periods     []financialPeriod `json:"periods"`      // 从新到旧
 }
 
+// secFacts 缓存 SEC XBRL 数据：sec mcp 是长期运行的进程，模型常常先查年度再查季度，不用每次重新下载几 MB。
+var secFacts = &edgar.FactsCache{}
+
 // loadSECFacts 读取美股的 SEC XBRL 数据，测试时替换。
 var loadSECFacts = func(ctx context.Context, ticker string) (edgar.Company, *edgar.Facts, error) {
 	// 读取失败时 Load 返回默认配置。MCP 由 agent 启动，环境不一定完整（比如没有 HOME），用默认邮箱继续，不让配置挡住查询。
@@ -102,7 +105,7 @@ var loadSECFacts = func(ctx context.Context, ticker string) (edgar.Company, *edg
 	if err != nil {
 		return company, nil, err
 	}
-	facts, err := client.CompanyFacts(ctx, company.CIK)
+	facts, err := secFacts.Facts(ctx, client, company.CIK)
 	return company, facts, err
 }
 

@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/alwqx/sec/financials"
@@ -47,58 +46,12 @@ func (s *desktopServer) handleUSCompany(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
-// usFactsCache 按 CIK 缓存 XBRL 数据 10 分钟，切换报表和年度、季度时不用重新下载（大公司有几 MB）。
-var usFactsCache = struct {
-	sync.Mutex
-	entries map[int]usFactsEntry
-}{entries: map[int]usFactsEntry{}}
+// usFactsCache 缓存 XBRL 数据（见 edgar.FactsCache），财报、分红和估值栏目共用。
+var usFactsCache = &edgar.FactsCache{}
 
-type usFactsEntry struct {
-	at    time.Time
-	facts *edgar.Facts
-}
-
-const (
-	usFactsTTL        = 10 * time.Minute
-	usFactsMaxEntries = 20
-)
-
-// cacheUSFacts 写入时清理过期条目，达到上限时移除最早写入的公司。调用方不持有锁。
-// cachedUSFacts 返回先查缓存、过期或没有时再下载的 XBRL 读取函数，财报和估值栏目共用。
+// cachedUSFacts 返回先查缓存、过期或没有时再下载的 XBRL 读取函数。
 func cachedUSFacts(client *edgar.Client) func(context.Context, int) (*edgar.Facts, error) {
-	return func(ctx context.Context, cik int) (*edgar.Facts, error) {
-		usFactsCache.Lock()
-		entry, ok := usFactsCache.entries[cik]
-		usFactsCache.Unlock()
-		if ok && time.Since(entry.at) < usFactsTTL {
-			return entry.facts, nil
-		}
-		facts, err := client.CompanyFacts(ctx, cik)
-		if err == nil {
-			cacheUSFacts(cik, facts, time.Now())
-		}
-		return facts, err
-	}
-}
-
-func cacheUSFacts(cik int, facts *edgar.Facts, now time.Time) {
-	usFactsCache.Lock()
-	defer usFactsCache.Unlock()
-	for key, entry := range usFactsCache.entries {
-		if now.Sub(entry.at) >= usFactsTTL {
-			delete(usFactsCache.entries, key)
-		}
-	}
-	usFactsCache.entries[cik] = usFactsEntry{now, facts}
-	for len(usFactsCache.entries) > usFactsMaxEntries {
-		oldest := cik
-		for key, entry := range usFactsCache.entries {
-			if entry.at.Before(usFactsCache.entries[oldest].at) {
-				oldest = key
-			}
-		}
-		delete(usFactsCache.entries, oldest)
-	}
+	return func(ctx context.Context, cik int) (*edgar.Facts, error) { return usFactsCache.Facts(ctx, client, cik) }
 }
 
 // usBadRequest 是美股接口的参数错误，返回 400。
