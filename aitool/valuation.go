@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/alwqx/sec/provider/edgar"
 	"github.com/alwqx/sec/provider/sina"
 	"github.com/alwqx/sec/valuation"
 )
@@ -159,9 +158,7 @@ var (
 	analyzeA  = valuation.Analyze
 	analyzeUS = func(ctx context.Context, exCode string, params valuation.DCFParams) (*valuation.Result, error) {
 		client := secClient(ctx)
-		return valuation.AnalyzeUS(ctx, client, exCode, params, func(ctx context.Context, cik int) (*edgar.Facts, error) {
-			return secFacts.Facts(ctx, client, cik)
-		})
+		return valuation.AnalyzeUS(ctx, client, exCode, params, secFacts.Loader(client))
 	}
 )
 
