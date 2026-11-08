@@ -544,7 +544,7 @@ func macroEventLabel(dataset *macrodata.Dataset, eventID string) string {
 			if e.TrancheCount > 1 {
 				label += fmt.Sprintf("，第 %d/%d 批", e.TrancheIndex, e.TrancheCount)
 			}
-			return truncateRunes(label, 50)
+			return utils.TruncateRunes(label, 50)
 		}
 	}
 	for _, e := range dataset.Events {
@@ -576,20 +576,12 @@ func compactNotes(prefix string, texts []string) []string {
 			omitted++
 			continue
 		}
-		out = append(out, prefix+truncateRunes(strings.ReplaceAll(text, "\n", " "), macroNoteLength))
+		out = append(out, prefix+utils.TruncateRunes(strings.ReplaceAll(text, "\n", " "), macroNoteLength))
 	}
 	if omitted > 0 {
 		out = append(out, fmt.Sprintf("%s另有 %d 条未列出", prefix, omitted))
 	}
 	return out
-}
-
-func truncateRunes(text string, n int) string {
-	runes := []rune(text)
-	if len(runes) <= n {
-		return text
-	}
-	return string(runes[:n]) + "…"
 }
 
 // macroHosts 把观测的来源链接换成机构名。

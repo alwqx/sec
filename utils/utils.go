@@ -211,6 +211,15 @@ func SecDir(sub ...string) (string, error) {
 	return dir, nil
 }
 
+// TruncateRunes 把 text 截到最多 n 个字符（按 Unicode 字符计，不切开多字节字符），截断时末尾加「…」。
+func TruncateRunes(text string, n int) string {
+	runes := []rune(text)
+	if len(runes) <= n {
+		return text
+	}
+	return string(runes[:n]) + "…"
+}
+
 // JSONify json 序列化
 func JSONify(data interface{}) string {
 	v, err := json.Marshal(data)
