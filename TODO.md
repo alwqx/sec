@@ -120,7 +120,7 @@
   - [x] `get_macro_series`：宏观指标的口径和最近 12 期观测。
 - [ ] 共用 AI 配置：CLI 和 Desktop 共用 `~/.sec/config.json` 的 `ai` 段，可以保存多个模型配置（`profiles`，按名字区分，各自有厂商 `provider`、接口协议 `api`、`base_url`、模型和 Key，协议和地址默认用厂商的官方设置），`default` 指定默认配置；`sec config ai list/add/edit/set-key/use/remove` 管理；Key 可以用环境变量，或用 AES-256-GCM 加密保存在 `config.json`，加密密钥单独存在 `~/.sec/secret.key`（`0600`）；`set-key` 隐藏输入或从 stdin 读取，不接受命令行参数。拆成以下几个 PR：
   - [x] `config` 包的 `ai` 段：结构、内置厂商列表、校验、旧文件兼容、增删改和设默认值，`sec config` 显示摘要且不显示 Key。
-  - [ ] Key 加密与读取：`secret.key`、AES-256-GCM（配置名作附加认证数据）、`enc:v1:` 格式、Key 读取顺序，显示时给出来源和末 4 位。
+  - [x] Key 加密与读取：`secret.key`、AES-256-GCM（配置名作附加认证数据）、`enc:v1:` 格式、Key 读取顺序，显示时给出来源和末 4 位。
   - [ ] `sec config ai list/add/edit/use/remove/enable/disable`。
   - [ ] `sec config ai set-key/unset-key`：终端里隐藏输入，管道时从 stdin 读一行。
   - [x] `ai` 段无效时的两处问题：`config.UpdateFile` 拒绝一切写入，Desktop 前端每次保存都带 `sec_edgar_email`，所以每一次保存（包括自选股）都报 500「请稍后重试」。改为不修改 `ai` 段时照常保存其他配置、`ai` 段按原样写回，只有修改 `ai` 段时才返回 `ErrInvalidAI`；`sec mcp` 的 `secClient` 读取配置出错时都记「使用默认 SEC 联系邮箱」，`ai` 段无效时实际用的是配置里的邮箱，日志应只说读取配置有问题并带上原因（`aitool/financials.go`）。

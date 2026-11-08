@@ -344,3 +344,124 @@ func (a AIConfig) Redacted() AIConfig {
 
 // RedactedKey 是显示时代替加密 Key 的文字。
 const RedactedKey = "（已加密保存）"
+
+// 读取 Key 的来源，顺序见 ResolveKey。
+const (
+	AIKeyFromEnv         = "env"          // api_key_env 指定的环境变量
+	AIKeyStored          = "stored"       // config.json 里加密保存的 Key
+	AIKeyFromProviderEnv = "provider_env" // 厂商默认的环境变量
+	AIKeyNone            = "none"         // 没有 Key，本地模型可以不填
+)
+
+// AIKey 是读到的 Key 和它的来源。
+type AIKey struct {
+	Value  string
+	Source string // AIKeyFromEnv 等
+	Env    string // 来源是环境变量时的变量名
+}
+
+// SetKey 加密保存一个配置的 Key，没有 secret.key 时先生成。Key 去掉首尾空白后不能为空，也不能含空白字符。
+// 保存的 Key 排在 api_key_env 之后，所以同时清空 api_key_env，否则保存的 Key 用不上；返回被清空的环境变量名，供命令提示。
+func (a *AIConfig) SetKey(secret *AISecret, name, key string) (string, error) {
+	p, ok := a.Profiles[name]
+	if !ok {
+		return "", fmt.Errorf("%w：%s", ErrAIProfileNotFound, name)
+	}
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return "", errors.New("Key 不能为空")
+	}
+	if strings.ContainsAny(key, " \t\r\n") {
+		return "", errors.New("Key 不能包含空白字符，请检查是否多粘贴了内容")
+	}
+	encrypted, err := secret.Encrypt(name, key)
+	if err != nil {
+		return "", err
+	}
+	clearedEnv := p.APIKeyEnv
+	p.APIKey, p.APIKeyEnv = encrypted, ""
+	a.Profiles[name] = p
+	return clearedEnv, nil
+}
+
+// UnsetKey 删除一个配置保存的 Key，返回原来有没有保存。
+func (a *AIConfig) UnsetKey(name string) (bool, error) {
+	p, ok := a.Profiles[name]
+	if !ok {
+		return false, fmt.Errorf("%w：%s", ErrAIProfileNotFound, name)
+	}
+	had := p.APIKey != ""
+	p.APIKey = ""
+	a.Profiles[name] = p
+	return had, nil
+}
+
+// ResolveKey 读取一个配置的 Key，顺序：
+//  1. api_key_env 非空时读这个环境变量，没有设置时报错，不往下找；
+//  2. 否则解密 api_key；
+//  3. 都没有时读厂商的默认环境变量（见 DefaultKeyEnv）。
+//
+// 都没有时返回 AIKeyNone，本地模型可以不用 Key，由调用方决定是否报错。getenv 一般传 os.Getenv。
+func (a *AIConfig) ResolveKey(secret *AISecret, name string, getenv func(string) string) (AIKey, error) {
+	p, ok := a.Profiles[name]
+	if !ok {
+		return AIKey{}, fmt.Errorf("%w：%s", ErrAIProfileNotFound, name)
+	}
+	if p.APIKeyEnv != "" {
+		if value := strings.TrimSpace(getenv(p.APIKeyEnv)); value != "" {
+			return AIKey{Value: value, Source: AIKeyFromEnv, Env: p.APIKeyEnv}, nil
+		}
+		return AIKey{}, fmt.Errorf("模型配置 %s 从环境变量 %s 读取 Key，但这个环境变量没有设置", name, p.APIKeyEnv)
+	}
+	if p.APIKey != "" {
+		value, err := secret.Decrypt(name, p.APIKey)
+		if err != nil {
+			return AIKey{}, fmt.Errorf("模型配置 %s：%w", name, err)
+		}
+		return AIKey{Value: value, Source: AIKeyStored}, nil
+	}
+	if env := p.DefaultKeyEnv(); env != "" {
+		if value := strings.TrimSpace(getenv(env)); value != "" {
+			return AIKey{Value: value, Source: AIKeyFromProviderEnv, Env: env}, nil
+		}
+	}
+	return AIKey{Source: AIKeyNone}, nil
+}
+
+// KeyStatus 是一个配置的 Key 的显示文字：来源和末 4 位，不显示 Key 本身。
+func (a *AIConfig) KeyStatus(secret *AISecret, name string, getenv func(string) string) string {
+	key, err := a.ResolveKey(secret, name, getenv)
+	switch {
+	// 只给简短状态，完整原因（含路径）在 ResolveKey 的错误里。
+	case errors.Is(err, ErrSecretMissing), errors.Is(err, ErrKeyUndecryptable):
+		return "加密保存，无法解密，请重新设置"
+	case errors.Is(err, ErrSecretPermissions):
+		return "加密保存，secret.key 权限过宽，请改为 600"
+	case errors.Is(err, ErrSecretCorrupt):
+		return "加密保存，secret.key 已损坏，请重新设置"
+	case err != nil && a.Profiles[name].APIKeyEnv == "":
+		return "加密保存，读取 secret.key 失败"
+	case err != nil:
+		return err.Error()
+	}
+	switch key.Source {
+	case AIKeyFromEnv:
+		return "环境变量 " + key.Env + lastFour(key.Value)
+	case AIKeyStored:
+		return "加密保存" + lastFour(key.Value)
+	case AIKeyFromProviderEnv:
+		return "厂商环境变量 " + key.Env + lastFour(key.Value)
+	}
+	if a.Profiles[name].IsLocal() {
+		return "未设置（本机模型可以不填）"
+	}
+	return "未设置"
+}
+
+// lastFour 是 Key 的末 4 位；太短的 Key 不显示，避免露出大半；含非 ASCII 或不可打印字符时也不显示，避免切出乱码。
+func lastFour(key string) string {
+	if len(key) < 12 || strings.ContainsFunc(key, func(r rune) bool { return r < '!' || r > '~' }) {
+		return ""
+	}
+	return "（末 4 位 " + key[len(key)-4:] + "）"
+}
