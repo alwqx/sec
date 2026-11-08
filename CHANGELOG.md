@@ -5,6 +5,7 @@
 1. Add the `ai` section of `~/.sec/config.json` for model profiles shared by the CLI and Desktop.
 2. Save other settings while the `ai` section is invalid, keeping it as is, so Desktop saves no longer fail.
 3. Encrypt AI API keys with AES-256-GCM and a separate `~/.sec/secret.key`, and resolve keys from env vars or the stored key.
+4. Stop Desktop from writing back a stale SEC email over one changed with `sec config`.
 
 ### v0.4.8
 
