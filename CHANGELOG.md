@@ -12,6 +12,7 @@
 8. Add `sec config ai test` to check a model profile's connection and tool calling.
 9. Add a number check that flags AI answer numbers missing from tool results and advice wording.
 10. Add the cached valuation explainer in `llm`, shared by the CLI and Desktop.
+11. Mark the `llm` abstraction done in TODO.md, with the `--ai` flag tracked under the valuation explanation.
 
 ### v0.4.8
 
