@@ -82,6 +82,7 @@
 - [ ] 港股指数行情：搜索能找到恒生指数（`HKhsi`）等港股指数，但 `sec quote` 报 `invalid HK stock quote line`，行情接口和解析都不支持港股指数。
 - [ ] 搜索结果标出指数：`parseBasicSecurity` 把指数都当成 `stock`，`search_security` 只能在 `aitool/search.go` 的 `indexCode` 里按代码规则（`SH000`、`SZ399`、`BJ899` 开头、港股字母代码）判断。港股指数在新浪有单独的类型 33，可以直接用；A 股指数和股票同为 11，仍要按代码判断。把判断移到 provider，新增 `index` 类型（`types.SecurityType`），再删掉 `indexCode`。会改变 `sec search --json` 的 `security_type`，`watchlist/store.go` 目前只接受 `stock` 和 `fund`，要一起改。
 - [ ] 等比复权：东方财富的前复权（`fqt=1`）把分红金额直接从更早的价格里减去，不是按比例缩小，区间越长，早期价格越接近 0 甚至为负，百分比都会失真。例如招商银行（SH600036）2002 年起的前复权月线，第一根收盘价是 −13.24；2007 年高点到 2016 年的回撤按前复权算是 −99.26%，实际 2007—2008 年约 −70%。受影响的有 `get_kline_summary`（默认前复权，目前只在 `notes` 里提示）、`sec strategy` 回测（固定前复权，长区间收益率失真）、`sec kline -f qfq`、`sec quote-history -f qfq` 和 Desktop 的 `fq=qfq`。方案：用不复权价格和分红送转数据（`sina.QueryDividends`、`eastmoney.GetDividendPlans`）按除权除息日自己算等比复权因子；做不到时，百分比统计改用不复权价格并说明除权日的跳变。先核实后复权（`fqt=2`）是不是也按金额调整。美股拆股、港股的复权方式也要一起核实。
+- [ ] 巨潮证券列表没找到时重新下载：`cninfo.GetStockList` 把证券列表在 `~/.sec/cache/` 缓存 24 小时，刚上市的股票在缓存过期前查不到 orgId，`sec announce`、Desktop 公告栏目和 `list_filings` 都会报找不到（`list_filings` 目前只在报错里说明缓存）。缓存里没有这个代码时绕过缓存重新下载一次，并限制频率，避免查不存在的代码时反复下载。
 
 ## Desktop
 
@@ -114,7 +115,7 @@
   - [x] `get_kline_summary`：K 线区间统计和最近 20 根。
   - [x] `get_financials`：最近 5 年或 8 个季度的关键财务项及同比，A 股和美股统一结构。
   - [x] `get_valuation`：估值、历史分位、`assessment`、全部 `_note` 和 `disclaimer`。
-  - [ ] `list_filings`：巨潮公告和 SEC 申报列表。
+  - [x] `list_filings`：巨潮公告和 SEC 申报列表。
   - [ ] `get_macro_series`：宏观指标的口径和最近 12 期观测。
 - [ ] 共用 AI 配置：CLI 和 Desktop 共用 `~/.sec/config.json` 的 `ai` 段，可以保存多个模型配置（`providers`，按名字区分，各自有接口类型、`base_url`、模型和 Key），`default` 指定默认配置；`sec config ai list/add/edit/set-key/use/remove` 管理；Key 可以用环境变量，或用 AES-256-GCM 加密保存在 `config.json`，加密密钥单独存在 `~/.sec/secret.key`（`0600`）；`set-key` 隐藏输入或从 stdin 读取，不接受命令行参数。
 - [ ] `llm/` 模型接入抽象：支持 Anthropic 和 OpenAI 兼容接口（覆盖 DeepSeek、通义、本地 Ollama），含回答数字核对、`sec config ai test` 测试连接和各命令的 `--ai <配置名>` 参数；CLI 和 Desktop 共用。
