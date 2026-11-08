@@ -9,6 +9,7 @@
 5. Add `sec config ai list/add/edit/use/remove/enable/disable` to manage AI model profiles.
 6. Add `sec config ai set-key/unset-key` to store AI API keys encrypted.
 7. Add the `llm` package with Anthropic and OpenAI-compatible model clients.
+8. Add `sec config ai test` to check a model profile's connection and tool calling.
 
 ### v0.4.8
 
