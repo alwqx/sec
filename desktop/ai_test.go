@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -208,4 +209,82 @@ func TestAIProfileChangesRefused(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, bad, string(data), "文件没有被改写")
 	}
+}
+
+func TestAIKey(t *testing.T) {
+	t.Setenv("DEEPSEEK_API_KEY", "")
+	t.Setenv("MY_DS_KEY", "")
+	dir := t.TempDir()
+	srv := &desktopServer{dev: true, workspace: workspaceStore{path: filepath.Join(dir, "workspace.json")}}
+	code, _, _ := aiChange(t, srv, http.MethodPost, "/api/v1/ai/profiles", `{"name":"ds","provider":"deepseek","model":"m","api_key_env":"MY_DS_KEY"}`)
+	require.Equal(t, http.StatusOK, code)
+
+	const key = "sk-desktop-abcdef123456"
+	code, got, body := aiChange(t, srv, http.MethodPut, "/api/v1/ai/profiles/ds/key", `{"key":"  `+key+`\n"}`)
+	require.Equal(t, http.StatusOK, code, body)
+	require.NotContains(t, body, key, "Key 不出现在返回里")
+	require.NotContains(t, body, "enc:v1:")
+	require.Equal(t, "加密保存（末 4 位 3456）", got.Profiles[0].Key, "去掉首尾空白")
+	require.True(t, got.Profiles[0].KeyStored)
+	require.Empty(t, got.Profiles[0].APIKeyEnv, "保存的 Key 排在环境变量之后，所以清空环境变量")
+	require.Contains(t, got.Notice, "MY_DS_KEY")
+	require.Contains(t, got.Notice, "已生成加密密钥")
+	require.FileExists(t, filepath.Join(dir, "secret.key"), "测试时不写真实的 ~/.sec")
+
+	// 再保存一次：密钥已经有了，不再提醒。
+	code, got, _ = aiChange(t, srv, http.MethodPut, "/api/v1/ai/profiles/ds/key", `{"key":"sk-desktop-zzzzzz987654"}`)
+	require.Equal(t, http.StatusOK, code)
+	require.Empty(t, got.Notice)
+	require.Equal(t, "加密保存（末 4 位 7654）", got.Profiles[0].Key)
+
+	for input, want := range map[string]string{`{"key":"   "}`: "不能为空", `{"key":"sk-a sk-b"}`: "空白字符"} {
+		code, _, body = aiChange(t, srv, http.MethodPut, "/api/v1/ai/profiles/ds/key", input)
+		require.Equal(t, http.StatusBadRequest, code)
+		require.Contains(t, body, want)
+		require.NotContains(t, body, "sk-a", "错误里不回显 Key")
+	}
+	code, _, _ = aiChange(t, srv, http.MethodPut, "/api/v1/ai/profiles/nosuch/key", `{"key":"`+key+`"}`)
+	require.Equal(t, http.StatusBadRequest, code)
+
+	code, got, _ = aiChange(t, srv, http.MethodDelete, "/api/v1/ai/profiles/ds/key", "")
+	require.Equal(t, http.StatusOK, code)
+	require.Contains(t, got.Notice, "已删除")
+	require.Contains(t, got.Notice, "现在的 Key：未设置", "说明现在用哪个 Key")
+	require.False(t, got.Profiles[0].KeyStored)
+	require.Equal(t, "未设置", got.Profiles[0].Key)
+	code, got, _ = aiChange(t, srv, http.MethodDelete, "/api/v1/ai/profiles/ds/key", "")
+	require.Equal(t, http.StatusOK, code)
+	require.Contains(t, got.Notice, "没有保存的 Key")
+
+	// secret.key 权限过宽：不是输入错误，返回 500 并说明原因。Windows 不检查权限位。
+	secretPath := filepath.Join(dir, "secret.key")
+	if runtime.GOOS != "windows" {
+		require.NoError(t, os.Chmod(secretPath, 0o644))
+		code, _, body = aiChange(t, srv, http.MethodPut, "/api/v1/ai/profiles/ds/key", `{"key":"`+key+`"}`)
+		require.Equal(t, http.StatusInternalServerError, code, body)
+		require.Contains(t, body, "600")
+		require.NotContains(t, body, key)
+		require.NoError(t, os.Chmod(secretPath, 0o600))
+	}
+
+	// 损坏的 secret.key 被替换：提示其他配置保存的 Key 无法再解密。
+	code, _, _ = aiChange(t, srv, http.MethodPost, "/api/v1/ai/profiles", `{"name":"qw","provider":"qwen","model":"m"}`)
+	require.Equal(t, http.StatusOK, code)
+	code, _, _ = aiChange(t, srv, http.MethodPut, "/api/v1/ai/profiles/qw/key", `{"key":"sk-qwen-abcdef123456"}`)
+	require.Equal(t, http.StatusOK, code)
+	require.NoError(t, os.WriteFile(secretPath, []byte("short"), 0o600))
+	code, got, _ = aiChange(t, srv, http.MethodPut, "/api/v1/ai/profiles/ds/key", `{"key":"`+key+`"}`)
+	require.Equal(t, http.StatusOK, code)
+	require.Contains(t, got.Notice, "原来的加密密钥无法使用")
+	require.Contains(t, got.Notice, "qw 保存的 Key 无法再解密")
+	require.NotContains(t, got.Notice, "ds 保存的 Key 无法再解密")
+
+	// 跨站请求不能删除。
+	srv.dev = false
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/ai/profiles/ds/key", nil)
+	req.AddCookie(&http.Cookie{Name: "token", Value: srv.token})
+	req.Header.Set("Origin", "https://evil.example")
+	rr := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rr, req)
+	require.Equal(t, http.StatusForbidden, rr.Code)
 }

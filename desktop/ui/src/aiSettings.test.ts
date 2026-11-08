@@ -7,7 +7,7 @@ const providers: AIProvider[] = [
   { id: 'deepseek', name: 'DeepSeek', api: 'openai', base_url: 'https://api.deepseek.com', key_env: 'DEEPSEEK_API_KEY' },
   { id: 'custom', name: '自定义', api: '', base_url: '' },
 ]
-const view = (over: Partial<AIProfileView>): AIProfileView => ({ name: 'ds', default: true, provider: 'deepseek', provider_name: 'DeepSeek', api: 'openai', base_url: 'https://api.deepseek.com', model: 'deepseek-chat', key: '未设置', local: false, ...over })
+const view = (over: Partial<AIProfileView>): AIProfileView => ({ name: 'ds', default: true, provider: 'deepseek', provider_name: 'DeepSeek', api: 'openai', base_url: 'https://api.deepseek.com', model: 'deepseek-chat', key: '未设置', key_stored: false, local: false, ...over })
 
 test('profileForm 和厂商默认值相同的协议和地址留空，跟随默认值', () => {
   assert.deepEqual(profileForm(view({}), providers), { provider: 'deepseek', api: '', base_url: '', model: 'deepseek-chat', api_key_env: '' })

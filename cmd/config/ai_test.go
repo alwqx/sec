@@ -69,7 +69,7 @@ func TestConfigAI(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(output), &listed))
 	require.True(t, listed.Enabled)
 	require.Equal(t, "ds", listed.Default)
-	require.Equal(t, config.AIProfileView{Name: "ds", Default: true, Provider: "deepseek", ProviderName: "DeepSeek", API: "openai", BaseURL: "https://api.deepseek.com", Model: "deepseek-chat", Key: "厂商环境变量 DEEPSEEK_API_KEY（末 4 位 1234）"}, listed.Profiles[0])
+	require.Equal(t, config.AIProfileView{Name: "ds", Default: true, Provider: "deepseek", ProviderName: "DeepSeek", API: "openai", BaseURL: "https://api.deepseek.com", Model: "deepseek-chat", Key: "厂商环境变量 DEEPSEEK_API_KEY（末 4 位 1234）", KeyStored: false}, listed.Profiles[0])
 	require.True(t, listed.Profiles[1].Local)
 
 	// edit 只改给出的参数，空字符串清空。

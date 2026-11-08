@@ -196,6 +196,7 @@ export interface AIProfileView {
   model: string
   api_key_env?: string
   key: string
+  key_stored: boolean // 有没有加密保存的 Key
   local: boolean
 }
 export interface AIProvider {

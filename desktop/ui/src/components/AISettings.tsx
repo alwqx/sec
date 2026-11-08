@@ -7,7 +7,7 @@ import ResourceState from './ResourceState'
 
 const emptyForm: AIProfileInput = { name: '', provider: 'deepseek', api: '', base_url: '', model: '', api_key_env: '' }
 
-// 管理和 CLI 共用的模型配置：新增、编辑、删除、设为默认、启用和关闭，规则和 sec config ai 一致。保存 Key 暂时用 sec config ai set-key。
+// 管理和 CLI 共用的模型配置：新增、编辑、删除、设为默认、启用和关闭、保存和清除 Key，规则和 sec config ai 一致。
 export default function AISettings() {
   const load = useCallback((signal: AbortSignal) => aiSettings(signal), [])
   const resource = useResource(load)
@@ -21,6 +21,10 @@ export default function AISettings() {
   const [form, setForm] = useState<AIProfileInput>(emptyForm)
   const [confirmEnable, setConfirmEnable] = useState(false)
   const [confirmRemove, setConfirmRemove] = useState('')
+  // keyFor 是正在输入 Key 的配置名；confirmUnset 是等待确认清除 Key 的配置名。
+  const [keyFor, setKeyFor] = useState('')
+  const [keyValue, setKeyValue] = useState('')
+  const [confirmUnset, setConfirmUnset] = useState('')
 
   const apply = async (change: AIChange) => {
     setBusy(true); setError('')
@@ -32,15 +36,22 @@ export default function AISettings() {
       return false
     } finally { setBusy(false) }
   }
+  // 同一时间只打开一个表单或确认。输入的 Key 不留在页面状态里：关掉时清空。
+  const closeAll = () => { setEditing(null); setConfirmEnable(false); setConfirmRemove(''); setKeyFor(''); setKeyValue(''); setConfirmUnset('') }
   // 刷新时关掉表单和确认：它们基于刷新前的数据，留着可能覆盖命令行刚做的修改。
   const reload = () => {
-    setChanged(null); setError(''); setEditing(null); setConfirmEnable(false); setConfirmRemove('')
+    setChanged(null); setError(''); closeAll()
     resource.reload()
   }
   const openForm = (name: string) => {
     const view = data?.profiles.find(p => p.name === name)
+    closeAll()
     setForm(view && data ? profileForm(view, data.providers) : emptyForm)
-    setEditing(name); setError(''); setConfirmRemove('')
+    setEditing(name); setError('')
+  }
+  const saveKey = async (e: FormEvent) => {
+    e.preventDefault()
+    if (await apply({ kind: 'setKey', name: keyFor, key: keyValue })) closeAll()
   }
   const submit = async (e: FormEvent) => {
     e.preventDefault()
@@ -52,14 +63,14 @@ export default function AISettings() {
   const groups = privacyGroups(data?.profiles ?? [])
   return <section className="page-panel settings-panel" aria-labelledby="ai-settings-title">
     <h2 id="ai-settings-title">AI 模型</h2>
-    <p className="data-note">模型配置和命令行共用 ~/.sec/config.json 的 ai 段，在这里或用 sec config ai 修改都可以。保存 Key 暂时用 sec config ai set-key。</p>
+    <p className="data-note">模型配置和命令行共用 ~/.sec/config.json 的 ai 段，在这里或用 sec config ai 修改都可以。Key 加密保存在 config.json，加密密钥在 ~/.sec/secret.key。</p>
     <ResourceState {...resource} retry={reload} />
     {data && <>
       {data.invalid && <p className="error" role="alert">读取模型配置有问题，请手动修正后刷新：{data.invalid}</p>}
       <div className="setting-row"><div><span>AI 功能</span><p className="data-note">默认关闭，启用后才会调用模型。</p></div>
         {data.enabled
           ? <button disabled={busy} onClick={() => void apply({ kind: 'enabled', enabled: false })}>关闭</button>
-          : <button disabled={busy || data.profiles.length === 0} onClick={() => setConfirmEnable(true)}>启用</button>}
+          : <button disabled={busy || data.profiles.length === 0} onClick={() => { closeAll(); setConfirmEnable(true) }}>启用</button>}
       </div>
       {confirmEnable && !data.enabled && <div className="ai-confirm" role="alertdialog" aria-labelledby="ai-enable-title">
         <p id="ai-enable-title">使用 AI 功能时，查询的证券、自选股和数据结果会发送给所选配置的厂商，按厂商的隐私政策处理。</p>
@@ -81,21 +92,32 @@ export default function AISettings() {
             <td>{p.model}</td><td>{p.base_url}</td><td>{p.key}</td>
             <td className="ai-actions">{confirmRemove === p.name
               ? <><button disabled={busy} onClick={async () => { if (await apply({ kind: 'remove', name: p.name })) setConfirmRemove('') }}>确认删除</button><button onClick={() => setConfirmRemove('')}>取消</button></>
-              : <>
-                <button disabled={busy} onClick={() => openForm(p.name)}>编辑</button>
-                {!p.default && <button disabled={busy} onClick={() => void apply({ kind: 'default', name: p.name })}>设为默认</button>}
-                {removable(p, data.profiles.length) && <button disabled={busy} onClick={() => { setConfirmRemove(p.name); setEditing(null) }}>删除</button>}
-              </>}</td>
+              : confirmUnset === p.name
+                ? <><button disabled={busy} onClick={async () => { if (await apply({ kind: 'unsetKey', name: p.name })) setConfirmUnset('') }}>确认清除 Key</button><button onClick={() => setConfirmUnset('')}>取消</button></>
+                : <>
+                  <button disabled={busy} onClick={() => openForm(p.name)}>编辑</button>
+                  <button disabled={busy} onClick={() => { closeAll(); setKeyFor(p.name); setError('') }}>设置 Key</button>
+                  {p.key_stored && <button disabled={busy} onClick={() => { closeAll(); setConfirmUnset(p.name) }}>清除 Key</button>}
+                  {!p.default && <button disabled={busy} onClick={() => void apply({ kind: 'default', name: p.name })}>设为默认</button>}
+                  {removable(p, data.profiles.length) && <button disabled={busy} onClick={() => { closeAll(); setConfirmRemove(p.name) }}>删除</button>}
+                </>}</td>
           </tr>)}</tbody>
         </table></div>}
       {data.profiles.length > 1 && <p className="data-note">默认配置要先把别的配置设为默认才能删除。</p>}
+      {keyFor && <form className="ai-form" onSubmit={saveKey} aria-label={`设置 ${keyFor} 的 Key`}>
+        <fieldset className="settings-group"><legend>设置 {keyFor} 的 Key</legend>
+          <div className="setting-row"><div><label htmlFor="ai-key">API Key</label><p className="data-note">加密保存，之后只显示末 4 位，不会再显示完整的 Key。保存后不再从 Key 环境变量读取。本机模型一般不需要 Key，不用设置。</p></div>
+            <input id="ai-key" type="password" required autoComplete="off" spellCheck={false} value={keyValue} onChange={e => setKeyValue(e.target.value)} /></div>
+        </fieldset>
+        <div className="settings-actions"><button className="primary-button" type="submit" disabled={busy}>{busy ? '保存中…' : '保存 Key'}</button><button type="button" disabled={busy} onClick={() => { closeAll(); setError('') }}>取消</button></div>
+      </form>}
       {editing !== null
-        ? <ProfileForm form={form} adding={editing === ''} name={editing} providers={data.providers} busy={busy} onChange={setForm} onSubmit={submit} onCancel={() => { setEditing(null); setError('') }} />
-        : <div className="version-actions"><button disabled={busy || !!data.invalid} onClick={() => openForm('')}>新增配置</button></div>}
+        ? <ProfileForm form={form} adding={editing === ''} name={editing} providers={data.providers} busy={busy} onChange={setForm} onSubmit={submit} onCancel={() => { closeAll(); setError('') }} />
+        : !keyFor && <div className="version-actions"><button disabled={busy || !!data.invalid} onClick={() => openForm('')}>新增配置</button></div>}
       {data.notice && <p className="data-note" role="status">{data.notice}</p>}
       {error && <p className="error" role="alert">{error}</p>}
       {groups.remoteNames.length > 0 && <p className="data-note">{groups.remoteNames.join('、')} 不是本机模型：使用 AI 功能时，查询的证券、自选股和数据结果会发送给模型厂商。本机模型（如 Ollama）不出本机。</p>}
-      <p className="data-note">Key 只显示来源和末 4 位。从访达或开始菜单打开的 Desktop 读不到终端里设置的环境变量，用环境变量提供 Key 时这里可能显示「未设置」，可以改用 sec config ai set-key 加密保存。</p>
+      <p className="data-note">Key 只显示来源和末 4 位。从访达或开始菜单打开的 Desktop 读不到终端里设置的环境变量，用环境变量提供 Key 时这里可能显示「未设置」，可以改用「设置 Key」加密保存。</p>
     </>}
     {/* 刷新按钮放在数据外面：重新加载时数据先清空，按钮不随之消失。 */}
     <div className="version-actions"><button disabled={resource.loading || busy} onClick={reload}>刷新</button></div>

@@ -74,6 +74,8 @@ func (s *desktopServer) Handler() http.Handler {
 	mux.Handle("POST /api/v1/ai/profiles", s.withAuth(http.HandlerFunc(s.handleAIAddProfile)))
 	mux.Handle("PUT /api/v1/ai/profiles/{name}", s.withAuth(http.HandlerFunc(s.handleAIEditProfile)))
 	mux.Handle("DELETE /api/v1/ai/profiles/{name}", s.withAuth(http.HandlerFunc(s.handleAIRemoveProfile)))
+	mux.Handle("PUT /api/v1/ai/profiles/{name}/key", s.withAuth(http.HandlerFunc(s.handleAISetKey)))
+	mux.Handle("DELETE /api/v1/ai/profiles/{name}/key", s.withAuth(http.HandlerFunc(s.handleAIUnsetKey)))
 	mux.Handle("PUT /api/v1/ai/default", s.withAuth(http.HandlerFunc(s.handleAIDefault)))
 	mux.Handle("PUT /api/v1/ai/enabled", s.withAuth(http.HandlerFunc(s.handleAIEnabled)))
 

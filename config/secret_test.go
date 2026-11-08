@@ -202,6 +202,8 @@ func TestAIKeys(t *testing.T) {
 	// 2. 保存的 Key 优先于厂商环境变量。
 	require.ErrorContains(t, setKey("ds", "  "), "不能为空")
 	require.ErrorContains(t, setKey("ds", "sk-a sk-b"), "空白字符")
+	require.ErrorIs(t, setKey("ds", "sk-a sk-b"), ErrInvalidKey)
+	require.ErrorIs(t, setKey("ds", " "), ErrInvalidKey)
 	require.ErrorIs(t, setKey("nosuch", "k"), ErrAIProfileNotFound)
 	require.NoError(t, setKey("ds", " sk-stored-22222222\n"))
 	require.NoError(t, ai.Validate(), "保存的是密文")

@@ -141,6 +141,8 @@ export type AIChange =
   | { kind: 'remove'; name: string }
   | { kind: 'default'; name: string }
   | { kind: 'enabled'; enabled: boolean }
+  | { kind: 'setKey'; name: string; key: string }
+  | { kind: 'unsetKey'; name: string }
 
 export function changeAI(change: AIChange): Promise<import('./types').AISettings> {
   const json = (method: string, body: unknown): RequestInit => ({ method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -150,6 +152,8 @@ export function changeAI(change: AIChange): Promise<import('./types').AISettings
     case 'remove': return request(`/api/v1/ai/profiles/${encodeURIComponent(change.name)}`, undefined, { method: 'DELETE' })
     case 'default': return request('/api/v1/ai/default', undefined, json('PUT', { name: change.name }))
     case 'enabled': return request('/api/v1/ai/enabled', undefined, json('PUT', { enabled: change.enabled }))
+    case 'setKey': return request(`/api/v1/ai/profiles/${encodeURIComponent(change.name)}/key`, undefined, json('PUT', { key: change.key }))
+    case 'unsetKey': return request(`/api/v1/ai/profiles/${encodeURIComponent(change.name)}/key`, undefined, { method: 'DELETE' })
   }
 }
 
