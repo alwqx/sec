@@ -345,6 +345,7 @@ sec valuation 600036 --method graham      # 格雷厄姆数
 sec valuation 600036 --method peers       # 同行业对比
 sec valuation 600036 --method dividend    # 股息率和分红
 sec valuation 600036 --method overview    # 多方法综合估值摘要
+sec valuation 600036 --explain            # 表格后附 AI 解读，--ai <配置名> 选模型配置，见 docs/ai.md
 ```
 
 ### 6.2 需要额外数据的功能

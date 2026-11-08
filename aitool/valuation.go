@@ -219,13 +219,14 @@ func callValuation(ctx context.Context, input json.RawMessage) (*Result, error) 
 		case err != nil:
 			return nil, fmt.Errorf("估值计算失败：%w", err)
 		}
-		return valuationResult(sec, r), nil
+		return ValuationResult(sec, r), nil
 	}
 	return nil, noData
 }
 
-// valuationResult 把完整估值精简成给模型的结果：去掉逐日序列、历史情景价格、年报明细和同行业逐家数据。
-func valuationResult(sec *sina.BasicSecurity, r *valuation.Result) *Result {
+// ValuationResult 把完整估值精简成给模型的结果：去掉逐日序列、历史情景价格、年报明细和同行业逐家数据。
+// sec valuation --explain 用它复用已经算好的估值，不再请求一次。
+func ValuationResult(sec *sina.BasicSecurity, r *valuation.Result) *Result {
 	data := &valuationData{
 		ExCode: sec.ExCode, Name: sec.Name, Industry: r.Industry, Currency: r.Currency, TradeDate: r.TradeDate,
 		Price: r.Price, MarketCap: round(r.MarketCap/1e8, 2),

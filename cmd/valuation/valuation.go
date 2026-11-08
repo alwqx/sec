@@ -9,6 +9,7 @@ import (
 
 	"github.com/alwqx/sec/cmd/internal/termtable"
 	"github.com/alwqx/sec/config"
+	"github.com/alwqx/sec/llm"
 	"github.com/alwqx/sec/provider/edgar"
 	"github.com/alwqx/sec/provider/sina"
 	"github.com/alwqx/sec/utils"
@@ -30,7 +31,9 @@ func NewValuationCLI() *cobra.Command {
 		RunE: ValuationHandler,
 	}
 	cmd.Flags().BoolP("debug", "D", false, "Enable debug mode")
-	cmd.Flags().Bool("json", false, "Output the full valuation as JSON, regardless of --method")
+	cmd.Flags().Bool("json", false, "Output the full valuation as JSON, regardless of --method; with --explain, output the explanation")
+	cmd.Flags().Bool("explain", false, "Explain the valuation with the AI model after the table; it covers the whole valuation regardless of --method")
+	cmd.Flags().String("ai", "", "AI model profile for --explain, omit to use the default profile")
 	cmd.Flags().StringP("method", "m", "overview",
 		"Valuation method: overview, pe, pb, ps, peg, graham, dcf, peers, dividend")
 	// DCF parameters
@@ -49,6 +52,10 @@ func ValuationHandler(cmd *cobra.Command, args []string) error {
 	if !slices.Contains(methods, method) {
 		return fmt.Errorf("不支持的估值方法 %s，可选 %s", method, strings.Join(methods, "、"))
 	}
+	explainFlag, _ := cmd.Flags().GetBool("explain")
+	if cmd.Flags().Changed("ai") && !explainFlag {
+		return errors.New("--ai 只能和 --explain 一起用")
+	}
 	params := shared.DCFParams{}
 	if cmd.Flags().Changed("growth-rate") {
 		growth, _ := cmd.Flags().GetFloat64("growth-rate")
@@ -59,6 +66,14 @@ func ValuationHandler(cmd *cobra.Command, args []string) error {
 	params.MarginOfSafety, _ = cmd.Flags().GetFloat64("margin-of-safety")
 	if err := params.Validate(); err != nil {
 		return err
+	}
+	var explainer *llm.ValuationExplainer
+	var cfg *config.Config
+	if explainFlag {
+		var err error
+		if explainer, cfg, err = openExplainer(cmd); err != nil {
+			return err
+		}
 	}
 
 	secs, err := sina.Resolve(cmd.Context(), args[0])
@@ -79,10 +94,13 @@ func ValuationHandler(cmd *cobra.Command, args []string) error {
 	for _, sec := range shared.Candidates(secs, args[0]) {
 		var result *shared.Result
 		if strings.HasPrefix(sec.ExCode, "$") {
-			// 美股估值来自 SEC XBRL 和新浪日线，访问 SEC 需要共享配置里的联系邮箱。
-			cfg, cfgErr := config.LoadOrWarn(cmd.Context(), cmd.ErrOrStderr())
-			if cfgErr != nil {
-				return cfgErr
+			// 美股估值来自 SEC XBRL 和新浪日线，访问 SEC 需要共享配置里的联系邮箱。--explain 时已经读过配置。
+			if cfg == nil {
+				loaded, cfgErr := config.LoadOrWarn(cmd.Context(), cmd.ErrOrStderr())
+				if cfgErr != nil {
+					return cfgErr
+				}
+				cfg = &loaded
 			}
 			result, err = shared.AnalyzeUS(cmd.Context(), &edgar.Client{Email: cfg.SECEmail}, sec.ExCode, params, nil)
 		} else {
@@ -96,6 +114,16 @@ func ValuationHandler(cmd *cobra.Command, args []string) error {
 		}
 		if err != nil {
 			return err
+		}
+		if explainer != nil {
+			input, err := explainInput(cmd, args[0])
+			if err != nil {
+				return err
+			}
+			if !asJSON {
+				render(cmd.OutOrStdout(), method, result)
+			}
+			return explain(cmd.Context(), cmd.OutOrStdout(), explainer, input, sec, result, asJSON)
 		}
 		if asJSON {
 			return utils.PrintJSON(cmd.OutOrStdout(), result)

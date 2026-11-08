@@ -102,7 +102,7 @@ func TestValuationResultNotes(t *testing.T) {
 	r.Dividends = &valuation.Dividends{Mismatches: []valuation.DividendMismatch{{ExDate: "2025-07-01", Sina: 1}}}
 	r.Currency, r.Name = "USD", "Test Inc."
 
-	result := valuationResult(&sina.BasicSecurity{ExCode: "$TEST"}, r)
+	result := ValuationResult(&sina.BasicSecurity{ExCode: "$TEST"}, r)
 	data := result.Data.(*valuationData)
 	require.Equal(t, "Test Inc.", data.Name, "新浪没有名称时用估值数据里的")
 	require.Equal(t, "SEC EDGAR XBRL 与新浪美股日线", result.Source)
@@ -118,10 +118,10 @@ func TestValuationResultNotes(t *testing.T) {
 
 	// A 股没和新浪核对时说明股息率可能偏低。
 	r.Currency = "CNY"
-	notes = strings.Join(valuationResult(&sina.BasicSecurity{ExCode: "SH600036"}, r).Notes, "\n")
+	notes = strings.Join(ValuationResult(&sina.BasicSecurity{ExCode: "SH600036"}, r).Notes, "\n")
 	require.Contains(t, notes, "未能和新浪的分红记录核对")
 	r.Dividends.MismatchChecked = true
-	notes = strings.Join(valuationResult(&sina.BasicSecurity{ExCode: "SH600036"}, r).Notes, "\n")
+	notes = strings.Join(ValuationResult(&sina.BasicSecurity{ExCode: "SH600036"}, r).Notes, "\n")
 	require.NotContains(t, notes, "未能和新浪的分红记录核对")
 	require.NotNil(t, data.Dividends.Pending, "空数组，不是 null")
 	require.Nil(t, data.Peers)
