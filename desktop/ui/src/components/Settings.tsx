@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import VersionInfo from './VersionInfo'
+import AISettings from './AISettings'
 import type { WorkspaceSettings } from '../types'
 import { settingsToSave } from '../workspace'
 
@@ -36,6 +37,6 @@ export default function Settings({ settings, saving, onSave }: {
       </fieldset>
       <div className="settings-actions"><button className="primary-button" type="submit" disabled={saving || !changed}>{saving ? '保存中…' : '保存设置'}</button><span role="status">{saved && !changed ? '设置已保存' : ''}</span></div>
     </form>
-    </section><section className="page-panel settings-about"><h3>关于 SEC Desktop</h3><p className="data-note">证券研究工作台 · 支持 A 股、港股和美股行情。公司资料和财报支持 A 股和美股（SEC EDGAR），分红目前只有 A 股；公告支持 A 股（巨潮资讯）和美股（SEC 申报）。</p><VersionInfo /></section>
+    </section><AISettings /><section className="page-panel settings-about"><h3>关于 SEC Desktop</h3><p className="data-note">证券研究工作台 · 支持 A 股、港股和美股行情。公司资料和财报支持 A 股和美股（SEC EDGAR），分红目前只有 A 股；公告支持 A 股（巨潮资讯）和美股（SEC 申报）。</p><VersionInfo /></section>
   </div>
 }

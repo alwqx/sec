@@ -130,6 +130,10 @@ export async function changeWatchlist(action: 'add' | 'remove', security: BasicS
   return data.results
 }
 
+export function aiSettings(signal?: AbortSignal): Promise<import('./types').AISettings> {
+  return request('/api/v1/ai', signal)
+}
+
 export function versionDetails(signal?: AbortSignal): Promise<import('./types').VersionDetails> {
   return request('/api/v1/version', signal)
 }

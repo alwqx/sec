@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -31,6 +32,7 @@ func TestLoadSave(t *testing.T) {
 		require.NoError(t, os.WriteFile(path, []byte(bad), 0600))
 		cfg, err = LoadFile(ctx, path)
 		require.ErrorIs(t, err, ErrInvalid, bad)
+		require.Equal(t, bad == `{`, errors.Is(err, ErrInvalidJSON), "只有整个文件不是 JSON 对象时是 ErrInvalidJSON：%s", bad)
 		require.Equal(t, DefaultSECEmail, cfg.SECEmail)
 		require.NoError(t, UpdateFile(ctx, path, func(c *Config) error { c.SECEmail = "fixed@example.org"; return nil }), bad)
 		cfg, err = LoadFile(ctx, path)

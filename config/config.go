@@ -28,6 +28,10 @@ var ErrInvalid = errors.New("配置文件无效")
 // 要修改 ai 段时返回这个错误，避免丢掉已保存的模型配置和 Key，需要用户先手动修正。
 var ErrInvalidAI = fmt.Errorf("%w：ai 段无效", ErrInvalid)
 
+// ErrInvalidJSON 表示整个文件不是有效的 JSON 对象，它也是 ErrInvalid。读取时全部配置（包括 ai 段）都换成默认值，
+// 不能当作没有模型配置。
+var ErrInvalidJSON = fmt.Errorf("%w：不是有效的 JSON 对象", ErrInvalid)
+
 // Config 是全部配置项。
 type Config struct {
 	// SECEmail 是访问 SEC EDGAR 时写在 User-Agent 里的联系邮箱，SEC 要求自动程序提供，否则返回 403。
@@ -91,7 +95,7 @@ func Save(ctx context.Context, cfg Config) error {
 	return SaveFile(ctx, path, cfg)
 }
 
-// LoadFile 从指定文件读取配置。不是有效的 JSON 时返回默认配置和 ErrInvalid；
+// LoadFile 从指定文件读取配置。不是有效的 JSON 时返回默认配置和 ErrInvalidJSON；
 // 某一项无效时只把这一项换成默认值，并返回 ErrInvalid（ai 段无效时是 ErrInvalidAI）。
 func LoadFile(ctx context.Context, path string) (Config, error) {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -119,7 +123,7 @@ func read(path string) (Config, json.RawMessage, error) {
 	// ai 段的类型不对（如 "enabled": "yes"）时按 ai 段无效处理，修改时不覆盖文件。
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(data, &fields); err != nil {
-		return Default(), nil, fmt.Errorf("%w：%s 不是有效的 JSON 对象，已使用默认配置：%v", ErrInvalid, path, err)
+		return Default(), nil, fmt.Errorf("%w（%s），已使用默认配置：%v", ErrInvalidJSON, path, err)
 	}
 	aiData := takeAI(fields)
 	var invalid []error

@@ -53,20 +53,6 @@ func remoteNotice(out io.Writer, ai config.AIConfig, name string) {
 	}
 }
 
-// aiProfileView 是 list --json 里的一个配置：协议和地址是实际使用的值，Key 只给来源和末 4 位。
-type aiProfileView struct {
-	Name         string `json:"name"`
-	Default      bool   `json:"default"`
-	Provider     string `json:"provider"`
-	ProviderName string `json:"provider_name"`
-	API          string `json:"api"`
-	BaseURL      string `json:"base_url"`
-	Model        string `json:"model"`
-	APIKeyEnv    string `json:"api_key_env,omitempty"`
-	Key          string `json:"key"`
-	Local        bool   `json:"local"`
-}
-
 func newAIListCLI() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -85,16 +71,7 @@ func newAIListCLI() *cobra.Command {
 				return err
 			}
 			ai := cfg.AI
-			views := []aiProfileView{}
-			for _, name := range ai.Names() {
-				p := ai.Profiles[name]
-				provider, _ := config.LookupAIProvider(p.Provider)
-				views = append(views, aiProfileView{
-					Name: name, Default: name == ai.Default, Provider: p.Provider, ProviderName: provider.Name,
-					API: p.EffectiveAPI(), BaseURL: p.EffectiveBaseURL(), Model: p.Model, APIKeyEnv: p.APIKeyEnv,
-					Key: ai.KeyStatus(secret, name, os.Getenv), Local: p.IsLocal(),
-				})
-			}
+			views := ai.Views(secret, os.Getenv)
 			if asJSON, _ := cmd.Flags().GetBool("json"); asJSON {
 				return utils.PrintJSON(cmd.OutOrStdout(), map[string]any{"enabled": ai.Enabled, "default": ai.Default, "profiles": views})
 			}
