@@ -469,6 +469,36 @@ func (a *AIConfig) DescribeKey(name string, key AIKey, err error) string {
 	return "未设置"
 }
 
+// AIProfileView 是给用户看的一个配置：协议和地址是实际使用的值，Key 只给来源和末 4 位。
+// sec config ai list --json 和 Desktop 设置页共用。
+type AIProfileView struct {
+	Name         string `json:"name"`
+	Default      bool   `json:"default"`
+	Provider     string `json:"provider"`
+	ProviderName string `json:"provider_name"`
+	API          string `json:"api"`
+	BaseURL      string `json:"base_url"`
+	Model        string `json:"model"`
+	APIKeyEnv    string `json:"api_key_env,omitempty"`
+	Key          string `json:"key"`
+	Local        bool   `json:"local"`
+}
+
+// Views 按名字顺序返回全部配置的显示信息，没有配置时是空切片。getenv 一般传 os.Getenv。
+func (a *AIConfig) Views(secret *AISecret, getenv func(string) string) []AIProfileView {
+	views := []AIProfileView{}
+	for _, name := range a.Names() {
+		p := a.Profiles[name]
+		provider, _ := LookupAIProvider(p.Provider)
+		views = append(views, AIProfileView{
+			Name: name, Default: name == a.Default, Provider: p.Provider, ProviderName: provider.Name,
+			API: p.EffectiveAPI(), BaseURL: p.EffectiveBaseURL(), Model: p.Model, APIKeyEnv: p.APIKeyEnv,
+			Key: a.KeyStatus(secret, name, getenv), Local: p.IsLocal(),
+		})
+	}
+	return views
+}
+
 // lastFour 是 Key 的末 4 位；太短的 Key 不显示，避免露出大半；含非 ASCII 或不可打印字符时也不显示，避免切出乱码。
 func lastFour(key string) string {
 	if len(key) < 12 || strings.ContainsFunc(key, func(r rune) bool { return r < '!' || r > '~' }) {

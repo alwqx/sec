@@ -265,6 +265,7 @@ CLI 和 Desktop 共用一份配置，在任意一边设置后另一边直接可�
   - 第一版不提供改名：Key 加密绑定了配置名，改名需要重新加密，等有需要再加 `rename`。
   - `sec config get/set` 继续只管 `sec_edgar_email` 这类单值配置，`sec config` 显示全部配置时 `ai` 段的 Key 只显示来源和末 4 位。
 - **Desktop**：设置页列出所有配置，可以新增、编辑、删除、设为默认、保存 Key 和测试连接，规则和 CLI 一致，都通过同一个 `config` 包读写。
+  - 已实现只读列表：设置页「AI 模型」调用 `GET /api/v1/ai`，返回启用状态、`default` 和各配置的显示信息（`config.AIProfileView`，和 `sec config ai list --json` 一致，Key 只有来源和末 4 位）；`ai` 段无效时按没有配置显示，`invalid` 给出原因。非本机配置旁边说明数据会发给厂商。从访达或开始菜单打开的 Desktop 读不到终端里的环境变量，用环境变量提供的 Key 可能显示「未设置」。管理操作暂时用 `sec config ai`。
 
 约束：
 

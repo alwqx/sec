@@ -185,6 +185,25 @@ export interface ProspectusPage {
   has_more: boolean
 }
 
+// AISettings 是和 CLI 共用的模型配置（GET /api/v1/ai），Key 只有来源和末 4 位。
+export interface AIProfileView {
+  name: string
+  default: boolean
+  provider: string
+  provider_name: string
+  api: string
+  base_url: string
+  model: string
+  api_key_env?: string
+  key: string
+  local: boolean
+}
+export interface AISettings {
+  enabled: boolean
+  default: string
+  profiles: AIProfileView[]
+  invalid?: string // ai 段无效的原因
+}
 export interface VersionDetails {
   version: string
   build_time: string

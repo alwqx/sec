@@ -70,6 +70,7 @@ func (s *desktopServer) Handler() http.Handler {
 	mux.Handle("POST /api/v1/annual-reports/download", s.withAuth(http.HandlerFunc(s.handleAnnualDownload)))
 	mux.Handle("GET /api/v1/financials", s.withAuth(http.HandlerFunc(s.handleFinancials)))
 	mux.Handle("GET /api/v1/financials/charts", s.withAuth(http.HandlerFunc(s.handleFinancialCharts)))
+	mux.Handle("GET /api/v1/ai", s.withAuth(http.HandlerFunc(s.handleAISettings)))
 
 	// 前端 SPA：先尝试真实文件，否则回退 index.html（支持前端路由）。
 	mux.Handle("GET /", s.spa())
