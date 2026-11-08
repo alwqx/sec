@@ -11,6 +11,7 @@
 7. Add the `llm` package with Anthropic and OpenAI-compatible model clients.
 8. Add `sec config ai test` to check a model profile's connection and tool calling.
 9. Add a number check that flags AI answer numbers missing from tool results and advice wording.
+10. Add the cached valuation explainer in `llm`, shared by the CLI and Desktop.
 
 ### v0.4.8
 

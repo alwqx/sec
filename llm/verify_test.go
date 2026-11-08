@@ -190,7 +190,7 @@ func TestVerifyNegationWords(t *testing.T) {
 		require.Len(t, Verify(answer).AdviceTerms, 1, answer)
 	}
 	// 紧挨着的不、勿、别和否定短语照常算否定。
-	for _, answer := range []string{"不买入", "勿追涨，别加仓", "本文不建议任何人清仓", "这并非目标价"} {
+	for _, answer := range []string{"不买入", "勿追涨，别加仓", "本文不建议任何人清仓", "这并非目标价", "DCF 结果是情景值，非目标价", "无止损要求"} {
 		for _, term := range Verify(answer).AdviceTerms {
 			t.Errorf("%q 不应标出 %q", answer, term.Text)
 		}
