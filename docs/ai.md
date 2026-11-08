@@ -133,17 +133,19 @@ type Client interface {
 }
 
 type Request struct {
-	System   string
-	Messages []Message
-	Tools    []aitool.Spec // 名字、说明、InputSchema
-	MaxTokens int
+	System    string
+	Messages  []Message
+	Tools     []Tool // 名字、说明、InputSchema，由调用方从 aitool 注册表换过来
+	MaxTokens int    // 0 表示 16000
 }
 ```
 
-两个实现，都用 `net/http` 直接调用，不引入厂商 SDK，依赖保持最少：
+`llm.New(profile, key)` 按模型配置的实际协议创建客户端，`key` 来自 `config.AIConfig.ResolveKey`；不是本机模型、也不是自定义厂商（自建网关可能不需要认证）时没有 Key 直接报 `llm.ErrMissingKey`，和设错了 Key 的 401 区分开。接口地址在 `base_url` 的路径后面拼接，保留查询参数（如 `?api-version=`）。两个实现，都用 `net/http` 直接调用（`utils.MakeRequest`，POST 不自动重试），不引入厂商 SDK，依赖保持最少（实现见 `llm/`）：
 
-- **Anthropic**：Messages API，原生 tool use。
-- **OpenAI 兼容**：Chat Completions + function calling，覆盖 OpenAI、DeepSeek、通义千问和本地 Ollama，通过 `base_url` 区分。
+- **Anthropic**：`POST {base_url}/v1/messages`，`x-api-key` 和 `anthropic-version: 2026-10-21`，原生 tool use；不发送 `temperature`、`top_p`、`top_k`（这个版本会拒绝）。助手消息的原始内容块（含 `thinking` 块和签名）原样发回，不重新拼装：thinking 块绑定了对话，改动会被拒绝或丢失推理；调用方改了回复的文字或工具调用时按改过的内容重新拼装（不再带 thinking 块），回复内容为空时不保存；原始内容只发回给产生它的厂商，换到别家的 Anthropic 兼容接口时重新拼装（thinking 签名对不上）。`base_url` 已经以 `/v1` 结尾时只加 `/messages`。
+- **OpenAI 兼容**：`POST {base_url}/chat/completions` + function calling，覆盖 OpenAI、DeepSeek、通义千问、Kimi、智谱和本地 Ollama。按厂商处理差异：OpenAI 用 `max_completion_tokens`（新模型不接受 `max_tokens`），其他用 `max_tokens`；没有 Key 时不发 `Authorization`；部分本机模型调用工具时 `finish_reason` 仍是 `stop`、不给调用 id，以是否有工具调用为准、随机补 id；DeepSeek、Kimi 等返回的 `reasoning_content` 原样发回给产生它的厂商（DeepSeek 要求请求带工具时发回之前所有助手消息的推理内容，否则返回 400；Kimi 要求原样保留每条助手消息的推理内容），不发给别的厂商；回复的 `content` 是内容块数组时按顺序拼接文字；不合法的工具参数保留成字符串，交给参数校验报错让模型修正，发回时 Anthropic 发空对象、OpenAI 兼容接口发原来的字符串。
+- 停止原因统一成 `end`、`max_tokens`、`tool_use`、`refusal`、`other`，原始值另外保留。接口错误统一成 `llm.APIError`（状态码、厂商错误类型和信息、`Retry-After`），`Retryable()` 区分限流、超时、5xx 和参数、认证错误；`llm.IsRetryable(ctx, err)` 把网络超时、连接被重置或中断也算可重试，连接被拒绝、证书错误、域名找不到不算，调用方取消后也不算；`Retry-After` 支持秒数、HTTP 日期和 `retry-after-ms`；错误里不含 Key。没有文字、工具调用和工具结果的消息在本地报错，说明是第几条；没有参数 Schema 的工具发空的 object。
+- `llm.Fake` 按顺序返回预设回复并记下请求，CI 用它测试，不调用真实模型。
 
 不支持工具调用的模型只能用解读和摘要，不能用 `sec ask` 和对话面板，CLI 报错和设置页都给出提示。
 

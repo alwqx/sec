@@ -8,6 +8,7 @@
 4. Stop Desktop from writing back a stale SEC email over one changed with `sec config`.
 5. Add `sec config ai list/add/edit/use/remove/enable/disable` to manage AI model profiles.
 6. Add `sec config ai set-key/unset-key` to store AI API keys encrypted.
+7. Add the `llm` package with Anthropic and OpenAI-compatible model clients.
 
 ### v0.4.8
 

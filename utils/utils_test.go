@@ -271,3 +271,9 @@ func TestPositiveOrNil(t *testing.T) {
 	require.Nil(t, PositiveOrNil(0))
 	require.Nil(t, PositiveOrNil(-1))
 }
+
+func TestTruncateRunes(t *testing.T) {
+	require.Equal(t, "abc", TruncateRunes("abc", 3))
+	require.Equal(t, "ab…", TruncateRunes("abc", 2))
+	require.Equal(t, "中文…", TruncateRunes("中文字符", 2), "按字符截，不切开多字节字符")
+}
