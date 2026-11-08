@@ -315,7 +315,8 @@ CLI 和 Desktop 共用一份配置，在任意一边设置后另一边直接可�
 - 输出：一段 300 字以内的说明，分「估值水平」「历史位置」「数据口径」三部分，末尾附 `disclaimer`，下方是数字核对结果。
 - 缓存：按 证券代码 + `as_of` + 模型 + 提示词版本 缓存在 `~/.sec/cache/ai/`，CLI 和 Desktop 共用，同一天重复调用不再请求模型。
 - 实现见 `llm/explain.go` 的 `ValuationExplainer`：`get_valuation` 的完整结果（含 notes 和 disclaimer）放进用户消息，系统提示词是 `llm/prompts/system.md` 的核心约束，任务说明是 `llm/prompts/valuation_explain.md`（版本 `valuation-explain-v1`）；`disclaimer` 由代码从工具结果附上，不靠模型；模型拒绝或没有给出文字时报错。缓存键用解析后的 `ex_code`（600519 和 SH600519 共用）、`as_of`、`llm.Model.ID()`（协议、地址、模型名，不含配置名）、提示词版本和内容摘要、除代码外的其他参数（如 DCF 参数，按键排序）；被截断的解读不缓存。
-- 客户端由 `llm.Open(ai, name, secret, getenv)` 按配置名创建（不写名字时用 `default`）：没有模型配置、AI 功能没有启用、Key 读不出来时报错并说明怎么处理，解读、摘要和对话共用。
+- 客户端由 `llm.Open(ai, name, secret, getenv)` 按配置名创建（不写名字时用 `default`，并记一条 Debug 日志）：没有模型配置、AI 功能没有启用、Key 读不出来时报错并说明怎么处理，解读、摘要和对话共用。
+- CLI：`sec valuation <code> --explain [--ai <配置名>]` 先检查模型配置再取数，配置有问题时不请求估值数据；按 `--method` 输出表格后附上解读、核对结果和免责声明（解读总是覆盖整体估值，不受 `--method` 影响），解读复用已经算好的估值（`aitool.ValuationResult`），不再取一次数。`--json` 时只输出 `llm.Explanation`；`--ai` 不带 `--explain` 时报错。只有改过的 DCF 参数写进缓存键，和默认参数的解读共用缓存。
 
 ### 申报与公告摘要
 

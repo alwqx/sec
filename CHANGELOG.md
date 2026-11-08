@@ -13,6 +13,7 @@
 9. Add a number check that flags AI answer numbers missing from tool results and advice wording.
 10. Add the cached valuation explainer in `llm`, shared by the CLI and Desktop.
 11. Mark the `llm` abstraction done in TODO.md, with the `--ai` flag tracked under the valuation explanation.
+12. Add `sec valuation <code> --explain` with `--ai <profile>` to explain the valuation with an AI model.
 
 ### v0.4.8
 

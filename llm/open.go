@@ -3,6 +3,7 @@ package llm
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/alwqx/sec/config"
 )
@@ -37,6 +38,7 @@ func Open(ai *config.AIConfig, name string, secret *config.AISecret, getenv func
 	}
 	if name == "" {
 		name = ai.Default
+		slog.Debug("没有指定模型配置，使用默认配置", "profile", name)
 	}
 	profile, ok := ai.Profiles[name]
 	if !ok {
