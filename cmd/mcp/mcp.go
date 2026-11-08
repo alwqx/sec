@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/alwqx/sec/aitool"
+	"github.com/alwqx/sec/cmd/macro"
 	"github.com/alwqx/sec/version"
 	gomcp "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/spf13/cobra"
@@ -40,7 +41,7 @@ func NewMCPCLI() *cobra.Command {
 			}
 			slog.SetDefault(slog.New(slog.NewTextHandler(cmd.ErrOrStderr(), &slog.HandlerOptions{Level: level})))
 			transport := &gomcp.IOTransport{Reader: io.NopCloser(cmd.InOrStdin()), Writer: nopWriteCloser{cmd.OutOrStdout()}}
-			return NewServer(aitool.Default()).Run(cmd.Context(), transport)
+			return NewServer(aitool.Default(macro.AISource())).Run(cmd.Context(), transport)
 		},
 	}
 	cmd.Flags().BoolP("debug", "D", false, "Write debug logs to stderr")

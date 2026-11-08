@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/alwqx/sec/aitool"
+	"github.com/alwqx/sec/cmd/macro"
 	gomcp "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/h2non/gock.v1"
@@ -19,7 +20,7 @@ func connect(t *testing.T) *gomcp.ClientSession {
 	t.Helper()
 	ctx := context.Background()
 	serverTransport, clientTransport := gomcp.NewInMemoryTransports()
-	serverSession, err := NewServer(aitool.Default()).Connect(ctx, serverTransport, nil)
+	serverSession, err := NewServer(aitool.Default(macro.AISource())).Connect(ctx, serverTransport, nil)
 	require.NoError(t, err)
 	t.Cleanup(func() { serverSession.Close() })
 	client := gomcp.NewClient(&gomcp.Implementation{Name: "test", Version: "1"}, nil)
@@ -50,7 +51,7 @@ func TestListTools(t *testing.T) {
 		require.True(t, tool.Annotations.ReadOnlyHint)
 	}
 	expected := []string{}
-	for _, tool := range aitool.Default().Tools() {
+	for _, tool := range aitool.Default(macro.AISource()).Tools() {
 		expected = append(expected, tool.Name)
 	}
 	require.ElementsMatch(t, expected, names, "SDK 按名字排序列出工具，不保留注册顺序")
