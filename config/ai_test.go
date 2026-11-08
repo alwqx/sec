@@ -307,3 +307,22 @@ func aiSection(t *testing.T, path string) string {
 	require.NotNil(t, raw, "文件里有 ai 段")
 	return string(raw)
 }
+
+func TestAIEditClearsKeyOnEndpointChange(t *testing.T) {
+	ai := AIConfig{Default: "ds", Profiles: map[string]AIProfile{"ds": {Provider: "deepseek", Model: "m", APIKey: "enc:v1:keep"}}}
+	keep := func() { p := ai.Profiles["ds"]; p.APIKey = "enc:v1:keep"; ai.Profiles["ds"] = p }
+
+	require.NoError(t, ai.Edit("ds", func(p *AIProfile) { p.Model = "deepseek-reasoner" }))
+	require.Equal(t, "enc:v1:keep", ai.Profiles["ds"].APIKey, "只改模型时保留")
+	require.NoError(t, ai.Edit("ds", func(p *AIProfile) { p.BaseURL = "https://api.deepseek.com/" }))
+	require.Equal(t, "enc:v1:keep", ai.Profiles["ds"].APIKey, "填的就是官方地址（只差结尾斜杠）时保留")
+
+	require.NoError(t, ai.Edit("ds", func(p *AIProfile) { p.BaseURL = "https://llm.other.example/v1" }))
+	require.Empty(t, ai.Profiles["ds"].APIKey, "地址变了，原来的 Key 不能发过去")
+	keep()
+	require.NoError(t, ai.Edit("ds", func(p *AIProfile) { p.BaseURL = "" }))
+	require.Empty(t, ai.Profiles["ds"].APIKey, "改回官方地址也是换了服务")
+	keep()
+	require.NoError(t, ai.Edit("ds", func(p *AIProfile) { p.Provider = "openai" }))
+	require.Empty(t, ai.Profiles["ds"].APIKey, "换了厂商")
+}
