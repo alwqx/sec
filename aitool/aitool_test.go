@@ -59,7 +59,7 @@ func TestNewRegistry(t *testing.T) {
 }
 
 func TestDefault(t *testing.T) {
-	r := Default()
+	r := Default(nil)
 	for _, name := range []string{"search_security", "get_quote"} {
 		_, ok := r.Lookup(name)
 		require.True(t, ok, name)

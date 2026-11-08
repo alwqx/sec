@@ -44,8 +44,7 @@ args = ["mcp"]
 | `get_valuation` | 一只 A 股或美股的 PE/PB/PS 当前值和历史分位、股息率、PEG、格雷厄姆数、同行业对比（仅 A 股）、DCF 每股价值和规则汇总（`signals`、`assessment`），带 `disclaimer`；可传 DCF 参数 |
 | `list_filings` | 一只 A 股在巨潮资讯的公告或一只美股在 SEC EDGAR 的申报，从新到旧列出日期、标题和原文链接（美股另带申报类型），默认 10 条、最多 20 条，不含正文；A 股可按定期报告类型、美股可按申报类型筛选 |
 | `get_kline_summary` | 一只沪深、港股或美股证券的 K 线摘要：区间涨跌幅、最高最低、最大回撤、MA5/MA20/MA60、平均成交量和成交额，加最近 20 根 K 线；默认前复权日线、最近 1 年 |
-
-宏观指标工具 `get_macro_series` 按 [TODO](../TODO.md) 的 AI/LLM 部分逐个加入。
+| `get_macro_series` | 一个中国或美国宏观指标（和 Desktop 宏观页同一份目录）最近 12 期的观测和各序列口径：单位、季调、价格基准、官方值还是计算值；可按 `begin`、`end` 查更早的区间，按 `series` 筛选序列 |
 
 ## 输出格式
 
@@ -71,7 +70,7 @@ args = ["mcp"]
 | `disclaimer` | 结果自带的免责声明，没有时省略 |
 | `data` | 工具自己的数据，`null` 表示缺失或不适用，不是 0 |
 
-工具出错时返回 `isError: true` 的结果，文本是中文原因：参数错误（比如一次超过 5 只，或者给出的代码全都找不到）提示怎么改，上游失败或超时说明哪一步失败。以 `get_quote` 为例，部分证券查不到不算出错，列在 `data.missing` 里；几个输入搜到同一只证券时合并为一条，并在 `notes` 里说明；基金净值没有成交，`volume`、`amount` 是 `null`。`search_security` 没有匹配时不算出错，返回空的 `results` 并在 `notes` 里提示换关键字；结果超过 10 条时截短，`total` 是新浪返回的条数（接口最多约 50 条，不是匹配总数）。`market` 是 `sse`、`szse`、`bse`、`hk`、`us` 或 `fund`，基金不区分场内场外。`get_kline_summary` 默认前复权，东方财富失败时不复权行情改用新浪备用数据并在 `notes` 里说明，前复权没有备用数据，提示可改用 `bfq`；不支持北交所和场外基金。`get_financials` 的同比在上年同期缺失或 ≤ 0 时是 `null`；美股读取 `sec config` 里的 SEC 联系邮箱，按 IFRS 申报的外国公司没有季度数据。`get_valuation` 和 `sec valuation` 一样，纯数字代码依次试所有沪深北结果（`000001` 是上证指数也是平安银行）；不返回逐日序列、按历史倍数推算的情景价格和同行业逐家数据；外国公司（IFRS、以 ADS 上市等）返回参数错误。`list_filings` 的 `category` 只用于 A 股、`forms` 只用于美股，用错市场是参数错误；A 股结果带 `total`（巨潮资讯符合条件的公告总数）；纯数字代码同样跳过指数，`000001` 查的是平安银行。
+工具出错时返回 `isError: true` 的结果，文本是中文原因：参数错误（比如一次超过 5 只，或者给出的代码全都找不到）提示怎么改，上游失败或超时说明哪一步失败。以 `get_quote` 为例，部分证券查不到不算出错，列在 `data.missing` 里；几个输入搜到同一只证券时合并为一条，并在 `notes` 里说明；基金净值没有成交，`volume`、`amount` 是 `null`。`search_security` 没有匹配时不算出错，返回空的 `results` 并在 `notes` 里提示换关键字；结果超过 10 条时截短，`total` 是新浪返回的条数（接口最多约 50 条，不是匹配总数）。`market` 是 `sse`、`szse`、`bse`、`hk`、`us` 或 `fund`，基金不区分场内场外。`get_kline_summary` 默认前复权，东方财富失败时不复权行情改用新浪备用数据并在 `notes` 里说明，前复权没有备用数据，提示可改用 `bfq`；不支持北交所和场外基金。`get_financials` 的同比在上年同期缺失或 ≤ 0 时是 `null`；美股读取 `sec config` 里的 SEC 联系邮箱，按 IFRS 申报的外国公司没有季度数据。`get_valuation` 和 `sec valuation` 一样，纯数字代码依次试所有沪深北结果（`000001` 是上证指数也是平安银行）；不返回逐日序列、按历史倍数推算的情景价格和同行业逐家数据；外国公司（IFRS、以 ADS 上市等）返回参数错误。`list_filings` 的 `category` 只用于 A 股、`forms` 只用于美股，用错市场是参数错误；A 股结果带 `total`（巨潮资讯符合条件的公告总数）；纯数字代码同样跳过指数，`000001` 查的是平安银行。`get_macro_series` 复用 `sec macro <region> <command> --standard-json`，`indicator` 是 `cn.cpi`、`us.treasury` 这样的「地区.命令」；`rows` 从新到旧，`values` 和 `series` 一一对应；最新几期所有序列都还没公布时省略并在 `notes` 里说明；一个指标超过 8 个序列（如社会融资规模、美国国债发行）时只返回前 8 个，`notes` 里列出可用于 `series` 筛选的其他序列；口径说明和观测备注去掉链接、去重后放进 `notes`。
 
 server 连接时会给模型一段使用规则（只用工具返回的数字、保留口径说明和日期、不给投资建议），见 `cmd/mcp/mcp.go` 的 `instructions`。
 
@@ -110,6 +109,6 @@ npx @modelcontextprotocol/inspector sec mcp
    - 同比、变化量、分位等派生值在 Go 里算好并四舍五入，不让模型自己算。
    - 缺失的值用指针表示 `null`，不用 0。
 5. **填写信封**：用 `NewResult(name, source, data)`；设置 `AsOf`；把非空的 `*_note`、推导说明和截短说明放进 `Notes`；估值等自带免责声明的放进 `Disclaimer`。
-6. **注册**：在 `aitool.go` 的 `Default()` 里加上新工具。
+6. **注册**：在 `aitool.go` 的 `Default()` 里加上新工具。数据只能从 `cmd/` 拿到时（比如宏观命令），像 `get_macro_series` 一样在 `aitool` 里定义接口（`MacroSource`），由 `cmd/` 实现（`macro.AISource()`），调用方传给 `Default`。
 7. **测试**：在 `aitool/<名字>_test.go` 里用 `gock` 模拟上游，覆盖正常结果、`notes`、`as_of`、参数错误和上游失败；`cmd/mcp` 的测试会自动检查新工具能被列出。再在 `scripts/mcp-smoke.py` 的 `SAMPLES` 里加一条示例参数，用真实数据跑一遍，看输出大小和内容。
 8. **文档**：在上面的工具表里加一行，CHANGELOG 加一条。

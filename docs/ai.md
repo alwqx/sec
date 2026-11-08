@@ -73,7 +73,7 @@ type Tool struct {
 // Registry 按名字查找工具，顺序固定，便于测试和生成文档。
 type Registry struct{ ... }
 
-func Default() *Registry // 第一批 7 类工具
+func Default(macro MacroSource) *Registry // 第一批 7 类工具；宏观数据由 cmd/macro 注入，见 sec mcp 文档
 ```
 
 工具全部只读：不改自选、不写配置、不下载文件。参数错误返回带中文说明的 error，上游失败返回 error 并写日志；MCP 和对话都把 error 文本原样交给模型，让它告诉用户哪一步失败了，不让它猜数据。
@@ -116,7 +116,7 @@ func Default() *Registry // 第一批 7 类工具
 
 ## sec mcp
 
-- 命令：`sec mcp`，stdio 传输，只暴露 `aitool.Default()` 里的工具，不暴露 resources 和 prompts。
+- 命令：`sec mcp`，stdio 传输，只暴露 `aitool.Default(macro.AISource())` 里的工具，不暴露 resources 和 prompts。
 - stdout 只给 MCP 协议用：日志一律写 stderr，任何 `fmt.Print` 都不能走到 stdout。
 - 实现优先用官方 Go SDK（`github.com/modelcontextprotocol/go-sdk`），新增依赖在该 PR 里评估；如果不合适再手写 JSON-RPC。
 - 每次工具调用设超时（默认 30 秒，和 Desktop 的美股接口一致），复用现有的 HTTP 重试和缓存。

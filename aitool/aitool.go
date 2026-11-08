@@ -133,15 +133,20 @@ func (r *Registry) Lookup(name string) (Tool, bool) {
 }
 
 // Default 返回 sec 提供的全部工具。新工具在这里注册。
-func Default() *Registry {
-	r, err := NewRegistry(
+// 宏观命令在 cmd/macro 里，本包不能依赖，由调用方传入 macro；为 nil 时不注册 get_macro_series。
+func Default(macro MacroSource) *Registry {
+	tools := []Tool{
 		SearchTool(),
 		QuoteTool(),
 		KlineSummaryTool(),
 		FinancialsTool(),
 		ValuationTool(),
 		FilingsTool(),
-	)
+	}
+	if macro != nil {
+		tools = append(tools, MacroSeriesTool(macro))
+	}
+	r, err := NewRegistry(tools...)
 	if err != nil {
 		// 工具在代码里写死，出错是编程错误，测试会覆盖到。
 		panic(err)
