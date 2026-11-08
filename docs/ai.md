@@ -242,7 +242,7 @@ CLI 和 Desktop 共用一份配置，在任意一边设置后另一边直接可�
 - **CLI**：配置是嵌套结构，用 `sec config set` 的点号路径太长，改为 `sec config ai` 子命令：
 
   ```bash
-  sec config ai list                     # 列出所有配置：名字、厂商、协议、地址、模型、Key 来源和末 4 位，标出 default
+  sec config ai list                     # 列出所有配置：名字、厂商、协议、地址、模型、Key 来源和末 4 位，标出 default；--json 输出 JSON
   sec config ai add ds --provider deepseek --model deepseek-chat
   sec config ai add gw --provider custom --api openai --base-url https://llm.corp.example/v1 --model x
   sec config ai edit ds --model deepseek-reasoner   # 修改 provider、api、base-url、model、api-key-env
@@ -256,6 +256,9 @@ CLI 和 Desktop 共用一份配置，在任意一边设置后另一边直接可�
 
   - `set-key` 在终端里隐藏输入，非终端（管道）时从 stdin 读一行，不接受命令行参数，避免 Key 进 shell 历史和进程列表。
   - 第一次 `add` 的配置自动成为 `default`；不能删除 `default` 指向的配置，要先 `use` 另一个。
+  - `edit` 改了厂商或实际地址时删除保存的 Key：那是原来那个服务的 Key，不能发给新地址，要重新设置。
+  - 第一次 `enable` 时提示哪些配置会把数据发给外部厂商、哪些是本机模型；已启用后 `add` 或 `use` 一个外部厂商的配置时再提示一行。
+  - `ai` 段无效时所有 `sec config ai` 子命令都直接报原因，不做修改，要先手动修正。
   - 第一版不提供改名：Key 加密绑定了配置名，改名需要重新加密，等有需要再加 `rename`。
   - `sec config get/set` 继续只管 `sec_edgar_email` 这类单值配置，`sec config` 显示全部配置时 `ai` 段的 Key 只显示来源和末 4 位。
 - **Desktop**：设置页列出所有配置，可以新增、编辑、删除、设为默认、保存 Key 和测试连接，规则和 CLI 一致，都通过同一个 `config` 包读写。

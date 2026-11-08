@@ -63,6 +63,7 @@ func NewConfigCLI() *cobra.Command {
 		},
 	}
 	cmd.Flags().Bool("json", false, "Output JSON")
+	cmd.AddCommand(newAICLI())
 	cmd.AddCommand(&cobra.Command{
 		Use:       "get <key>",
 		Short:     "Print one setting",
@@ -116,7 +117,7 @@ func aiSummary(ai config.AIConfig) string {
 	if ai.Enabled {
 		state = "已启用"
 	}
-	return fmt.Sprintf("%s，%d 个模型配置，default 是 %s", state, len(ai.Profiles), ai.Default)
+	return fmt.Sprintf("%s，%d 个模型配置，default 是 %s；详情用 sec config ai list", state, len(ai.Profiles), ai.Default)
 }
 
 // load 读取配置；文件内容无效时提示并使用默认值，可以用 sec config set 覆盖。

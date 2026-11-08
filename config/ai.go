@@ -55,7 +55,8 @@ func LookupAIProvider(id string) (AIProvider, bool) {
 	return AIProviders[i], true
 }
 
-func aiProviderIDs() []string {
+// AIProviderIDs 返回全部厂商 id，按显示顺序。
+func AIProviderIDs() []string {
 	ids := make([]string, 0, len(AIProviders))
 	for _, p := range AIProviders {
 		ids = append(ids, p.ID)
@@ -113,7 +114,7 @@ func (p AIProfile) Validate() error {
 	provider, ok := LookupAIProvider(p.Provider)
 	if !ok {
 		// 校验错误会写进日志和终端，不回显填的值：Key 填错位置时不打印出来。
-		return fmt.Errorf("厂商无效，只能是 %s；其他厂商或自建网关用 %s", strings.Join(aiProviderIDs(), "、"), AIProviderCustom)
+		return fmt.Errorf("厂商无效，只能是 %s；其他厂商或自建网关用 %s", strings.Join(AIProviderIDs(), "、"), AIProviderCustom)
 	}
 	if p.API != "" && !slices.Contains(AIAPIs, p.API) {
 		return fmt.Errorf("接口协议无效，只能是 %s", strings.Join(AIAPIs, " 或 "))
@@ -279,13 +280,18 @@ func (a *AIConfig) Add(name string, p AIProfile) error {
 	return nil
 }
 
-// Edit 修改一个配置，修改后重新校验。
+// Edit 修改一个配置，修改后重新校验。厂商或实际地址变了时删除保存的 Key：
+// 那是原来那个服务的 Key，不能发给新地址（厂商环境变量同样不会发，见 DefaultKeyEnv）。
 func (a *AIConfig) Edit(name string, change func(*AIProfile)) error {
 	p, ok := a.Profiles[name]
 	if !ok {
 		return fmt.Errorf("%w：%s", ErrAIProfileNotFound, name)
 	}
+	before := p
 	change(&p)
+	if p.Provider != before.Provider || strings.TrimRight(p.EffectiveBaseURL(), "/") != strings.TrimRight(before.EffectiveBaseURL(), "/") {
+		p.APIKey = ""
+	}
 	if err := p.Validate(); err != nil {
 		return err
 	}
