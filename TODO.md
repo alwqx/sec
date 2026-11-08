@@ -86,6 +86,7 @@
 
 ## Desktop
 
+- [ ] 设置页带着旧的 SEC 联系邮箱保存会覆盖 CLI 刚改的邮箱：前端每次保存工作台都发送 `sec_edgar_email`，后端照写到 `~/.sec/config.json`。Desktop 打开后用 `sec config set sec-edgar-email` 改了邮箱，再在 Desktop 里加一只自选股，邮箱就被改回去。前端应只在邮箱改动时才发送。
 - [ ] 升级或修补 `github.com/webview/webview_go` 依赖，消除新版 Clang 的 `-Wdeprecated-literal-operator` 警告：将 `operator"" _cls`、`operator"" _sel`、`operator"" _str` 改为后缀紧邻引号的写法（如 `operator""_cls`）。通过依赖升级或仓库内维护补丁处理，不直接修改 Go 模块缓存。
   - 当前这三条警告来自 WebView 的 C++ 代码，不代表构建失败；未将警告视为错误时，可正常生成二进制。临时隐藏该类警告，可在 `desktop` 目录执行：
   ```shell
@@ -122,7 +123,7 @@
   - [ ] Key 加密与读取：`secret.key`、AES-256-GCM（配置名作附加认证数据）、`enc:v1:` 格式、Key 读取顺序，显示时给出来源和末 4 位。
   - [ ] `sec config ai list/add/edit/use/remove/enable/disable`。
   - [ ] `sec config ai set-key/unset-key`：终端里隐藏输入，管道时从 stdin 读一行。
-  - [ ] `ai` 段无效时的两处提示（下一个 PR 先修）：Desktop 前端每次保存都带 `sec_edgar_email`，所以 `ai` 段无效时每一次保存（包括自选股，其实已保存）都因 `config.UpdateFile` 返回 `ErrInvalidAI` 而报 500「请稍后重试」，应在邮箱没变时不调用 `updateConfig`，`ErrInvalidAI` 时返回 400 并说明要手动修正 `ai` 段（`desktop/workspace.go`）；`sec mcp` 的 `secClient` 读取配置出错时都记「使用默认 SEC 联系邮箱」，`ai` 段无效时实际用的是配置里的邮箱，日志应只说读取配置有问题并带上原因（`aitool/financials.go`）。
+  - [x] `ai` 段无效时的两处问题：`config.UpdateFile` 拒绝一切写入，Desktop 前端每次保存都带 `sec_edgar_email`，所以每一次保存（包括自选股）都报 500「请稍后重试」。改为不修改 `ai` 段时照常保存其他配置、`ai` 段按原样写回，只有修改 `ai` 段时才返回 `ErrInvalidAI`；`sec mcp` 的 `secClient` 读取配置出错时都记「使用默认 SEC 联系邮箱」，`ai` 段无效时实际用的是配置里的邮箱，日志应只说读取配置有问题并带上原因（`aitool/financials.go`）。
 - [ ] `llm/` 模型接入抽象：支持 Anthropic 和 OpenAI 兼容接口（覆盖 DeepSeek、通义、本地 Ollama），含回答数字核对、`sec config ai test` 测试连接和各命令的 `--ai <配置名>` 参数；CLI 和 Desktop 共用。
 - [ ] Desktop 模型设置：设置页管理同一份 `ai` 配置（新增、编辑、删除、设为默认）、保存 Key、测试连接，AI 功能旁边可以临时切换配置；说明自选股和查询内容会发给模型厂商，本地模型可不出本机。
 - [ ] 估值解读：`sec valuation <code> --explain`，把估值精简输出和口径说明交给模型生成一段说明，范围有限、便于测试。

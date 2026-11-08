@@ -88,6 +88,26 @@ func TestWorkspaceWithInvalidConfig(t *testing.T) {
 	require.Equal(t, "fixed@example.org", cfg.SECEmail)
 }
 
+// ai 段无效时照常保存工作台和邮箱，ai 段原样保留。
+func TestWorkspaceWithInvalidAIConfig(t *testing.T) {
+	dir := t.TempDir()
+	srv := &desktopServer{dev: true, workspace: workspaceStore{path: filepath.Join(dir, "workspace.json")}}
+	path := filepath.Join(dir, "config.json")
+	require.NoError(t, os.WriteFile(path, []byte(`{"sec_edgar_email":"me@example.org","ai":{"enabled":"yes","profiles":{"x":{"api_key":"enc:v1:keep"}}}}`), 0600))
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/workspace", strings.NewReader(`{"watchlist":[],"settings":{"refresh_seconds":5,"theme":"dark","sec_edgar_email":"new@example.org"}}`))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rr, req)
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+
+	cfg, err := config.LoadFile(context.Background(), path)
+	require.ErrorIs(t, err, config.ErrInvalidAI, "ai 段仍然无效，没有被覆盖")
+	require.Equal(t, "new@example.org", cfg.SECEmail)
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	require.Contains(t, string(data), "enc:v1:keep")
+}
+
 func TestFilingsEndpointErrors(t *testing.T) {
 	defer gock.Off()
 	t.Setenv("HOME", t.TempDir())

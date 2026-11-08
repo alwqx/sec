@@ -3,6 +3,7 @@
 ### v0.4.9
 
 1. Add the `ai` section of `~/.sec/config.json` for model profiles shared by the CLI and Desktop.
+2. Save other settings while the `ai` section is invalid, keeping it as is, so Desktop saves no longer fail.
 
 ### v0.4.8
 
