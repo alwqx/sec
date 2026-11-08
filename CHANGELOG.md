@@ -19,6 +19,7 @@
 15. Move the 10-minute SEC company facts cache from Desktop to `provider/edgar` and use it in `sec mcp`.
 16. Move the valuation candidate selection (`000001` is both an index and a stock) from `sec valuation` to the `valuation` package.
 17. Add the `get_valuation` tool to `sec mcp`.
+18. Add the `list_filings` tool to `sec mcp`.
 
 ### v0.4.7
 

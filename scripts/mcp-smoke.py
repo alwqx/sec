@@ -28,6 +28,7 @@ SAMPLES = {
     "get_kline_summary": {"code": "SH000300"},
     "get_financials": {"code": "$AAPL", "period": "quarter"},
     "get_valuation": {"code": "000001"},
+    "list_filings": {"code": "SH600036", "category": "annual", "limit": 5},
 }
 
 # 单个工具结果的建议上限，见 docs/mcp.md 的「添加工具」。
