@@ -134,6 +134,25 @@ export function aiSettings(signal?: AbortSignal): Promise<import('./types').AISe
   return request('/api/v1/ai', signal)
 }
 
+// changeAI 修改模型配置，返回修改后的全部配置。
+export type AIChange =
+  | { kind: 'add'; profile: import('./types').AIProfileInput }
+  | { kind: 'edit'; name: string; profile: import('./types').AIProfileInput }
+  | { kind: 'remove'; name: string }
+  | { kind: 'default'; name: string }
+  | { kind: 'enabled'; enabled: boolean }
+
+export function changeAI(change: AIChange): Promise<import('./types').AISettings> {
+  const json = (method: string, body: unknown): RequestInit => ({ method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  switch (change.kind) {
+    case 'add': return request('/api/v1/ai/profiles', undefined, json('POST', change.profile))
+    case 'edit': return request(`/api/v1/ai/profiles/${encodeURIComponent(change.name)}`, undefined, json('PUT', change.profile))
+    case 'remove': return request(`/api/v1/ai/profiles/${encodeURIComponent(change.name)}`, undefined, { method: 'DELETE' })
+    case 'default': return request('/api/v1/ai/default', undefined, json('PUT', { name: change.name }))
+    case 'enabled': return request('/api/v1/ai/enabled', undefined, json('PUT', { enabled: change.enabled }))
+  }
+}
+
 export function versionDetails(signal?: AbortSignal): Promise<import('./types').VersionDetails> {
   return request('/api/v1/version', signal)
 }

@@ -85,7 +85,7 @@ func TestAIConfigOperations(t *testing.T) {
 	require.ErrorIs(t, ai.Edit("nosuch", func(*AIProfile) {}), ErrAIProfileNotFound)
 
 	require.NoError(t, ai.SetEnabled(true))
-	require.ErrorContains(t, ai.Remove("deepseek"), "是 default，不能删除")
+	require.ErrorContains(t, ai.Remove("deepseek"), "是默认配置（default），不能删除")
 	require.ErrorIs(t, ai.Use("nosuch"), ErrAIProfileNotFound)
 	require.NoError(t, ai.Use("claude"))
 	require.NoError(t, ai.Remove("deepseek"))
@@ -325,4 +325,32 @@ func TestAIEditClearsKeyOnEndpointChange(t *testing.T) {
 	keep()
 	require.NoError(t, ai.Edit("ds", func(p *AIProfile) { p.Provider = "openai" }))
 	require.Empty(t, ai.Profiles["ds"].APIKey, "换了厂商")
+}
+
+func TestUpdateAIFile(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "config.json")
+	add := func(ai *AIConfig) error { return ai.Add("ds", AIProfile{Provider: "deepseek", Model: "m"}) }
+	require.NoError(t, UpdateAIFile(ctx, path, add))
+	cfg, err := LoadFile(ctx, path)
+	require.NoError(t, err)
+	require.True(t, cfg.AI.Has("ds"))
+
+	// 修改出错时不保存。
+	require.ErrorContains(t, UpdateAIFile(ctx, path, add), "已存在")
+
+	// 整个文件不是 JSON、ai 段无效：不修改，连关闭也不写。
+	for bad, want := range map[string]error{`{"ai":{"profiles":{}},}`: ErrInvalidJSON, `{"ai":{"enabled":"yes"}}`: ErrInvalidAI} {
+		require.NoError(t, os.WriteFile(path, []byte(bad), 0o600))
+		err := UpdateAIFile(ctx, path, func(ai *AIConfig) error { return ai.SetEnabled(false) })
+		require.ErrorIs(t, err, want, bad)
+		require.ErrorContains(t, err, "没有修改")
+		data, err := os.ReadFile(path)
+		require.NoError(t, err)
+		require.Equal(t, bad, string(data))
+	}
+
+	// 只是邮箱无效时照常修改 ai 段。
+	require.NoError(t, os.WriteFile(path, []byte(`{"sec_edgar_email":"me"}`), 0o600))
+	require.NoError(t, UpdateAIFile(ctx, path, add))
 }

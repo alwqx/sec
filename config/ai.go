@@ -265,7 +265,7 @@ func (a *AIConfig) Add(name string, p AIProfile) error {
 		return err
 	}
 	if a.Has(name) {
-		return fmt.Errorf("模型配置 %s 已存在，修改请用 edit", name)
+		return fmt.Errorf("模型配置 %s 已存在", name)
 	}
 	if err := p.Validate(); err != nil {
 		return err
@@ -306,7 +306,7 @@ func (a *AIConfig) Remove(name string) error {
 		return fmt.Errorf("%w：%s", ErrAIProfileNotFound, name)
 	}
 	if name == a.Default && len(a.Profiles) > 1 {
-		return fmt.Errorf("%s 是 default，不能删除，请先把 default 改成别的配置", name)
+		return fmt.Errorf("%s 是默认配置（default），不能删除，请先把别的配置设为默认", name)
 	}
 	delete(a.Profiles, name)
 	if len(a.Profiles) == 0 {

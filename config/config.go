@@ -185,6 +185,18 @@ func SaveFile(ctx context.Context, path string, cfg Config) error {
 // 原文件内容无效时从默认值开始修改。ai 段无效时，没有修改 ai 段就照常保存其他配置，ai 段按文件里的原始内容写回；
 // 修改了 ai 段时不保存，返回 ErrInvalidAI，避免丢掉已保存的 Key。写入时先写临时文件再改名，中途失败不会留下写了一半的文件。
 func UpdateFile(ctx context.Context, path string, change func(*Config) error) error {
+	return updateFile(ctx, path, false, change)
+}
+
+// UpdateAIFile 在同一把文件锁里修改 ai 段。整个文件不是 JSON 或 ai 段无效时不修改，返回读取时的错误（都是 ErrInvalid）：
+// 从默认值开始写会丢掉文件里的模型配置和 Key，ai 段无效时的修改（包括关闭）也写不进去。检查和写入在同一把锁里，
+// 不会被其他进程的写入错开。
+func UpdateAIFile(ctx context.Context, path string, change func(*AIConfig) error) error {
+	return updateFile(ctx, path, true, func(c *Config) error { return change(&c.AI) })
+}
+
+// updateFile 是 UpdateFile 和 UpdateAIFile 的实现，aiOnly 时拒绝修改无效的文件或 ai 段。
+func updateFile(ctx context.Context, path string, aiOnly bool, change func(*Config) error) error {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	unlock, err := watchlist.FileLock(ctx, path)
@@ -196,6 +208,9 @@ func UpdateFile(ctx context.Context, path string, change func(*Config) error) er
 	invalidAI := errors.Is(err, ErrInvalidAI)
 	if err != nil && !errors.Is(err, ErrInvalid) {
 		return err
+	}
+	if aiOnly && (invalidAI || errors.Is(err, ErrInvalidJSON)) {
+		return fmt.Errorf("%w；为避免丢掉已保存的模型配置和 Key，没有修改，请先手动修正配置文件", err)
 	}
 	if err := change(&cfg); err != nil {
 		return err

@@ -198,11 +198,29 @@ export interface AIProfileView {
   key: string
   local: boolean
 }
+export interface AIProvider {
+  id: string
+  name: string
+  api: string // 默认协议，自定义厂商为空
+  base_url: string // 官方地址，自定义厂商为空
+  key_env?: string // 没有设置 Key 时读取的环境变量
+}
 export interface AISettings {
   enabled: boolean
   default: string
   profiles: AIProfileView[]
+  providers: AIProvider[]
   invalid?: string // ai 段无效的原因
+  notice?: string // 修改后的提示，只在修改接口的返回里有
+}
+// AIProfileInput 是新增和编辑提交的配置；协议和地址为空表示用厂商的默认值。不含 Key。
+export interface AIProfileInput {
+  name?: string
+  provider: string
+  api: string
+  base_url: string
+  model: string
+  api_key_env: string
 }
 export interface VersionDetails {
   version: string
