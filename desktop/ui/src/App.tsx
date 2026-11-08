@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { ArrowLeftRight, ChartCandlestick, FilePlusCorner, Newspaper, Coins, Factory, Landmark, Settings as SettingsIcon, RefreshCw, Star, PanelLeftClose, PanelLeftOpen, type LucideIcon } from 'lucide-react'
 import { loadWorkspace, saveWorkspace, search, loadWatchlist, changeWatchlist } from './api'
+import { settingsToSave } from './workspace'
 import type { BasicSecurity, WorkspaceSettings, WorkspaceState } from './types'
 import SearchBar from './components/SearchBar'
 import SecurityList from './components/SecurityList'
@@ -175,7 +176,8 @@ export default function App() {
   const toggleSidebar = () => {
     const hidden = !sidebarHidden
     setSidebarHidden(hidden)
-    if (ready) void persist({ ...workspace, settings: { ...workspace.settings, sidebar_hidden: hidden } })
+    // 不带 SEC 联系邮箱：页面上的值可能是旧的，不能覆盖 CLI 之后做的修改。
+    if (ready) void persist({ ...workspace, settings: settingsToSave({ ...workspace.settings, sidebar_hidden: hidden }, false) })
   }
   const currentPage = pages.find(item => item.id === page)!
   const items = listMode === 'watchlist' ? workspace.watchlist : results

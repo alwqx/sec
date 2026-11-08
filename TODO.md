@@ -86,7 +86,7 @@
 
 ## Desktop
 
-- [ ] 设置页带着旧的 SEC 联系邮箱保存会覆盖 CLI 刚改的邮箱：前端每次保存工作台都发送 `sec_edgar_email`，后端照写到 `~/.sec/config.json`。Desktop 打开后用 `sec config set sec-edgar-email` 改了邮箱，再在 Desktop 里加一只自选股，邮箱就被改回去。前端应只在邮箱改动时才发送。
+- [x] 设置页带着旧的 SEC 联系邮箱保存会覆盖 CLI 刚改的邮箱：前端每次保存工作台（切换左侧菜单、保存其他设置）都发送打开时读到的 `sec_edgar_email`。改为设置页记录用户是否编辑过邮箱输入框，只在编辑过时发送，切换菜单等其他保存不发送；没编辑过时设置页跟随后端返回的最新邮箱。后端收到空邮箱时不修改。
 - [ ] 升级或修补 `github.com/webview/webview_go` 依赖，消除新版 Clang 的 `-Wdeprecated-literal-operator` 警告：将 `operator"" _cls`、`operator"" _sel`、`operator"" _str` 改为后缀紧邻引号的写法（如 `operator""_cls`）。通过依赖升级或仓库内维护补丁处理，不直接修改 Go 模块缓存。
   - 当前这三条警告来自 WebView 的 C++ 代码，不代表构建失败；未将警告视为错误时，可正常生成二进制。临时隐藏该类警告，可在 `desktop` 目录执行：
   ```shell
