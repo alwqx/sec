@@ -251,11 +251,12 @@ CLI 和 Desktop 共用一份配置，在任意一边设置后另一边直接可�
   sec config ai set-key deepseek         # 设置 Key
   sec config ai unset-key deepseek       # 删除保存的 Key
   sec config ai use deepseek             # 设为 default
-  sec config ai test deepseek            # 发一个最小请求测试连接
+  sec config ai test deepseek            # 发两个最小请求测试连接和工具调用，不写名字时测 default
   sec config ai remove deepseek
   sec config ai enable / disable
   ```
 
+  - `test` 先发一句固定的测试文字（「请只回复 OK」）检查地址、Key 和模型，显示耗时、实际模型和用量；再让模型调用一个测试工具，判断是否支持工具调用（`sec ask` 和 Desktop 对话需要）。不含用户数据，启用 AI 功能前也可以用。连接失败时按原因给出建议（401 是 Key 不对、404 是地址或模型名不对、本机连接被拒绝是模型服务没启动等），退出码非 0；回复被截断或为空时仍算连接正常，但提示可能要更大的输出上限。带工具的请求被厂商拒绝（如 400）时提示可能不支持工具调用，限流、5xx、超时、网络中断时报「没测出来」，都不算失败。读取 Key 时就失败的不会发出请求，输出里也说明没有发出。`--json` 输出同样的内容。
   - `set-key` 在终端里隐藏输入（`golang.org/x/term`），非终端（管道）时从 stdin 读一行（如 `pbpaste | sec config ai set-key ds`），不接受命令行参数，避免 Key 进 shell 历史和进程列表。先确认配置存在再读 Key。终端里按 Ctrl-C 取消时先恢复回显再退出；stdin 不是终端时在 stderr 说明输入不会隐藏（Windows mintty 等控制台不算终端）；输入有多行内容或第一行超过 4096 字节时报错，不截断保存。第一次生成或替换了损坏的 `secret.key` 时提醒不要和 `config.json` 一起同步或备份。`unset-key` 删除后显示现在会用哪个 Key（比如厂商环境变量）。
   - 第一次 `add` 的配置自动成为 `default`；不能删除 `default` 指向的配置，要先 `use` 另一个。
   - `edit` 改了厂商或实际地址时删除保存的 Key：那是原来那个服务的 Key，不能发给新地址，要重新设置。

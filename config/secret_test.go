@@ -263,3 +263,11 @@ func TestAIKeys(t *testing.T) {
 	_, err = ai.UnsetKey("nosuch")
 	require.ErrorIs(t, err, ErrAIProfileNotFound)
 }
+
+func TestDescribeKey(t *testing.T) {
+	ai := AIConfig{Default: "ds", Profiles: map[string]AIProfile{"ds": {Provider: "deepseek", Model: "m"}, "local": {Provider: "ollama", Model: "m"}}}
+	require.Equal(t, "加密保存（末 4 位 2222）", ai.DescribeKey("ds", AIKey{Value: "sk-stored-22222222", Source: AIKeyStored}, nil))
+	require.Equal(t, "厂商环境变量 DEEPSEEK_API_KEY（末 4 位 1111）", ai.DescribeKey("ds", AIKey{Value: "sk-provider-11111111", Source: AIKeyFromProviderEnv, Env: "DEEPSEEK_API_KEY"}, nil))
+	require.Equal(t, "未设置（本机模型可以不填）", ai.DescribeKey("local", AIKey{Source: AIKeyNone}, nil))
+	require.Equal(t, "加密保存，secret.key 已损坏，请重新设置", ai.DescribeKey("ds", AIKey{}, ErrSecretCorrupt))
+}

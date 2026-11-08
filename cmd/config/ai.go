@@ -27,7 +27,10 @@ func newAICLI() *cobra.Command {
 			"Providers: " + providerList(),
 		Args: cobra.NoArgs,
 	}
-	cmd.AddCommand(newAIListCLI(), newAIAddCLI(), newAIEditCLI(), newAISetKeyCLI(), newAIUnsetKeyCLI(), newAIUseCLI(), newAIRemoveCLI(), newAIEnableCLI(true), newAIEnableCLI(false))
+	cmd.AddCommand(
+		newAIListCLI(), newAIAddCLI(), newAIEditCLI(), newAISetKeyCLI(),
+		newAIUnsetKeyCLI(), newAIUseCLI(), newAIRemoveCLI(), newAIEnableCLI(true),
+		newAIEnableCLI(false), newAITestCLI())
 	return cmd
 }
 

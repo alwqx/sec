@@ -126,7 +126,7 @@
   - [x] `ai` 段无效时的两处问题：`config.UpdateFile` 拒绝一切写入，Desktop 前端每次保存都带 `sec_edgar_email`，所以每一次保存（包括自选股）都报 500「请稍后重试」。改为不修改 `ai` 段时照常保存其他配置、`ai` 段按原样写回，只有修改 `ai` 段时才返回 `ErrInvalidAI`；`sec mcp` 的 `secClient` 读取配置出错时都记「使用默认 SEC 联系邮箱」，`ai` 段无效时实际用的是配置里的邮箱，日志应只说读取配置有问题并带上原因（`aitool/financials.go`）。
 - [ ] `llm/` 模型接入抽象：支持 Anthropic 和 OpenAI 兼容接口（覆盖 DeepSeek、通义、本地 Ollama），含回答数字核对、`sec config ai test` 测试连接和各命令的 `--ai <配置名>` 参数；CLI 和 Desktop 共用。拆成以下几个 PR：
   - [x] 两种接口的适配器和假客户端：`llm.Client`、`llm.New(profile, key)`、统一的消息、工具调用、停止原因和错误类型。
-  - [ ] `sec config ai test`：发一个最小请求测试连接，说明 Key 来源、地址和是否支持工具调用。
+  - [x] `sec config ai test`：发一个最小请求测试连接，说明 Key 来源、地址和是否支持工具调用。
   - [ ] 回答数字核对：回答里的数字要能在工具结果里找到。
   - [ ] 各命令的 `--ai <配置名>` 参数和按配置创建客户端的共用代码，随第一个调用模型的命令一起加。
 - [ ] Desktop 模型设置：设置页管理同一份 `ai` 配置（新增、编辑、删除、设为默认）、保存 Key、测试连接，AI 功能旁边可以临时切换配置；说明自选股和查询内容会发给模型厂商，本地模型可不出本机。

@@ -437,6 +437,11 @@ func (a *AIConfig) ResolveKey(secret *AISecret, name string, getenv func(string)
 // KeyStatus 是一个配置的 Key 的显示文字：来源和末 4 位，不显示 Key 本身。
 func (a *AIConfig) KeyStatus(secret *AISecret, name string, getenv func(string) string) string {
 	key, err := a.ResolveKey(secret, name, getenv)
+	return a.DescribeKey(name, key, err)
+}
+
+// DescribeKey 把 ResolveKey 的结果换成 KeyStatus 的显示文字。已经调用过 ResolveKey 时用它，不用再读一次 secret.key。
+func (a *AIConfig) DescribeKey(name string, key AIKey, err error) string {
 	switch {
 	// 只给简短状态，完整原因（含路径）在 ResolveKey 的错误里。
 	case errors.Is(err, ErrSecretMissing), errors.Is(err, ErrKeyUndecryptable):
