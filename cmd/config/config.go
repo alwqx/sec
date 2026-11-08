@@ -49,14 +49,16 @@ func NewConfigCLI() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			// 不显示加密保存的 Key。
 			if asJSON, _ := cmd.Flags().GetBool("json"); asJSON {
-				return utils.PrintJSON(cmd.OutOrStdout(), cfg)
+				return utils.PrintJSON(cmd.OutOrStdout(), cfg.Redacted())
 			}
 			path, _ := config.Path()
 			fmt.Fprintf(cmd.OutOrStdout(), "配置文件：%s\n\n", path)
 			for _, name := range keyNames() {
 				fmt.Fprintf(cmd.OutOrStdout(), "%s = %s\t# %s\n", name, keys[name].get(cfg), keys[name].description)
 			}
+			fmt.Fprintf(cmd.OutOrStdout(), "ai = %s\t# 调用模型的 AI 功能，见 docs/ai.md\n", aiSummary(cfg.AI))
 			return nil
 		},
 	}
@@ -103,6 +105,18 @@ func NewConfigCLI() *cobra.Command {
 		},
 	})
 	return cmd
+}
+
+// aiSummary 是 sec config 里 ai 段的一行摘要。
+func aiSummary(ai config.AIConfig) string {
+	if len(ai.Profiles) == 0 {
+		return "未启用，没有模型配置"
+	}
+	state := "未启用"
+	if ai.Enabled {
+		state = "已启用"
+	}
+	return fmt.Sprintf("%s，%d 个模型配置，default 是 %s", state, len(ai.Profiles), ai.Default)
 }
 
 // load 读取配置；文件内容无效时提示并使用默认值，可以用 sec config set 覆盖。

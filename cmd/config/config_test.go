@@ -55,3 +55,25 @@ func TestConfigCommands(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "fixed@example.org\n", output)
 }
+
+func TestConfigShowAI(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	output, err := run(t)
+	require.NoError(t, err)
+	require.Contains(t, output, "ai = 未启用，没有模型配置")
+
+	require.NoError(t, os.MkdirAll(filepath.Join(home, ".sec"), 0700))
+	require.NoError(t, os.WriteFile(filepath.Join(home, ".sec", "config.json"), []byte(`{"ai":{"enabled":true,"default":"claude","profiles":{
+		"claude":{"provider":"anthropic","model":"claude-sonnet-5-5","api_key":"enc:v1:c2VjcmV0"},
+		"local":{"provider":"ollama","base_url":"http://127.0.0.1:11434/v1","model":"qwen3"}}}}`), 0600))
+	output, err = run(t)
+	require.NoError(t, err)
+	require.Contains(t, output, "ai = 已启用，2 个模型配置，default 是 claude")
+
+	output, err = run(t, "--json")
+	require.NoError(t, err)
+	require.NotContains(t, output, "enc:v1:", "不显示加密保存的 Key")
+	require.Contains(t, output, `"api_key": "（已加密保存）"`)
+	require.Contains(t, output, `"model": "qwen3"`)
+}

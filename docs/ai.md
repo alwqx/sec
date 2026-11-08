@@ -159,7 +159,7 @@ CLI 和 Desktop 共用一份配置，在任意一边设置后另一边直接可�
 | API Key | 每个配置各自一个：环境变量，或 `config.json` 里加密保存的 Key |
 | 加密密钥 | `~/.sec/secret.key`，首次保存 Key 时生成，和 `config.json` 分开存放，所有配置共用 |
 
-`config.json` 的 `ai` 段可以保存多个模型配置，每个配置自带接口类型、地址、模型和 Key，切换时只改 `default` 或临时指定，不用改别的字段：
+`config.json` 的 `ai` 段可以保存多个模型配置，每个配置写明厂商、模型和 Key，协议和地址默认用厂商的官方设置，切换时只改 `default` 或临时指定，不用改别的字段：
 
 ```json
 {
@@ -167,49 +167,66 @@ CLI 和 Desktop 共用一份配置，在任意一边设置后另一边直接可�
   "ai": {
     "enabled": true,
     "default": "claude",
-    "providers": {
+    "profiles": {
       "claude": {
-        "type": "anthropic",
-        "base_url": "",
+        "provider": "anthropic",
         "model": "claude-sonnet-5-5",
-        "api_key_env": "",
         "api_key": "enc:v1:3q2+7w...（base64）"
       },
-      "deepseek": {
-        "type": "openai",
-        "base_url": "https://api.deepseek.com",
+      "ds": {
+        "provider": "deepseek",
         "model": "deepseek-chat",
-        "api_key_env": "",
         "api_key": "enc:v1:9xk2Lm...（base64）"
       },
       "local": {
-        "type": "openai",
-        "base_url": "http://127.0.0.1:11434/v1",
+        "provider": "ollama",
         "model": "qwen3"
+      },
+      "gw": {
+        "provider": "custom",
+        "api": "openai",
+        "base_url": "https://llm.corp.example/v1",
+        "model": "x",
+        "api_key_env": "CORP_LLM_KEY"
       }
     }
   }
 }
 ```
 
-- `providers` 是以配置名为键的对象，名字天然唯一，命令里直接用名字引用。名字只能用小写字母、数字和 `-`，最长 32 个字符。Desktop 下拉框按名字排序显示。
-- `default` 是不指定时使用的配置，必须是 `providers` 里存在的名字。
-- `type` 是接口协议：`anthropic`（Messages API）或 `openai`（OpenAI 兼容接口）。同一种协议可以有多个配置，比如 OpenAI、DeepSeek、通义和本地 Ollama 都是 `openai`。
-- `base_url` 为空时用该协议的官方默认地址；`model` 必填。
+- `profiles` 是以配置名为键的对象，名字天然唯一，命令里直接用名字引用。名字只能用小写字母、数字和 `-`，以字母或数字开头，最长 32 个字符。Desktop 下拉框按名字排序显示。
+- `default` 是不指定时使用的配置，必须是 `profiles` 里存在的名字。
+- `provider` 是模型厂商，必填，只能从内置列表里选（`config.AIProviders`），列表给出每个厂商的显示名、默认协议、官方地址和默认环境变量：
+
+  | `provider` | 厂商 | 默认 `api` | 官方地址 | 默认环境变量 |
+  | --- | --- | --- | --- | --- |
+  | `anthropic` | Anthropic | `anthropic` | `https://api.anthropic.com` | `ANTHROPIC_API_KEY` |
+  | `openai` | OpenAI | `openai` | `https://api.openai.com/v1` | `OPENAI_API_KEY` |
+  | `deepseek` | DeepSeek | `openai` | `https://api.deepseek.com` | `DEEPSEEK_API_KEY` |
+  | `qwen` | 通义千问（阿里云百炼） | `openai` | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `DASHSCOPE_API_KEY` |
+  | `moonshot` | 月之暗面 Kimi | `openai` | `https://api.moonshot.cn/v1` | `MOONSHOT_API_KEY` |
+  | `zhipu` | 智谱 GLM | `openai` | `https://open.bigmodel.cn/api/paas/v4` | `ZAI_API_KEY` |
+  | `ollama` | Ollama（本地） | `openai` | `http://localhost:11434/v1` | 无 |
+  | `custom` | 自定义（自建网关、代理等） | 必填 | 必填 | 无 |
+
+  通义千问和 Kimi 分中国和国际两个区域，Key 只能在签发它的区域使用，默认是中国区域，国际区域的 Key 要填 `base_url`。其他厂商用 `custom`。厂商列表用于默认值、隐私提示和以后 `llm/` 里各厂商的差异处理，列表外的值是无效配置，不猜测。
+- `api` 是接口协议：`anthropic`（Messages API）或 `openai`（OpenAI 兼容接口），为空时用厂商的默认协议。部分厂商同时提供两种协议（比如 DeepSeek 的 Anthropic 兼容接口），这时填 `api` 和对应的 `base_url`：官方地址只对应默认协议，`api` 和默认协议不同时 `base_url` 必填。
+- `base_url` 为空时用厂商的官方地址；`custom` 必须填 `api` 和 `base_url`；`model` 必填。`base_url` 不能带用户名密码、`#` 片段，也不能在查询参数里放 Key、token 或密码（`api-version` 这类普通参数可以），地址会明文写进文件。
 - 每个配置只有一个 `api_key`（密文）；`api_key_env` 指定从哪个环境变量读 Key。本地模型两者都可以不填。
 - Key 的读取顺序：
   1. `api_key_env` 非空时读这个环境变量；
   2. 否则读 `api_key` 解密；
-  3. 都没有时，读该协议默认的环境变量（`ANTHROPIC_API_KEY` 或 `OPENAI_API_KEY`）。
+  3. 都没有时，读厂商的默认环境变量（见上表）。`base_url` 改成官方地址以外的地址时不读（只差结尾的 `/` 仍算官方地址），避免把厂商的 Key 发给别的服务。
 
-  默认环境变量放在最后，避免同为 `openai` 协议的 DeepSeek 配置误用 OpenAI 的 Key。环境变量适合 CI、服务器和临时覆盖。
+  默认环境变量按厂商区分，DeepSeek 配置不会误用 `OPENAI_API_KEY`。环境变量适合 CI、服务器和临时覆盖。
+- 是否本机按实际地址判断（`localhost` 或回环地址），不按厂商：本机模型的查询内容不出本机，隐私提示据此说明；指向其他主机的 Ollama 不算本机。
 - 以后需要按配置区分的设置（如 `max_tokens`、超时）作为可选字段加到每个配置里，属于兼容变更，第一版不加。
 
 ### 选择配置
 
 - **CLI**：所有调用模型的命令（`--explain`、`--summary`、`sec ipo ask`、`sec ask`）都支持 `--ai <配置名>`，不写时用 `default`。
 - **Desktop**：解读按钮、摘要按钮和对话面板旁边有配置下拉框，默认选中 `default`；临时切换只对当前页面有效，不改 `default`，要改默认值去设置页。
-- 缓存键里的「模型」用配置的 `type` + `base_url` + `model`，不用配置名，改名或复制配置不会让缓存失效，换了模型才会重新调用。
+- 缓存键里的「模型」用配置实际的 `api` + `base_url` + `model`，不用配置名，改名或复制配置不会让缓存失效，换了模型才会重新调用。
 
 ### API Key 加密
 
@@ -225,9 +242,10 @@ CLI 和 Desktop 共用一份配置，在任意一边设置后另一边直接可�
 - **CLI**：配置是嵌套结构，用 `sec config set` 的点号路径太长，改为 `sec config ai` 子命令：
 
   ```bash
-  sec config ai list                     # 列出所有配置：名字、协议、地址、模型、Key 来源和末 4 位，标出 default
-  sec config ai add deepseek --type openai --base-url https://api.deepseek.com --model deepseek-chat
-  sec config ai edit deepseek --model deepseek-reasoner   # 修改 type、base-url、model、api-key-env
+  sec config ai list                     # 列出所有配置：名字、厂商、协议、地址、模型、Key 来源和末 4 位，标出 default
+  sec config ai add ds --provider deepseek --model deepseek-chat
+  sec config ai add gw --provider custom --api openai --base-url https://llm.corp.example/v1 --model x
+  sec config ai edit ds --model deepseek-reasoner   # 修改 provider、api、base-url、model、api-key-env
   sec config ai set-key deepseek         # 设置 Key
   sec config ai unset-key deepseek       # 删除保存的 Key
   sec config ai use deepseek             # 设为 default
@@ -247,6 +265,7 @@ CLI 和 Desktop 共用一份配置，在任意一边设置后另一边直接可�
 - 明文 Key 不写入任何文件，不在 `sec config`、接口和日志里回显，只显示「已设置」和末 4 位。
 - Desktop 前端提交 Key 后，后端不在任何接口里返回 Key 或密文。
 - 本地模型（Ollama 等）可以不填 Key。
+- `ai` 段和其他配置分开解析。`ai` 段无效（比如手动编辑后 `default` 指向不存在的配置，或 `"enabled": "yes"` 这样的类型错误）时，读取时忽略整个 `ai` 段并提示，相当于未启用；修改配置时不覆盖文件，提示手动修正，避免丢掉已保存的 Key。其他配置项无效或类型不对时只把它们换成默认值，`ai` 段照常保留；只有文件根本不是 JSON 对象时才整体使用默认配置。校验错误不回显填的值，Key 填错位置时不会出现在提示和日志里。
 - 默认关闭，用户主动配置后才启用。首次启用时 CLI 和设置页都提示：查询的证券、自选股和工具结果会发送给所选厂商，本地模型的数据不出本机。
 
 ### 提示词

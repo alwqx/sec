@@ -1,5 +1,9 @@
 ## sec change log
 
+### v0.4.9
+
+1. Add the `ai` section of `~/.sec/config.json` for model profiles shared by the CLI and Desktop.
+
 ### v0.4.8
 
 1. Add the AI/LLM design in `docs/ai.md` and its roadmap in `TODO.md`.
