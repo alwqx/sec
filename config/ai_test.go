@@ -174,7 +174,7 @@ func TestAIFile(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, cfg.AI.Has("deepseek"), "修正邮箱不会丢掉模型配置")
 
-	// ai 段无效：读取时忽略，修改时不覆盖文件。
+	// ai 段无效：读取时忽略；修改其他配置照常保存，ai 段原样写回；修改 ai 段时不保存。
 	bad := `{"sec_edgar_email":"me@example.org","ai":{"default":"nosuch","profiles":{"deepseek":{"provider":"openai","model":"m","api_key":"enc:v1:keep"}}}}`
 	require.NoError(t, os.WriteFile(path, []byte(bad), 0600))
 	cfg, err = LoadFile(ctx, path)
@@ -183,24 +183,34 @@ func TestAIFile(t *testing.T) {
 	require.ErrorContains(t, err, "已忽略 ai 段")
 	require.Equal(t, AIConfig{}, cfg.AI)
 	require.Equal(t, "me@example.org", cfg.SECEmail)
-	err = UpdateFile(ctx, path, func(c *Config) error { c.SECEmail = "you@example.org"; return nil })
-	require.ErrorIs(t, err, ErrInvalidAI)
+	rawAI := aiSection(t, path)
+	require.NoError(t, UpdateFile(ctx, path, func(c *Config) error { c.SECEmail = "you@example.org"; return nil }))
+	cfg, err = LoadFile(ctx, path)
+	require.ErrorIs(t, err, ErrInvalidAI, "ai 段仍然无效")
+	require.Equal(t, "you@example.org", cfg.SECEmail, "其他配置照常保存")
+	require.JSONEq(t, rawAI, aiSection(t, path), "ai 段原样写回")
+
+	before, err := os.ReadFile(path)
+	require.NoError(t, err)
+	err = UpdateFile(ctx, path, func(c *Config) error { return c.AI.Add("claude", AIProfile{Provider: "anthropic", Model: "m"}) })
+	require.ErrorIs(t, err, ErrInvalidAI, "修改 ai 段时不保存")
 	require.ErrorContains(t, err, "手动修正")
 	data, err = os.ReadFile(path)
 	require.NoError(t, err)
-	require.Equal(t, bad, string(data), "文件不变")
+	require.Equal(t, string(before), string(data), "文件不变")
+	require.ErrorContains(t, UpdateFile(ctx, path, func(c *Config) error { c.SECEmail = "bad"; return nil }), "SEC 联系邮箱无效", "其他配置照常校验")
 
-	// ai 段类型不对：其余配置照常读取，修改时同样不覆盖。
+	// ai 段类型不对：其余配置照常读取，修改其他配置时 ai 段同样原样写回。
 	typed := `{"sec_edgar_email":"me@example.org","ai":{"enabled":"yes","profiles":{"deepseek":{"provider":"openai","model":"m","api_key":"enc:v1:keep"}}}}`
 	require.NoError(t, os.WriteFile(path, []byte(typed), 0600))
 	cfg, err = LoadFile(ctx, path)
 	require.ErrorIs(t, err, ErrInvalidAI)
 	require.Equal(t, "me@example.org", cfg.SECEmail)
 	require.Equal(t, AIConfig{}, cfg.AI)
-	require.ErrorIs(t, UpdateFile(ctx, path, func(c *Config) error { c.SECEmail = "you@example.org"; return nil }), ErrInvalidAI)
-	data, err = os.ReadFile(path)
-	require.NoError(t, err)
-	require.Equal(t, typed, string(data), "文件不变")
+	rawAI = aiSection(t, path)
+	require.NoError(t, UpdateFile(ctx, path, func(c *Config) error { c.SECEmail = "you@example.org"; return nil }))
+	require.JSONEq(t, rawAI, aiSection(t, path))
+	require.Contains(t, aiSection(t, path), "enc:v1:keep")
 
 	// 其他字段类型不对时只换掉它们，ai 段保留，修改时也不丢。
 	valid := `{"sec_edgar_email":123,"ai":{"default":"ds","profiles":{"ds":{"provider":"deepseek","model":"m","api_key":"enc:v1:keep"}}}}`
@@ -220,10 +230,10 @@ func TestAIFile(t *testing.T) {
 	require.NoError(t, os.WriteFile(path, []byte(upper), 0600))
 	_, err = LoadFile(ctx, path)
 	require.ErrorIs(t, err, ErrInvalidAI)
-	require.ErrorIs(t, UpdateFile(ctx, path, func(c *Config) error { return nil }), ErrInvalidAI)
-	data, err = os.ReadFile(path)
-	require.NoError(t, err)
-	require.Equal(t, upper, string(data))
+	require.NoError(t, UpdateFile(ctx, path, func(c *Config) error { return nil }))
+	require.JSONEq(t, `{"enabled":"yes","profiles":{}}`, aiSection(t, path), "大写的 AI 段也原样写回")
+	_, err = LoadFile(ctx, path)
+	require.ErrorIs(t, err, ErrInvalidAI)
 
 	// 不是 JSON 对象：从默认值开始，修改时覆盖。
 	for _, broken := range []string{`{"ai":`, `[]`, `"x"`} {
@@ -284,4 +294,16 @@ func TestAIProfileDefaults(t *testing.T) {
 		require.True(t, AIProfile{Provider: AIProviderCustom, API: AIAPIOpenAI, BaseURL: u}.IsLocal(), u)
 	}
 	require.Empty(t, AIProfile{Provider: AIProviderCustom, API: AIAPIOpenAI, BaseURL: "https://x.example"}.DefaultKeyEnv())
+}
+
+// aiSection 返回文件里 ai 段的原始 JSON，字段名不分大小写。
+func aiSection(t *testing.T, path string) string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	var fields map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(data, &fields))
+	raw := takeAI(fields)
+	require.NotNil(t, raw, "文件里有 ai 段")
+	return string(raw)
 }

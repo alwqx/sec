@@ -246,6 +246,11 @@ func (a AIConfig) Names() []string {
 	return slices.Sorted(maps.Keys(a.Profiles))
 }
 
+// isZero 判断 ai 段是不是空的：没有启用、没有 default、没有配置。
+func (a AIConfig) isZero() bool {
+	return !a.Enabled && a.Default == "" && len(a.Profiles) == 0
+}
+
 // normalize 把空的 Profiles 换成 nil，没有配置时不写入 ai 段。
 func (a *AIConfig) normalize() {
 	if len(a.Profiles) == 0 {

@@ -24,8 +24,8 @@ const DefaultSECEmail = "sec_dev@example.com"
 // 修改配置时直接覆盖无效内容，不需要手动编辑文件。
 var ErrInvalid = errors.New("配置文件无效")
 
-// ErrInvalidAI 表示 ai 段无效，它也是 ErrInvalid。读取时忽略 ai 段（相当于未启用）；修改配置时不覆盖文件，
-// 避免丢掉已保存的模型配置和 Key，需要用户手动修正。
+// ErrInvalidAI 表示 ai 段无效，它也是 ErrInvalid。读取时忽略 ai 段（相当于未启用）；修改其他配置时 ai 段按原样写回，
+// 要修改 ai 段时返回这个错误，避免丢掉已保存的模型配置和 Key，需要用户先手动修正。
 var ErrInvalidAI = fmt.Errorf("%w：ai 段无效", ErrInvalid)
 
 // Config 是全部配置项。
@@ -101,24 +101,25 @@ func LoadFile(ctx context.Context, path string) (Config, error) {
 		return Default(), err
 	}
 	defer unlock()
-	return read(path)
+	cfg, _, err := read(path)
+	return cfg, err
 }
 
-// read 在持有文件锁时读取配置。
-func read(path string) (Config, error) {
+// read 在持有文件锁时读取配置，同时返回文件里 ai 段的原始内容（没有时为 nil），ai 段无效时 UpdateFile 用它原样写回。
+func read(path string) (Config, json.RawMessage, error) {
 	cfg := Default()
 	data, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
-		return cfg, nil
+		return cfg, nil, nil
 	}
 	if err != nil {
-		return cfg, err
+		return cfg, nil, err
 	}
 	// ai 段和其他配置分开解析：其他配置的类型不对时只把它们换成默认值，不会连带丢掉 ai 段；
 	// ai 段的类型不对（如 "enabled": "yes"）时按 ai 段无效处理，修改时不覆盖文件。
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(data, &fields); err != nil {
-		return Default(), fmt.Errorf("%w：%s 不是有效的 JSON 对象，已使用默认配置：%v", ErrInvalid, path, err)
+		return Default(), nil, fmt.Errorf("%w：%s 不是有效的 JSON 对象，已使用默认配置：%v", ErrInvalid, path, err)
 	}
 	aiData := takeAI(fields)
 	var invalid []error
@@ -150,7 +151,7 @@ func read(path string) (Config, error) {
 		invalid = append(invalid, fmt.Errorf("%w：%s，SEC 联系邮箱已使用默认值：%v", ErrInvalid, path, err))
 	}
 	cfg.AI.normalize()
-	return cfg, errors.Join(invalid...)
+	return cfg, aiData, errors.Join(invalid...)
 }
 
 // takeAI 从 fields 里取出并删掉 ai 字段，没有时返回 nil。和 encoding/json 一样不分大小写，"AI" 也算，名字完全一样的优先。
@@ -177,8 +178,8 @@ func SaveFile(ctx context.Context, path string, cfg Config) error {
 }
 
 // UpdateFile 在同一把文件锁里读取、修改并保存配置，CLI 和 Desktop 同时修改时不会互相覆盖。
-// 原文件内容无效时从默认值开始修改；只有 ai 段无效时不修改，返回 ErrInvalidAI，避免丢掉已保存的 Key。
-// 写入时先写临时文件再改名，中途失败不会留下写了一半的文件。
+// 原文件内容无效时从默认值开始修改。ai 段无效时，没有修改 ai 段就照常保存其他配置，ai 段按文件里的原始内容写回；
+// 修改了 ai 段时不保存，返回 ErrInvalidAI，避免丢掉已保存的 Key。写入时先写临时文件再改名，中途失败不会留下写了一半的文件。
 func UpdateFile(ctx context.Context, path string, change func(*Config) error) error {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
@@ -187,15 +188,27 @@ func UpdateFile(ctx context.Context, path string, change func(*Config) error) er
 		return err
 	}
 	defer unlock()
-	cfg, err := read(path)
-	if errors.Is(err, ErrInvalidAI) {
-		return fmt.Errorf("%w；为避免丢掉已保存的模型配置和 Key，没有修改，请先手动修正或删除 ai 段", err)
-	}
+	cfg, rawAI, err := read(path)
+	invalidAI := errors.Is(err, ErrInvalidAI)
 	if err != nil && !errors.Is(err, ErrInvalid) {
 		return err
 	}
 	if err := change(&cfg); err != nil {
 		return err
+	}
+	if invalidAI {
+		// 读取时已忽略无效的 ai 段，cfg.AI 是空的；不是空的说明这次修改了 ai 段。
+		if !cfg.AI.isZero() {
+			return fmt.Errorf("%w；为避免丢掉已保存的模型配置和 Key，没有修改，请先手动修正或删除 ai 段", err)
+		}
+		if err := ValidateEmail(cfg.SECEmail); err != nil {
+			return err
+		}
+		data, err := marshalWithAI(cfg, rawAI)
+		if err != nil {
+			return err
+		}
+		return watchlist.AtomicWrite(path, append(data, '\n'))
 	}
 	if err := cfg.validate(); err != nil {
 		return err
@@ -206,6 +219,20 @@ func UpdateFile(ctx context.Context, path string, change func(*Config) error) er
 		return err
 	}
 	return watchlist.AtomicWrite(path, append(data, '\n'))
+}
+
+// marshalWithAI 编码 cfg，ai 段用文件里的原始内容。
+func marshalWithAI(cfg Config, rawAI json.RawMessage) ([]byte, error) {
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		return nil, err
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return nil, err
+	}
+	fields["ai"] = rawAI
+	return json.MarshalIndent(fields, "", "  ")
 }
 
 // Update 修改默认位置的配置，见 UpdateFile。

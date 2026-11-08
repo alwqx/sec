@@ -93,12 +93,13 @@ type financialsData struct {
 // secFacts 缓存 SEC XBRL 数据：sec mcp 是长期运行的进程，模型常常先查年度再查季度，不用每次重新下载几 MB。
 var secFacts = &edgar.FactsCache{}
 
-// secClient 返回访问 SEC EDGAR 的客户端，联系邮箱来自 sec config。读取失败时 Load 返回默认配置。
+// secClient 返回访问 SEC EDGAR 的客户端，联系邮箱来自 sec config。读取有问题时 Load 返回能读到的部分，其余用默认值。
 // MCP 由 agent 启动，环境不一定完整（比如没有 HOME），用默认邮箱继续，不让配置挡住查询。
 func secClient(ctx context.Context) *edgar.Client {
 	cfg, err := config.Load(ctx)
 	if err != nil {
-		slog.WarnContext(ctx, "读取配置失败，使用默认 SEC 联系邮箱", "error", err)
+		// 不一定用了默认邮箱：只有 ai 段无效时邮箱照常读取。
+		slog.WarnContext(ctx, "读取配置有问题，继续查询", "error", err)
 	}
 	return &edgar.Client{Email: cfg.SECEmail}
 }
