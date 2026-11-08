@@ -97,6 +97,15 @@ var (
 	envVar = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 )
 
+// ErrInvalidKey 表示要保存的 Key 本身不对（为空、含空白字符），是用户输入的问题，区别于加密和读写 secret.key 的错误。
+var ErrInvalidKey = errors.New("Key 无效")
+
+// keyError 是 Key 无效的具体原因，文字不变，errors.Is 时算作 ErrInvalidKey。
+type keyError string
+
+func (e keyError) Error() string      { return string(e) }
+func (keyError) Is(target error) bool { return target == ErrInvalidKey }
+
 // ErrAIProfileNotFound 表示没有这个名字的模型配置。
 var ErrAIProfileNotFound = errors.New("没有这个模型配置")
 
@@ -375,10 +384,10 @@ func (a *AIConfig) SetKey(secret *AISecret, name, key string) (string, error) {
 	}
 	key = strings.TrimSpace(key)
 	if key == "" {
-		return "", errors.New("Key 不能为空")
+		return "", keyError("Key 不能为空")
 	}
 	if strings.ContainsAny(key, " \t\r\n") {
-		return "", errors.New("Key 不能包含空白字符，请检查是否多粘贴了内容")
+		return "", keyError("Key 不能包含空白字符，请检查是否多粘贴了内容")
 	}
 	encrypted, err := secret.Encrypt(name, key)
 	if err != nil {
@@ -481,6 +490,7 @@ type AIProfileView struct {
 	Model        string `json:"model"`
 	APIKeyEnv    string `json:"api_key_env,omitempty"`
 	Key          string `json:"key"`
+	KeyStored    bool   `json:"key_stored"` // 有没有加密保存的 Key，Key 也可能来自环境变量
 	Local        bool   `json:"local"`
 }
 
@@ -493,7 +503,7 @@ func (a *AIConfig) Views(secret *AISecret, getenv func(string) string) []AIProfi
 		views = append(views, AIProfileView{
 			Name: name, Default: name == a.Default, Provider: p.Provider, ProviderName: provider.Name,
 			API: p.EffectiveAPI(), BaseURL: p.EffectiveBaseURL(), Model: p.Model, APIKeyEnv: p.APIKeyEnv,
-			Key: a.KeyStatus(secret, name, getenv), Local: p.IsLocal(),
+			Key: a.KeyStatus(secret, name, getenv), KeyStored: p.APIKey != "", Local: p.IsLocal(),
 		})
 	}
 	return views

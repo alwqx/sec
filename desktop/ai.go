@@ -96,7 +96,7 @@ func (s *desktopServer) handleAIAddProfile(w http.ResponseWriter, r *http.Reques
 			return "", err
 		}
 		if env := p.DefaultKeyEnv(); env != "" && p.APIKeyEnv == "" {
-			return "Key 可以用环境变量 " + env + " 提供，或用 sec config ai set-key " + in.Name + " 加密保存。", nil
+			return "Key 可以用环境变量 " + env + " 提供，或点「设置 Key」加密保存。", nil
 		}
 		return "", nil
 	})
@@ -166,11 +166,96 @@ func (s *desktopServer) handleAIEnabled(w http.ResponseWriter, r *http.Request) 
 	s.changeAI(w, r, func(ai *config.AIConfig) (string, error) { return "", ai.SetEnabled(in.Enabled) })
 }
 
+// handleAISetKey 加密保存一个配置的 Key，规则和 sec config ai set-key 一致。Key 只提交不返回，不写日志，错误信息里也不回显。
+func (s *desktopServer) handleAISetKey(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Key string `json:"key"`
+	}
+	if !s.readAIRequest(w, r, &in) {
+		return
+	}
+	secret, err := s.aiSecret()
+	if err != nil {
+		slog.ErrorContext(r.Context(), "保存 Key 失败", "error", err)
+		writeError(w, http.StatusInternalServerError, "保存 Key 失败")
+		return
+	}
+	name := r.PathValue("name")
+	before, beforeErr := os.Stat(secret.Path())
+	s.changeAI(w, r, func(ai *config.AIConfig) (string, error) {
+		clearedEnv, err := ai.SetKey(secret, name, in.Key)
+		switch {
+		case errors.Is(err, config.ErrInvalidKey), errors.Is(err, config.ErrAIProfileNotFound):
+			return "", err
+		case err != nil:
+			return "", aiInternalError{err}
+		}
+		var notices []string
+		if clearedEnv != "" {
+			notices = append(notices, "已不再从环境变量 "+clearedEnv+" 读取 Key。")
+		}
+		// 第一次生成或替换了损坏的密钥时提醒；替换是改名，和原来不是同一个文件。
+		after, err := os.Stat(secret.Path())
+		switch {
+		case err != nil:
+		case beforeErr != nil:
+			notices = append(notices, "已生成加密密钥 "+secret.Path()+"，不要和 config.json 一起同步或备份。")
+		case !os.SameFile(before, after):
+			// 原来的密钥无法使用（损坏等）被换掉了：用它加密的其他 Key 再也解不开，要说清楚。
+			var lost []string
+			for _, other := range ai.Names() {
+				if other != name && ai.Profiles[other].APIKey != "" {
+					lost = append(lost, other)
+				}
+			}
+			notice := "原来的加密密钥无法使用，已换成新的 " + secret.Path() + "，不要和 config.json 一起同步或备份。"
+			if len(lost) > 0 {
+				notice += strings.Join(lost, "、") + " 保存的 Key 无法再解密，请重新设置。"
+			}
+			notices = append(notices, notice)
+		}
+		return strings.Join(notices, ""), nil
+	})
+}
+
+// handleAIUnsetKey 删除一个配置保存的 Key。删除后可能还会从环境变量读到 Key，列表里的 Key 状态会说明。
+func (s *desktopServer) handleAIUnsetKey(w http.ResponseWriter, r *http.Request) {
+	if !s.checkAIOrigin(w, r) {
+		return
+	}
+	secret, err := s.aiSecret()
+	if err != nil {
+		slog.ErrorContext(r.Context(), "清除 Key 失败", "error", err)
+		writeError(w, http.StatusInternalServerError, "清除 Key 失败")
+		return
+	}
+	name := r.PathValue("name")
+	s.changeAI(w, r, func(ai *config.AIConfig) (string, error) {
+		had, err := ai.UnsetKey(name)
+		if err != nil {
+			return "", err
+		}
+		notice := "已删除 " + name + " 保存的 Key。"
+		if !had {
+			notice = name + " 没有保存的 Key。"
+		}
+		// 保存 Key 时已经清空了 api_key_env，删除后不会回到原来的环境变量，说清楚现在用哪个 Key。
+		return notice + "现在的 Key：" + ai.KeyStatus(secret, name, os.Getenv) + "。", nil
+	})
+}
+
 func (in aiProfileInput) profile() config.AIProfile {
 	return config.AIProfile{Provider: in.Provider, API: in.API, BaseURL: in.BaseURL, Model: in.Model, APIKeyEnv: in.APIKeyEnv}
 }
 
-// changeAI 在共享配置的锁里修改 ai 段，返回修改后的模型配置。change 的错误是用户输入的问题（名字重复、地址无效等），返回 400。
+// aiInternalError 标记 change 里不是用户输入造成的错误（如加密或写 secret.key 失败），changeAI 记日志并返回 500。
+type aiInternalError struct{ err error }
+
+func (e aiInternalError) Error() string { return e.err.Error() }
+func (e aiInternalError) Unwrap() error { return e.err }
+
+// changeAI 在共享配置的锁里修改 ai 段，返回修改后的模型配置。change 的错误默认是用户输入的问题（名字重复、地址无效等），
+// 返回 400；用 aiInternalError 包起来的返回 500。
 func (s *desktopServer) changeAI(w http.ResponseWriter, r *http.Request, change func(*config.AIConfig) (string, error)) {
 	ctx := r.Context()
 	path, err := s.configPath()
@@ -186,7 +271,13 @@ func (s *desktopServer) changeAI(w http.ResponseWriter, r *http.Request, change 
 		notice, inputErr = change(ai)
 		return inputErr
 	})
+	var internal aiInternalError
 	switch {
+	case errors.As(inputErr, &internal):
+		slog.ErrorContext(ctx, "修改模型配置失败", "error", internal.err)
+		// 原因（如 secret.key 权限要改为 600）对用户有用，保留在提示里。
+		writeError(w, http.StatusInternalServerError, "修改模型配置失败："+internal.err.Error())
+		return
 	case inputErr != nil:
 		writeError(w, http.StatusBadRequest, inputErr.Error())
 		return
