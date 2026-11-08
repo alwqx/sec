@@ -16,21 +16,23 @@ import (
 
 // Check 是一次核对的结果。位置按字符（rune）计，界面可以据此标出。
 type Check struct {
-	Numbers     int         // 参与核对的数字个数
-	Unsourced   []NumberRef // 在数据里找不到的数字
-	AdviceTerms []TermRef   // 出现的投资建议用语
+	Numbers     int         `json:"numbers"`      // 参与核对的数字个数
+	Unsourced   []NumberRef `json:"unsourced"`    // 在数据里找不到的数字
+	AdviceTerms []TermRef   `json:"advice_terms"` // 出现的投资建议用语
 }
 
 // NumberRef 是回答里的一个数字。
 type NumberRef struct {
-	Text       string // 回答里的原文，如 1,523.5、12.5%、1.2万亿
-	Start, End int
+	Text  string `json:"text"` // 回答里的原文，如 1,523.5、12.5%、1.2万亿
+	Start int    `json:"start"`
+	End   int    `json:"end"`
 }
 
 // TermRef 是回答里的一个投资建议用语。
 type TermRef struct {
-	Text       string
-	Start, End int
+	Text  string `json:"text"`
+	Start int    `json:"start"`
+	End   int    `json:"end"`
 }
 
 // OK 表示没有找不到来源的数字，也没有投资建议用语。
@@ -94,8 +96,9 @@ var adviceTerms = []string{"买入", "卖出", "加仓", "减仓", "建仓", "�
 // 「非常」「无论」「不断」「不错」里的非、无、不不是否定。
 var negations = []string{"不构成", "不建议", "不能", "不会", "不提供", "不给", "不应", "不宜", "不要", "不是", "并非", "无法", "没有", "勿"}
 
-// immediateNegations 紧挨在建议用语前面时是否定，如「不买入」「勿追高加仓」里的勿只在紧挨时算。
-const immediateNegations = "不勿别"
+// immediateNegations 紧挨在建议用语前面时是否定，如「不买入」「非目标价」「无止损」。只在紧挨时算：
+// 「非常适合买入」里的非后面不是建议用语。
+const immediateNegations = "不勿别非无"
 
 // negationWindow 是往前找否定短语的字符数。
 const negationWindow = 8
@@ -129,14 +132,15 @@ func Verify(answer string, sources ...string) Check {
 		slices.Sort(values)
 		set[scale] = slices.Compact(values)
 	}
-	check := Check{}
+	// 空的列表编码成 []，不是 null。
+	check := Check{Unsourced: []NumberRef{}, AdviceTerms: []TermRef{}}
 	for _, n := range extractNumbers(answer, true) {
 		check.Numbers++
 		if !set.has(n) {
 			check.Unsourced = append(check.Unsourced, n.ref)
 		}
 	}
-	check.AdviceTerms = findAdvice(answer)
+	check.AdviceTerms = append(check.AdviceTerms, findAdvice(answer)...)
 	return check
 }
 
