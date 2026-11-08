@@ -254,7 +254,7 @@ CLI 和 Desktop 共用一份配置，在任意一边设置后另一边直接可�
   sec config ai enable / disable
   ```
 
-  - `set-key` 在终端里隐藏输入，非终端（管道）时从 stdin 读一行，不接受命令行参数，避免 Key 进 shell 历史和进程列表。
+  - `set-key` 在终端里隐藏输入（`golang.org/x/term`），非终端（管道）时从 stdin 读一行（如 `pbpaste | sec config ai set-key ds`），不接受命令行参数，避免 Key 进 shell 历史和进程列表。先确认配置存在再读 Key。终端里按 Ctrl-C 取消时先恢复回显再退出；stdin 不是终端时在 stderr 说明输入不会隐藏（Windows mintty 等控制台不算终端）；输入有多行内容或第一行超过 4096 字节时报错，不截断保存。第一次生成或替换了损坏的 `secret.key` 时提醒不要和 `config.json` 一起同步或备份。`unset-key` 删除后显示现在会用哪个 Key（比如厂商环境变量）。
   - 第一次 `add` 的配置自动成为 `default`；不能删除 `default` 指向的配置，要先 `use` 另一个。
   - `edit` 改了厂商或实际地址时删除保存的 Key：那是原来那个服务的 Key，不能发给新地址，要重新设置。
   - 第一次 `enable` 时提示哪些配置会把数据发给外部厂商、哪些是本机模型；已启用后 `add` 或 `use` 一个外部厂商的配置时再提示一行。

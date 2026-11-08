@@ -7,6 +7,7 @@
 3. Encrypt AI API keys with AES-256-GCM and a separate `~/.sec/secret.key`, and resolve keys from env vars or the stored key.
 4. Stop Desktop from writing back a stale SEC email over one changed with `sec config`.
 5. Add `sec config ai list/add/edit/use/remove/enable/disable` to manage AI model profiles.
+6. Add `sec config ai set-key/unset-key` to store AI API keys encrypted.
 
 ### v0.4.8
 

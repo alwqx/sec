@@ -1,9 +1,12 @@
 package config
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/alwqx/sec/config"
@@ -189,4 +192,97 @@ func TestConfigAINotices(t *testing.T) {
 	output, err = run(t, "ai", "use", "local")
 	require.NoError(t, err)
 	require.NotContains(t, output, "不是本机模型")
+}
+
+// runIn 和 run 一样，stdin 用 input（不是终端，set-key 读一行）。
+func runIn(t *testing.T, input string, args ...string) (string, error) {
+	t.Helper()
+	cmd := NewConfigCLI()
+	cmd.SilenceUsage = true
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetIn(strings.NewReader(input))
+	cmd.SetArgs(args)
+	err := cmd.Execute()
+	return out.String(), err
+}
+
+func TestConfigAISetKey(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("DEEPSEEK_API_KEY", "")
+	_, err := run(t, "ai", "add", "ds", "--provider", "deepseek", "--model", "m", "--api-key-env", "MY_KEY")
+	require.NoError(t, err)
+
+	_, err = runIn(t, "sk-abcdefghijkl1234\n", "ai", "set-key", "nosuch")
+	require.ErrorIs(t, err, config.ErrAIProfileNotFound, "名字写错时不读 Key")
+	_, err = runIn(t, "", "ai", "set-key", "ds")
+	require.ErrorContains(t, err, "没有读到 Key")
+	_, err = runIn(t, "sk-abcdefghijkl1234\n", "ai", "set-key", "ds", "sk-extra")
+	require.Error(t, err, "不接受命令行参数里的 Key")
+
+	_, err = runIn(t, "sk-abcdefghijkl1234\nsecond line\n", "ai", "set-key", "ds")
+	require.ErrorContains(t, err, "多行内容", "传错了多行内容时不保存")
+	_, err = runIn(t, strings.Repeat("k", maxKeyLength+10), "ai", "set-key", "ds")
+	require.ErrorContains(t, err, "超过 4096 字节", "太长时不截断保存")
+
+	output, err := runIn(t, "  sk-abcdefghijkl1234\r\n\n  \n", "ai", "set-key", "ds")
+	require.NoError(t, err, "后面的空行可以有")
+	require.Contains(t, output, "已保存 ds 的 Key：加密保存（末 4 位 1234）")
+	require.Contains(t, output, "已不再从环境变量 MY_KEY 读取 Key")
+	require.Contains(t, output, "已生成加密密钥", "第一次生成密钥时提醒")
+	require.Contains(t, output, "不要和 config.json 一起同步或备份")
+	require.NotContains(t, output, "abcdefghijkl")
+
+	data, err := os.ReadFile(filepath.Join(home, ".sec", "config.json"))
+	require.NoError(t, err)
+	require.NotContains(t, string(data), "sk-abcdefghijkl1234", "文件里只有密文")
+	require.Contains(t, string(data), `"api_key": "enc:v1:`)
+	require.NotContains(t, string(data), "MY_KEY")
+	info, err := os.Stat(filepath.Join(home, ".sec", "secret.key"))
+	require.NoError(t, err)
+	if runtime.GOOS != "windows" {
+		require.Equal(t, os.FileMode(0o600), info.Mode().Perm())
+	}
+
+	output, err = run(t, "ai", "list")
+	require.NoError(t, err)
+	require.Contains(t, output, "加密保存（末 4 位 1234）")
+
+	output, err = runIn(t, "sk-zyxwvutsrqpo9876", "ai", "set-key", "ds")
+	require.NoError(t, err, "没有换行的最后一行也能读")
+	require.Contains(t, output, "末 4 位 9876")
+	require.NotContains(t, output, "已生成加密密钥", "已有密钥时不重复提醒")
+
+	// 密钥损坏后被替换：同样提醒。
+	require.NoError(t, os.WriteFile(filepath.Join(home, ".sec", "secret.key"), []byte("short"), 0o600))
+	output, err = runIn(t, "sk-zyxwvutsrqpo9876", "ai", "set-key", "ds")
+	require.NoError(t, err)
+	require.Contains(t, output, "已生成加密密钥", "替换了损坏的密钥也提醒")
+
+	// unset-key 后说明现在用的是什么 Key。
+	t.Setenv("DEEPSEEK_API_KEY", "sk-provider-55555555")
+	output, err = run(t, "ai", "unset-key", "ds")
+	require.NoError(t, err)
+	require.Contains(t, output, "已删除 ds 保存的 Key")
+	require.Contains(t, output, "现在的 Key：厂商环境变量 DEEPSEEK_API_KEY（末 4 位 5555）")
+	output, err = run(t, "ai", "unset-key", "ds")
+	require.NoError(t, err)
+	require.Contains(t, output, "ds 没有保存的 Key")
+	_, err = run(t, "ai", "unset-key", "nosuch")
+	require.ErrorIs(t, err, config.ErrAIProfileNotFound)
+
+	// 配置文件根本不是 JSON：找不到配置时把读取的问题一起说明。
+	writeConfig(t, home, `{not json`)
+	_, err = runIn(t, "sk-abcdefghijkl1234\n", "ai", "set-key", "ds")
+	require.ErrorIs(t, err, config.ErrAIProfileNotFound)
+	require.ErrorContains(t, err, "读取配置时有问题")
+
+	// ai 段无效时同样先报原因。
+	writeConfig(t, home, `{"ai":{"default":"x"}}`)
+	_, err = runIn(t, "sk-abcdefghijkl1234\n", "ai", "set-key", "ds")
+	require.ErrorIs(t, err, config.ErrInvalidAI)
+	_, err = run(t, "ai", "unset-key", "ds")
+	require.ErrorIs(t, err, config.ErrInvalidAI)
 }
