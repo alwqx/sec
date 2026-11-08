@@ -92,7 +92,7 @@ func TestConfigAI(t *testing.T) {
 	require.ErrorIs(t, err, config.ErrAIProfileNotFound)
 
 	_, err = run(t, "ai", "remove", "ds")
-	require.ErrorContains(t, err, "是 default，不能删除")
+	require.ErrorContains(t, err, "是默认配置（default），不能删除")
 	output, err = run(t, "ai", "use", "local")
 	require.NoError(t, err)
 	require.Contains(t, output, "default 已改为 local")

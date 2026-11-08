@@ -266,6 +266,7 @@ CLI 和 Desktop 共用一份配置，在任意一边设置后另一边直接可�
   - `sec config get/set` 继续只管 `sec_edgar_email` 这类单值配置，`sec config` 显示全部配置时 `ai` 段的 Key 只显示来源和末 4 位。
 - **Desktop**：设置页列出所有配置，可以新增、编辑、删除、设为默认、保存 Key 和测试连接，规则和 CLI 一致，都通过同一个 `config` 包读写。
   - 已实现只读列表：设置页「AI 模型」调用 `GET /api/v1/ai`，返回启用状态、`default` 和各配置的显示信息（`config.AIProfileView`，和 `sec config ai list --json` 一致，Key 只有来源和末 4 位）；`ai` 段无效时按没有配置显示，`invalid` 给出原因。非本机配置旁边说明数据会发给厂商。从访达或开始菜单打开的 Desktop 读不到终端里的环境变量，用环境变量提供的 Key 可能显示「未设置」。管理操作暂时用 `sec config ai`。
+  - 已实现管理：`POST /api/v1/ai/profiles` 新增，`PUT`、`DELETE /api/v1/ai/profiles/{name}` 编辑和删除，`PUT /api/v1/ai/default` 设为默认，`PUT /api/v1/ai/enabled` 启用和关闭，都调用 `config.AIConfig` 的同名方法，返回修改后的配置和提示（`notice`，如换地址后保存的 Key 被删除）。请求不含 Key，带 `api_key` 字段时拒绝；JSON 内容类型和同源校验与工作台一致。修改通过 `config.UpdateAIFile`：在文件锁里读到 `ai` 段无效或整个文件不是 JSON 时拒绝修改（包括关闭），返回 409，不从默认值开始写、不覆盖文件。编辑表单提交全部字段，协议和地址与厂商默认值相同时留空，继续跟随默认值；换厂商时协议和地址清空。还有别的配置时不显示默认配置的删除按钮。启用前在页面上说明哪些配置会把数据发给外部厂商、哪些是本机模型，确认后才启用；删除也要再点一次确认（WebView 不一定支持 `window.confirm`，都在页面内确认）。保存 Key 暂时用 `sec config ai set-key`。
 
 约束：
 

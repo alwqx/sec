@@ -190,6 +190,11 @@ h1, h2, h3 { font-weight: 600; }
 .settings-actions { display: flex; gap: 14px; align-items: center; margin-top: 24px; }
 .settings-actions span { color: var(--muted); font-size: 12px; }
 .settings-about { margin: 0; }
+.ai-confirm { margin: 16px 0; padding: 14px 16px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.ai-confirm p { margin: 0 0 8px; }
+.ai-actions { display: flex; gap: 6px; }
+.ai-actions button { padding: 3px 8px; font-size: 11px; }
+.ai-form { margin-top: 8px; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 @media (max-width: 1100px) {
   .sidebar { width: 184px; }

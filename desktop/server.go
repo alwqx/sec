@@ -71,6 +71,11 @@ func (s *desktopServer) Handler() http.Handler {
 	mux.Handle("GET /api/v1/financials", s.withAuth(http.HandlerFunc(s.handleFinancials)))
 	mux.Handle("GET /api/v1/financials/charts", s.withAuth(http.HandlerFunc(s.handleFinancialCharts)))
 	mux.Handle("GET /api/v1/ai", s.withAuth(http.HandlerFunc(s.handleAISettings)))
+	mux.Handle("POST /api/v1/ai/profiles", s.withAuth(http.HandlerFunc(s.handleAIAddProfile)))
+	mux.Handle("PUT /api/v1/ai/profiles/{name}", s.withAuth(http.HandlerFunc(s.handleAIEditProfile)))
+	mux.Handle("DELETE /api/v1/ai/profiles/{name}", s.withAuth(http.HandlerFunc(s.handleAIRemoveProfile)))
+	mux.Handle("PUT /api/v1/ai/default", s.withAuth(http.HandlerFunc(s.handleAIDefault)))
+	mux.Handle("PUT /api/v1/ai/enabled", s.withAuth(http.HandlerFunc(s.handleAIEnabled)))
 
 	// 前端 SPA：先尝试真实文件，否则回退 index.html（支持前端路由）。
 	mux.Handle("GET /", s.spa())
