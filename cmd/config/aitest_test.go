@@ -2,19 +2,13 @@ package config
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
-	"os"
 	"strings"
 	"sync"
-	"syscall"
 	"testing"
 
 	"github.com/alwqx/sec/config"
@@ -86,11 +80,11 @@ func TestConfigAITest(t *testing.T) {
 
 	output, err = run(t, "ai", "test", "gw", "--json")
 	require.NoError(t, err)
-	var result aiTestResult
+	var result llm.ProbeResult
 	require.NoError(t, json.Unmarshal([]byte(output), &result))
 	require.True(t, result.OK)
-	require.Equal(t, aiToolsSupported, result.Tools)
-	require.Equal(t, aiTestUsage{InputTokens: 10, OutputTokens: 2}, result.Usage)
+	require.Equal(t, llm.ToolsSupported, result.Tools)
+	require.Equal(t, llm.ProbeUsage{InputTokens: 10, OutputTokens: 2}, result.Usage)
 	require.Contains(t, output, `"input_tokens": 10`)
 	require.True(t, result.Sent)
 	require.Contains(t, output, `"latency_ms"`, "字段固定输出")
@@ -134,7 +128,7 @@ func TestConfigAITestFailures(t *testing.T) {
 		setupTestProfile(t, model.serve(t))
 		output, err = run(t, "ai", "test", "--json")
 		require.Error(t, err)
-		var result aiTestResult
+		var result llm.ProbeResult
 		require.NoError(t, json.Unmarshal([]byte(output), &result))
 		require.False(t, result.OK)
 		require.Contains(t, result.Hint, hint)
@@ -170,40 +164,9 @@ func TestConfigAITestFailures(t *testing.T) {
 	require.ErrorIs(t, err, config.ErrInvalidAI)
 }
 
-func TestAITestHint(t *testing.T) {
-	local := config.AIProfile{Provider: "ollama", Model: "m"}
-	remote := config.AIProfile{Provider: "deepseek", Model: "m"}
-	urlErr := func(err error) error { return &url.Error{Op: "Post", URL: "http://x", Err: err} }
-	for name, c := range map[string]struct {
-		err     error
-		profile config.AIProfile
-		want    string
-	}{
-		"Key 无法解密":      {config.ErrKeyUndecryptable, remote, "重新设置"},
-		"密钥丢失":          {config.ErrSecretMissing, remote, "重新设置"},
-		"权限过宽":          {config.ErrSecretPermissions, remote, "chmod 600"},
-		"403":           {&llm.APIError{Status: 403}, remote, "Key 不对"},
-		"400":           {&llm.APIError{Status: 400}, remote, "检查模型名和协议"},
-		"402":           {&llm.APIError{Status: 402}, remote, "余额不足"},
-		"本机连接被拒绝":       {urlErr(&net.OpError{Op: "dial", Err: syscall.ECONNREFUSED}), local, "ollama serve"},
-		"Windows 连接被拒绝": {urlErr(&net.OpError{Op: "dial", Err: &os.SyscallError{Syscall: "connectex", Err: wsaeConnRefused}}), local, "ollama serve"},
-		"远程连接被拒绝":       {urlErr(&net.OpError{Op: "dial", Err: syscall.ECONNREFUSED}), remote, "检查网络、代理"},
-		"超时":            {fmt.Errorf("x：%w", context.DeadlineExceeded), remote, "内没有回复"},
-		"没有 Key":        {llm.ErrMissingKey, remote, ""},
-		"其他":            {errors.New("boom"), remote, ""},
-	} {
-		got := aiTestHint(c.err, c.profile)
-		if c.want == "" {
-			require.Empty(t, got, name)
-		} else {
-			require.Contains(t, got, c.want, name)
-		}
-	}
-}
-
 func TestPrintAITest(t *testing.T) {
 	var out bytes.Buffer
-	printAITest(&out, aiTestResult{Name: "ds", Provider: "DeepSeek", Model: "deepseek-chat", ReplyModel: "deepseek-chat", Sent: true, OK: true, LatencyMS: 1234, Reply: "OK", Tools: aiToolsSupported})
+	printAITest(&out, llm.ProbeResult{Name: "ds", Provider: "DeepSeek", Model: "deepseek-chat", ReplyModel: "deepseek-chat", Sent: true, OK: true, LatencyMS: 1234, Reply: "OK", Tools: llm.ToolsSupported})
 	text := out.String()
 	require.Contains(t, text, "数据：发送给 DeepSeek")
 	require.Contains(t, text, "连接正常：1.2 秒，回复")
@@ -235,16 +198,9 @@ func TestConfigAITestTruncated(t *testing.T) {
 	require.Contains(t, output, "注意：回复被截断或为空（停止原因 length）")
 }
 
-func TestConnRefused(t *testing.T) {
-	require.True(t, connRefused(&net.OpError{Err: syscall.ECONNREFUSED}))
-	require.True(t, connRefused(&net.OpError{Err: &os.SyscallError{Err: wsaeConnRefused}}), "Windows 的 WSAECONNREFUSED")
-	require.False(t, connRefused(&net.OpError{Err: syscall.ECONNRESET}))
-	require.False(t, connRefused(errors.New("x")))
-}
-
 func TestPrintAITestNotSent(t *testing.T) {
 	var out bytes.Buffer
-	printAITest(&out, aiTestResult{Name: "ds", Provider: "DeepSeek", Error: "没有 API Key"})
+	printAITest(&out, llm.ProbeResult{Name: "ds", Provider: "DeepSeek", Error: "没有 API Key"})
 	require.Contains(t, out.String(), "数据：没有发出请求")
 	require.NotContains(t, out.String(), "发送给")
 }

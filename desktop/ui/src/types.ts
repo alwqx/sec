@@ -214,6 +214,27 @@ export interface AISettings {
   invalid?: string // ai 段无效的原因
   notice?: string // 修改后的提示，只在修改接口的返回里有
 }
+// AIProbeResult 是连接测试的结果（POST /api/v1/ai/profiles/{name}/test），和 sec config ai test --json 一致。
+export interface AIProbeResult {
+  name: string
+  provider: string
+  api: string
+  base_url: string
+  model: string
+  key: string
+  local: boolean
+  ok: boolean
+  error?: string
+  hint?: string
+  sent: boolean // 是否真的发出了请求
+  latency_ms: number
+  warning?: string
+  reply_model?: string
+  reply?: string
+  usage: { input_tokens: number; output_tokens: number }
+  tools?: 'supported' | 'not_called' | 'error' | 'unknown'
+  tools_detail?: string
+}
 // AIProfileInput 是新增和编辑提交的配置；协议和地址为空表示用厂商的默认值。不含 Key。
 export interface AIProfileInput {
   name?: string

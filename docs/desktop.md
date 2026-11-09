@@ -239,6 +239,12 @@ provider 在保持原有数值字段的同时，通过 `MissingTenors` 记录上
 
 设置仍保存到 `~/.sec/desktop/workspace.json`，仅持久化 settings；SEC 联系邮箱例外，保存在和 CLI 共用的 `~/.sec/config.json`（`config` 包，文件锁加原子写入），工作台接口返回时合并进 settings，保存时留空表示不修改，不写入 workspace.json。保存设置即使携带过期 watchlist 快照也不会改写共享自选；增删使用独立接口，只提交对应证券。首次保存设置前先完成旧列表迁移，设置文件与迁移使用同一工作台文件锁。Desktop 打开「自选」或「研究」、重新获得窗口焦点或点击「刷新自选」时同步列表，后台响应不会覆盖本窗口正在进行的增删。当前研究证券、筛选条件与菜单仅在本次运行中保留。
 
+### AI 模型连接测试
+
+设置页「AI 模型」的每个配置都有「测试连接」按钮，AI 功能关闭时也可以用。测试和 `sec config ai test` 共用 `llm.ProbeProfile`：先请求固定回复 OK，再请求调用 ping 工具，不含查询或自选股数据，不执行工具，不修改配置。结果显示连接耗时、实际模型、回复与 token 用量、工具调用能力和失败建议，Key 只显示来源和末 4 位。每个请求最长等待 2 分钟，可点「取消测试」；离开设置页也会取消，修改配置或刷新时清除旧结果。
+
+`POST /api/v1/ai/profiles/{name}/test` 读取磁盘最新配置，返回和 `sec config ai test --json` 相同的 `llm.ProbeResult`。连接或工具测试失败也返回 200，检查 `ok`、`error`、`hint`、`tools`（`supported`、`not_called`、`error`、`unknown`）；不存在的配置返回 404，无效的 `ai` 段或配置 JSON 返回 409。接口使用与其他 AI 设置接口相同的鉴权和同源检查。
+
 ### 版本与更新
 
 设置页「关于 SEC Desktop」展示链接器注入的版本、构建时间、提交号及当前平台；未注入版本时显示开发构建，其他缺失字段显示未知。仅点击「检查更新」时查询 GitHub 最新正式 Release，CLI 与 Desktop 共用 `release.FetchLatest`。版本按语义版本比较，区分可更新、已是最新、当前版本更高及无法比较；查询失败时保留直接访问 Release 的入口。

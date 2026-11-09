@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/alwqx/sec/config"
+	"github.com/alwqx/sec/llm"
 	"github.com/stretchr/testify/require"
 )
 
@@ -287,4 +289,93 @@ func TestAIKey(t *testing.T) {
 	rr := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(rr, req)
 	require.Equal(t, http.StatusForbidden, rr.Code)
+}
+
+func TestAITestProfile(t *testing.T) {
+	var bodies []string
+	var keys []string
+	model := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		data, _ := io.ReadAll(r.Body)
+		bodies = append(bodies, string(data))
+		keys = append(keys, r.Header.Get("Authorization"))
+		if len(bodies) > 2 {
+			w.WriteHeader(http.StatusUnauthorized)
+			_, _ = w.Write([]byte(`{"error":{"message":"invalid key"}}`))
+			return
+		}
+		if len(bodies) == 1 {
+			_, _ = w.Write([]byte(`{"model":"served","choices":[{"finish_reason":"stop","message":{"role":"assistant","content":"OK"}}],"usage":{"prompt_tokens":10,"completion_tokens":2}}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"choices":[{"finish_reason":"stop","message":{"role":"assistant","content":"不调用"}}]}`))
+	}))
+	defer model.Close()
+	dir := t.TempDir()
+	srv := &desktopServer{dev: true, workspace: workspaceStore{path: filepath.Join(dir, "workspace.json")}}
+	code, _, _ := aiChange(t, srv, http.MethodPost, "/api/v1/ai/profiles", `{"name":"gw","provider":"custom","api":"openai","base_url":"`+model.URL+`","model":"m"}`)
+	require.Equal(t, http.StatusOK, code)
+	key := "sk-probe-private-123456"
+	code, _, _ = aiChange(t, srv, http.MethodPut, "/api/v1/ai/profiles/gw/key", `{"key":"`+key+`"}`)
+	require.Equal(t, http.StatusOK, code)
+	path, err := srv.configPath()
+	require.NoError(t, err)
+	before, err := os.ReadFile(path)
+	require.NoError(t, err)
+
+	test := func(name string) *httptest.ResponseRecorder {
+		rr := httptest.NewRecorder()
+		srv.Handler().ServeHTTP(rr, httptest.NewRequest(http.MethodPost, "/api/v1/ai/profiles/"+name+"/test", nil))
+		return rr
+	}
+	rr := test("gw")
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	var got llm.ProbeResult
+	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &got))
+	require.True(t, got.OK, "AI 功能没启用也可以测试")
+	require.Equal(t, "served", got.ReplyModel)
+	require.Equal(t, llm.ToolsNotCalled, got.Tools)
+	require.Contains(t, bodies[0], "请只回复 OK", "只发固定的测试文字")
+	require.Equal(t, []string{"Bearer " + key, "Bearer " + key}, keys, "读取配置里加密保存的 Key")
+	require.NotContains(t, rr.Body.String(), key)
+	require.NotContains(t, rr.Body.String(), "enc:v1:")
+	after, err := os.ReadFile(path)
+	require.NoError(t, err)
+	require.Equal(t, before, after, "连接测试不写配置或改变启用状态")
+
+	rr = test("gw")
+	require.Equal(t, http.StatusOK, rr.Code, "上游连接失败也返回结构化测试结果")
+	got = llm.ProbeResult{}
+	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &got))
+	require.False(t, got.OK)
+	require.True(t, got.Sent)
+	require.Contains(t, got.Hint, "Key 不对")
+	require.Len(t, bodies, 3, "连接失败后不再测试工具调用")
+
+	require.Equal(t, http.StatusNotFound, test("nosuch").Code)
+
+	// 测试失败（远程厂商没有 Key）：200，原因在结果里，不发请求。
+	t.Setenv("DEEPSEEK_API_KEY", "")
+	code, _, _ = aiChange(t, srv, http.MethodPost, "/api/v1/ai/profiles", `{"name":"ds","provider":"deepseek","model":"m"}`)
+	require.Equal(t, http.StatusOK, code)
+	rr = test("ds")
+	require.Equal(t, http.StatusOK, rr.Code)
+	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &got))
+	require.False(t, got.OK)
+	require.False(t, got.Sent)
+
+	// ai 段无效、跨站请求：不测试。
+	require.NoError(t, os.WriteFile(path, []byte(`{"ai":{"enabled":"yes"}}`), 0o600))
+	require.Equal(t, http.StatusConflict, test("gw").Code)
+	require.NoError(t, os.WriteFile(path, []byte(`not JSON`), 0o600))
+	require.Equal(t, http.StatusConflict, test("gw").Code)
+	srv.dev = false
+	srv.token = "test-token"
+	require.Equal(t, http.StatusForbidden, test("gw").Code)
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/ai/profiles/gw/test", nil)
+	req.AddCookie(&http.Cookie{Name: "token", Value: srv.token})
+	req.Header.Set("Origin", "https://evil.example")
+	rr = httptest.NewRecorder()
+	srv.Handler().ServeHTTP(rr, req)
+	require.Equal(t, http.StatusForbidden, rr.Code)
+	require.Len(t, bodies, 3, "没有多发请求")
 }

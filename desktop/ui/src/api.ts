@@ -134,6 +134,11 @@ export function aiSettings(signal?: AbortSignal): Promise<import('./types').AISe
   return request('/api/v1/ai', signal)
 }
 
+// testAIProfile 测试一个配置的连接和工具调用，可能要等几十秒。测试失败也正常返回，原因在结果里。
+export function testAIProfile(name: string, signal?: AbortSignal): Promise<import('./types').AIProbeResult> {
+  return request(`/api/v1/ai/profiles/${encodeURIComponent(name)}/test`, signal, { method: 'POST' })
+}
+
 // changeAI 修改模型配置，返回修改后的全部配置。
 export type AIChange =
   | { kind: 'add'; profile: import('./types').AIProfileInput }

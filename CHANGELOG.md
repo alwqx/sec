@@ -17,6 +17,7 @@
 13. Show the shared AI model profiles read-only in Desktop settings.
 14. Add, edit, delete, set default and enable or disable AI model profiles in Desktop settings.
 15. Save and clear encrypted AI API keys in Desktop settings.
+16. Share connection and tool-calling probes in `llm` and add connection testing with cancellation and results to Desktop settings.
 
 ### v0.4.8
 
