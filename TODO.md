@@ -134,7 +134,7 @@
   - [x] 新增、编辑、删除、设为默认、启用和停用：第一次启用时说明哪些配置会把数据发给外部厂商。
   - [x] 保存和清除 Key：Key 只提交不返回。
   - [x] 测试连接：把 `sec config ai test` 的测试逻辑移到 `llm`，CLI 和 Desktop 共用。
-- [ ] 估值解读：`sec valuation <code> --explain`，把估值精简输出和口径说明交给模型生成一段说明，范围有限、便于测试。拆成以下几个 PR：
+- [x] 估值解读：`sec valuation <code> --explain`，把估值精简输出和口径说明交给模型生成一段说明，范围有限、便于测试。拆成以下几个 PR：
   - [x] `llm` 里的解读逻辑和缓存：`llm.Open` 按配置创建客户端，`ValuationExplainer` 组装提示词、附上免责声明、做数字核对，按证券、`as_of`、模型和提示词缓存。
   - [x] CLI：`sec valuation <code> --explain`，以及随它一起加的 `--ai <配置名>` 参数（各命令共用，不写时用 `default`）。
 - [ ] Desktop 估值 tab「解读」按钮：复用上一项，旁边加模型配置下拉框，默认选中 `default`，临时切换只对当前页面有效。
