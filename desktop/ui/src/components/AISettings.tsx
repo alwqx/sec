@@ -1,20 +1,25 @@
-import { useCallback, useState, type FormEvent } from 'react'
-import { aiSettings, changeAI, type AIChange } from '../api'
-import { privacyGroups, profileForm, removable, trimProfile, withProvider } from '../aiSettings'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { aiSettings, changeAI, testAIProfile, type AIChange } from '../api'
+import { privacyGroups, probeLines, profileForm, removable, trimProfile, withProvider } from '../aiSettings'
 import { useResource } from '../hooks/useResource'
-import type { AIProfileInput, AIProvider, AISettings as Settings } from '../types'
+import type { AIProbeResult, AIProfileInput, AIProvider, AISettings as Settings } from '../types'
 import ResourceState from './ResourceState'
 
 const emptyForm: AIProfileInput = { name: '', provider: 'deepseek', api: '', base_url: '', model: '', api_key_env: '' }
 
-// 管理和 CLI 共用的模型配置：新增、编辑、删除、设为默认、启用和关闭、保存和清除 Key，规则和 sec config ai 一致。
+// 管理和 CLI 共用的模型配置，测试连接也复用 sec config ai test 的逻辑。
 export default function AISettings() {
   const load = useCallback((signal: AbortSignal) => aiSettings(signal), [])
   const resource = useResource(load)
   // 修改接口返回修改后的全部配置，直接显示，不重新加载；刷新时清掉。
   const [changed, setChanged] = useState<Settings | null>(null)
   const data = changed ?? resource.data
-  const [busy, setBusy] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [probe, setProbe] = useState<{ name: string; result?: AIProbeResult; error?: string } | null>(null)
+  const probeRequest = useRef<AbortController | null>(null)
+  const testing = probe !== null && !probe.result && probe.error === undefined
+  const busy = saving || testing
+  useEffect(() => () => probeRequest.current?.abort(), [])
   const [error, setError] = useState('')
   // editing 是正在编辑的配置名，'' 表示新增，null 表示没有打开表单。
   const [editing, setEditing] = useState<string | null>(null)
@@ -27,20 +32,39 @@ export default function AISettings() {
   const [confirmUnset, setConfirmUnset] = useState('')
 
   const apply = async (change: AIChange) => {
-    setBusy(true); setError('')
+    setSaving(true); setError(''); setProbe(null)
     try {
       setChanged(await changeAI(change))
       return true
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
       return false
-    } finally { setBusy(false) }
+    } finally { setSaving(false) }
   }
   // 同一时间只打开一个表单或确认。输入的 Key 不留在页面状态里：关掉时清空。
   const closeAll = () => { setEditing(null); setConfirmEnable(false); setConfirmRemove(''); setKeyFor(''); setKeyValue(''); setConfirmUnset('') }
+  const cancelProbe = () => {
+    probeRequest.current?.abort()
+    probeRequest.current = null
+    setProbe(null)
+  }
+  const testProfile = async (name: string) => {
+    cancelProbe(); closeAll(); setError('')
+    const controller = new AbortController()
+    probeRequest.current = controller
+    setProbe({ name })
+    try {
+      const result = await testAIProfile(name, controller.signal)
+      if (!controller.signal.aborted) setProbe({ name, result })
+    } catch (e) {
+      if (!controller.signal.aborted) setProbe({ name, error: e instanceof Error ? e.message : String(e) })
+    } finally {
+      if (probeRequest.current === controller) probeRequest.current = null
+    }
+  }
   // 刷新时关掉表单和确认：它们基于刷新前的数据，留着可能覆盖命令行刚做的修改。
   const reload = () => {
-    setChanged(null); setError(''); closeAll()
+    cancelProbe(); setChanged(null); setError(''); closeAll()
     resource.reload()
   }
   const openForm = (name: string) => {
@@ -97,6 +121,7 @@ export default function AISettings() {
                 : <>
                   <button disabled={busy} onClick={() => openForm(p.name)}>编辑</button>
                   <button disabled={busy} onClick={() => { closeAll(); setKeyFor(p.name); setError('') }}>设置 Key</button>
+                  <button disabled={busy} onClick={() => void testProfile(p.name)}>{testing && probe?.name === p.name ? '测试中…' : '测试连接'}</button>
                   {p.key_stored && <button disabled={busy} onClick={() => { closeAll(); setConfirmUnset(p.name) }}>清除 Key</button>}
                   {!p.default && <button disabled={busy} onClick={() => void apply({ kind: 'default', name: p.name })}>设为默认</button>}
                   {removable(p, data.profiles.length) && <button disabled={busy} onClick={() => { closeAll(); setConfirmRemove(p.name) }}>删除</button>}
@@ -104,6 +129,18 @@ export default function AISettings() {
           </tr>)}</tbody>
         </table></div>}
       {data.profiles.length > 1 && <p className="data-note">默认配置要先把别的配置设为默认才能删除。</p>}
+      {data.profiles.length > 0 && <p className="data-note">测试连接会发送两条固定的测试消息，检查连接和工具调用，不含你的查询或自选股数据；AI 功能关闭时也可以测试。</p>}
+      {probe && <div className="ai-confirm" aria-label={`测试模型配置 ${probe.name}`} aria-busy={testing}>
+        <h3>测试模型配置 {probe.name}</h3>
+        {testing && <p className="data-note" role="status">正在测试连接和工具调用，每个请求最长等待 2 分钟…</p>}
+        {probe.result && <div role="status">
+          <p className="data-note">厂商：{probe.result.provider}；协议：{probe.result.api}；模型：{probe.result.model}</p>
+          <p className="data-note">地址：{probe.result.base_url}；Key：{probe.result.key}</p>
+          {probeLines(probe.result).map((line, i) => <p key={i} className={line.startsWith('连接失败：') ? 'error' : 'data-note'}>{line}</p>)}
+        </div>}
+        {probe.error !== undefined && <p className="error" role="alert">测试请求失败：{probe.error}</p>}
+        <button onClick={cancelProbe}>{testing ? '取消测试' : '关闭结果'}</button>
+      </div>}
       {keyFor && <form className="ai-form" onSubmit={saveKey} aria-label={`设置 ${keyFor} 的 Key`}>
         <fieldset className="settings-group"><legend>设置 {keyFor} 的 Key</legend>
           <div className="setting-row"><div><label htmlFor="ai-key">API Key</label><p className="data-note">加密保存，之后只显示末 4 位，不会再显示完整的 Key。保存后不再从 Key 环境变量读取。本机模型一般不需要 Key，不用设置。</p></div>

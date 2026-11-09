@@ -265,9 +265,10 @@ CLI 和 Desktop 共用一份配置，在任意一边设置后另一边直接可�
   - 第一版不提供改名：Key 加密绑定了配置名，改名需要重新加密，等有需要再加 `rename`。
   - `sec config get/set` 继续只管 `sec_edgar_email` 这类单值配置，`sec config` 显示全部配置时 `ai` 段的 Key 只显示来源和末 4 位。
 - **Desktop**：设置页列出所有配置，可以新增、编辑、删除、设为默认、保存 Key 和测试连接，规则和 CLI 一致，都通过同一个 `config` 包读写。
-  - 已实现只读列表：设置页「AI 模型」调用 `GET /api/v1/ai`，返回启用状态、`default` 和各配置的显示信息（`config.AIProfileView`，和 `sec config ai list --json` 一致，Key 只有来源和末 4 位）；`ai` 段无效时按没有配置显示，`invalid` 给出原因。非本机配置旁边说明数据会发给厂商。从访达或开始菜单打开的 Desktop 读不到终端里的环境变量，用环境变量提供的 Key 可能显示「未设置」。管理操作暂时用 `sec config ai`。
+  - 已实现只读列表：设置页「AI 模型」调用 `GET /api/v1/ai`，返回启用状态、`default` 和各配置的显示信息（`config.AIProfileView`，和 `sec config ai list --json` 一致，Key 只有来源和末 4 位）；`ai` 段无效时按没有配置显示，`invalid` 给出原因。非本机配置旁边说明数据会发给厂商。从访达或开始菜单打开的 Desktop 读不到终端里的环境变量，用环境变量提供的 Key 可能显示「未设置」。
   - 已实现管理：`POST /api/v1/ai/profiles` 新增，`PUT`、`DELETE /api/v1/ai/profiles/{name}` 编辑和删除，`PUT /api/v1/ai/default` 设为默认，`PUT /api/v1/ai/enabled` 启用和关闭，都调用 `config.AIConfig` 的同名方法，返回修改后的配置和提示（`notice`，如换地址后保存的 Key 被删除）。请求不含 Key，带 `api_key` 字段时拒绝；JSON 内容类型和同源校验与工作台一致。修改通过 `config.UpdateAIFile`：在文件锁里读到 `ai` 段无效或整个文件不是 JSON 时拒绝修改（包括关闭），返回 409，不从默认值开始写、不覆盖文件。编辑表单提交全部字段，协议和地址与厂商默认值相同时留空，继续跟随默认值；换厂商时协议和地址清空。还有别的配置时不显示默认配置的删除按钮。启用前在页面上说明哪些配置会把数据发给外部厂商、哪些是本机模型，确认后才启用；删除也要再点一次确认（WebView 不一定支持 `window.confirm`，都在页面内确认）。
   - 已实现保存和清除 Key：`PUT /api/v1/ai/profiles/{name}/key`（`{"key": "..."}`）调用 `AIConfig.SetKey`，`DELETE` 同一地址调用 `UnsetKey`，规则和 `sec config ai set-key/unset-key` 一致：去掉首尾空白，不能为空或含空白字符，保存后清空 `api_key_env`；第一次生成 `secret.key` 时提醒不要和 `config.json` 一起同步或备份，替换了无法使用的 `secret.key` 时另外列出其他配置保存的、已无法解密的 Key；清除后说明现在用哪个 Key。Key 无效（`config.ErrInvalidKey`）或没有这个配置时返回 400，加密和读写 `secret.key` 失败（如权限过宽）记日志并返回 500，提示里保留原因。Key 只提交不返回，接口返回和错误信息里都不回显，也不写日志；页面上用密码输入框，保存或取消后清空输入。`AIProfileView` 加了 `key_stored`，有保存的 Key 时才显示「清除 Key」，清除前要再点一次确认。
+  - 已实现测试连接：每个配置的「测试连接」按钮调用 `POST /api/v1/ai/profiles/{name}/test`，和 CLI 共用 `llm.ProbeProfile` 及其 `ProbeResult`，不要求先启用 AI。每次读取磁盘上的最新配置和 Key，不修改配置；向模型发送两个固定测试请求，不含用户数据，也不执行测试工具。每个请求最长等待 2 分钟，页面显示等待状态，可以取消，离开设置页时取消未完成的请求。结果展示实际地址、模型、Key 来源、耗时、回复、用量、工具调用能力及失败建议；修改配置或刷新时清除旧结果。测试失败也返回 200，由 `ok`、`error`、`hint` 和 `tools` 区分；配置不存在返回 404，`ai` 段无效或整个文件不是 JSON 对象时返回 409，跨站请求被拒绝。
 
 约束：
 

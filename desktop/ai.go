@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/alwqx/sec/config"
+	"github.com/alwqx/sec/llm"
 )
 
 // aiSettings 是设置页「AI 模型」读取的模型配置，和 sec config ai list --json 一致，Key 只给来源和末 4 位。
@@ -242,6 +243,45 @@ func (s *desktopServer) handleAIUnsetKey(w http.ResponseWriter, r *http.Request)
 		// 保存 Key 时已经清空了 api_key_env，删除后不会回到原来的环境变量，说清楚现在用哪个 Key。
 		return notice + "现在的 Key：" + ai.KeyStatus(secret, name, os.Getenv) + "。", nil
 	})
+}
+
+// handleAITestProfile 测试一个配置的连接和工具调用，和 sec config ai test 共用 llm.ProbeProfile。
+// 只发固定的测试文字，不含用户数据，AI 功能没有启用时也可以测试。测试失败也返回 200，原因和建议在结果里。
+func (s *desktopServer) handleAITestProfile(w http.ResponseWriter, r *http.Request) {
+	// 测试会向厂商发请求，不允许别的网页触发。
+	if !s.checkAIOrigin(w, r) {
+		return
+	}
+	ctx := r.Context()
+	path, err := s.configPath()
+	if err != nil {
+		slog.ErrorContext(ctx, "读取模型配置失败", "error", err)
+		writeError(w, http.StatusInternalServerError, "读取模型配置失败")
+		return
+	}
+	cfg, err := config.LoadFile(ctx, path)
+	switch {
+	case errors.Is(err, config.ErrInvalidAI), errors.Is(err, config.ErrInvalidJSON):
+		writeError(w, http.StatusConflict, "读取模型配置有问题，请先手动修正配置文件："+err.Error())
+		return
+	case errors.Is(err, config.ErrInvalid):
+	case err != nil:
+		slog.ErrorContext(ctx, "读取模型配置失败", "error", err)
+		writeError(w, http.StatusInternalServerError, "读取模型配置失败")
+		return
+	}
+	name := r.PathValue("name")
+	if !cfg.AI.Has(name) {
+		writeError(w, http.StatusNotFound, config.ErrAIProfileNotFound.Error()+"："+name)
+		return
+	}
+	secret, err := s.aiSecret()
+	if err != nil {
+		slog.ErrorContext(ctx, "读取模型配置失败", "error", err)
+		writeError(w, http.StatusInternalServerError, "读取模型配置失败")
+		return
+	}
+	writeJSON(w, llm.ProbeProfile(ctx, &cfg.AI, name, secret, os.Getenv))
 }
 
 func (in aiProfileInput) profile() config.AIProfile {
