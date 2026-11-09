@@ -18,6 +18,7 @@
 14. Add, edit, delete, set default and enable or disable AI model profiles in Desktop settings.
 15. Save and clear encrypted AI API keys in Desktop settings.
 16. Share connection and tool-calling probes in `llm` and add connection testing with cancellation and results to Desktop settings.
+17. Add cancellable AI valuation explanations to Desktop with a temporary model-profile selector, shared caching, number checks and disclaimers.
 
 ### v0.4.8
 

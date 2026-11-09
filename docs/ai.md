@@ -321,6 +321,8 @@ CLI 和 Desktop 共用一份配置，在任意一边设置后另一边直接可�
 - 实现见 `llm/explain.go` 的 `ValuationExplainer`：`get_valuation` 的完整结果（含 notes 和 disclaimer）放进用户消息，系统提示词是 `llm/prompts/system.md` 的核心约束，任务说明是 `llm/prompts/valuation_explain.md`（版本 `valuation-explain-v1`）；`disclaimer` 由代码从工具结果附上，不靠模型；模型拒绝或没有给出文字时报错。缓存键用解析后的 `ex_code`（600519 和 SH600519 共用）、`as_of`、`llm.Model.ID()`（协议、地址、模型名，不含配置名）、提示词版本和内容摘要、除代码外的其他参数（如 DCF 参数，按键排序）；被截断的解读不缓存。
 - 客户端由 `llm.Open(ai, name, secret, getenv)` 按配置名创建（不写名字时用 `default`，并记一条 Debug 日志）：没有模型配置、AI 功能没有启用、Key 读不出来时报错并说明怎么处理，解读、摘要和对话共用。
 - CLI：`sec valuation <code> --explain [--ai <配置名>]` 先检查模型配置再取数，配置有问题时不请求估值数据；按 `--method` 输出表格后附上解读、核对结果和免责声明（解读总是覆盖整体估值，不受 `--method` 影响），解读复用已经算好的估值（`aitool.ValuationResult`），不再取一次数。`--json` 时只输出 `llm.Explanation`；`--ai` 不带 `--explain` 时报错。只有改过的 DCF 参数写进缓存键，和默认参数的解读共用缓存。
+- Desktop：估值页顶部的「解读」按钮旁可临时选择模型，默认选中 `default`，选择只保存在当前页面，不写配置。未配置、未启用或配置无效时按钮置灰并提示去设置页；可手动刷新模型配置。点击前说明估值数据会发给所选厂商，本机地址标明不出本机。生成可取消，切换证券、模型、已应用的 DCF 参数或离开页面时取消请求并清除旧解读，旧响应不会覆盖新页面。结果显示模型、配置、数据截止日期、缓存生成时间、截断提示、数字及建议用语核对结果和免责声明。
+- `POST /api/v1/ai/valuation` 接收 JSON：`code`（`SH600036` 或 `$AAPL`）、可选 `profile`（不填用 `default`），以及可选数值 `growth`、`terminal_growth`、`wacc`、`margin_of_safety`。只发送已应用且非空的参数，零值保留。后端校验鉴权和同源，读取最新模型配置，先通过 `llm.Open` 检查可用性，再按估值页相同路径重新查询并计算；不接受前端提交的估值或提示词。将 `aitool.ValuationResult` 的精简输出交给 `ValuationExplainer`，返回 `llm.Explanation`，与 CLI 共用提示词、缓存和核对。解读以本次查询的 `as_of` 为准，不保证与页面先前加载的交易日相同。无效输入返回 400，模型配置不可用返回 409，没有估值返回 404，不支持的外国公司返回 422，上游失败返回 502，模型超时返回 504；模型错误正文不回传，避免厂商回显 Key。
 
 ### 申报与公告摘要
 
