@@ -401,6 +401,10 @@ h1, h2, h3 { font-weight: 600; }
 .strategy-signals { max-height: 300px; }
 .valuation-page { display: grid; gap: 18px; }
 .valuation-page > section { min-width: 0; }
+.valuation-explanation { border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+.valuation-explanation h3 { margin: 0; font-size: 14px; }
+.valuation-explanation select { max-width: 260px; }
+.explanation-text { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; line-height: 1.8; }
 .valuation-page .section-toolbar { justify-content: space-between; margin-bottom: 12px; }
 .valuation-page .strategy-form input { width: 72px; }
 .valuation-annuals { max-height: 300px; }

@@ -55,6 +55,14 @@ func (s *desktopServer) handleValuation(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	if result := s.queryValuation(w, r, strings.ToUpper(raw), params); result != nil {
+		writeJSON(w, result)
+	}
+}
+
+// queryValuation 为估值页面和 AI 解读查询同一套数据，失败时写入 HTTP 错误。
+func (s *desktopServer) queryValuation(w http.ResponseWriter, r *http.Request, code string, params valuation.DCFParams) *valuation.Result {
+	us := usTicker.MatchString(code)
 	// 美股要下载 XBRL 和全部日线，比 A 股慢。
 	timeout := 20 * time.Second
 	if us {
@@ -62,13 +70,13 @@ func (s *desktopServer) handleValuation(w http.ResponseWriter, r *http.Request) 
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), timeout)
 	defer cancel()
-	code := strings.ToUpper(raw)
 	var result *valuation.Result
+	var err error
 	if us {
 		var client *edgar.Client
 		if client, err = s.edgarClient(ctx); err != nil {
 			writeError(w, http.StatusInternalServerError, "读取 SEC 联系邮箱失败，请在设置中检查")
-			return
+			return nil
 		}
 		result, err = valuation.AnalyzeUS(ctx, client, code, params, usFactsCache.Loader(client))
 	} else {
@@ -76,19 +84,19 @@ func (s *desktopServer) handleValuation(w http.ResponseWriter, r *http.Request) 
 	}
 	if errors.Is(err, valuation.ErrNoData) {
 		writeError(w, http.StatusNotFound, err.Error())
-		return
+		return nil
 	}
 	if errors.Is(err, valuation.ErrForeign) {
 		writeError(w, http.StatusUnprocessableEntity, err.Error())
-		return
+		return nil
 	}
 	if err != nil {
 		if r.Context().Err() != nil {
-			return
+			return nil
 		}
 		slog.ErrorContext(ctx, "查询估值失败", "code", code, "error", err)
 		writeError(w, http.StatusBadGateway, "估值数据获取失败，请稍后重试")
-		return
+		return nil
 	}
-	writeJSON(w, result)
+	return result
 }

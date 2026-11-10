@@ -235,6 +235,26 @@ export interface AIProbeResult {
   tools?: 'supported' | 'not_called' | 'error' | 'unknown'
   tools_detail?: string
 }
+// ValuationExplanation 与 llm.Explanation 一致，核对位置按 Unicode 字符计。
+export interface ValuationExplanation {
+  ex_code: string
+  name: string
+  as_of: string
+  text: string
+  disclaimer: string
+  check: {
+    numbers: number
+    unsourced: { text: string; start: number; end: number }[]
+    advice_terms: { text: string; start: number; end: number }[]
+  }
+  truncated: boolean
+  model: string
+  profile: string
+  prompt_version: string
+  cached: boolean
+  created_at: string
+}
+
 // AIProfileInput 是新增和编辑提交的配置；协议和地址为空表示用厂商的默认值。不含 Key。
 export interface AIProfileInput {
   name?: string

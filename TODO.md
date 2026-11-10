@@ -137,7 +137,7 @@
 - [x] 估值解读：`sec valuation <code> --explain`，把估值精简输出和口径说明交给模型生成一段说明，范围有限、便于测试。拆成以下几个 PR：
   - [x] `llm` 里的解读逻辑和缓存：`llm.Open` 按配置创建客户端，`ValuationExplainer` 组装提示词、附上免责声明、做数字核对，按证券、`as_of`、模型和提示词缓存。
   - [x] CLI：`sec valuation <code> --explain`，以及随它一起加的 `--ai <配置名>` 参数（各命令共用，不写时用 `default`）。
-- [ ] Desktop 估值 tab「解读」按钮：复用上一项，旁边加模型配置下拉框，默认选中 `default`，临时切换只对当前页面有效。
+- [x] Desktop 估值 tab「解读」按钮：复用上一项，旁边加模型配置下拉框，默认选中 `default`，临时切换只对当前页面有效。
 - [ ] 申报与公告摘要：CLI 用 `--summary`，Desktop 在列表行上加按钮，两边共用 `llm/` 里的实现。拆成以下几个 PR：
   - [ ] 巨潮公告摘要。
   - [ ] 美股 8-K 事项摘要。

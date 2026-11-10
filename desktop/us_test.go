@@ -107,10 +107,8 @@ func TestUSFinancialsIFRS(t *testing.T) {
 	require.True(t, gock.IsDone())
 }
 
-// 美股估值：SEC XBRL 财务数据 + 新浪不复权日线。
-func TestUSValuation(t *testing.T) {
-	defer gock.Off()
-	srv := usServer(t)
+// mockUSValuation 为估值页面和 AI 解读提供同一套 SEC XBRL 与新浪日线。
+func mockUSValuation() {
 	gock.New("https://www.sec.gov").Get("/files/company_tickers.json").Reply(200).BodyString(usTickers)
 	gock.New("https://data.sec.gov").Get("/submissions/CIK0000320193.json").Reply(200).BodyString(`{"name":"Apple Inc.","sicDescription":"Electronic Computers","sic":"3571","filings":{"recent":{}}}`)
 	gock.New("https://data.sec.gov").Get("/api/xbrl/companyfacts/CIK0000320193.json").Reply(200).BodyString(`{"entityName":"Apple Inc.","facts":{
@@ -132,6 +130,13 @@ func TestUSValuation(t *testing.T) {
 }}`)
 	gock.New("https://stock.finance.sina.com.cn").Get("/usstock/api/jsonp.php/var.t=/US_MinKService.getDailyK").MatchParam("symbol", "aapl").Reply(200).
 		BodyString(`var t=([{"d":"2026-03-02","o":"40","h":"40","l":"40","c":"40","v":"1"},{"d":"2026-03-03","o":"40","h":"40","l":"40","c":"40","v":"1"}]);`)
+}
+
+// 美股估值：SEC XBRL 财务数据 + 新浪不复权日线。
+func TestUSValuation(t *testing.T) {
+	defer gock.Off()
+	srv := usServer(t)
+	mockUSValuation()
 	rr := usRequest(t, srv, "/api/v1/valuation?code=$aapl")
 	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
 	var data struct {

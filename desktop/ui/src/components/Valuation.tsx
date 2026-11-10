@@ -4,6 +4,7 @@ import { useResource } from '../hooks/useResource'
 import type { ValuationDividends, ValuationHistory, ValuationMultiple, ValuationPeers, ValuationResult } from '../types'
 import { money } from '../format'
 import ResourceState from './ResourceState'
+import ValuationExplanation from './ValuationExplanation'
 
 const multiples = { pe: 'PE（TTM）', pb: 'PB（MRQ）', ps: 'PS（TTM）' } as const
 type MultipleKey = keyof typeof multiples
@@ -194,6 +195,7 @@ export default function Valuation({ code }: { code: string }) {
   const submit = (event: FormEvent) => { event.preventDefault(); setParams({ ...draft }) }
   const reset = () => { setDraft(defaultParams); setParams(defaultParams) }
   return <div className="valuation-page">
+    <ValuationExplanation key={code} code={code} params={params} data={resource.data} loading={resource.loading} error={resource.error} />
     {!data && <ResourceState {...resource} retry={resource.reload} />}
     {data && <>
       <Summary data={data} />

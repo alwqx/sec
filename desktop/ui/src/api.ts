@@ -193,6 +193,12 @@ export function valuation(query: Record<string, string>, signal?: AbortSignal): 
   return request(`/api/v1/valuation?${new URLSearchParams(query)}`, signal)
 }
 
+export function explainValuation(input: import('./aiValuation').ValuationExplanationInput, signal?: AbortSignal): Promise<import('./types').ValuationExplanation> {
+  return request('/api/v1/ai/valuation', signal, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
+  })
+}
+
 export function strategy(query: Record<string, string>, signal?: AbortSignal): Promise<StrategyResult> {
   return request(`/api/v1/strategy?${new URLSearchParams(query)}`, signal)
 }
