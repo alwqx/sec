@@ -1,5 +1,7 @@
 import type { BasicSecurity, SecurityQuote, Company, Dividend, WorkspaceState, PageResult, IPOListing, Announcement, FinancialReport, MetalData, SECFilings, USCompanyData, HKCompanyData, FundOverview, USFinancialsData, CommodityQuote, CommodityHistory, HistoryQuote, BondData, CompanyMetrics, SavedDownload, AnnualReportsPage, ProspectusPage , MacroCatalog, MacroDataset , FxDataset, FxSpread , HistoryOverlay , StrategyResult, ValuationResult, FinancialCharts, USDividends } from './types'
 
+import { readExplanationStream } from './sse'
+
 async function request<T>(path: string, signal?: AbortSignal, options?: RequestInit): Promise<T> {
   const resp = await fetch(path, { ...options, signal })
   if (!resp.ok) {
@@ -197,6 +199,13 @@ export function explainValuation(input: import('./aiValuation').ValuationExplana
   return request('/api/v1/ai/valuation', signal, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
   })
+}
+
+export async function streamValuation(input: import('./aiValuation').ValuationExplanationInput, emit: (event: import('./types').ExplanationStreamEvent) => void, signal?: AbortSignal): Promise<import('./types').ValuationExplanation> {
+  const response = await fetch('/api/v1/ai/valuation', {
+    method: 'POST', signal, headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' }, body: JSON.stringify(input),
+  })
+  return readExplanationStream(response, emit, signal)
 }
 
 export function strategy(query: Record<string, string>, signal?: AbortSignal): Promise<StrategyResult> {

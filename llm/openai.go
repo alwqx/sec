@@ -49,16 +49,20 @@ type openAITool struct {
 	} `json:"function"`
 }
 
+type openAIChoice struct {
+	Message      openAIReply `json:"message"`
+	FinishReason string      `json:"finish_reason"`
+}
+
+type openAIUsage struct {
+	PromptTokens     int `json:"prompt_tokens"`
+	CompletionTokens int `json:"completion_tokens"`
+}
+
 type openAIResponse struct {
-	Model   string `json:"model"`
-	Choices []struct {
-		Message      openAIReply `json:"message"`
-		FinishReason string      `json:"finish_reason"`
-	} `json:"choices"`
-	Usage struct {
-		PromptTokens     int `json:"prompt_tokens"`
-		CompletionTokens int `json:"completion_tokens"`
-	} `json:"usage"`
+	Model   string         `json:"model"`
+	Choices []openAIChoice `json:"choices"`
+	Usage   openAIUsage    `json:"usage"`
 }
 
 // openAIReply 是回复里的消息。content 通常是字符串，部分兼容网关和多模态模型返回内容块数组，见 replyText。
@@ -104,8 +108,20 @@ func (c *openAIClient) maxTokensField() string {
 }
 
 func (c *openAIClient) Chat(ctx context.Context, req Request) (*Response, error) {
-	if err := validateRequest(req); err != nil {
+	body, headers, err := c.request(req)
+	if err != nil {
 		return nil, err
+	}
+	var resp openAIResponse
+	if err := postJSON(ctx, c.url, headers, body, &resp, c.name, parseOpenAIError); err != nil {
+		return nil, err
+	}
+	return c.response(ctx, resp)
+}
+
+func (c *openAIClient) request(req Request) (map[string]any, http.Header, error) {
+	if err := validateRequest(req); err != nil {
+		return nil, nil, err
 	}
 	messages := make([]openAIMessage, 0, len(req.Messages)+1)
 	if req.System != "" {
@@ -128,10 +144,10 @@ func (c *openAIClient) Chat(ctx context.Context, req Request) (*Response, error)
 	if c.key != "" {
 		headers.Set("Authorization", "Bearer "+c.key)
 	}
-	var resp openAIResponse
-	if err := postJSON(ctx, c.url, headers, body, &resp, c.name, parseOpenAIError); err != nil {
-		return nil, err
-	}
+	return body, headers, nil
+}
+
+func (c *openAIClient) response(ctx context.Context, resp openAIResponse) (*Response, error) {
 	if len(resp.Choices) == 0 {
 		return nil, fmt.Errorf("%s 的回复里没有内容（choices 为空）", c.name)
 	}

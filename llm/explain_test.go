@@ -184,3 +184,90 @@ func TestOpen(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "ds", model.Profile)
 }
+
+type failingStream struct {
+	Fake
+	err error
+}
+
+func (f *failingStream) ChatStream(ctx context.Context, _ Request, emit func(StreamEvent) error) (*Response, error) {
+	if err := emitStream(ctx, emit, StreamEvent{Type: StreamText, Text: "半篇草稿"}); err != nil {
+		return nil, err
+	}
+	return nil, f.err
+}
+
+func TestExplainStreamChecksAndCache(t *testing.T) {
+	asOf, inputs := "2026-11-06", []string{}
+	fake := &Fake{Replies: []FakeReply{FakeText(explainText)}}
+	e := &ValuationExplainer{Client: fake, CacheDir: t.TempDir(), Fetch: stubFetch(&asOf, &inputs)}
+	var events []ExplanationEvent
+	got, err := e.ExplainStream(context.Background(), nil, func(event ExplanationEvent) error {
+		events = append(events, event)
+		return nil
+	})
+	require.NoError(t, err)
+	require.Equal(t, "meta", events[0].Type)
+	require.Contains(t, events[0].Meta.Disclaimer, "不构成投资建议")
+	require.Equal(t, "delta", events[1].Type)
+	require.Equal(t, explainText, events[1].Text)
+	require.Equal(t, "status", events[2].Type)
+	require.Equal(t, []string{"3.8%"}, unsourcedTexts(got.Check), "流式完成后仍做完整数字核对")
+	jsonResult, err := e.Explain(context.Background(), nil)
+	require.NoError(t, err)
+	require.True(t, jsonResult.Cached, "流式与 JSON 共用缓存")
+	events = nil
+	got, err = e.ExplainStream(context.Background(), nil, func(event ExplanationEvent) error { events = append(events, event); return nil })
+	require.NoError(t, err)
+	require.True(t, got.Cached)
+	require.Len(t, events, 1, "缓存直接返回完整结果，不伪造增量")
+	require.True(t, events[0].Meta.Cached)
+	require.Len(t, fake.Requests, 1)
+}
+
+func TestExplainStreamDoesNotCacheDraft(t *testing.T) {
+	for _, mode := range []string{"断流", "回调失败", "取消", "截断"} {
+		t.Run(mode, func(t *testing.T) {
+			asOf, inputs := "2026-11-06", []string{}
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			want := errors.New("断流")
+			var client Client = &failingStream{err: want}
+			if mode != "断流" {
+				reply := FakeText(explainText)
+				if mode == "截断" {
+					reply.Response.StopReason = StopMaxTokens
+				}
+				client = &Fake{Replies: []FakeReply{reply}}
+			}
+			dir := t.TempDir()
+			e := &ValuationExplainer{Client: client, CacheDir: dir, Fetch: stubFetch(&asOf, &inputs)}
+			got, err := e.ExplainStream(ctx, nil, func(event ExplanationEvent) error {
+				if event.Type == "delta" {
+					if mode == "取消" {
+						cancel()
+					}
+					if mode == "回调失败" {
+						return want
+					}
+				}
+				return nil
+			})
+			if mode == "截断" {
+				require.NoError(t, err)
+				require.True(t, got.Truncated)
+			} else {
+				require.Error(t, err)
+				require.Nil(t, got)
+				if mode == "取消" {
+					require.ErrorIs(t, err, context.Canceled)
+				} else {
+					require.ErrorIs(t, err, want)
+				}
+			}
+			entries, err := os.ReadDir(dir)
+			require.NoError(t, err)
+			require.Empty(t, entries)
+		})
+	}
+}

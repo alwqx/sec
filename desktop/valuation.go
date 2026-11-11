@@ -62,41 +62,55 @@ func (s *desktopServer) handleValuation(w http.ResponseWriter, r *http.Request) 
 
 // queryValuation 为估值页面和 AI 解读查询同一套数据，失败时写入 HTTP 错误。
 func (s *desktopServer) queryValuation(w http.ResponseWriter, r *http.Request, code string, params valuation.DCFParams) *valuation.Result {
+	result, err := s.fetchValuation(r.Context(), code, params)
+	if err != nil {
+		if r.Context().Err() != nil {
+			return nil
+		}
+		status, message := valuationFailure(err)
+		slog.ErrorContext(r.Context(), "查询估值失败", "code", code, "error", err)
+		writeError(w, status, message)
+		return nil
+	}
+	return result
+}
+
+type valuationConfigError struct{ error }
+
+func valuationFailure(err error) (int, string) {
+	var configErr valuationConfigError
+	switch {
+	case errors.As(err, &configErr):
+		return http.StatusInternalServerError, "读取 SEC 联系邮箱失败，请在设置中检查"
+	case errors.Is(err, valuation.ErrNoData):
+		return http.StatusNotFound, err.Error()
+	case errors.Is(err, valuation.ErrForeign):
+		return http.StatusUnprocessableEntity, err.Error()
+	default:
+		return http.StatusBadGateway, "估值数据获取失败，请稍后重试"
+	}
+}
+
+// fetchValuation 不写 HTTP 响应，JSON 和已开始的 SSE 共用同一套取数与超时。
+func (s *desktopServer) fetchValuation(ctx context.Context, code string, params valuation.DCFParams) (*valuation.Result, error) {
 	us := usTicker.MatchString(code)
 	// 美股要下载 XBRL 和全部日线，比 A 股慢。
 	timeout := 20 * time.Second
 	if us {
 		timeout = 40 * time.Second
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), timeout)
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	var result *valuation.Result
 	var err error
 	if us {
 		var client *edgar.Client
 		if client, err = s.edgarClient(ctx); err != nil {
-			writeError(w, http.StatusInternalServerError, "读取 SEC 联系邮箱失败，请在设置中检查")
-			return nil
+			return nil, valuationConfigError{err}
 		}
 		result, err = valuation.AnalyzeUS(ctx, client, code, params, usFactsCache.Loader(client))
 	} else {
 		result, err = valuation.Analyze(ctx, code, params)
 	}
-	if errors.Is(err, valuation.ErrNoData) {
-		writeError(w, http.StatusNotFound, err.Error())
-		return nil
-	}
-	if errors.Is(err, valuation.ErrForeign) {
-		writeError(w, http.StatusUnprocessableEntity, err.Error())
-		return nil
-	}
-	if err != nil {
-		if r.Context().Err() != nil {
-			return nil
-		}
-		slog.ErrorContext(ctx, "查询估值失败", "code", code, "error", err)
-		writeError(w, http.StatusBadGateway, "估值数据获取失败，请稍后重试")
-		return nil
-	}
-	return result
+	return result, err
 }

@@ -138,6 +138,7 @@
   - [x] `llm` 里的解读逻辑和缓存：`llm.Open` 按配置创建客户端，`ValuationExplainer` 组装提示词、附上免责声明、做数字核对，按证券、`as_of`、模型和提示词缓存。
   - [x] CLI：`sec valuation <code> --explain`，以及随它一起加的 `--ai <配置名>` 参数（各命令共用，不写时用 `default`）。
 - [x] Desktop 估值 tab「解读」按钮：复用上一项，旁边加模型配置下拉框，默认选中 `default`，临时切换只对当前页面有效。
+- [x] AI 流式输出：Anthropic 与 OpenAI 兼容客户端共用流式抽象；估值解读在 Desktop 逐段显示、CLI 交互终端逐段输出，保留 JSON 接口、取消、数字核对与完整结果缓存。协议调研与接口约定见 `docs/ai.md`。
 - [ ] 申报与公告摘要：CLI 用 `--summary`，Desktop 在列表行上加按钮，两边共用 `llm/` 里的实现。拆成以下几个 PR：
   - [ ] 巨潮公告摘要。
   - [ ] 美股 8-K 事项摘要。

@@ -29,6 +29,7 @@ type anthropicRequest struct {
 	System    string             `json:"system,omitempty"`
 	Messages  []anthropicMessage `json:"messages"`
 	Tools     []anthropicTool    `json:"tools,omitempty"`
+	Stream    bool               `json:"stream,omitempty"`
 }
 
 type anthropicMessage struct {
@@ -65,8 +66,20 @@ type anthropicResponse struct {
 }
 
 func (c *anthropicClient) Chat(ctx context.Context, req Request) (*Response, error) {
-	if err := validateRequest(req); err != nil {
+	body, headers, err := c.request(req)
+	if err != nil {
 		return nil, err
+	}
+	var resp anthropicResponse
+	if err := postJSON(ctx, c.url, headers, body, &resp, c.name, parseAnthropicError); err != nil {
+		return nil, err
+	}
+	return c.response(ctx, resp)
+}
+
+func (c *anthropicClient) request(req Request) (anthropicRequest, http.Header, error) {
+	if err := validateRequest(req); err != nil {
+		return anthropicRequest{}, nil, err
 	}
 	body := anthropicRequest{Model: c.model, MaxTokens: maxTokens(req), System: req.System, Messages: make([]anthropicMessage, 0, len(req.Messages))}
 	for _, t := range req.Tools {
@@ -75,11 +88,11 @@ func (c *anthropicClient) Chat(ctx context.Context, req Request) (*Response, err
 	for i, m := range req.Messages {
 		content, empty, err := c.content(m)
 		if err != nil {
-			return nil, err
+			return anthropicRequest{}, nil, err
 		}
 		// 别的厂商产生、只有推理内容的消息重新拼装后可能是空的。
 		if empty {
-			return nil, emptyMessage(i, m)
+			return anthropicRequest{}, nil, emptyMessage(i, m)
 		}
 		body.Messages = append(body.Messages, anthropicMessage{Role: m.Role, Content: content})
 	}
@@ -88,11 +101,10 @@ func (c *anthropicClient) Chat(ctx context.Context, req Request) (*Response, err
 		headers.Set("x-api-key", c.key)
 	}
 	headers.Set("anthropic-version", anthropicVersion)
-	var resp anthropicResponse
-	if err := postJSON(ctx, c.url, headers, body, &resp, c.name, parseAnthropicError); err != nil {
-		return nil, err
-	}
+	return body, headers, nil
+}
 
+func (c *anthropicClient) response(ctx context.Context, resp anthropicResponse) (*Response, error) {
 	var blocks []anthropicBlock
 	if len(resp.Content) > 0 && string(resp.Content) != "null" {
 		if err := json.Unmarshal(resp.Content, &blocks); err != nil {

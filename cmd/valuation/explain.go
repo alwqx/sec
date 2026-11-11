@@ -16,6 +16,7 @@ import (
 	"github.com/alwqx/sec/utils"
 	shared "github.com/alwqx/sec/valuation"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
 
 // openExplainer 按 --ai 创建估值解读用的客户端，不写时用 default，同时返回读到的配置，美股估值复用。
@@ -88,6 +89,10 @@ func printExplanation(out io.Writer, x *llm.Explanation) {
 		source += fmt.Sprintf("，%s 生成的缓存", x.CreatedAt.Local().Format(utils.StandardTimeLayout))
 	}
 	fmt.Fprintf(out, "【AI 解读】%s\n\n%s\n\n", source, x.Text)
+	printExplanationFooter(out, x)
+}
+
+func printExplanationFooter(out io.Writer, x *llm.Explanation) {
 	if x.Truncated {
 		fmt.Fprintln(out, "注意: 输出达到上限，解读不完整")
 	}
@@ -103,4 +108,52 @@ func printExplanation(out io.Writer, x *llm.Explanation) {
 		fmt.Fprintf(out, "核对: %s\n", warning)
 	}
 	fmt.Fprintf(out, "\n%s\n\n", x.Disclaimer)
+}
+
+func terminalOutput(out io.Writer) bool {
+	f, ok := out.(*os.File)
+	return ok && term.IsTerminal(int(f.Fd()))
+}
+
+// 交互终端逐段输出正文，完成后才显示核对结论；管道和 --json 仍用完整结果。
+func explainStreaming(ctx context.Context, out io.Writer, explainer *llm.ValuationExplainer, input json.RawMessage, sec *sina.BasicSecurity, r *shared.Result) error {
+	e := *explainer
+	e.Fetch = func(context.Context, json.RawMessage) (*aitool.Result, error) {
+		return aitool.ValuationResult(sec, r), nil
+	}
+	wroteText := false
+	x, err := e.ExplainStream(ctx, input, func(event llm.ExplanationEvent) error {
+		switch event.Type {
+		case "meta":
+			state := "生成中的正文尚未完成核对"
+			if event.Meta.Cached {
+				state = "已核对的缓存解读"
+			}
+			_, err := fmt.Fprintf(out, "【AI 解读】模型 %s，配置 %s；%s\n%s\n\n", event.Meta.Model, event.Meta.Profile, state, event.Meta.Disclaimer)
+			return err
+		case "delta":
+			wroteText = true
+			_, err := io.WriteString(out, event.Text)
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		if wroteText {
+			fmt.Fprintln(out, "\n注意：以上为未完成核对的草稿。")
+		}
+		return fmt.Errorf("估值解读失败：%w", err)
+	}
+	if !wroteText {
+		if _, err := io.WriteString(out, x.Text); err != nil {
+			return err
+		}
+	}
+	fmt.Fprintf(out, "\n\n模型 %s，配置 %s", x.Model, x.Profile)
+	if x.Cached {
+		fmt.Fprintf(out, "，%s 生成的缓存", x.CreatedAt.Local().Format(utils.StandardTimeLayout))
+	}
+	fmt.Fprintln(out)
+	printExplanationFooter(out, x)
+	return nil
 }

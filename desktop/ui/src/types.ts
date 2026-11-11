@@ -255,6 +255,13 @@ export interface ValuationExplanation {
   created_at: string
 }
 
+export type ValuationExplanationMeta = Pick<ValuationExplanation, 'ex_code' | 'name' | 'as_of' | 'model' | 'profile' | 'disclaimer' | 'cached'>
+export type ExplanationStreamEvent =
+  | { type: 'status'; text: string }
+  | { type: 'delta'; text: string }
+  | { type: 'meta'; meta: ValuationExplanationMeta }
+  | { type: 'done'; result: ValuationExplanation }
+
 // AIProfileInput 是新增和编辑提交的配置；协议和地址为空表示用厂商的默认值。不含 Key。
 export interface AIProfileInput {
   name?: string

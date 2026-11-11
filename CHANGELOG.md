@@ -19,6 +19,10 @@
 15. Save and clear encrypted AI API keys in Desktop settings.
 16. Share connection and tool-calling probes in `llm` and add connection testing with cancellation and results to Desktop settings.
 17. Add cancellable AI valuation explanations to Desktop with a temporary model-profile selector, shared caching, number checks and disclaimers.
+18. Stream AI valuation explanations in Desktop and interactive CLI terminals with Anthropic and OpenAI-compatible clients, cancellation, verified final results and shared caching.
+19. Require Go 1.26.11 for development and release builds to fix the standard-library vulnerability GO-2026-6859 reported by Desktop CI.
+20. Extract the OpenAI streaming chunk schema into a package-level type.
+21. Extract the Anthropic streaming event schema into a package-level type.
 
 ### v0.4.8
 

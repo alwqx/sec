@@ -1,5 +1,5 @@
 // Package llm 是调用大模型的抽象，CLI 和 Desktop 共用：Anthropic Messages API 和 OpenAI 兼容的 Chat Completions，
-// 都用 net/http 直接调用，不引入厂商 SDK。第一版不做流式输出。设计见 docs/ai.md 的「模型接入（llm）」。
+// 都用 net/http 直接调用，不引入厂商 SDK。StreamingClient 提供流式能力。设计见 docs/ai.md 的「模型接入（llm）」。
 //
 // 本包只负责一轮请求：把 Request 换成各协议的格式发出去，把回复换回 Response。工具调用的循环、数字核对和提示词在别处。
 package llm

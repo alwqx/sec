@@ -105,20 +105,15 @@ func (s *desktopServer) handleAIValuation(w http.ResponseWriter, r *http.Request
 		writeError(w, http.StatusConflict, err.Error()+"；请在设置页「AI 模型」中检查配置")
 		return
 	}
+	if wantsAIStream(r) {
+		s.streamAIValuation(w, r, in.Code, params, input, client, model)
+		return
+	}
 	result := s.queryValuation(w, r, in.Code, params)
 	if result == nil {
 		return
 	}
-	cacheDir, err := llm.DefaultCacheDir("valuation")
-	if err != nil {
-		slog.WarnContext(r.Context(), "无法创建解读缓存目录，本次不缓存", "error", err)
-	}
-	explainer := llm.ValuationExplainer{
-		Client: client, Model: model, CacheDir: cacheDir,
-		Fetch: func(context.Context, json.RawMessage) (*aitool.Result, error) {
-			return aitool.ValuationResult(&sina.BasicSecurity{ExCode: in.Code, Name: result.Name}, result), nil
-		},
-	}
+	explainer := valuationExplainer(r.Context(), in.Code, result, client, model)
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
 	defer cancel()
 	explanation, err := explainer.Explain(ctx, input)
@@ -126,18 +121,33 @@ func (s *desktopServer) handleAIValuation(w http.ResponseWriter, r *http.Request
 		if r.Context().Err() != nil {
 			return
 		}
-		if errors.Is(err, context.DeadlineExceeded) || ctx.Err() != nil {
-			writeError(w, http.StatusGatewayTimeout, "模型解读超时，请稍后重试或选择其他模型")
-			return
-		}
-		// 厂商的原始错误可能回显 Key 或请求，不返回其正文，也不写入日志。
-		var apiErr *llm.APIError
-		if errors.As(err, &apiErr) {
-			writeError(w, http.StatusBadGateway, fmt.Sprintf("模型接口返回 HTTP %d，请检查模型配置或稍后重试", apiErr.Status))
-			return
-		}
-		writeError(w, http.StatusBadGateway, "估值解读失败，模型没有返回可用解读，请检查模型配置或稍后重试")
+		status, message := explanationFailure(ctx, err)
+		writeError(w, status, message)
 		return
 	}
 	writeJSON(w, explanation)
+}
+
+func valuationExplainer(ctx context.Context, code string, result *valuation.Result, client llm.Client, model llm.Model) *llm.ValuationExplainer {
+	cacheDir, err := llm.DefaultCacheDir("valuation")
+	if err != nil {
+		slog.WarnContext(ctx, "无法创建解读缓存目录，本次不缓存", "error", err)
+	}
+	return &llm.ValuationExplainer{Client: client, Model: model, CacheDir: cacheDir,
+		Fetch: func(context.Context, json.RawMessage) (*aitool.Result, error) {
+			return aitool.ValuationResult(&sina.BasicSecurity{ExCode: code, Name: result.Name}, result), nil
+		},
+	}
+}
+
+func explanationFailure(ctx context.Context, err error) (int, string) {
+	if errors.Is(err, context.DeadlineExceeded) || ctx.Err() != nil {
+		return http.StatusGatewayTimeout, "模型解读超时，请稍后重试或选择其他模型"
+	}
+	// 厂商错误正文可能回显 Key，不回传也不写日志。
+	var apiErr *llm.APIError
+	if errors.As(err, &apiErr) {
+		return http.StatusBadGateway, fmt.Sprintf("模型接口返回 HTTP %d，请检查模型配置或稍后重试", apiErr.Status)
+	}
+	return http.StatusBadGateway, "估值解读失败，流式回复可能中断或模型没有返回可用解读，请检查模型配置或稍后重试"
 }
