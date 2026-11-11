@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { aiSettings, explainValuation } from '../api'
+import { aiSettings, streamValuation } from '../api'
 import { explanationChecks, explanationInput, explanationProfile, explanationUnavailable } from '../aiValuation'
 import { useResource } from '../hooks/useResource'
-import type { AIProfileView, ValuationExplanation as Explanation, ValuationResult } from '../types'
+import type { AIProfileView, ValuationExplanation as Explanation, ValuationExplanationMeta, ValuationResult } from '../types'
 
 export default function ValuationExplanation({ code, params, data, loading, error }: {
   code: string
@@ -15,7 +15,7 @@ export default function ValuationExplanation({ code, params, data, loading, erro
   const models = useResource(loadModels)
   const [selected, setSelected] = useState('')
   const profile = explanationProfile(models.data, selected)
-  const [run, setRun] = useState<{ source: ValuationResult; profile: AIProfileView; result?: Explanation; error?: string } | null>(null)
+  const [run, setRun] = useState<{ source: ValuationResult; profile: AIProfileView; result?: Explanation; error?: string; draft?: string; meta?: ValuationExplanationMeta; status?: string } | null>(null)
   const controller = useRef<AbortController | null>(null)
   // 证券、模型或已应用的估值参数变了时取消请求。旧响应不能覆盖新页面或新的配置选择。
   useEffect(() => {
@@ -37,10 +37,19 @@ export default function ValuationExplanation({ code, params, data, loading, erro
     const source = data
     setRun({ source, profile })
     try {
-      const result = await explainValuation(explanationInput(code, profile.name, params), request.signal)
+      const result = await streamValuation(explanationInput(code, profile.name, params), event => {
+        if (request.signal.aborted) return
+        setRun(previous => {
+          if (!previous || previous.source !== source || previous.profile !== profile) return previous
+          if (event.type === 'delta') return { ...previous, draft: (previous.draft ?? '') + event.text }
+          if (event.type === 'meta') return { ...previous, meta: event.meta }
+          if (event.type === 'status') return { ...previous, status: event.text }
+          return previous
+        })
+      }, request.signal)
       if (!request.signal.aborted) setRun({ source, profile, result })
     } catch (e) {
-      if (!request.signal.aborted) setRun({ source, profile, error: e instanceof Error ? e.message : String(e) })
+      if (!request.signal.aborted) setRun(previous => previous && { ...previous, error: e instanceof Error ? e.message : String(e) })
     } finally {
       if (controller.current === request) controller.current = null
     }
@@ -61,7 +70,9 @@ export default function ValuationExplanation({ code, params, data, loading, erro
     {profile && <p className="data-note">{profile.local ? '本机模型，估值数据不出本机。' : `点击解读会将这只证券的估值数据和口径说明发送给 ${profile.provider_name}（${profile.name}）。`} 临时切换只对当前页面有效，不修改默认配置。</p>}
     <p className="data-note">解读时会按已应用的参数重新查询估值，以解读中的数据截止日期为准。</p>
     {!unavailable && (loading || error) && <p className="data-note">请先等待估值加载完成或修正估值参数，再生成解读。</p>}
-    {busy && <p className="data-note" role="status">正在生成解读，可能需要几分钟，可以取消…</p>}
+    {busy && <p className="data-note" role="status">{current?.status ?? '正在连接…'} 可以取消。</p>}
+    {current?.meta && !result && <p className="data-note">数据截止 {current.meta.as_of} · 模型 {current.meta.model} · {current.meta.disclaimer}</p>}
+    {current?.draft && !result && <div><p className="data-note">{current.error ? '以下是中断前的草稿，未完成核对。' : '生成中的草稿，尚未完成数字核对。'}</p><p className="explanation-text">{current.draft}</p></div>}
     {current?.error !== undefined && <p className="error" role="alert">{current.error}</p>}
     {result && !blocked && <div className="explanation-result" role="status">
       <p className="data-note">{result.name}（{result.ex_code}） · 数据截止 {result.as_of} · 模型 {result.model} · 配置 {result.profile}{result.cached ? ` · 缓存，生成于 ${new Date(result.created_at).toLocaleString('zh-CN')}` : ''}</p>

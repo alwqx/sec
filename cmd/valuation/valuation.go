@@ -123,6 +123,9 @@ func ValuationHandler(cmd *cobra.Command, args []string) error {
 			if !asJSON {
 				render(cmd.OutOrStdout(), method, result)
 			}
+			if !asJSON && terminalOutput(cmd.OutOrStdout()) {
+				return explainStreaming(cmd.Context(), cmd.OutOrStdout(), explainer, input, sec, result)
+			}
 			return explain(cmd.Context(), cmd.OutOrStdout(), explainer, input, sec, result, asJSON)
 		}
 		if asJSON {

@@ -1,6 +1,6 @@
 # AI/LLM 接入设计
 
-本文记录 sec 接入大模型的设计和拆分。实现进度见 [TODO](../TODO.md) 的 AI/LLM 部分，每一步一个 PR，本文只描述方案，不对应代码。
+本文记录 sec 接入大模型的设计和拆分，以及已实现的接口约定。实现进度见 [TODO](../TODO.md) 的 AI/LLM 部分，每一步一个 PR。
 
 ## 目标与边界
 
@@ -149,7 +149,43 @@ type Request struct {
 
 不支持工具调用的模型只能用解读和摘要，不能用 `sec ask` 和对话面板，CLI 报错和设置页都给出提示。
 
-第一版不做流式输出：解读和摘要一次性返回，`sec ask` 和对话面板按轮显示。流式输出等对话稳定后再加。
+### 流式输出（2026-11-10 调研与实现方案）
+
+流式输出优先用于已实现的估值解读，沿用 Anthropic Messages 和 OpenAI Chat Completions。保留 `Client.Chat` 及完整 JSON 输出，增加可选的 `ChatStream(ctx, req, emit)`：持续发送正文增量，同时组装最终 `Response`，让提示词、数字核对、缓存和未来工具循环共用。
+
+协议依据：
+
+- [OpenAI 流式事件](https://developers.openai.com/api/reference/resources/chat/subresources/completions/streaming-events)：`stream: true` 后从 `choices[].delta` 取增量，正文与工具参数分别拼接，以 `[DONE]` 结束。请求 `stream_options.include_usage` 时，最后可能有 `choices: []` 的统计包，不是空回复错误。
+- [Anthropic 流式协议](https://platform.claude.com/docs/en/build-with-claude/streaming)：按 `message_start`、内容块 start/delta/stop、`message_delta`、`message_stop` 组装消息；`message_delta.usage` 是累计值，不能逐包相加。处理 `ping` 和流内 `error`，保留 thinking、signature 和工具参数分片，正文与推理内容分离。
+- [DeepSeek](https://api-docs.deepseek.com/api/create-chat-completion/) 的用量可能放在最后一个内容块，而不是独立的空 choices 包；[通义](https://help.aliyun.com/zh/model-studio/stream) 的部分模型只支持流式调用；[Ollama](https://docs.ollama.com/api/openai-compatibility) 也支持 OpenAI 兼容流式接口。自定义网关仍需单独验证，不能假设兼容所有扩展参数。
+
+Desktop 继续使用 `POST /api/v1/ai/valuation`，请求 `Accept: text/event-stream` 时返回 SSE，否则保留 JSON。前端用 `fetch`、`ReadableStream` 和 UTF-8 增量解码读取 POST 响应；原生 `EventSource` 不支持当前的 JSON POST 请求体。参考 [Fetch 流式读取](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch) 和 [SSE 格式](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events)。
+
+应用层事件不直接暴露厂商协议：`status` 表示取数、生成、核对阶段，`meta` 携带证券、模型配置、数据截止日期和免责声明，`delta` 追加正文，`done` 返回完整 `Explanation`，`error` 是脱敏后的失败终态。`done` 与 `error` 二选一，连接提前结束不能当成成功。Go 服务每次输出后调用 `http.ResponseController.Flush`；取数逻辑与 HTTP 错误输出分离，避免开始 SSE 后再写普通 JSON 错误。
+
+正确性约束：
+
+- 生成中的正文是尚未完成核对的草稿；免责声明先显示，完整回答后执行 `Verify` 并用最终结果替换草稿。只有上游正常完成且未截断的结果才缓存，取消或异常断流不缓存半篇回答；缓存命中直接返回完整结果。
+- SSE 解析处理 UTF-8 字符、半行、跨网络块事件、CRLF、多行 data 和心跳，明确限制事件和总响应大小，不能按一次网络 read 解析一次 JSON。
+- 鉴权、输入和配置错误在流开始前返回 HTTP 错误；取数和模型错误发生在流开始后，以 `error` 事件结束，事件内携带对应 `status`。模型原始错误正文不返回 Desktop 客户端，不输出 Key 或推理内容。流式 POST 不自动重发，避免重复内容和额外调用。
+- 沿用 `AbortController → request context → 模型请求` 的取消链；写出或 Flush 失败时终止上游。保留明确的总超时，心跳不延长总超时。取估值和模型首段输出前的耗时仍存在，通过阶段状态展示。
+- CLI 的终端正文可以流式显示，管道及 `--json` 继续返回完整结果；连接测试保持完整结果输出。
+
+实现按以下顺序分层，便于审查：公共 SSE 解析及 OpenAI 兼容客户端 → Anthropic 客户端 → 共享估值解读和 Desktop 端到端 → CLI 终端。每层使用假服务测试，不调用真实模型。验收覆盖上游尚未结束时已经收到首段正文、取消、流内错误、缺少结束标记、用量统计、工具参数分片、最终核对及缓存。
+
+实现入口为 `llm.StreamingClient.ChatStream` 和 `ValuationExplainer.ExplainStream`。SSE 单事件最多 1 MiB，模型和应用流总量最多 16 MiB；服务每 15 秒发送注释心跳，单次写出最多等待 15 秒，取估值最多 20 秒（美股 40 秒）、模型最多 5 分钟。自定义 OpenAI 网关不附加 `stream_options`；其他 OpenAI 兼容厂商请求 `include_usage`，均兼容统计跟随最后一段正文返回。
+
+Desktop 请求示例（正式应用仍需原有 cookie 鉴权及同源校验）：
+
+```http
+POST /api/v1/ai/valuation
+Content-Type: application/json
+Accept: text/event-stream
+
+{"code":"SH600036","profile":"deepseek"}
+```
+
+事件的 JSON 数据分别是：`status` / `delta` 为 `{"text":"…"}`，`meta` 为 `ex_code`、`name`、`as_of`、`model`、`profile`、`disclaimer`、`cached`，`done` 为原 JSON 接口的完整 `Explanation`，`error` 为 `{"message":"…","status":502}`。缓存命中不发送虚构的正文增量，直接发送 `meta` 和 `done`；前端只把 `done` 当作成功，保留断流前草稿并标明未完成核对。CLI 直接连接终端时自动流式输出，重定向、管道和 `--json` 保持原输出方式；暂不增加自动降级，网关不支持 SSE 时明确报错。
 
 ### 配置与密钥
 
@@ -322,7 +358,7 @@ CLI 和 Desktop 共用一份配置，在任意一边设置后另一边直接可�
 - 客户端由 `llm.Open(ai, name, secret, getenv)` 按配置名创建（不写名字时用 `default`，并记一条 Debug 日志）：没有模型配置、AI 功能没有启用、Key 读不出来时报错并说明怎么处理，解读、摘要和对话共用。
 - CLI：`sec valuation <code> --explain [--ai <配置名>]` 先检查模型配置再取数，配置有问题时不请求估值数据；按 `--method` 输出表格后附上解读、核对结果和免责声明（解读总是覆盖整体估值，不受 `--method` 影响），解读复用已经算好的估值（`aitool.ValuationResult`），不再取一次数。`--json` 时只输出 `llm.Explanation`；`--ai` 不带 `--explain` 时报错。只有改过的 DCF 参数写进缓存键，和默认参数的解读共用缓存。
 - Desktop：估值页顶部的「解读」按钮旁可临时选择模型，默认选中 `default`，选择只保存在当前页面，不写配置。未配置、未启用或配置无效时按钮置灰并提示去设置页；可手动刷新模型配置。点击前说明估值数据会发给所选厂商，本机地址标明不出本机。生成可取消，切换证券、模型、已应用的 DCF 参数或离开页面时取消请求并清除旧解读，旧响应不会覆盖新页面。结果显示模型、配置、数据截止日期、缓存生成时间、截断提示、数字及建议用语核对结果和免责声明。
-- `POST /api/v1/ai/valuation` 接收 JSON：`code`（`SH600036` 或 `$AAPL`）、可选 `profile`（不填用 `default`），以及可选数值 `growth`、`terminal_growth`、`wacc`、`margin_of_safety`。只发送已应用且非空的参数，零值保留。后端校验鉴权和同源，读取最新模型配置，先通过 `llm.Open` 检查可用性，再按估值页相同路径重新查询并计算；不接受前端提交的估值或提示词。将 `aitool.ValuationResult` 的精简输出交给 `ValuationExplainer`，返回 `llm.Explanation`，与 CLI 共用提示词、缓存和核对。解读以本次查询的 `as_of` 为准，不保证与页面先前加载的交易日相同。无效输入返回 400，模型配置不可用返回 409，没有估值返回 404，不支持的外国公司返回 422，上游失败返回 502，模型超时返回 504；模型错误正文不回传，避免厂商回显 Key。
+- `POST /api/v1/ai/valuation` 接收 JSON：`code`（`SH600036` 或 `$AAPL`）、可选 `profile`（不填用 `default`），以及可选数值 `growth`、`terminal_growth`、`wacc`、`margin_of_safety`。只发送已应用且非空的参数，零值保留。后端校验鉴权和同源，读取最新模型配置，先通过 `llm.Open` 检查可用性，再按估值页相同路径重新查询并计算；不接受前端提交的估值或提示词。将 `aitool.ValuationResult` 的精简输出交给 `ValuationExplainer`，返回 `llm.Explanation`，与 CLI 共用提示词、缓存和核对。解读以本次查询的 `as_of` 为准，不保证与页面先前加载的交易日相同。JSON 模式下，无效输入返回 400，模型配置不可用返回 409，没有估值返回 404，不支持的外国公司返回 422，上游失败返回 502，模型超时返回 504；模型错误正文不回传，避免厂商回显 Key。`Accept: text/event-stream` 选择流式输出，开始后通过事件返回状态和错误，见上文「流式输出」。
 
 ### 申报与公告摘要
 

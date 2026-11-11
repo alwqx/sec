@@ -52,6 +52,23 @@ type Explanation struct {
 	CreatedAt     time.Time `json:"created_at"`
 }
 
+// ExplanationMeta 在正文之前发送，提前说明数据日期、模型和免责声明。
+type ExplanationMeta struct {
+	ExCode     string `json:"ex_code"`
+	Name       string `json:"name"`
+	AsOf       string `json:"as_of"`
+	Model      string `json:"model"`
+	Profile    string `json:"profile"`
+	Disclaimer string `json:"disclaimer"`
+	Cached     bool   `json:"cached"`
+}
+
+type ExplanationEvent struct {
+	Type string
+	Text string
+	Meta *ExplanationMeta
+}
+
 // ValuationExplainer 生成估值解读：调用 get_valuation 取精简输出，单轮请求模型（不开放工具调用），
 // 附上工具结果里的 disclaimer，并做数字核对。按 证券 + as_of + 模型 + 提示词 + 参数 缓存，同一份数据不重复调用模型。
 type ValuationExplainer struct {
@@ -70,6 +87,27 @@ func DefaultCacheDir(kind string) (string, error) {
 
 // Explain 解读一只股票的估值。input 是 get_valuation 的参数，如 {"code":"600519"}，也可以带 DCF 参数。
 func (e *ValuationExplainer) Explain(ctx context.Context, input json.RawMessage) (*Explanation, error) {
+	return e.explain(ctx, input, nil, false)
+}
+
+// ExplainStream 发送尚未核对的正文增量，正常结束后才核对和缓存；返回最终完整结果。
+func (e *ValuationExplainer) ExplainStream(ctx context.Context, input json.RawMessage, emit func(ExplanationEvent) error) (*Explanation, error) {
+	return e.explain(ctx, input, emit, true)
+}
+
+func (e *ValuationExplainer) explain(ctx context.Context, input json.RawMessage, emit func(ExplanationEvent) error, streaming bool) (*Explanation, error) {
+	output := func(event ExplanationEvent) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if emit != nil {
+			return emit(event)
+		}
+		return nil
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	fetch := e.Fetch
 	if fetch == nil {
 		fetch = aitool.ValuationTool().Call
@@ -94,16 +132,46 @@ func (e *ValuationExplainer) Explain(ctx context.Context, input json.RawMessage)
 	if err != nil {
 		return nil, err
 	}
+	disclaimer := result.Disclaimer
+	if disclaimer == "" {
+		disclaimer = defaultDisclaimer
+	}
+	meta := &ExplanationMeta{ExCode: data.ExCode, Name: data.Name, AsOf: result.AsOf, Model: e.Model.Name, Profile: e.Model.Profile, Disclaimer: disclaimer}
 	if cached := e.readCache(key); cached != nil {
 		cached.Profile = e.Model.Profile
+		meta.Model, meta.Disclaimer, meta.Cached = cached.Model, cached.Disclaimer, true
+		if err := output(ExplanationEvent{Type: "meta", Meta: meta}); err != nil {
+			return nil, err
+		}
 		return cached, nil
 	}
+	if err := output(ExplanationEvent{Type: "meta", Meta: meta}); err != nil {
+		return nil, err
+	}
 
-	resp, err := e.Client.Chat(ctx, Request{
+	req := Request{
 		System:    systemPrompt,
 		Messages:  []Message{{Role: RoleUser, Text: valuationPrompt + "\n\n" + string(source)}},
 		MaxTokens: explainMaxTokens,
-	})
+	}
+	var resp *Response
+	if streaming {
+		client, ok := e.Client.(StreamingClient)
+		if !ok {
+			return nil, ErrStreamUnsupported
+		}
+		resp, err = client.ChatStream(ctx, req, func(event StreamEvent) error {
+			if event.Type == StreamText {
+				return output(ExplanationEvent{Type: "delta", Text: event.Text})
+			}
+			if event.Type == StreamThinking {
+				return output(ExplanationEvent{Type: "status", Text: "模型正在思考…"})
+			}
+			return nil
+		})
+	} else {
+		resp, err = e.Client.Chat(ctx, req)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -113,10 +181,11 @@ func (e *ValuationExplainer) Explain(ctx context.Context, input json.RawMessage)
 		return nil, errors.New("模型拒绝了这个请求，换一个模型配置再试")
 	case text == "":
 		return nil, fmt.Errorf("模型没有给出解读（停止原因 %s）", resp.RawStopReason)
+	case resp.StopReason != StopEnd && resp.StopReason != StopMaxTokens:
+		return nil, fmt.Errorf("模型没有正常完成解读（停止原因 %s）", resp.RawStopReason)
 	}
-	disclaimer := result.Disclaimer
-	if disclaimer == "" {
-		disclaimer = defaultDisclaimer
+	if err := output(ExplanationEvent{Type: "status", Text: "正在核对回答…"}); err != nil {
+		return nil, err
 	}
 	explanation := &Explanation{
 		ExCode: data.ExCode, Name: data.Name, AsOf: result.AsOf, Text: text, Disclaimer: disclaimer,
@@ -125,6 +194,9 @@ func (e *ValuationExplainer) Explain(ctx context.Context, input json.RawMessage)
 	}
 	if explanation.Model == "" {
 		explanation.Model = e.Model.Name
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 	// 被截断的解读不缓存，下次重新生成。
 	if !explanation.Truncated {

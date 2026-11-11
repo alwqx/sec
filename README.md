@@ -374,7 +374,7 @@ $ sec quote-history lxjm --begin 20250601 --end 20250630
 
 ## 本地开发
 
-CLI 使用 Go 1.26.10 或更新版本：
+CLI 使用 Go 1.26.11 或更新版本：
 
 ```shell
 go build -o sec .

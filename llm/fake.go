@@ -55,3 +55,17 @@ func (f *Fake) Chat(ctx context.Context, req Request) (*Response, error) {
 	}
 	return reply.Response, reply.Err
 }
+
+// ChatStream 复用预设回复；需要跨块、延迟或断流时在测试中使用假的 HTTP 服务。
+func (f *Fake) ChatStream(ctx context.Context, req Request, emit func(StreamEvent) error) (*Response, error) {
+	resp, err := f.Chat(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	if resp.Message.Text != "" {
+		if err := emitStream(ctx, emit, StreamEvent{Type: StreamText, Text: resp.Message.Text}); err != nil {
+			return nil, err
+		}
+	}
+	return resp, nil
+}
