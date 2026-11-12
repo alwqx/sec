@@ -204,6 +204,7 @@ func TestOpenAIThinkingIgnored(t *testing.T) {
 		resp, err := c.client.response(context.Background(), c.resp)
 		require.NoError(t, err, name)
 		require.Equal(t, c.want, resp.ThinkingIgnored, name)
+		require.Equal(t, c.resp.Choices[0].Message.ReasoningContent != "" || c.resp.Usage.CompletionTokensDetails.ReasoningTokens > 0, resp.Reasoned, name)
 	}
 }
 

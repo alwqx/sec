@@ -107,7 +107,7 @@ func ProbeProfile(ctx context.Context, ai *config.AIConfig, name string, secret 
 	switch {
 	// 关闭思考没有生效时最需要知道：用户正是为了避免推理用完输出上限才关闭的。
 	case resp.ThinkingIgnored:
-		result.Warning = "配置关闭了思考，但模型仍在思考，这个模型可能不支持关闭；请换一个模型，或用 --thinking \"\" 恢复默认"
+		result.Warning = ThinkingIgnoredHint(name)
 	case resp.StopReason == StopMaxTokens || strings.TrimSpace(resp.Message.Text) == "":
 		result.Warning = fmt.Sprintf("回复被截断或为空（停止原因 %s），模型可能需要更大的输出上限，或者模型本身有问题", resp.RawStopReason)
 	}

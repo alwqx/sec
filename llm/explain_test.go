@@ -183,6 +183,13 @@ func TestOpen(t *testing.T) {
 	_, model, err = Open(&ai, "ds", secret, getenv)
 	require.NoError(t, err)
 	require.Equal(t, "ds", model.Profile)
+	require.True(t, model.ThinkingOffSupported, "DeepSeek 官方地址能关闭思考，出错时据此给建议")
+	require.False(t, model.ThinkingOff)
+	require.NoError(t, ai.Edit("ds", func(p *config.AIProfile) { p.Thinking = config.AIThinkingOff }))
+	_, off, err := Open(&ai, "ds", secret, getenv)
+	require.NoError(t, err)
+	require.True(t, off.ThinkingOff)
+	require.Equal(t, model.ID(), off.ID(), "思考设置不进缓存键")
 }
 
 type failingStream struct {

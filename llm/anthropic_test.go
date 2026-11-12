@@ -74,6 +74,20 @@ func TestAnthropic(t *testing.T) {
 	require.Equal(t, map[string]any{"type": "tool_result", "tool_use_id": "toolu_2", "content": "参数错误", "is_error": true}, results[1])
 }
 
+// 回复里有 thinking 块时标记为有推理，供被截断时判断是不是推理用完了上限。
+func TestAnthropicReasoned(t *testing.T) {
+	c := &anthropicClient{name: "Anthropic", provider: "anthropic"}
+	for content, want := range map[string]bool{
+		`[{"type":"thinking","thinking":"想一想","signature":"s"},{"type":"text","text":"OK"}]`: true,
+		`[{"type":"redacted_thinking","data":"x"}]`:                                          true,
+		`[{"type":"text","text":"OK"}]`:                                                      false,
+	} {
+		resp, err := c.response(context.Background(), anthropicResponse{Content: json.RawMessage(content), StopReason: "end_turn"})
+		require.NoError(t, err)
+		require.Equal(t, want, resp.Reasoned, content)
+	}
+}
+
 func TestAnthropicStopReasons(t *testing.T) {
 	for raw, want := range map[string]string{"end_turn": StopEnd, "stop_sequence": StopEnd, "max_tokens": StopMaxTokens, "tool_use": StopToolUse, "refusal": StopRefusal, "pause_turn": StopOther} {
 		require.Equal(t, want, anthropicStopReason(raw), raw)

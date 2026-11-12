@@ -160,12 +160,47 @@ func TestAnnouncementSummaryRejectsInvalidOutput(t *testing.T) {
 	require.ErrorIs(t, err, ErrSummary)
 	require.ErrorContains(t, err, "分块摘要时回复超过 16000 token 的输出上限被截断")
 	require.ErrorContains(t, err, "思考模型")
-	// 合并被截断时不归咎于推理，换非思考模型帮不上忙。两块都只有第 1 页，分块回复相同，合并在最后。
-	truncated := FakeReply{Response: &Response{StopReason: StopMaxTokens, RawStopReason: "length"}}
-	s = AnnouncementSummarizer{Client: &Fake{Replies: []FakeReply{summaryReply("事项", 1), summaryReply("事项", 1), truncated}}, Read: summaryReader(strings.Repeat("文", announcementChunkRunes+1))}
-	_, err = s.Summarize(context.Background(), summaryURL)
-	require.ErrorContains(t, err, "合并分块摘要时回复超过 16000 token 的输出上限被截断")
-	require.NotContains(t, err.Error(), "思考模型")
+	// 建议按回复实际有没有推理和配置给。推理包括：有推理内容或推理 token，或者一个字都没有（推理用完了上限）。
+	partial := Message{Text: `{"sections":[{"text":"收入`}
+	for name, c := range map[string]struct {
+		model Model
+		resp  Response
+		want  string
+		not   string
+	}{
+		"推理用完上限，能关闭思考":  {Model{Profile: "ds", ThinkingOffSupported: true}, Response{Reasoned: true, Message: partial}, "sec config ai edit ds --thinking off", ""},
+		"没有正文也算推理":      {Model{Profile: "ds", ThinkingOffSupported: true}, Response{}, "--thinking off", ""},
+		"推理用完上限，不能关闭思考": {Model{Profile: "local"}, Response{Reasoned: true}, "换用非思考模型", "--thinking off"},
+		"已关闭但模型仍在推理":    {Model{Profile: "qw", ThinkingOff: true, ThinkingOffSupported: true}, Response{Reasoned: true, ThinkingIgnored: true, Message: partial}, "模型仍在思考", "--thinking off"},
+		"已关闭但没有正文":      {Model{Profile: "qw", ThinkingOff: true, ThinkingOffSupported: true}, Response{}, `sec config ai edit qw --thinking ""`, "--thinking off"},
+		"没有推理，只是正文太长":   {Model{Profile: "ds", ThinkingOffSupported: true}, Response{Message: partial}, "摘要正文超出上限", "思考"},
+		"已关闭且生效，正文太长":   {Model{Profile: "ds", ThinkingOff: true, ThinkingOffSupported: true}, Response{Message: partial}, "请重试或更换模型", "思考"},
+	} {
+		resp := c.resp
+		resp.StopReason, resp.RawStopReason = StopMaxTokens, "length"
+		s := AnnouncementSummarizer{Client: &Fake{Replies: []FakeReply{{Response: &resp}}}, Model: c.model, Read: summaryReader("原文")}
+		_, err := s.Summarize(context.Background(), summaryURL)
+		require.ErrorContains(t, err, c.want, name)
+		require.ErrorContains(t, err, "上限被截断（", "统一格式：被截断（原因）。建议")
+		if c.not != "" {
+			require.NotContains(t, err.Error(), c.not, name)
+		}
+	}
+	// 合并和分块用同样的建议：推理模型合并时也在推理；只有正文太长时才说公告太长。两块都只有第 1 页，分块回复相同，合并在最后。
+	for name, c := range map[string]struct {
+		resp Response
+		want string
+	}{
+		"合并时推理用完上限": {Response{Reasoned: true}, "--thinking off"},
+		"合并结果太长":    {Response{Message: partial}, "公告可能太长"},
+	} {
+		resp := c.resp
+		resp.StopReason, resp.RawStopReason = StopMaxTokens, "length"
+		s = AnnouncementSummarizer{Client: &Fake{Replies: []FakeReply{summaryReply("事项", 1), summaryReply("事项", 1), {Response: &resp}}}, Model: Model{Profile: "ds", ThinkingOffSupported: true}, Read: summaryReader(strings.Repeat("文", announcementChunkRunes+1))}
+		_, err = s.Summarize(context.Background(), summaryURL)
+		require.ErrorContains(t, err, "合并分块摘要时回复超过 16000 token 的输出上限被截断", name)
+		require.ErrorContains(t, err, c.want, name)
+	}
 	for reply, want := range map[*Response]string{
 		{StopReason: StopRefusal, RawStopReason: "content_filter"}: "模型拒绝或未正常结束（停止原因 content_filter）",
 		{StopReason: StopOther}: "模型拒绝或未正常结束，请重试",
