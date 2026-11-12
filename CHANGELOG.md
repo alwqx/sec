@@ -28,6 +28,7 @@
 24. Track two announcement summary bugs found in live testing in TODO.md.
 25. Add `scripts/ci-local.sh` to run the CI checks locally before pushing.
 26. Test the Desktop package and frontend on Linux CI and run the macOS Desktop build only when its webview entry point or dependencies change.
+27. Extract CNINFO PDF text by position so numbers drawn in pieces stay whole.
 
 ### v0.4.8
 

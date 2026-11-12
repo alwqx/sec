@@ -87,3 +87,17 @@ func TestDocumentExtractionLimits(t *testing.T) {
 	_, err = extractDocumentPages(ctx, testpdf.Build("文本"))
 	require.ErrorIs(t, err, context.Canceled)
 }
+
+func TestExtractJoinsFragmentsByPosition(t *testing.T) {
+	// 字号 12：数字估算宽 6pt、中文 12pt。202 和 6 分在两个文本对象里但紧挨着，应拼回 2026；
+	// 表格同一行相距较远的两个单元格加空格，不能拼成一个数字；下一行另起一行。
+	data := testpdf.BuildFragments([]testpdf.Fragment{
+		{X: 50, Y: 700, Text: "202"}, {X: 68, Y: 700, Text: "6"}, {X: 74, Y: 700, Text: "年总资产"},
+		{X: 122, Y: 700, Text: "27,"}, {X: 140, Y: 700, Text: "859"}, {X: 158, Y: 700, Text: ".52"}, {X: 176, Y: 700, Text: "亿元"},
+		{X: 50, Y: 680, Text: "1,200"}, {X: 200, Y: 680, Text: "18.07"},
+		{X: 50, Y: 660, Text: "下一行"},
+	})
+	pages, err := extractDocumentPages(context.Background(), data)
+	require.NoError(t, err)
+	require.Equal(t, "2026年总资产27,859.52亿元\n1,200 18.07\n下一行", pages[0].Text)
+}
