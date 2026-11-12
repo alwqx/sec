@@ -30,19 +30,14 @@ jobs:
       - name: Vulnerability check
         run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
 
-  # desktop 包只在 windows 和 darwin 上编译，Linux 上的 go test ./... 不会检查它。
-  desktop:
-    name: Desktop
-    runs-on: macos-15
+  # desktop 包除 webview 入口 main.go 外都在 Linux 上编译，Go 部分由上面的 go vet/test ./... 覆盖；
+  # 这里只构建和测试前端。webview 入口的 macOS 编译见 desktop-macos.yml，不阻塞 PR。
+  desktop-ui:
+    name: Desktop UI
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out source code
         uses: actions/checkout@v6
-
-      - name: Set up Go Env
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
-          cache: true
 
       - name: Set up Node
         uses: actions/setup-node@v7
@@ -58,13 +53,3 @@ jobs:
       - name: Test frontend
         working-directory: desktop/ui
         run: npm test
-
-      - name: Vet
-        run: go vet ./desktop
-
-      - name: Test
-        run: go test -v ./desktop
-
-      # Linux 上的检查不包含 desktop 包。
-      - name: Vulnerability check
-        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./desktop

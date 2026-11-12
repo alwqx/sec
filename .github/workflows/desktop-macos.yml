@@ -1,0 +1,42 @@
+name: Desktop macOS
+permissions:
+  contents: read
+# macOS runner 排队久，只在 macOS 才会出问题的改动上运行：webview 入口 desktop/main.go 和 cgo 依赖（go.mod）。
+# 其余 desktop 代码和前端在 Sec CI 的 Linux 任务里测试。每周跑一次，及时发现 runner 镜像或依赖的变化；也可以手动触发。
+on:
+  push:
+    paths:
+      - desktop/main.go
+      - go.mod
+      - go.sum
+      - .github/workflows/desktop-macos.yml
+  schedule:
+    - cron: "0 2 * * 1"
+  workflow_dispatch:
+jobs:
+  desktop-macos:
+    name: Desktop macOS
+    runs-on: macos-15
+    steps:
+      - name: Check out source code
+        uses: actions/checkout@v6
+
+      - name: Set up Go Env
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Vet
+        run: go vet ./desktop
+
+      - name: Test
+        run: go test -v ./desktop
+
+      # 带 webview（cgo）编译桌面二进制，前端用仓库里的占位 dist，发布时才构建真实前端。
+      - name: Build
+        run: CGO_ENABLED=1 go build -o sec-desktop ./desktop
+
+      # Linux 上的检查不包含 webview 依赖。
+      - name: Vulnerability check
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./desktop

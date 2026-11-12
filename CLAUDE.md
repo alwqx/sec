@@ -42,7 +42,7 @@ go build -o sec . && scripts/live-smoke.sh ./sec
 scripts/ci-local.sh
 ```
 
-CI runs `gofmt`, `go vet` and `go test -v ./...` on Linux on every push, and a macOS job builds and tests the Desktop frontend and vets and tests `./desktop`, which only compiles on Windows and macOS. Release builds (linux/windows/darwin × amd64/arm64) trigger on GitHub Release creation via ldflags-injected version.
+CI runs `gofmt`, `go vet` and `go test -v ./...` on Linux on every push, which includes `./desktop`: only its webview entry point `desktop/main.go` is limited to Windows and macOS (`desktop/main_other.go` stands in elsewhere), so keep new Desktop code free of build tags. A Linux job builds and tests the Desktop frontend. The `Desktop macOS` workflow vets, tests and builds `./desktop` with cgo on macOS only when `desktop/main.go`, `go.mod` or `go.sum` change, weekly, or on manual dispatch, so PRs don't wait for macOS runners. Release builds (linux/windows/darwin × amd64/arm64) trigger on GitHub Release creation via ldflags-injected version.
 
 ## Architecture
 
