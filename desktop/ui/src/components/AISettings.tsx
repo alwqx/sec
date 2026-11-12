@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { aiSettings, changeAI, testAIProfile, type AIChange } from '../api'
-import { privacyGroups, probeLines, profileForm, removable, trimProfile, withProvider } from '../aiSettings'
+import { privacyGroups, probeLines, profileForm, removable, thinkingLabel, thinkingSwitch, trimProfile, withProvider } from '../aiSettings'
 import { useResource } from '../hooks/useResource'
 import type { AIProbeResult, AIProfileInput, AIProvider, AISettings as Settings } from '../types'
 import ResourceState from './ResourceState'
 
-const emptyForm: AIProfileInput = { name: '', provider: 'deepseek', api: '', base_url: '', model: '', api_key_env: '' }
+const emptyForm: AIProfileInput = { name: '', provider: 'deepseek', api: '', base_url: '', model: '', api_key_env: '', thinking: '' }
 
 // 管理和 CLI 共用的模型配置，测试连接也复用 sec config ai test 的逻辑。
 export default function AISettings() {
@@ -109,11 +109,11 @@ export default function AISettings() {
       {data.profiles.length === 0
         ? <p className="data-note">还没有模型配置，点「新增配置」添加。</p>
         : <div className="table-scroll"><table className="data-table">
-          <thead><tr><th>配置</th><th>厂商</th><th>模型</th><th>地址</th><th>Key</th><th>操作</th></tr></thead>
+          <thead><tr><th>配置</th><th>厂商</th><th>模型</th><th>地址</th><th>思考</th><th>Key</th><th>操作</th></tr></thead>
           <tbody>{data.profiles.map(p => <tr key={p.name}>
             <td>{p.name}{p.default && <span className="data-note">（默认）</span>}</td>
             <td>{p.provider_name}{p.local && <span className="data-note">（本机）</span>}</td>
-            <td>{p.model}</td><td>{p.base_url}</td><td>{p.key}</td>
+            <td>{p.model}</td><td>{p.base_url}</td><td>{thinkingLabel(p)}</td><td>{p.key}</td>
             <td className="ai-actions">{confirmRemove === p.name
               ? <><button disabled={busy} onClick={async () => { if (await apply({ kind: 'remove', name: p.name })) setConfirmRemove('') }}>确认删除</button><button onClick={() => setConfirmRemove('')}>取消</button></>
               : confirmUnset === p.name
@@ -149,7 +149,7 @@ export default function AISettings() {
         <div className="settings-actions"><button className="primary-button" type="submit" disabled={busy}>{busy ? '保存中…' : '保存 Key'}</button><button type="button" disabled={busy} onClick={() => { closeAll(); setError('') }}>取消</button></div>
       </form>}
       {editing !== null
-        ? <ProfileForm form={form} adding={editing === ''} name={editing} providers={data.providers} busy={busy} onChange={setForm} onSubmit={submit} onCancel={() => { closeAll(); setError('') }} />
+        ? <ProfileForm form={form} adding={editing === ''} name={editing} providers={data.providers} thinkingOffProviders={data.thinking_off_providers} busy={busy} onChange={setForm} onSubmit={submit} onCancel={() => { closeAll(); setError('') }} />
         : !keyFor && <div className="version-actions"><button disabled={busy || !!data.invalid} onClick={() => openForm('')}>新增配置</button></div>}
       {data.notice && <p className="data-note" role="status">{data.notice}</p>}
       {error && <p className="error" role="alert">{error}</p>}
@@ -161,11 +161,12 @@ export default function AISettings() {
   </section>
 }
 
-function ProfileForm({ form, adding, name, providers, busy, onChange, onSubmit, onCancel }: {
+function ProfileForm({ form, adding, name, providers, thinkingOffProviders, busy, onChange, onSubmit, onCancel }: {
   form: AIProfileInput
   adding: boolean
   name: string
   providers: AIProvider[]
+  thinkingOffProviders: string[]
   busy: boolean
   onChange: (form: AIProfileInput) => void
   onSubmit: (e: FormEvent) => void
@@ -174,6 +175,8 @@ function ProfileForm({ form, adding, name, providers, busy, onChange, onSubmit, 
   const provider = providers.find(p => p.id === form.provider)
   const custom = provider?.api === ''
   const set = (field: keyof AIProfileInput) => (e: { target: { value: string } }) => onChange({ ...form, [field]: e.target.value })
+  const thinking = thinkingSwitch(form, providers, thinkingOffProviders)
+  const supportedNames = providers.filter(p => thinkingOffProviders.includes(p.id)).map(p => p.name).join('、')
   return <form className="ai-form" onSubmit={onSubmit} aria-label={adding ? '新增模型配置' : `编辑模型配置 ${name}`}>
     <fieldset className="settings-group"><legend>{adding ? '新增模型配置' : `编辑 ${name}`}</legend>
       {adding && <div className="setting-row"><div><label htmlFor="ai-name">配置名</label><p className="data-note">小写字母、数字和 -，以字母或数字开头，最长 32 个字符，如 ds。</p></div>
@@ -188,6 +191,11 @@ function ProfileForm({ form, adding, name, providers, busy, onChange, onSubmit, 
         <input id="ai-base-url" type="url" required={custom} placeholder={provider?.base_url || 'https://llm.example.com/v1'} value={form.base_url} onChange={set('base_url')} /></div>
       <div className="setting-row"><div><label htmlFor="ai-key-env">Key 环境变量</label><p className="data-note">可选，填环境变量名而不是 Key 本身。{provider?.key_env ? `留空时读取 ${provider.key_env}（用官方地址时）。` : ''}</p></div>
         <input id="ai-key-env" placeholder={provider?.key_env || 'MY_API_KEY'} value={form.api_key_env} onChange={set('api_key_env')} /></div>
+      <div className="setting-row"><div><label htmlFor="ai-thinking">关闭思考</label><p className="data-note">{thinking.disabled || thinking.conflict
+        ? `目前只支持 ${supportedNames} 官方地址的 OpenAI 兼容接口，当前的厂商、协议或地址不能关闭。`
+        : '思考模型的推理也计入输出上限，长公告摘要可能用完上限、没有正文；关闭后更快。保存后可以「测试连接」，模型忽略了这个设置时会提示。'}</p>
+        {thinking.conflict && <p className="error" role="alert">这个配置关闭了思考，但当前的厂商、协议或地址不能关闭，请取消勾选后再保存。</p>}</div>
+        <input id="ai-thinking" type="checkbox" disabled={thinking.disabled} checked={thinking.checked} onChange={e => onChange({ ...form, thinking: e.target.checked ? 'off' : '' })} /></div>
     </fieldset>
     <div className="settings-actions"><button className="primary-button" type="submit" disabled={busy}>{busy ? '保存中…' : '保存'}</button><button type="button" onClick={onCancel}>取消</button></div>
   </form>

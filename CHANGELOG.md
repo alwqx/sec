@@ -32,6 +32,7 @@
 28. Raise the announcement summary output limit to 16000 tokens and report truncation separately.
 29. Add `thinking: off` to AI model profiles to turn off reasoning, starting with the official DeepSeek API.
 30. Support `thinking: off` for Qwen and Zhipu, and warn in the connection test when a model ignores it.
+31. Add a thinking-off switch to the Desktop AI profile form and show the setting in the profile list.
 
 ### v0.4.8
 

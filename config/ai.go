@@ -193,6 +193,9 @@ func thinkingOffProviderNames() string {
 	return strings.Join(names, "、")
 }
 
+// ThinkingOffProviderIDs 返回能关闭思考的厂商 id，供 Desktop 表单判断开关是否可用；最终以 Validate 为准。
+func ThinkingOffProviderIDs() []string { return slices.Clone(thinkingOffProviders) }
+
 // thinkingOffProviders 是能关闭思考的厂商（OpenAI 兼容接口），请求参数见 llm 的 openAIExtraParams。
 var thinkingOffProviders = []string{"deepseek", "qwen", "zhipu"}
 

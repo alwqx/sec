@@ -101,24 +101,24 @@ func aiChange(t *testing.T, srv *desktopServer, method, path, body string) (int,
 	return rr.Code, got, rr.Body.String()
 }
 
-func TestAIProfileEditKeepsThinking(t *testing.T) {
+func TestAIProfileThinking(t *testing.T) {
 	dir := t.TempDir()
 	srv := &desktopServer{dev: true, workspace: workspaceStore{path: filepath.Join(dir, "workspace.json")}}
-	code, _, _ := aiChange(t, srv, http.MethodPost, "/api/v1/ai/profiles", `{"name":"ds","provider":"deepseek","model":"deepseek-v4-pro"}`)
-	require.Equal(t, http.StatusOK, code)
-	require.NoError(t, srv.updateConfig(context.Background(), func(c *config.Config) error {
-		return c.AI.Edit("ds", func(p *config.AIProfile) { p.Thinking = config.AIThinkingOff })
-	}))
-	// 设置页的表单没有思考字段，编辑时保留 CLI 设的关闭思考。
-	code, got, _ := aiChange(t, srv, http.MethodPut, "/api/v1/ai/profiles/ds", `{"provider":"deepseek","model":"deepseek-chat"}`)
+	code, got, _ := aiChange(t, srv, http.MethodPost, "/api/v1/ai/profiles", `{"name":"ds","provider":"deepseek","model":"deepseek-v4-pro","thinking":"off"}`)
 	require.Equal(t, http.StatusOK, code)
 	require.Equal(t, config.AIThinkingOff, got.Profiles[0].Thinking)
-	require.Empty(t, got.Notice)
-	// 换到不支持关闭思考的厂商时恢复默认并说明，不让保存失败。
-	code, got, _ = aiChange(t, srv, http.MethodPut, "/api/v1/ai/profiles/ds", `{"provider":"moonshot","model":"kimi-k2.6"}`)
+	require.Equal(t, config.ThinkingOffProviderIDs(), got.ThinkingOffProviders, "表单据此决定开关是否可用")
+	// 表单提交全部字段，思考为空表示恢复厂商默认。
+	code, got, _ = aiChange(t, srv, http.MethodPut, "/api/v1/ai/profiles/ds", `{"provider":"deepseek","model":"deepseek-v4-pro","thinking":""}`)
 	require.Equal(t, http.StatusOK, code)
 	require.Empty(t, got.Profiles[0].Thinking)
-	require.Contains(t, got.Notice, "不支持关闭思考，已恢复默认")
+	code, got, _ = aiChange(t, srv, http.MethodPut, "/api/v1/ai/profiles/ds", `{"provider":"deepseek","model":"deepseek-v4-pro","thinking":"off"}`)
+	require.Equal(t, http.StatusOK, code)
+	require.Equal(t, config.AIThinkingOff, got.Profiles[0].Thinking)
+	// 不支持关闭思考的厂商返回原因，不悄悄保存。
+	code, _, body := aiChange(t, srv, http.MethodPut, "/api/v1/ai/profiles/ds", `{"provider":"moonshot","model":"kimi-k2.6","thinking":"off"}`)
+	require.Equal(t, http.StatusBadRequest, code)
+	require.Contains(t, body, "暂不支持关闭思考")
 }
 
 func TestAIProfileChanges(t *testing.T) {

@@ -23,6 +23,8 @@ type aiSettings struct {
 	Profiles []config.AIProfileView `json:"profiles"`
 	// Providers 是内置厂商和它们的默认协议、地址，供新增和编辑表单使用。
 	Providers []config.AIProvider `json:"providers"`
+	// ThinkingOffProviders 是能关闭思考的厂商，表单据此决定开关是否可用。
+	ThinkingOffProviders []string `json:"thinking_off_providers"`
 	// Invalid 是 ai 段无效的原因：这时按没有配置显示，提示用户手动修正。
 	Invalid string `json:"invalid,omitempty"`
 	// Notice 是修改后的提示，比如编辑后保存的 Key 被删除，只在修改接口的返回里有。
@@ -37,6 +39,7 @@ type aiProfileInput struct {
 	BaseURL   string `json:"base_url"`
 	Model     string `json:"model"`
 	APIKeyEnv string `json:"api_key_env"`
+	Thinking  string `json:"thinking"`
 }
 
 // aiSecret 返回加密 Key 用的 secret.key；测试时放在工作台文件旁边，和共享配置一样。
@@ -71,7 +74,7 @@ func (s *desktopServer) loadAISettings(ctx context.Context) (aiSettings, error) 
 		return aiSettings{}, err
 	}
 	ai := cfg.AI
-	return aiSettings{Enabled: ai.Enabled, Default: ai.Default, Profiles: ai.Views(secret, os.Getenv), Providers: config.AIProviders, Invalid: invalid}, nil
+	return aiSettings{Enabled: ai.Enabled, Default: ai.Default, Profiles: ai.Views(secret, os.Getenv), Providers: config.AIProviders, ThinkingOffProviders: config.ThinkingOffProviderIDs(), Invalid: invalid}, nil
 }
 
 func (s *desktopServer) handleAISettings(w http.ResponseWriter, r *http.Request) {
@@ -109,31 +112,18 @@ func (s *desktopServer) handleAIEditProfile(w http.ResponseWriter, r *http.Reque
 	name := r.PathValue("name")
 	s.changeAI(w, r, func(ai *config.AIConfig) (string, error) {
 		hadKey := ai.Profiles[name].APIKey != ""
-		thinkingReset := false
-		// 表单提交全部字段：协议和地址为空表示用厂商的默认值。保存的 Key 不在表单里，由 Edit 决定是否保留。
-		// 设置页还不能改思考，保留 CLI 设的关闭思考；新厂商不支持关闭时恢复默认，不让保存失败。
+		// 表单提交全部字段（包括思考开关）：协议和地址为空表示用厂商的默认值。保存的 Key 不在表单里，由 Edit 决定是否保留。
 		if err := ai.Edit(name, func(p *config.AIProfile) {
-			key, thinking := p.APIKey, p.Thinking
+			key := p.APIKey
 			*p = in.profile()
 			p.APIKey = key
-			if thinking == config.AIThinkingOff {
-				if p.ThinkingOffSupported() {
-					p.Thinking = thinking
-				} else {
-					thinkingReset = true
-				}
-			}
 		}); err != nil {
 			return "", err
 		}
-		var notes []string
 		if hadKey && ai.Profiles[name].APIKey == "" {
-			notes = append(notes, "厂商或地址变了，原来保存的 Key 不会发给新地址，已删除，请重新设置。")
+			return "厂商或地址变了，原来保存的 Key 不会发给新地址，已删除，请重新设置。", nil
 		}
-		if thinkingReset {
-			notes = append(notes, "新的厂商、协议或地址不支持关闭思考，已恢复默认。")
-		}
-		return strings.Join(notes, ""), nil
+		return "", nil
 	})
 }
 
@@ -296,7 +286,7 @@ func (s *desktopServer) handleAITestProfile(w http.ResponseWriter, r *http.Reque
 }
 
 func (in aiProfileInput) profile() config.AIProfile {
-	return config.AIProfile{Provider: in.Provider, API: in.API, BaseURL: in.BaseURL, Model: in.Model, APIKeyEnv: in.APIKeyEnv}
+	return config.AIProfile{Provider: in.Provider, API: in.API, BaseURL: in.BaseURL, Model: in.Model, APIKeyEnv: in.APIKeyEnv, Thinking: in.Thinking}
 }
 
 // aiInternalError 标记 change 里不是用户输入造成的错误（如加密或写 secret.key 失败），changeAI 记日志并返回 500。

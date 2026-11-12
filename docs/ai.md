@@ -268,7 +268,7 @@ CLI 和 Desktop 共用一份配置，在任意一边设置后另一边直接可�
 
   表中都是 OpenAI 兼容接口、官方地址。按文档加入的厂商不能保证每个模型都遵守：只思考的模型（如部分 qwq、GLM-4.7）可能忽略关闭参数。所以关闭思考后，回复里仍有 `reasoning_content` 或推理 token 时，`llm.Response.ThinkingIgnored` 标为 true 并记警告日志；`sec config ai test` 和 Desktop 的测试连接显示「配置关闭了思考，但模型仍在思考」，用户可以先测试确认设置生效。
 
-  不支持的有：Anthropic 协议（Claude 各模型规则不同，Claude Opus 5.5 不能关闭，Sonnet 5.5 要用 `between_tools`，Haiku 5.5 只在 effort `high` 及以下可关，没有统一的关闭方式）；OpenAI（`reasoning_effort: "none"` 只有 gpt-5.1 及以后支持，其他模型直接返回 400，错误里不说明和思考设置有关）；Kimi（`kimi-k2-thinking` 总是思考，K3 改用 `reasoning_effort`）；Ollama（OpenAI 兼容接口是否生效说法不一）。Desktop 设置页暂时不能改这个字段，编辑配置时保留 CLI 设的值；换到不支持的厂商时恢复默认并提示。
+  不支持的有：Anthropic 协议（Claude 各模型规则不同，Claude Opus 5.5 不能关闭，Sonnet 5.5 要用 `between_tools`，Haiku 5.5 只在 effort `high` 及以下可关，没有统一的关闭方式）；OpenAI（`reasoning_effort: "none"` 只有 gpt-5.1 及以后支持，其他模型直接返回 400，错误里不说明和思考设置有关）；Kimi（`kimi-k2-thinking` 总是思考，K3 改用 `reasoning_effort`）；Ollama（OpenAI 兼容接口是否生效说法不一）。Desktop 设置页「AI 模型」的配置表单有「关闭思考」开关，列表显示思考设置；设置接口返回 `thinking_off_providers`，表单按和 `ThinkingOffSupported` 相同的规则（去掉空白后）决定开关能不能打开，不能时显示支持的厂商。开关总是显示真实的设置，页面不悄悄改掉：已经关闭思考的配置换到不支持的厂商、协议或地址时仍显示勾选并提示取消勾选，原样提交时后端拒绝并说明原因，和 CLI 一致。保存什么以后端校验为准，两边规则不一致时最多是报错，不会存成别的值。
 - 以后需要按配置区分的其他设置（如 `max_tokens`、超时）作为可选字段加到每个配置里，属于兼容变更，第一版不加。
 
 ### 选择配置

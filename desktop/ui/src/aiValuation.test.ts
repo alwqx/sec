@@ -5,7 +5,7 @@ import type { AIProfileView, AISettings, ValuationExplanation } from './types'
 
 const first: AIProfileView = { name: 'ds', default: true, provider: 'deepseek', provider_name: 'DeepSeek', api: 'openai', base_url: 'https://api.deepseek.com', model: 'deepseek-chat', key: '未设置', key_stored: false, local: false }
 const second: AIProfileView = { ...first, name: 'local', default: false, provider: 'ollama', local: true }
-const settings: AISettings = { enabled: true, default: 'ds', profiles: [first, second], providers: [] }
+const settings: AISettings = { enabled: true, default: 'ds', profiles: [first, second], providers: [], thinking_off_providers: [] }
 
 test('解读请求省略空参数、保留零值并使用 get_valuation 的参数名', () => {
   assert.deepEqual(explanationInput('SH600036', 'ds', { growth: '', terminal: '', wacc: ' ', margin: '' }), { code: 'SH600036', profile: 'ds' })
