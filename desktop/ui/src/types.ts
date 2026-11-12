@@ -200,6 +200,7 @@ export interface AIProfileView {
   key: string
   key_stored: boolean // 有没有加密保存的 Key
   local: boolean
+  thinking?: string // off 表示关闭思考，没有时用厂商默认
 }
 export interface AIProvider {
   id: string
@@ -213,6 +214,7 @@ export interface AISettings {
   default: string
   profiles: AIProfileView[]
   providers: AIProvider[]
+  thinking_off_providers: string[] // 能关闭思考的厂商 id
   invalid?: string // ai 段无效的原因
   notice?: string // 修改后的提示，只在修改接口的返回里有
 }
@@ -289,6 +291,7 @@ export interface AIProfileInput {
   base_url: string
   model: string
   api_key_env: string
+  thinking: string // off 关闭思考，空为厂商默认
 }
 export interface VersionDetails {
   version: string

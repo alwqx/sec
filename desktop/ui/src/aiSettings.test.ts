@@ -1,16 +1,19 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { AIProbeResult, AIProfileView, AIProvider } from './types'
-import { privacyGroups, probeLines, profileForm, removable, trimProfile, withProvider } from './aiSettings.ts'
+import { privacyGroups, probeLines, profileForm, removable, thinkingLabel, thinkingOffAvailable, thinkingSwitch, trimProfile, withProvider } from './aiSettings.ts'
 
 const providers: AIProvider[] = [
   { id: 'deepseek', name: 'DeepSeek', api: 'openai', base_url: 'https://api.deepseek.com', key_env: 'DEEPSEEK_API_KEY' },
+  { id: 'moonshot', name: '月之暗面 Kimi', api: 'openai', base_url: 'https://api.moonshot.cn/v1', key_env: 'MOONSHOT_API_KEY' },
   { id: 'custom', name: '自定义', api: '', base_url: '' },
 ]
+const supported = ['deepseek']
 const view = (over: Partial<AIProfileView>): AIProfileView => ({ name: 'ds', default: true, provider: 'deepseek', provider_name: 'DeepSeek', api: 'openai', base_url: 'https://api.deepseek.com', model: 'deepseek-chat', key: '未设置', key_stored: false, local: false, ...over })
 
 test('profileForm 和厂商默认值相同的协议和地址留空，跟随默认值', () => {
-  assert.deepEqual(profileForm(view({}), providers), { provider: 'deepseek', api: '', base_url: '', model: 'deepseek-chat', api_key_env: '' })
+  assert.deepEqual(profileForm(view({}), providers), { provider: 'deepseek', api: '', base_url: '', model: 'deepseek-chat', api_key_env: '', thinking: '' })
+  assert.equal(profileForm(view({ thinking: 'off' }), providers).thinking, 'off')
   assert.equal(profileForm(view({ base_url: 'https://api.deepseek.com/' }), providers).base_url, '', '结尾的斜杠不算不同')
 })
 
@@ -25,8 +28,8 @@ test('profileForm 保留改过的协议、地址和环境变量', () => {
 })
 
 test('trimProfile 去掉首尾空白，编辑时不带名字', () => {
-  assert.deepEqual(trimProfile({ name: ' ds ', provider: 'deepseek', api: '', base_url: ' https://x ', model: ' m ', api_key_env: '' }), { name: 'ds', provider: 'deepseek', api: '', base_url: 'https://x', model: 'm', api_key_env: '' })
-  assert.equal('name' in trimProfile({ provider: 'deepseek', api: '', base_url: '', model: 'm', api_key_env: '' }), false)
+  assert.deepEqual(trimProfile({ name: ' ds ', provider: 'deepseek', api: '', base_url: ' https://x ', model: ' m ', api_key_env: '', thinking: 'off' }), { name: 'ds', provider: 'deepseek', api: '', base_url: 'https://x', model: 'm', api_key_env: '', thinking: 'off' })
+  assert.equal('name' in trimProfile({ provider: 'deepseek', api: '', base_url: '', model: 'm', api_key_env: '', thinking: '' }), false)
 })
 
 test('privacyGroups 区分外部厂商和本机模型', () => {
@@ -34,8 +37,8 @@ test('privacyGroups 区分外部厂商和本机模型', () => {
 })
 
 test('withProvider 换厂商时清空协议和地址，没换时不变', () => {
-  const form = { provider: 'custom', api: 'anthropic', base_url: 'https://gw.example/v1', model: 'm', api_key_env: 'K' }
-  assert.deepEqual(withProvider(form, 'deepseek'), { provider: 'deepseek', api: '', base_url: '', model: 'm', api_key_env: 'K' })
+  const form = { provider: 'custom', api: 'anthropic', base_url: 'https://gw.example/v1', model: 'm', api_key_env: 'K', thinking: '' }
+  assert.deepEqual(withProvider(form, 'deepseek'), { provider: 'deepseek', api: '', base_url: '', model: 'm', api_key_env: 'K', thinking: '' })
   assert.equal(withProvider(form, 'custom'), form)
 })
 
@@ -64,4 +67,28 @@ test('probeLines 区分工具请求被拒绝、未调用、临时失败并保留
   assert.match(probeLines(probe({ tools: 'not_called', tools_detail: '停止原因 stop' })).at(-1)!, /模型没有调用测试工具（停止原因 stop）/)
   assert.match(probeLines(probe({ tools: 'unknown', tools_detail: 'HTTP 503' })).at(-1)!, /没测出来.*HTTP 503.*稍后重试/)
   assert.deepEqual(probeLines(probe({ warning: '回复被截断', tools: undefined })).slice(2), ['注意：回复被截断'])
+})
+
+test('thinkingOffAvailable 只在支持的厂商、OpenAI 兼容接口和官方地址上可用', () => {
+  const form = (over: object) => ({ provider: 'deepseek', api: '', base_url: '', model: 'm', api_key_env: '', thinking: '', ...over })
+  assert.equal(thinkingOffAvailable(form({}), providers, supported), true)
+  assert.equal(thinkingOffAvailable(form({ api: 'openai', base_url: 'https://api.deepseek.com/' }), providers, supported), true, '填了官方地址也算')
+  assert.equal(thinkingOffAvailable(form({ provider: 'moonshot' }), providers, supported), false, '不支持的厂商')
+  assert.equal(thinkingOffAvailable(form({ api: 'anthropic', base_url: 'https://api.deepseek.com/anthropic' }), providers, supported), false, 'Anthropic 协议')
+  assert.equal(thinkingOffAvailable(form({ base_url: 'https://api.siliconflow.cn/v1' }), providers, supported), false, '第三方地址')
+  assert.equal(thinkingOffAvailable(form({ base_url: ' https://api.deepseek.com ' }), providers, supported), true, '按去掉空白后的值判断，和保存的一致')
+})
+
+test('thinkingSwitch 显示真实的设置，不在页面里悄悄改掉', () => {
+  const form = (over: object) => ({ provider: 'deepseek', api: '', base_url: '', model: 'm', api_key_env: '', thinking: '', ...over })
+  assert.deepEqual(thinkingSwitch(form({}), providers, supported), { checked: false, disabled: false, conflict: false })
+  assert.deepEqual(thinkingSwitch(form({ thinking: 'off' }), providers, supported), { checked: true, disabled: false, conflict: false })
+  assert.deepEqual(thinkingSwitch(form({ provider: 'moonshot' }), providers, supported), { checked: false, disabled: true, conflict: false }, '不能关闭时不能勾选')
+  // 已关闭又换到不支持的厂商：仍显示勾选、可以取消，并提示处理；换回来时设置没被悄悄改过。
+  assert.deepEqual(thinkingSwitch(form({ provider: 'moonshot', thinking: 'off' }), providers, supported), { checked: true, disabled: false, conflict: true })
+})
+
+test('thinkingLabel 和 sec config ai list 一致', () => {
+  assert.equal(thinkingLabel(view({ thinking: 'off' })), '关闭')
+  assert.equal(thinkingLabel(view({})), '默认')
 })
