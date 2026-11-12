@@ -25,6 +25,8 @@ type openAIClient struct {
 	key      string // 本机模型可以为空，为空时不发 Authorization
 	// extra 是按配置加到每个请求里的参数，比如关闭思考，见 openAIExtraParams。
 	extra map[string]any
+	// thinkingOff 表示配置关闭了思考，用于发现被模型忽略的情况，见 Response.ThinkingIgnored。
+	thinkingOff bool
 }
 
 type openAIMessage struct {
@@ -60,8 +62,11 @@ type openAIChoice struct {
 }
 
 type openAIUsage struct {
-	PromptTokens     int `json:"prompt_tokens"`
-	CompletionTokens int `json:"completion_tokens"`
+	PromptTokens            int `json:"prompt_tokens"`
+	CompletionTokens        int `json:"completion_tokens"`
+	CompletionTokensDetails struct {
+		ReasoningTokens int `json:"reasoning_tokens"`
+	} `json:"completion_tokens_details"`
 }
 
 type openAIResponse struct {
@@ -119,8 +124,10 @@ func openAIExtraParams(profile config.AIProfile) map[string]any {
 		return nil
 	}
 	switch profile.Provider {
-	case "deepseek":
+	case "deepseek", "zhipu":
 		return map[string]any{"thinking": map[string]string{"type": "disabled"}}
+	case "qwen":
+		return map[string]any{"enable_thinking": false}
 	}
 	return nil
 }
@@ -195,9 +202,15 @@ func (c *openAIClient) response(ctx context.Context, resp openAIResponse) (*Resp
 	if stop == StopOther {
 		slog.WarnContext(ctx, "模型返回了未处理的停止原因", "provider", c.name, "finish_reason", choice.FinishReason)
 	}
+	// 关闭参数按厂商文档发出，但只思考的模型（如部分 qwq、GLM-4.7）可能忽略它；从回复里发现这种情况，不让用户以为已经关闭。
+	ignored := c.thinkingOff && (choice.Message.ReasoningContent != "" || resp.Usage.CompletionTokensDetails.ReasoningTokens > 0)
+	if ignored {
+		slog.WarnContext(ctx, "配置关闭了思考，但模型仍在思考，这个模型可能不支持关闭", "provider", c.name, "model", resp.Model)
+	}
 	return &Response{
 		Message: msg, StopReason: stop, RawStopReason: choice.FinishReason, Model: resp.Model,
-		Usage: Usage{InputTokens: resp.Usage.PromptTokens, OutputTokens: resp.Usage.CompletionTokens},
+		Usage:           Usage{InputTokens: resp.Usage.PromptTokens, OutputTokens: resp.Usage.CompletionTokens},
+		ThinkingIgnored: ignored,
 	}, nil
 }
 

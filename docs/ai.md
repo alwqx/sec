@@ -262,9 +262,13 @@ CLI 和 Desktop 共用一份配置，在任意一边设置后另一边直接可�
 
   | 厂商（协议） | 请求参数 | 核实 |
   | --- | --- | --- |
-  | DeepSeek（openai，官方地址） | `"thinking": {"type": "disabled"}` | 实测：`deepseek-v4-pro` 推理由 749 字降到 0，输出由 337 降到 64 token，答案相同；`deepseek-reasoner`（实际为 `deepseek-flash`）推理由 240 字降到 0；`deepseek-chat` 默认不推理，带参数也正常 |
+  | DeepSeek | `"thinking": {"type": "disabled"}` | 实测：`deepseek-v4-pro` 推理由 749 字降到 0，输出由 337 降到 64 token，答案相同；`deepseek-reasoner`（实际为 `deepseek-flash`）推理由 240 字降到 0；`deepseek-chat` 默认不推理，带参数也正常 |
+  | 通义千问 | `"enable_thinking": false` | 按[百炼文档](https://help.aliyun.com/en/model-studio/deep-thinking)，未实测；默认是否思考因模型而异。国际区域要填 `base_url`，不是默认官方地址，暂不能关闭 |
+  | 智谱 | `"thinking": {"type": "disabled"}` | 按[智谱文档](https://docs.bigmodel.cn/cn/guide/capabilities/thinking.md)，未实测；GLM-4.5～5.2 支持，GLM-5.3 不能关闭，会报错而不是静默忽略 |
 
-  其他厂商逐个核实后加入。Desktop 设置页暂时不能改这个字段，编辑配置时保留 CLI 设的值；换到不支持的厂商时恢复默认并提示。
+  表中都是 OpenAI 兼容接口、官方地址。按文档加入的厂商不能保证每个模型都遵守：只思考的模型（如部分 qwq、GLM-4.7）可能忽略关闭参数。所以关闭思考后，回复里仍有 `reasoning_content` 或推理 token 时，`llm.Response.ThinkingIgnored` 标为 true 并记警告日志；`sec config ai test` 和 Desktop 的测试连接显示「配置关闭了思考，但模型仍在思考」，用户可以先测试确认设置生效。
+
+  不支持的有：Anthropic 协议（Claude 各模型规则不同，Claude Opus 5.5 不能关闭，Sonnet 5.5 要用 `between_tools`，Haiku 5.5 只在 effort `high` 及以下可关，没有统一的关闭方式）；OpenAI（`reasoning_effort: "none"` 只有 gpt-5.1 及以后支持，其他模型直接返回 400，错误里不说明和思考设置有关）；Kimi（`kimi-k2-thinking` 总是思考，K3 改用 `reasoning_effort`）；Ollama（OpenAI 兼容接口是否生效说法不一）。Desktop 设置页暂时不能改这个字段，编辑配置时保留 CLI 设的值；换到不支持的厂商时恢复默认并提示。
 - 以后需要按配置区分的其他设置（如 `max_tokens`、超时）作为可选字段加到每个配置里，属于兼容变更，第一版不加。
 
 ### 选择配置

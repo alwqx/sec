@@ -150,7 +150,7 @@ func (p AIProfile) Validate() error {
 	case p.Thinking != "" && p.Thinking != AIThinkingOff:
 		return fmt.Errorf("thinking 只能为空（用厂商默认）或 %s（关闭思考）", AIThinkingOff)
 	case p.Thinking == AIThinkingOff && !p.ThinkingOffSupported():
-		return fmt.Errorf("%s %w，目前只支持 DeepSeek 官方地址的 OpenAI 兼容接口", provider.Name, ErrThinkingOffUnsupported)
+		return fmt.Errorf("%s %w，目前只支持 %s 官方地址的 OpenAI 兼容接口", provider.Name, ErrThinkingOffUnsupported, thinkingOffProviderNames())
 	}
 	// 校验错误会写进日志和终端：可能含密码的地址和填错位置的 Key 不回显。
 	if p.BaseURL != "" {
@@ -177,9 +177,24 @@ func (p AIProfile) Validate() error {
 
 // ThinkingOffSupported 判断能否关闭思考。各厂商关闭思考的参数不同，只在实现并核实过参数的厂商、协议和官方地址上允许，
 // 避免发出厂商不认识的参数后被拒绝，或被忽略而以为已经关闭。改了地址的配置可能是转发同一模型的第三方服务，参数不一定相同。
+// 只思考的模型仍可能忽略关闭参数，llm 从回复里发现并提示（Response.ThinkingIgnored）。不支持的有：Anthropic 协议（Claude
+// 各模型规则不同，有的不能关闭）；OpenAI（只有 gpt-5.1 及以后支持，其他模型直接报错且不说明原因）；Kimi、Ollama（参数按模型而异）。
 func (p AIProfile) ThinkingOffSupported() bool {
-	return p.Provider == "deepseek" && p.EffectiveAPI() == AIAPIOpenAI && p.officialBaseURL()
+	return slices.Contains(thinkingOffProviders, p.Provider) && p.EffectiveAPI() == AIAPIOpenAI && p.officialBaseURL()
 }
+
+// thinkingOffProviderNames 是能关闭思考的厂商显示名，用于错误提示，和 thinkingOffProviders 保持一致。
+func thinkingOffProviderNames() string {
+	names := make([]string, 0, len(thinkingOffProviders))
+	for _, id := range thinkingOffProviders {
+		provider, _ := LookupAIProvider(id)
+		names = append(names, provider.Name)
+	}
+	return strings.Join(names, "、")
+}
+
+// thinkingOffProviders 是能关闭思考的厂商（OpenAI 兼容接口），请求参数见 llm 的 openAIExtraParams。
+var thinkingOffProviders = []string{"deepseek", "qwen", "zhipu"}
 
 // officialBaseURL 判断实际地址是不是厂商的官方地址：没填，或只差结尾的 /。
 func (p AIProfile) officialBaseURL() bool {

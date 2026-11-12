@@ -35,7 +35,19 @@ func TestAIProfileValidate(t *testing.T) {
 	require.NotContains(t, AIProfile{Provider: "sk-p4ss", Model: "m"}.Validate().Error(), "p4ss", "不回显厂商")
 	require.NotContains(t, AIProfile{Provider: "openai", API: "sk-p4ss", Model: "m"}.Validate().Error(), "p4ss", "不回显协议")
 	require.NoError(t, AIProfile{Provider: AIProviderCustom, API: AIAPIOpenAI, Model: "m", BaseURL: "https://x.openai.azure.com/openai/v1?api-version=preview"}.Validate(), "普通查询参数可以保留")
-	require.ErrorIs(t, AIProfile{Provider: "qwen", Model: "m", Thinking: AIThinkingOff}.Validate(), ErrThinkingOffUnsupported)
+	for _, provider := range []string{"deepseek", "qwen", "zhipu"} {
+		require.NoError(t, AIProfile{Provider: provider, Model: "m", Thinking: AIThinkingOff}.Validate(), provider)
+	}
+	// Anthropic 协议没有统一的关闭方式，OpenAI 只有新模型支持，Ollama 参数按模型而异，都不能关闭；Kimi 见下面的表。
+	for _, p := range []AIProfile{
+		{Provider: "anthropic", Model: "m", Thinking: AIThinkingOff},
+		{Provider: "openai", Model: "m", Thinking: AIThinkingOff},
+		{Provider: "ollama", Model: "m", Thinking: AIThinkingOff},
+		{Provider: "zhipu", API: AIAPIAnthropic, BaseURL: "https://open.bigmodel.cn/api/anthropic", Model: "m", Thinking: AIThinkingOff},
+	} {
+		require.ErrorIs(t, p.Validate(), ErrThinkingOffUnsupported, p)
+	}
+	require.ErrorContains(t, AIProfile{Provider: "openai", Model: "m", Thinking: AIThinkingOff}.Validate(), "只支持 DeepSeek、通义千问（阿里云百炼）、智谱 GLM 官方地址", "支持的厂商从列表生成")
 	for want, p := range map[string]AIProfile{
 		"厂商无效":    {Provider: "gemini", Model: "m"},
 		"接口协议无效":  {Provider: "openai", API: "grpc", Model: "m"},
@@ -51,10 +63,10 @@ func TestAIProfileValidate(t *testing.T) {
 		"不能写明文":                   {Provider: "openai", Model: "m", APIKey: "sk-123"},
 		"thinking 只能为空":           {Provider: "deepseek", Model: "m", Thinking: "none"},
 		// 关闭思考的参数各家不同，没有实现的厂商和协议不能开，不能让用户以为已经关闭。
-		"OpenAI 暂不支持关闭思考":   {Provider: "openai", Model: "m", Thinking: AIThinkingOff},
-		"DeepSeek 暂不支持关闭思考": {Provider: "deepseek", API: AIAPIAnthropic, BaseURL: "https://api.deepseek.com/anthropic", Model: "m", Thinking: AIThinkingOff},
+		"月之暗面 Kimi 暂不支持关闭思考": {Provider: "moonshot", Model: "m", Thinking: AIThinkingOff},
+		"DeepSeek 暂不支持关闭思考":  {Provider: "deepseek", API: AIAPIAnthropic, BaseURL: "https://api.deepseek.com/anthropic", Model: "m", Thinking: AIThinkingOff},
 		// 转发 DeepSeek 模型的第三方服务关闭思考的参数不一定相同，只在官方地址上允许。
-		"只支持 DeepSeek 官方地址": {Provider: "deepseek", BaseURL: "https://api.siliconflow.cn/v1", Model: "m", Thinking: AIThinkingOff},
+		"官方地址的 OpenAI 兼容接口": {Provider: "deepseek", BaseURL: "https://api.siliconflow.cn/v1", Model: "m", Thinking: AIThinkingOff},
 	} {
 		require.ErrorContains(t, p.Validate(), want)
 	}
