@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -148,10 +149,7 @@ func extractDocumentPages(ctx context.Context, data []byte) (pages []DocumentPag
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		text, err := reader.Page(n).GetPlainText(nil)
-		if err != nil {
-			return nil, fmt.Errorf("%w：第 %d 页提取失败", ErrDocument, n)
-		}
+		text := pageText(reader.Page(n))
 		text = strings.TrimSpace(strings.Map(func(r rune) rune {
 			if r == '\n' || r == '\t' || !unicode.IsControl(r) {
 				return r
@@ -168,4 +166,125 @@ func extractDocumentPages(ctx context.Context, data []byte) (pages []DocumentPag
 		return nil, fmt.Errorf("%w：未提取到文本，可能是扫描件；暂不支持 OCR", ErrDocument)
 	}
 	return pages, nil
+}
+
+// textMatrix 是 PDF 的 3×3 变换矩阵 [a b 0; c d 0; e f 1]，只存前两列。
+type textMatrix [6]float64
+
+var identityMatrix = textMatrix{1, 0, 0, 1, 0, 0}
+
+func (m textMatrix) mul(n textMatrix) textMatrix {
+	return textMatrix{
+		m[0]*n[0] + m[1]*n[2], m[0]*n[1] + m[1]*n[3],
+		m[2]*n[0] + m[3]*n[2], m[2]*n[1] + m[3]*n[3],
+		m[4]*n[0] + m[5]*n[2] + n[4], m[4]*n[1] + m[5]*n[3] + n[5],
+	}
+}
+
+func translate(x, y float64) textMatrix { return textMatrix{1, 0, 0, 1, x, y} }
+
+// pageText 按文字在页面上的位置拼接文本。巨潮的 PDF 常把一行拆成很多文本对象（一个数字也会拆开），
+// 库自带的 GetPlainText 在每个文本对象前加换行，会把 2026 拆成 202 和 6；GetTextByRow 又不跟踪 Td 等移动。
+// 这里自己跟踪文本矩阵：同一行紧挨着的片段直接相连，间距大（如表格的相邻单元格）时加空格，换行或回退时换行，
+// 避免把不同单元格的数字拼成一个数。字宽没有可靠来源，按中文全角 1 em、其他 0.5 em 估算。
+func pageText(page pdf.Page) string {
+	var out strings.Builder
+	fonts := map[string]pdf.TextEncoding{}
+	var enc pdf.TextEncoding
+	var size, leading float64
+	ctm, tm, tlm := identityMatrix, identityMatrix, identityMatrix
+	var saved []textMatrix
+	started := false
+	var endX, lastY, lastEm float64
+	show := func(raw string) {
+		text := raw
+		if enc != nil {
+			text = enc.Decode(raw)
+		}
+		if text == "" {
+			return
+		}
+		trm := textMatrix{size, 0, 0, size, 0, 0}.mul(tm).mul(ctm)
+		x, y := trm[4], trm[5]
+		em := math.Hypot(trm[0], trm[1])
+		if em == 0 {
+			em = 1
+		}
+		if started {
+			switch {
+			case math.Abs(y-lastY) > 0.5*math.Max(em, lastEm) || x < endX-0.5*em:
+				out.WriteByte('\n')
+			case x-endX > 0.3*em:
+				out.WriteByte(' ')
+			}
+		}
+		out.WriteString(text)
+		width := 0.0
+		for _, r := range text {
+			if unicode.Is(unicode.Han, r) || (r >= 0x3000 && r <= 0x303f) || (r >= 0xff00 && r <= 0xffef) {
+				width++
+			} else {
+				width += 0.5
+			}
+		}
+		endX, lastY, lastEm, started = x+width*em, y, em, true
+		// 同一文本对象里没有用 Td 定位的后续文字接在估算的宽度之后。
+		tm = translate(width*size, 0).mul(tm)
+	}
+	nextLine := func() {
+		tlm = translate(0, -leading).mul(tlm)
+		tm = tlm
+	}
+	pdf.Interpret(page.V.Key("Contents"), func(stk *pdf.Stack, op string) {
+		args := make([]pdf.Value, stk.Len())
+		for i := len(args) - 1; i >= 0; i-- {
+			args[i] = stk.Pop()
+		}
+		num := func(i int) float64 { return args[i].Float64() }
+		switch {
+		case op == "q":
+			saved = append(saved, ctm)
+		case op == "Q" && len(saved) > 0:
+			ctm, saved = saved[len(saved)-1], saved[:len(saved)-1]
+		case op == "cm" && len(args) == 6:
+			ctm = textMatrix{num(0), num(1), num(2), num(3), num(4), num(5)}.mul(ctm)
+		case op == "BT":
+			tm, tlm = identityMatrix, identityMatrix
+		case op == "Tf" && len(args) == 2:
+			name := args[0].Name()
+			if _, ok := fonts[name]; !ok {
+				font := page.Font(name)
+				fonts[name] = font.Encoder()
+			}
+			enc, size = fonts[name], num(1)
+		case op == "TL" && len(args) == 1:
+			leading = num(0)
+		case op == "Tm" && len(args) == 6:
+			tlm = textMatrix{num(0), num(1), num(2), num(3), num(4), num(5)}
+			tm = tlm
+		case (op == "Td" || op == "TD") && len(args) == 2:
+			if op == "TD" {
+				leading = -num(1)
+			}
+			tlm = translate(num(0), num(1)).mul(tlm)
+			tm = tlm
+		case op == "T*":
+			nextLine()
+		case op == "Tj" && len(args) == 1:
+			show(args[0].RawString())
+		case (op == "'" && len(args) == 1) || (op == "\"" && len(args) == 3):
+			nextLine()
+			show(args[len(args)-1].RawString())
+		case op == "TJ" && len(args) == 1:
+			for i := 0; i < args[0].Len(); i++ {
+				if item := args[0].Index(i); item.Kind() == pdf.String {
+					show(item.RawString())
+				} else {
+					// 数字是以千分之一 em 为单位的反向位移，较大的负值相当于空格。
+					tm = translate(-item.Float64()/1000*size, 0).mul(tm)
+				}
+			}
+		}
+	})
+	return out.String()
 }
