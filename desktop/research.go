@@ -79,10 +79,14 @@ func (s *desktopServer) handleIPO(w http.ResponseWriter, r *http.Request) {
 var titleTags = regexp.MustCompile(`<[^>]*>`)
 
 // announcementItem 转为页面使用的公告字段，标题和名称去掉高亮标签。
+// summarizable 表示链接是巨潮 PDF 原文，页面据此决定能否摘要，不在前端重复校验规则。
 func announcementItem(a *cninfo.Announcement) map[string]any {
+	link := cninfo.AnnouncementURL(a)
+	_, err := cninfo.DocumentURL(link)
 	return map[string]any{
 		"id": a.ID, "title": cninfo.CleanTitle(a.Title),
-		"date": a.DateText(), "code": a.SecCode, "name": cninfo.CleanTitle(a.SecName), "url": cninfo.AnnouncementURL(a),
+		"date": a.DateText(), "code": a.SecCode, "name": cninfo.CleanTitle(a.SecName), "url": link,
+		"summarizable": err == nil,
 	}
 }
 

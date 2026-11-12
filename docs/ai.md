@@ -373,6 +373,35 @@ CLI 和 Desktop 共用一份配置，在任意一边设置后另一边直接可�
 
 摘要缓存键为 文档 ID + 模型 + 提示词版本，文档不变时不重复调用。
 
+#### 已实现：巨潮公告摘要
+
+CLI 示例（先按「模型配置」章节添加配置并启用 AI）：
+
+```bash
+# 列表显示从 1 开始的本页序号，过滤掉失效公告；重新查询时公告顺序可能变化。
+sec announcements SH600036
+sec announcements SH600036 --summary 1
+sec announcements SH600036 --type annual --page 2 --summary 3 --ai local --json
+sec announcements --latest --summary 1
+
+# 直接指定原文 PDF，无需证券代码或查询列表。HTTP 链接自动升级为 HTTPS。
+sec announcements --summary 'https://static.cninfo.com.cn/finalpage/2026-11-10/1225664110.PDF'
+```
+
+`--summary` 必须带本页序号或巨潮 CDN PDF 直链，不接受公告详情页；`--ai` 只与 `--summary` 一起用。序号按本次查询返回的有效公告排列，使用同样的证券、类别和页码才能对应列表；所选公告没有 PDF 原文时直接报错；要固定文档请用 PDF 链接。模型配置先校验，AI 未启用或 Key 不可用时不查询公告、不下载 PDF。普通列表的 `--json` 保持原结构；`--summary --json` 只输出 `llm.AnnouncementSummary`，包括 `document_id`、`source_url`、`as_of`、`page_count`、`sections`（每段文字与 `pages`）、带引用的 `text`、`notes`、`check`、模型/配置和缓存元数据。`as_of` 来自巨潮 PDF 路径中的披露日期，不是报告期。
+
+Desktop 的公告列表每行提供「摘要」和生成中的「取消摘要」按钮，没有 PDF 原文的公告按钮不可用，列表上方可临时选择模型并刷新配置，点击前说明公告文本会发给所选厂商。结果展示披露日期、模型、配置、核对警告和可点击的页码引用；切换模型、证券、列表页或离开页面时取消请求，旧响应不能覆盖新页面。第一版为完整结果输出，不发送未经核对的摘要草稿。
+
+后端 `POST /api/v1/ai/announcements/summary` 只接收 `url` 和可选 `profile`，服务器自己读取 PDF，不接受浏览器传入正文或提示词；沿用鉴权、同源和 AI 启用检查。无效输入返回 400，配置不可用返回 409，文档/模型错误返回 502，超时返回 504；模型错误正文不回传，避免回显 Key。
+
+实现约定：
+
+- `provider/cninfo.ReadDocument` 只接受 `static.cninfo.com.cn/finalpage/YYYY-MM-DD/<数字 ID>.pdf`（扩展名大小写兼容），校验每次重定向，下载最多 20 MiB、200 页、40 万个文本字符，超限报错、不截取后冒充完整摘要；下载最多等待 1 分钟。页码从 PDF 首页开始，空白或无文本页保留位置并在结果 `notes` 里说明；全篇无文本时提示可能为扫描件，不做 OCR。图片内容不参与摘要，表格还需核对原文。
+- 采用 [ledongthuc/pdf](https://github.com/ledongthuc/pdf)（BSD-3-Clause，固定到 `5e46805f718e`），直接按页提取，支持带 ToUnicode 映射的中文 PDF，无 CGO 或外部命令，适用于 CLI 的跨平台构建。损坏文件提取失败时返回中文错误；离线 fixture 覆盖中文映射、多页和空白页。
+- `llm.AnnouncementSummarizer` 每块最多 12,000 个字符，单页太长时继续分块并保留页码；最多 40 块。先逐块摘要（最多 4 块同时请求，任一块失败即取消其余请求），多块时再合并分块摘要，整次操作最多 10 分钟，可取消。提示词把原文视为不可信数据，不开放工具调用。模型必须输出每段的文字和引用页码，代码拒绝不存在、缺失的页码；合并不能增加分块摘要未引用的页码。正文和引用以普通文本展示，不执行模型生成的 HTML。
+- 数字和建议用语复用 `llm.Verify`，每段只与该段引用的原文页核对。PDF 是自然语言，所以先合并原文里的千分位分组，保持其他工具的 JSON 数字核对规则不变。核对只提示、不证明语义准确；来源里找不到的数字和建议用语会明确显示。代码附加免责声明、原文地址和物理页码说明。
+- 缓存保存在 `~/.sec/cache/ai/announcements/`，CLI 与 Desktop 共用；键包含文档 ID、完整地址、模型实际协议/地址/名称、提示词版本和内容。配置改名不失效；缓存命中不再下载或调用模型。只有完整、正常结束且核对无警告的结果写入，失败、取消、截断和引用不合法的结果不缓存。缓存假设巨潮的文档地址对应不可变文档。
+
 ### 问答：sec ask 与 Desktop 对话面板
 
 - agent loop 在 `llm` 包里实现：模型返回工具调用 → 从 `aitool` 注册表执行 → 结果回传，最多 8 轮，单次工具调用 30 秒超时，整轮可取消（CLI 用 Ctrl-C）。

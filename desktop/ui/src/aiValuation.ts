@@ -36,7 +36,7 @@ export function explanationUnavailable(settings: AISettings | null): string {
 }
 
 // 与 llm.Check.Warnings 的提示一致，不把没有数字的回答说成核对通过。
-export function explanationChecks(result: ValuationExplanation): string[] {
+export function explanationChecks(result: Pick<ValuationExplanation, 'check'>): string[] {
   const lines: string[] = []
   const numbers = [...new Set(result.check.unsourced.map(item => item.text))]
   const advice = [...new Set(result.check.advice_terms.map(item => item.text))]

@@ -71,6 +71,11 @@ func TestAnnouncementsSanitizeTitlesNamesAndLinks(t *testing.T) {
 	}
 }
 
+func TestAnnouncementItemSummarizable(t *testing.T) {
+	require.Equal(t, true, announcementItem(&cninfo.Announcement{ID: "1", AdjunctURL: "finalpage/2026-11-01/123456.PDF"})["summarizable"])
+	require.Equal(t, false, announcementItem(&cninfo.Announcement{ID: "1", SecCode: "600036"})["summarizable"], "没有 PDF 附件时只有详情页链接，不能摘要")
+}
+
 func TestHistoryMapping(t *testing.T) {
 	for _, tc := range []struct {
 		code, symbol, secid string

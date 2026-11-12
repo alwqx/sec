@@ -77,6 +77,8 @@ export interface Announcement {
   code: string
   name: string
   url: string
+  // 链接是巨潮 PDF 原文时才能摘要。
+  summarizable?: boolean
 }
 
 export interface FinancialReport {
@@ -248,6 +250,23 @@ export interface ValuationExplanation {
     advice_terms: { text: string; start: number; end: number }[]
   }
   truncated: boolean
+  model: string
+  profile: string
+  prompt_version: string
+  cached: boolean
+  created_at: string
+}
+
+export interface AnnouncementSummary {
+  document_id: string
+  source_url: string
+  as_of: string
+  page_count: number
+  sections: { text: string; pages: number[] }[]
+  text: string
+  notes: string[]
+  check: ValuationExplanation['check']
+  disclaimer: string
   model: string
   profile: string
   prompt_version: string

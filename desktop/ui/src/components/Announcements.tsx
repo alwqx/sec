@@ -1,8 +1,10 @@
 import { useCallback, useState, type FormEvent } from 'react'
-import { announcements } from '../api'
+import { aiSettings, announcements } from '../api'
+import { explanationProfile, explanationUnavailable } from '../aiValuation'
 import { useResource } from '../hooks/useResource'
 import ResourceState from './ResourceState'
 import Pagination from './Pagination'
+import AnnouncementSummary from './AnnouncementSummary'
 
 const categories = { '': '全部公告', annual: '年报', halfyear: '中报', q1: '一季报', q3: '三季报', insider: '增减持公告' }
 type Category = keyof typeof categories
@@ -16,6 +18,11 @@ export default function Announcements({ code = '', compact = false }: { code?: s
   const [copyError, setCopyError] = useState('')
   const load = useCallback((signal: AbortSignal) => announcements(page, code, key, category, signal), [page, code, key, category])
   const resource = useResource(load)
+  const loadModels = useCallback((signal: AbortSignal) => aiSettings(signal), [])
+  const models = useResource(loadModels)
+  const [selected, setSelected] = useState('')
+  const profile = explanationProfile(models.data, selected)
+  const unavailable = models.error ? `读取模型配置失败：${models.error}` : explanationUnavailable(models.data)
   const submit = (e: FormEvent) => { e.preventDefault(); setPage(1); setKey(draft.trim()) }
   const copy = async (url: string) => {
     try { await navigator.clipboard.writeText(url); setCopied(url); setCopyError('') }
@@ -24,14 +31,20 @@ export default function Announcements({ code = '', compact = false }: { code?: s
   return <section className={compact ? 'research-section' : 'page-panel'}>
     <form className="section-toolbar announcement-search" onSubmit={submit}><label className="visually-hidden" htmlFor={compact ? 'stock-ann-type' : 'ann-type'}>公告类别</label><select id={compact ? 'stock-ann-type' : 'ann-type'} value={category} onChange={e => { setCategory(e.target.value as Category); setPage(1); setCopied(''); setCopyError('') }}>{Object.entries(categories).filter(([value]) => code || value !== 'insider').map(([value, title]) => <option key={value} value={value}>{title}</option>)}</select><label className="visually-hidden" htmlFor={compact ? 'stock-ann-key' : 'ann-key'}>公告关键字</label><input id={compact ? 'stock-ann-key' : 'ann-key'} value={draft} onChange={e => setDraft(e.target.value)} placeholder="搜索公告标题" maxLength={100} /><button type="submit" disabled={resource.loading}>查询</button><button type="button" onClick={resource.reload} disabled={resource.loading}>刷新</button></form>
     <p className="data-note">巨潮资讯 · {code ? '当前证券公告' : '最新披露公告'} · {categories[category]} · 原文可打开或复制链接。</p>
+    <div className="section-toolbar"><label>摘要模型配置<select aria-label="摘要模型配置" value={profile?.name ?? ''} disabled={models.loading || !profile} onChange={event => setSelected(event.target.value)}>
+      {!profile && <option value="">暂无配置</option>}
+      {models.data?.profiles.map(item => <option key={item.name} value={item.name}>{item.name}{item.default ? '（默认）' : ''} · {item.model}</option>)}
+    </select></label><button disabled={models.loading} onClick={models.reload}>刷新模型配置</button></div>
+    {unavailable && <p className="data-note" role="status">{unavailable}</p>}
+    {profile && <p className="data-note">{profile.local ? '本机模型，公告文本不出本机。' : `点击摘要会将公告 PDF 提取的文本发送给 ${profile.provider_name}（${profile.name}）。`} 临时切换只对当前页面有效，不修改默认配置。摘要附物理 PDF 页码，扫描件暂不支持。</p>}
     {category === 'insider' && <p className="data-note">按标题包含“增持”或“减持”匹配，不是结构化的高管交易记录，也可能是公司增持其他公司或股东的承诺。{resource.data?.truncated && '结果过多，只显示部分结果，部分年份可能缺失。'}</p>}
     {copyError && <p className="error" role="alert">{copyError}</p>}
     <ResourceState {...resource} retry={resource.reload} />
-    {resource.data && (resource.data.results.length === 0 ? <div className="empty-state">暂无符合条件的公告</div> : <ul className="announcement-list">{resource.data.results.map((item, i) => <li key={`${item.id}-${i}`}><div className="announcement-meta"><time>{item.date || '日期未知'}</time><span>{item.name} {item.code}</span></div><h3>{item.title}</h3><div className="announcement-actions"><a href={item.url} target="_blank" rel="noopener noreferrer" onClick={e => {
+    {resource.data && (resource.data.results.length === 0 ? <div className="empty-state">暂无符合条件的公告</div> : <ul className="announcement-list">{resource.data.results.map((item, i) => <li key={`${code}-${page}-${category}-${key}-${item.id}-${i}`}><div className="announcement-meta"><time>{item.date || '日期未知'}</time><span>{item.name} {item.code}</span></div><h3>{item.title}</h3><div className="announcement-actions"><a href={item.url} target="_blank" rel="noopener noreferrer" onClick={e => {
       if (!window.secOpenDisclosure) return
       e.preventDefault()
       void window.secOpenDisclosure(item.url).catch(() => setCopyError('打开原文失败，请复制链接到浏览器。'))
-    }}>查看原文 ↗</a><button onClick={() => void copy(item.url)}>{copied === item.url ? '已复制链接' : '复制链接'}</button></div></li>)}</ul>)}
+    }}>查看原文 ↗</a><button onClick={() => void copy(item.url)}>{copied === item.url ? '已复制链接' : '复制链接'}</button></div><AnnouncementSummary url={item.url} profile={profile} unavailable={item.summarizable ? unavailable : '该公告没有 PDF 原文，无法摘要'} /></li>)}</ul>)}
     {resource.data && <Pagination page={page} total={resource.data.total} hasMore={resource.data.has_more} loading={resource.loading} onPage={setPage} />}
   </section>
 }
