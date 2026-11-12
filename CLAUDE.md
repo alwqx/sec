@@ -37,6 +37,9 @@ go run . ipo list
 
 # Live smoke test of every command against real upstreams (network required, run by hand, not in CI)
 go build -o sec . && scripts/live-smoke.sh ./sec
+
+# Run the CI checks locally before pushing (on macOS also builds the cgo Desktop binary; --vuln adds govulncheck)
+scripts/ci-local.sh
 ```
 
 CI runs `gofmt`, `go vet` and `go test -v ./...` on Linux on every push, and a macOS job builds and tests the Desktop frontend and vets and tests `./desktop`, which only compiles on Windows and macOS. Release builds (linux/windows/darwin × amd64/arm64) trigger on GitHub Release creation via ldflags-injected version.
