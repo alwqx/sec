@@ -223,22 +223,6 @@ func chunkAnnouncement(pages []cninfo.DocumentPage) [][]cninfo.DocumentPage {
 	return chunks
 }
 
-// truncationAdvice 是被截断时的说明和建议，分块和合并都用，格式为「（原因）。建议」。按回复实际有没有推理判断：
-// 有推理内容、推理 token，或者回复一个字都没有（推理用完了上限，部分厂商不返回推理），都算推理用完了上限。
-func (s *AnnouncementSummarizer) truncationAdvice(resp *Response) string {
-	reasoned := resp.Reasoned || strings.TrimSpace(resp.Message.Text) == ""
-	const why = "（思考模型的推理也计入输出上限）。"
-	switch {
-	case reasoned && s.Model.ThinkingOff:
-		return why + ThinkingIgnoredHint(s.Model.Profile)
-	case reasoned && s.Model.ThinkingOffSupported:
-		return why + fmt.Sprintf("可以关闭思考后重试：sec config ai edit %s --thinking off，或在 Desktop 设置页「AI 模型」勾选「关闭思考」", profileName(s.Model.Profile))
-	case reasoned:
-		return why + "请重试，或换用非思考模型或其他配置"
-	}
-	return "（摘要正文超出上限，公告可能太长）。请重试或更换模型"
-}
-
 // summarizePart 请求一次分块摘要或合并（merge），按停止原因给出可操作的错误。
 func (s *AnnouncementSummarizer) summarizePart(ctx context.Context, input any, allowed map[int]bool, merge bool, maxSections, maxRunes int) ([]SummarySection, string, error) {
 	if err := ctx.Err(); err != nil {
@@ -260,7 +244,7 @@ func (s *AnnouncementSummarizer) summarizePart(ctx context.Context, input any, a
 		if merge {
 			stage = "合并分块摘要"
 		}
-		return nil, "", fmt.Errorf("%w：%s时回复超过 %d token 的输出上限被截断%s", ErrSummary, stage, announcementMaxTokens, s.truncationAdvice(resp))
+		return nil, "", fmt.Errorf("%w：%s时回复超过 %d token 的输出上限被截断%s", ErrSummary, stage, announcementMaxTokens, s.Model.TruncationAdvice(resp, "摘要正文超出上限，公告可能太长"))
 	case len(resp.Message.ToolCalls) > 0:
 		return nil, "", fmt.Errorf("%w：模型调用了工具，公告摘要不提供工具，请重试或更换模型", ErrSummary)
 	case resp.StopReason != StopEnd:

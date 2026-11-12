@@ -77,7 +77,7 @@ export default function ValuationExplanation({ code, params, data, loading, erro
     {result && !blocked && <div className="explanation-result" role="status">
       <p className="data-note">{result.name}（{result.ex_code}） · 数据截止 {result.as_of} · 模型 {result.model} · 配置 {result.profile}{result.cached ? ` · 缓存，生成于 ${new Date(result.created_at).toLocaleString('zh-CN')}` : ''}</p>
       <p className="explanation-text">{result.text}</p>
-      {result.truncated && <p className="error">输出达到上限，解读不完整。</p>}
+      {result.truncated && <p className="error">输出达到上限，解读不完整{result.truncation_hint ?? '。'}</p>}
       {explanationChecks(result).map(line => <p key={line} className={result.check.unsourced.length || result.check.advice_terms.length ? 'error' : 'data-note'}>核对：{line}</p>)}
       <p className="data-note">{result.disclaimer}</p>
     </div>}

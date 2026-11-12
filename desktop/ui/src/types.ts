@@ -252,6 +252,7 @@ export interface ValuationExplanation {
     advice_terms: { text: string; start: number; end: number }[]
   }
   truncated: boolean
+  truncation_hint?: string // 被截断的原因和建议，如关闭思考，接在「解读不完整」后面
   model: string
   profile: string
   prompt_version: string

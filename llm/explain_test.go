@@ -109,6 +109,36 @@ func TestValuationExplainCache(t *testing.T) {
 	require.Len(t, entries, 4)
 }
 
+// 被截断时按回复有没有推理给建议，和公告摘要共用 Model.TruncationAdvice。
+func TestValuationExplainTruncationHint(t *testing.T) {
+	asOf, inputs := "2026-11-06", []string{}
+	truncated := func(text string, reasoned bool) FakeReply {
+		r := FakeText(text)
+		r.Response.StopReason, r.Response.RawStopReason, r.Response.Reasoned = StopMaxTokens, "length", reasoned
+		return r
+	}
+	model := Model{Profile: "ds", ThinkingOffSupported: true}
+	explain := func(reply FakeReply) (*Explanation, error) {
+		explainer := &ValuationExplainer{Client: &Fake{Replies: []FakeReply{reply}}, Model: model, Fetch: stubFetch(&asOf, &inputs)}
+		return explainer.Explain(context.Background(), json.RawMessage(`{"code":"600519"}`))
+	}
+	got, err := explain(truncated("估值水平：", true))
+	require.NoError(t, err)
+	require.True(t, got.Truncated)
+	require.Contains(t, got.TruncationHint, "sec config ai edit ds --thinking off", "推理用完上限时提示关闭思考")
+	got, err = explain(truncated("估值水平：", false))
+	require.NoError(t, err)
+	require.Contains(t, got.TruncationHint, "解读正文超出上限")
+	require.NotContains(t, got.TruncationHint, "思考")
+	// 一个字都没有就被截断：推理用完了上限，报错并给出建议，不再只说没有给出解读。
+	_, err = explain(truncated("", false))
+	require.ErrorContains(t, err, "解读回复超过 4000 token 的输出上限被截断")
+	require.ErrorContains(t, err, "--thinking off")
+	got, err = explain(FakeText("完整"))
+	require.NoError(t, err)
+	require.Empty(t, got.TruncationHint, "没有截断时没有提示")
+}
+
 func TestValuationExplainNoCache(t *testing.T) {
 	asOf, inputs := "2026-11-06", []string{}
 	// 被截断的不缓存；CacheDir 为空时不缓存；没有 as_of 时不缓存。
