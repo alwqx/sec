@@ -25,6 +25,7 @@
 21. Extract the Anthropic streaming event schema into a package-level type.
 22. Add CNINFO announcement summaries with PDF page citations to the CLI and Desktop.
 23. Keep the Desktop AI valuation cancel test on gock mocks so it no longer reaches the real network.
+24. Track two announcement summary bugs found in live testing in TODO.md.
 
 ### v0.4.8
 
