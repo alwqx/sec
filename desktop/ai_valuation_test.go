@@ -207,17 +207,22 @@ func TestAIValuationCancel(t *testing.T) {
 	srv := &desktopServer{dev: true, workspace: workspaceStore{path: filepath.Join(t.TempDir(), "workspace.json")}}
 	configureAIValuation(t, srv)
 	mockValuationUpstream(valuationBody, performanceBody)
-	transport := http.DefaultTransport
-	defer func() { http.DefaultTransport = transport }()
+	// 不能直接替换 http.DefaultTransport：gock 只在它等于 gock.DefaultTransport 时拦截，否则所有请求都会走真实网络，
+	// 测试快慢取决于 CI 能否连上东方财富。这里让 gock 继续拦截，只把模型地址放行到一直等到取消的假传输。
+	native := gock.DefaultTransport.Transport
 	started := make(chan struct{})
-	http.DefaultTransport = aiValuationTransport(func(r *http.Request) (*http.Response, error) {
-		if r.URL.Host != "model.example" {
-			return transport.RoundTrip(r)
-		}
+	gock.DefaultTransport.Transport = aiValuationTransport(func(r *http.Request) (*http.Response, error) {
 		close(started)
 		<-r.Context().Done()
 		return nil, r.Context().Err()
 	})
+	gock.EnableNetworking()
+	gock.NetworkingFilter(func(r *http.Request) bool { return r.URL.Host == "model.example" })
+	defer func() {
+		gock.DisableNetworkingFilters()
+		gock.DisableNetworking()
+		gock.DefaultTransport.Transport = native
+	}()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	r := httptest.NewRequest(http.MethodPost, "/api/v1/ai/valuation", strings.NewReader(`{"code":"SH600036"}`)).WithContext(ctx)
@@ -241,4 +246,5 @@ func TestAIValuationCancel(t *testing.T) {
 		t.Fatal("取消后模型请求没有退出")
 	}
 	require.Empty(t, rr.Body.String(), "取消时不返回可缓存的解读或误报失败")
+	require.True(t, gock.IsDone(), "估值数据应由 gock 提供，不能请求真实网络")
 }
