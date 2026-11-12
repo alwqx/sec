@@ -87,7 +87,15 @@ type AIProfile struct {
 	APIKeyEnv string `json:"api_key_env,omitempty"`
 	// APIKey 是加密保存的 Key（enc:v1:...），明文 Key 不写入文件。本地模型可以不填。
 	APIKey string `json:"api_key,omitempty"`
+	// Thinking 为空时用厂商和模型的默认行为；AIThinkingOff 关闭思考，只支持 ThinkingOffSupported 的厂商和协议。
+	Thinking string `json:"thinking,omitempty"`
 }
+
+// AIThinkingOff 关闭模型的思考（推理）。思考 token 也计入输出上限，长输入时可能用完上限、没有正文，也更慢。
+const AIThinkingOff = "off"
+
+// ErrThinkingOffUnsupported 表示这个厂商、协议或地址不能关闭思考，见 AIProfile.ThinkingOffSupported。
+var ErrThinkingOffUnsupported = errors.New("暂不支持关闭思考")
 
 // aiKeyPrefix 是加密 Key 的格式前缀，v1 是 AES-256-GCM，见 docs/ai.md。
 const aiKeyPrefix = "enc:v1:"
@@ -138,6 +146,12 @@ func (p AIProfile) Validate() error {
 	if strings.TrimSpace(p.Model) == "" {
 		return errors.New("模型不能为空")
 	}
+	switch {
+	case p.Thinking != "" && p.Thinking != AIThinkingOff:
+		return fmt.Errorf("thinking 只能为空（用厂商默认）或 %s（关闭思考）", AIThinkingOff)
+	case p.Thinking == AIThinkingOff && !p.ThinkingOffSupported():
+		return fmt.Errorf("%s %w，目前只支持 DeepSeek 官方地址的 OpenAI 兼容接口", provider.Name, ErrThinkingOffUnsupported)
+	}
 	// 校验错误会写进日志和终端：可能含密码的地址和填错位置的 Key 不回显。
 	if p.BaseURL != "" {
 		u, err := url.Parse(p.BaseURL)
@@ -161,6 +175,18 @@ func (p AIProfile) Validate() error {
 	return nil
 }
 
+// ThinkingOffSupported 判断能否关闭思考。各厂商关闭思考的参数不同，只在实现并核实过参数的厂商、协议和官方地址上允许，
+// 避免发出厂商不认识的参数后被拒绝，或被忽略而以为已经关闭。改了地址的配置可能是转发同一模型的第三方服务，参数不一定相同。
+func (p AIProfile) ThinkingOffSupported() bool {
+	return p.Provider == "deepseek" && p.EffectiveAPI() == AIAPIOpenAI && p.officialBaseURL()
+}
+
+// officialBaseURL 判断实际地址是不是厂商的官方地址：没填，或只差结尾的 /。
+func (p AIProfile) officialBaseURL() bool {
+	provider, _ := LookupAIProvider(p.Provider)
+	return p.BaseURL == "" || strings.TrimRight(p.BaseURL, "/") == provider.BaseURL
+}
+
 // EffectiveAPI 是实际使用的接口协议：填了用填的，没填用厂商的默认协议。
 func (p AIProfile) EffectiveAPI() string {
 	if p.API != "" {
@@ -182,10 +208,10 @@ func (p AIProfile) EffectiveBaseURL() string {
 // DefaultKeyEnv 是没有设置 Key 时读取的厂商环境变量，按厂商而不是协议区分，DeepSeek 不会误用 OPENAI_API_KEY。
 // 改了接口地址时不读：地址可能是别的服务，不能把厂商的 Key 发过去。
 func (p AIProfile) DefaultKeyEnv() string {
-	provider, _ := LookupAIProvider(p.Provider)
-	if p.BaseURL != "" && strings.TrimRight(p.BaseURL, "/") != provider.BaseURL {
+	if !p.officialBaseURL() {
 		return ""
 	}
+	provider, _ := LookupAIProvider(p.Provider)
 	return provider.KeyEnv
 }
 
@@ -492,6 +518,7 @@ type AIProfileView struct {
 	Key          string `json:"key"`
 	KeyStored    bool   `json:"key_stored"` // 有没有加密保存的 Key，Key 也可能来自环境变量
 	Local        bool   `json:"local"`
+	Thinking     string `json:"thinking,omitempty"`
 }
 
 // Views 按名字顺序返回全部配置的显示信息，没有配置时是空切片。getenv 一般传 os.Getenv。
@@ -503,7 +530,7 @@ func (a *AIConfig) Views(secret *AISecret, getenv func(string) string) []AIProfi
 		views = append(views, AIProfileView{
 			Name: name, Default: name == a.Default, Provider: p.Provider, ProviderName: provider.Name,
 			API: p.EffectiveAPI(), BaseURL: p.EffectiveBaseURL(), Model: p.Model, APIKeyEnv: p.APIKeyEnv,
-			Key: a.KeyStatus(secret, name, getenv), KeyStored: p.APIKey != "", Local: p.IsLocal(),
+			Key: a.KeyStatus(secret, name, getenv), KeyStored: p.APIKey != "", Local: p.IsLocal(), Thinking: p.Thinking,
 		})
 	}
 	return views

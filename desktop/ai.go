@@ -109,18 +109,31 @@ func (s *desktopServer) handleAIEditProfile(w http.ResponseWriter, r *http.Reque
 	name := r.PathValue("name")
 	s.changeAI(w, r, func(ai *config.AIConfig) (string, error) {
 		hadKey := ai.Profiles[name].APIKey != ""
+		thinkingReset := false
 		// 表单提交全部字段：协议和地址为空表示用厂商的默认值。保存的 Key 不在表单里，由 Edit 决定是否保留。
+		// 设置页还不能改思考，保留 CLI 设的关闭思考；新厂商不支持关闭时恢复默认，不让保存失败。
 		if err := ai.Edit(name, func(p *config.AIProfile) {
-			key := p.APIKey
+			key, thinking := p.APIKey, p.Thinking
 			*p = in.profile()
 			p.APIKey = key
+			if thinking == config.AIThinkingOff {
+				if p.ThinkingOffSupported() {
+					p.Thinking = thinking
+				} else {
+					thinkingReset = true
+				}
+			}
 		}); err != nil {
 			return "", err
 		}
+		var notes []string
 		if hadKey && ai.Profiles[name].APIKey == "" {
-			return "厂商或地址变了，原来保存的 Key 不会发给新地址，已删除，请重新设置。", nil
+			notes = append(notes, "厂商或地址变了，原来保存的 Key 不会发给新地址，已删除，请重新设置。")
 		}
-		return "", nil
+		if thinkingReset {
+			notes = append(notes, "新的厂商、协议或地址不支持关闭思考，已恢复默认。")
+		}
+		return strings.Join(notes, ""), nil
 	})
 }
 

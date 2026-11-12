@@ -88,13 +88,13 @@ func newAIListCLI() *cobra.Command {
 			table := tablewriter.NewWriter(out)
 			table.SetBorder(false)
 			table.SetAutoWrapText(false)
-			table.SetHeader([]string{"配置", "厂商", "协议", "地址", "模型", "Key"})
+			table.SetHeader([]string{"配置", "厂商", "协议", "地址", "模型", "思考", "Key"})
 			for _, v := range views {
 				name := v.Name
 				if v.Default {
 					name += " *"
 				}
-				table.Append([]string{name, v.ProviderName, v.API, v.BaseURL, v.Model, v.Key})
+				table.Append([]string{name, v.ProviderName, v.API, v.BaseURL, v.Model, thinkingLabel(v.Thinking), v.Key})
 			}
 			table.Render()
 			_, err = fmt.Fprintln(out, "* 是 default，不指定配置时使用。")
@@ -105,6 +105,14 @@ func newAIListCLI() *cobra.Command {
 	return cmd
 }
 
+// thinkingLabel 是思考设置的显示文字。
+func thinkingLabel(thinking string) string {
+	if thinking == config.AIThinkingOff {
+		return "关闭"
+	}
+	return "默认"
+}
+
 // profileFlags 是 add 和 edit 共用的参数。
 func profileFlags(cmd *cobra.Command) {
 	cmd.Flags().String("provider", "", "Provider: "+providerList())
@@ -112,6 +120,8 @@ func profileFlags(cmd *cobra.Command) {
 	cmd.Flags().String("base-url", "", "Base URL; defaults to the provider's official one, required for custom")
 	cmd.Flags().String("model", "", "Model, e.g. deepseek-chat")
 	cmd.Flags().String("api-key-env", "", "Read the API key from this environment variable instead of the stored key")
+	cmd.Flags().String("thinking", "", "Set to off to turn off model thinking (reasoning), empty for the provider default; DeepSeek only for now")
+	_ = cmd.RegisterFlagCompletionFunc("thinking", cobra.FixedCompletions([]string{config.AIThinkingOff}, cobra.ShellCompDirectiveNoFileComp))
 	_ = cmd.RegisterFlagCompletionFunc("provider", func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 		return config.AIProviderIDs(), cobra.ShellCompDirectiveNoFileComp
 	})
@@ -119,14 +129,17 @@ func profileFlags(cmd *cobra.Command) {
 }
 
 // profileFlagNames 是 add 和 edit 共用的参数名。
-var profileFlagNames = []string{"provider", "api", "base-url", "model", "api-key-env"}
+var profileFlagNames = []string{"provider", "api", "base-url", "model", "api-key-env", "thinking"}
 
 // applyProfileFlags 把用户给出的参数写进配置，没给的不动；给空字符串表示清空（如 --base-url ""）。
 func applyProfileFlags(cmd *cobra.Command, p *config.AIProfile) {
-	for flag, field := range map[string]*string{"provider": &p.Provider, "api": &p.API, "base-url": &p.BaseURL, "model": &p.Model, "api-key-env": &p.APIKeyEnv} {
+	for flag, field := range map[string]*string{"provider": &p.Provider, "api": &p.API, "base-url": &p.BaseURL, "model": &p.Model, "api-key-env": &p.APIKeyEnv, "thinking": &p.Thinking} {
 		if cmd.Flags().Changed(flag) {
 			*field, _ = cmd.Flags().GetString(flag)
 			*field = strings.TrimSpace(*field)
+			if flag == "thinking" {
+				*field = strings.ToLower(*field)
+			}
 		}
 	}
 }
@@ -156,6 +169,9 @@ func newAIAddCLI() *cobra.Command {
 			}
 			out := cmd.OutOrStdout()
 			fmt.Fprintf(out, "已添加模型配置 %s（%s，%s）\n", name, providerName(p.Provider), p.Model)
+			if p.Thinking == config.AIThinkingOff {
+				fmt.Fprintln(out, "已关闭思考。")
+			}
 			if ai.Default == name {
 				fmt.Fprintf(out, "%s 是 default。\n", name)
 			}
@@ -179,11 +195,11 @@ func newAIEditCLI() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "edit <name>",
 		Short:   "Change a model profile; only the given flags change, an empty value clears an optional one",
-		Example: "  sec config ai edit ds --model deepseek-reasoner\n  sec config ai edit ds --base-url \"\"",
+		Example: "  sec config ai edit ds --model deepseek-reasoner\n  sec config ai edit ds --base-url \"\"\n  sec config ai edit ds --thinking off",
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if !slices.ContainsFunc(profileFlagNames, cmd.Flags().Changed) {
-				return fmt.Errorf("没有要修改的项，可以用 --provider、--api、--base-url、--model、--api-key-env")
+				return fmt.Errorf("没有要修改的项，可以用 --provider、--api、--base-url、--model、--api-key-env、--thinking")
 			}
 			if err := checkAI(cmd); err != nil {
 				return err
@@ -194,6 +210,10 @@ func newAIEditCLI() *cobra.Command {
 			if err := config.Update(cmd.Context(), func(c *config.Config) error {
 				hadKey := c.AI.Profiles[name].APIKey != ""
 				if err := c.AI.Edit(name, func(profile *config.AIProfile) { applyProfileFlags(cmd, profile) }); err != nil {
+					// 原来关闭了思考、这次换到不支持的厂商或地址时，说明一起恢复默认就能改。
+					if errors.Is(err, config.ErrThinkingOffUnsupported) && !cmd.Flags().Changed("thinking") {
+						return fmt.Errorf("%w；这个配置关闭了思考，请同时加 --thinking \"\" 恢复厂商默认", err)
+					}
 					return err
 				}
 				p = c.AI.Profiles[name]
@@ -203,7 +223,7 @@ func newAIEditCLI() *cobra.Command {
 				return err
 			}
 			out := cmd.OutOrStdout()
-			fmt.Fprintf(out, "已修改模型配置 %s：%s，%s，%s，%s\n", name, providerName(p.Provider), p.EffectiveAPI(), p.EffectiveBaseURL(), p.Model)
+			fmt.Fprintf(out, "已修改模型配置 %s：%s，%s，%s，%s，思考%s\n", name, providerName(p.Provider), p.EffectiveAPI(), p.EffectiveBaseURL(), p.Model, thinkingLabel(p.Thinking))
 			if keyCleared {
 				fmt.Fprintln(out, "厂商或地址变了，原来保存的 Key 不会发给新地址，已删除，请重新设置。")
 			}

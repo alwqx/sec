@@ -8,8 +8,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"maps"
 	"net/http"
 	"strings"
+
+	"github.com/alwqx/sec/config"
 )
 
 // openAIClient 调用 OpenAI 兼容的 Chat Completions（POST {base}/chat/completions），覆盖 OpenAI、DeepSeek、通义千问、
@@ -20,6 +23,8 @@ type openAIClient struct {
 	url      string
 	model    string
 	key      string // 本机模型可以为空，为空时不发 Authorization
+	// extra 是按配置加到每个请求里的参数，比如关闭思考，见 openAIExtraParams。
+	extra map[string]any
 }
 
 type openAIMessage struct {
@@ -107,6 +112,19 @@ func (c *openAIClient) maxTokensField() string {
 	return "max_tokens"
 }
 
+// openAIExtraParams 是按配置加到每个请求里的参数。关闭思考的参数各家不同，能否关闭由 config.AIProfile.ThinkingOffSupported
+// 判断，配置校验已拒绝其他厂商；这里遇到未知厂商不加参数，不猜。两处的一致性由 TestThinkingOffSupportedSendsParams 检查。
+func openAIExtraParams(profile config.AIProfile) map[string]any {
+	if profile.Thinking != config.AIThinkingOff {
+		return nil
+	}
+	switch profile.Provider {
+	case "deepseek":
+		return map[string]any{"thinking": map[string]string{"type": "disabled"}}
+	}
+	return nil
+}
+
 func (c *openAIClient) Chat(ctx context.Context, req Request) (*Response, error) {
 	body, headers, err := c.request(req)
 	if err != nil {
@@ -140,6 +158,7 @@ func (c *openAIClient) request(req Request) (map[string]any, http.Header, error)
 		}
 		body["tools"] = tools
 	}
+	maps.Copy(body, c.extra)
 	headers := http.Header{}
 	if c.key != "" {
 		headers.Set("Authorization", "Bearer "+c.key)

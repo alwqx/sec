@@ -157,6 +157,47 @@ func TestOpenAIMaxTokensField(t *testing.T) {
 	}
 }
 
+func TestOpenAIThinkingOff(t *testing.T) {
+	req := Request{Messages: []Message{{Role: RoleUser, Text: "hi"}}}
+	// DeepSeek 关闭思考用 thinking.type；没有关闭时不发这个参数，用厂商默认。
+	off, err := New(config.AIProfile{Provider: "deepseek", Model: "deepseek-v4-pro", Thinking: config.AIThinkingOff}, "k")
+	require.NoError(t, err)
+	body, _, err := off.(*openAIClient).request(req)
+	require.NoError(t, err)
+	require.Equal(t, map[string]string{"type": "disabled"}, body["thinking"])
+	on, err := New(config.AIProfile{Provider: "deepseek", Model: "deepseek-v4-pro"}, "k")
+	require.NoError(t, err)
+	body, _, err = on.(*openAIClient).request(req)
+	require.NoError(t, err)
+	require.NotContains(t, body, "thinking")
+	// 校验之外直接构造时，没有实现的厂商不猜参数。
+	require.Empty(t, openAIExtraParams(config.AIProfile{Provider: "qwen", Model: "m", Thinking: config.AIThinkingOff}))
+}
+
+// TestThinkingOffSupportedSendsParams 检查 config 允许关闭思考的每个厂商和协议，客户端都真的发出了关闭参数，
+// 避免两处不一致时配置显示已关闭、请求却什么都没发。
+func TestThinkingOffSupportedSendsParams(t *testing.T) {
+	supported := 0
+	for _, provider := range config.AIProviders {
+		for _, api := range config.AIAPIs {
+			p := config.AIProfile{Provider: provider.ID, API: api, Model: "m", Thinking: config.AIThinkingOff}
+			if api != provider.API {
+				p.BaseURL = "https://gateway.example/v1"
+			}
+			if !p.ThinkingOffSupported() {
+				continue
+			}
+			supported++
+			client, err := New(p, "k")
+			require.NoError(t, err, p)
+			c, ok := client.(*openAIClient)
+			require.True(t, ok, "%s/%s 允许关闭思考，但客户端不处理这个参数", provider.ID, api)
+			require.NotEmpty(t, c.extra, "%s/%s 允许关闭思考，但请求不带关闭参数", provider.ID, api)
+		}
+	}
+	require.Positive(t, supported)
+}
+
 func TestOpenAIMessagesConversion(t *testing.T) {
 	ds := &openAIClient{provider: "deepseek"}
 	encode := func(msgs []openAIMessage) string {

@@ -258,7 +258,14 @@ CLI 和 Desktop 共用一份配置，在任意一边设置后另一边直接可�
 
   默认环境变量按厂商区分，DeepSeek 配置不会误用 `OPENAI_API_KEY`。环境变量适合 CI、服务器和临时覆盖。
 - 是否本机按实际地址判断（`localhost` 或回环地址），不按厂商：本机模型的查询内容不出本机，隐私提示据此说明；指向其他主机的 Ollama 不算本机。
-- 以后需要按配置区分的设置（如 `max_tokens`、超时）作为可选字段加到每个配置里，属于兼容变更，第一版不加。
+- `thinking` 为空时用厂商和模型的默认行为；`off` 关闭思考（推理）。思考 token 也计入输出上限，长公告的一块可能用完上限、没有正文（实测 `deepseek-v4-pro` 摘要 12k 字的一块要 11k～16k+ token），也更慢。各厂商关闭思考的参数不同，只在实现并核实过参数的厂商、协议和官方地址上允许 `off`（`AIProfile.ThinkingOffSupported`）：改了 `base_url` 的配置可能是转发同一模型的第三方服务，参数不一定相同。其他情况报「暂不支持关闭思考」，不发出厂商不认识的参数，也不让用户以为已经关闭；CLI 把原来关闭思考的配置改到不支持的厂商时提示同时加 `--thinking ""`。允许关闭的组合和客户端实际发出的参数由 `TestThinkingOffSupportedSendsParams` 检查一致：
+
+  | 厂商（协议） | 请求参数 | 核实 |
+  | --- | --- | --- |
+  | DeepSeek（openai，官方地址） | `"thinking": {"type": "disabled"}` | 实测：`deepseek-v4-pro` 推理由 749 字降到 0，输出由 337 降到 64 token，答案相同；`deepseek-reasoner`（实际为 `deepseek-flash`）推理由 240 字降到 0；`deepseek-chat` 默认不推理，带参数也正常 |
+
+  其他厂商逐个核实后加入。Desktop 设置页暂时不能改这个字段，编辑配置时保留 CLI 设的值；换到不支持的厂商时恢复默认并提示。
+- 以后需要按配置区分的其他设置（如 `max_tokens`、超时）作为可选字段加到每个配置里，属于兼容变更，第一版不加。
 
 ### 选择配置
 
@@ -283,7 +290,8 @@ CLI 和 Desktop 共用一份配置，在任意一边设置后另一边直接可�
   sec config ai list                     # 列出所有配置：名字、厂商、协议、地址、模型、Key 来源和末 4 位，标出 default；--json 输出 JSON
   sec config ai add ds --provider deepseek --model deepseek-chat
   sec config ai add gw --provider custom --api openai --base-url https://llm.corp.example/v1 --model x
-  sec config ai edit ds --model deepseek-reasoner   # 修改 provider、api、base-url、model、api-key-env
+  sec config ai edit ds --model deepseek-reasoner   # 修改 provider、api、base-url、model、api-key-env、thinking
+  sec config ai edit ds --thinking off   # 关闭思考，--thinking "" 恢复厂商默认
   sec config ai set-key deepseek         # 设置 Key
   sec config ai unset-key deepseek       # 删除保存的 Key
   sec config ai use deepseek             # 设为 default
