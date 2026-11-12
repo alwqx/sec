@@ -23,6 +23,7 @@
 19. Require Go 1.26.11 for development and release builds to fix the standard-library vulnerability GO-2026-6859 reported by Desktop CI.
 20. Extract the OpenAI streaming chunk schema into a package-level type.
 21. Extract the Anthropic streaming event schema into a package-level type.
+22. Add CNINFO announcement summaries with PDF page citations to the CLI and Desktop.
 
 ### v0.4.8
 
