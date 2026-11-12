@@ -114,6 +114,41 @@ func TestConfigAI(t *testing.T) {
 	require.NotContains(t, string(data), `"ai"`, "没有配置时不写 ai 段")
 }
 
+func TestConfigAIThinking(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	_, err := run(t, "ai", "add", "local", "--provider", "ollama", "--model", "qwen3", "--thinking", "off")
+	require.ErrorContains(t, err, "暂不支持关闭思考", "没有实现关闭参数的厂商不能关闭")
+	output, err := run(t, "ai", "add", "ds", "--provider", "deepseek", "--model", "deepseek-v4-pro", "--thinking", "off")
+	require.NoError(t, err)
+	require.Contains(t, output, "已关闭思考")
+	output, err = run(t, "ai", "list")
+	require.NoError(t, err)
+	require.Contains(t, output, "思考")
+	require.Contains(t, output, "关闭")
+	output, err = run(t, "ai", "list", "--json")
+	require.NoError(t, err)
+	require.Contains(t, output, `"thinking": "off"`)
+	// 空值恢复厂商默认；只改 --thinking 也算有要修改的项。
+	output, err = run(t, "ai", "edit", "ds", "--thinking", "")
+	require.NoError(t, err)
+	require.Contains(t, output, "思考默认")
+	output, err = run(t, "ai", "list", "--json")
+	require.NoError(t, err)
+	require.NotContains(t, output, `"thinking"`)
+	_, err = run(t, "ai", "edit", "ds", "--thinking", "low")
+	require.ErrorContains(t, err, "thinking 只能为空")
+	output, err = run(t, "ai", "edit", "ds", "--thinking", "OFF")
+	require.NoError(t, err, "不区分大小写")
+	require.Contains(t, output, "思考关闭")
+	_, err = run(t, "ai", "edit", "ds", "--provider", "qwen")
+	require.ErrorContains(t, err, "暂不支持关闭思考", "换到不支持的厂商时提示，不悄悄保留无效设置")
+	require.ErrorContains(t, err, `--thinking ""`, "说明怎么改")
+	output, err = run(t, "ai", "edit", "ds", "--provider", "qwen", "--thinking", "")
+	require.NoError(t, err)
+	require.Contains(t, output, "思考默认")
+}
+
 func TestConfigAIRemoveStoredKey(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

@@ -181,7 +181,7 @@ func New(profile config.AIProfile, key string) (Client, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &openAIClient{name: provider.Name, provider: profile.Provider, url: endpoint, model: profile.Model, key: key}, nil
+		return &openAIClient{name: provider.Name, provider: profile.Provider, url: endpoint, model: profile.Model, key: key, extra: openAIExtraParams(profile)}, nil
 	}
 	return nil, fmt.Errorf("不支持的接口协议：%s", profile.EffectiveAPI())
 }

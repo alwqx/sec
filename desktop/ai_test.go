@@ -101,6 +101,26 @@ func aiChange(t *testing.T, srv *desktopServer, method, path, body string) (int,
 	return rr.Code, got, rr.Body.String()
 }
 
+func TestAIProfileEditKeepsThinking(t *testing.T) {
+	dir := t.TempDir()
+	srv := &desktopServer{dev: true, workspace: workspaceStore{path: filepath.Join(dir, "workspace.json")}}
+	code, _, _ := aiChange(t, srv, http.MethodPost, "/api/v1/ai/profiles", `{"name":"ds","provider":"deepseek","model":"deepseek-v4-pro"}`)
+	require.Equal(t, http.StatusOK, code)
+	require.NoError(t, srv.updateConfig(context.Background(), func(c *config.Config) error {
+		return c.AI.Edit("ds", func(p *config.AIProfile) { p.Thinking = config.AIThinkingOff })
+	}))
+	// 设置页的表单没有思考字段，编辑时保留 CLI 设的关闭思考。
+	code, got, _ := aiChange(t, srv, http.MethodPut, "/api/v1/ai/profiles/ds", `{"provider":"deepseek","model":"deepseek-chat"}`)
+	require.Equal(t, http.StatusOK, code)
+	require.Equal(t, config.AIThinkingOff, got.Profiles[0].Thinking)
+	require.Empty(t, got.Notice)
+	// 换到不支持关闭思考的厂商时恢复默认并说明，不让保存失败。
+	code, got, _ = aiChange(t, srv, http.MethodPut, "/api/v1/ai/profiles/ds", `{"provider":"qwen","model":"qwen-plus"}`)
+	require.Equal(t, http.StatusOK, code)
+	require.Empty(t, got.Profiles[0].Thinking)
+	require.Contains(t, got.Notice, "不支持关闭思考，已恢复默认")
+}
+
 func TestAIProfileChanges(t *testing.T) {
 	t.Setenv("DEEPSEEK_API_KEY", "")
 	dir := t.TempDir()
