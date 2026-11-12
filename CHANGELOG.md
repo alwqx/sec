@@ -34,6 +34,7 @@
 30. Support `thinking: off` for Qwen and Zhipu, and warn in the connection test when a model ignores it.
 31. Add a thinking-off switch to the Desktop AI profile form and show the setting in the profile list.
 32. Suggest turning off thinking when reasoning truncates an announcement summary, and mark the output limit TODO done.
+33. Show truncation advice, such as turning off thinking, for cut-off valuation explanations.
 
 ### v0.4.8
 

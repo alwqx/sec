@@ -38,18 +38,20 @@ const defaultDisclaimer = "以上由模型根据 sec 的数据生成，只解释
 
 // Explanation 是一次估值解读的结果，CLI 的 --json 和 Desktop 接口原样输出。
 type Explanation struct {
-	ExCode        string    `json:"ex_code"`
-	Name          string    `json:"name"`
-	AsOf          string    `json:"as_of"`      // 估值数据的截止日期
-	Text          string    `json:"text"`       // 模型的解读，不含免责声明
-	Disclaimer    string    `json:"disclaimer"` // 来自工具结果，由代码附上，不靠模型
-	Check         Check     `json:"check"`      // 数字核对结果
-	Truncated     bool      `json:"truncated"`  // 输出达到上限被截断
-	Model         string    `json:"model"`      // 厂商返回的实际模型
-	Profile       string    `json:"profile"`    // 使用的模型配置
-	PromptVersion string    `json:"prompt_version"`
-	Cached        bool      `json:"cached"` // 这次是不是从缓存读的
-	CreatedAt     time.Time `json:"created_at"`
+	ExCode     string `json:"ex_code"`
+	Name       string `json:"name"`
+	AsOf       string `json:"as_of"`      // 估值数据的截止日期
+	Text       string `json:"text"`       // 模型的解读，不含免责声明
+	Disclaimer string `json:"disclaimer"` // 来自工具结果，由代码附上，不靠模型
+	Check      Check  `json:"check"`      // 数字核对结果
+	Truncated  bool   `json:"truncated"`  // 输出达到上限被截断
+	// TruncationHint 是被截断的原因和建议（如关闭思考），格式为「（原因）。建议」，接在「解读不完整」后面显示。
+	TruncationHint string    `json:"truncation_hint,omitempty"`
+	Model          string    `json:"model"`   // 厂商返回的实际模型
+	Profile        string    `json:"profile"` // 使用的模型配置
+	PromptVersion  string    `json:"prompt_version"`
+	Cached         bool      `json:"cached"` // 这次是不是从缓存读的
+	CreatedAt      time.Time `json:"created_at"`
 }
 
 // ExplanationMeta 在正文之前发送，提前说明数据日期、模型和免责声明。
@@ -179,6 +181,9 @@ func (e *ValuationExplainer) explain(ctx context.Context, input json.RawMessage,
 	switch {
 	case resp.StopReason == StopRefusal:
 		return nil, errors.New("模型拒绝了这个请求，换一个模型配置再试")
+	case text == "" && resp.StopReason == StopMaxTokens:
+		// 一个字都没有就被截断，几乎总是推理用完了上限。
+		return nil, fmt.Errorf("解读回复超过 %d token 的输出上限被截断%s", explainMaxTokens, e.Model.TruncationAdvice(resp, "解读正文超出上限"))
 	case text == "":
 		return nil, fmt.Errorf("模型没有给出解读（停止原因 %s）", resp.RawStopReason)
 	case resp.StopReason != StopEnd && resp.StopReason != StopMaxTokens:
@@ -194,6 +199,9 @@ func (e *ValuationExplainer) explain(ctx context.Context, input json.RawMessage,
 	}
 	if explanation.Model == "" {
 		explanation.Model = e.Model.Name
+	}
+	if explanation.Truncated {
+		explanation.TruncationHint = e.Model.TruncationAdvice(resp, "解读正文超出上限")
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err

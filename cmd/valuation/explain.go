@@ -94,7 +94,11 @@ func printExplanation(out io.Writer, x *llm.Explanation) {
 
 func printExplanationFooter(out io.Writer, x *llm.Explanation) {
 	if x.Truncated {
-		fmt.Fprintln(out, "注意: 输出达到上限，解读不完整")
+		hint := x.TruncationHint
+		if hint == "" {
+			hint = "。"
+		}
+		fmt.Fprintf(out, "注意: 输出达到上限，解读不完整%s\n", hint)
 	}
 	warnings := x.Check.Warnings()
 	switch {

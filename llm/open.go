@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/alwqx/sec/config"
 )
@@ -25,6 +26,23 @@ type Model struct {
 	// ThinkingOff 和 ThinkingOffSupported 用于出错时给建议，比如推理用完输出上限时提示关闭思考；不进缓存键。
 	ThinkingOff          bool
 	ThinkingOffSupported bool
+}
+
+// TruncationAdvice 是回复被输出上限截断时的原因和建议，格式为「（原因）。建议」，各个调用模型的功能共用。
+// 按回复实际有没有推理判断：有推理内容、推理 token，或者回复一个字都没有（推理用完了上限，部分厂商不返回推理），
+// 都算推理用完了上限；能关闭思考的配置直接说怎么关。tooLong 是没有推理、只是正文太长时的原因。
+func (m Model) TruncationAdvice(resp *Response, tooLong string) string {
+	reasoned := resp.Reasoned || strings.TrimSpace(resp.Message.Text) == ""
+	const why = "（思考模型的推理也计入输出上限）。"
+	switch {
+	case reasoned && m.ThinkingOff:
+		return why + ThinkingIgnoredHint(m.Profile)
+	case reasoned && m.ThinkingOffSupported:
+		return why + fmt.Sprintf("可以关闭思考后重试：sec config ai edit %s --thinking off，或在 Desktop 设置页「AI 模型」勾选「关闭思考」", profileName(m.Profile))
+	case reasoned:
+		return why + "请重试，或换用非思考模型或其他配置"
+	}
+	return "（" + tooLong + "）。请重试或更换模型"
 }
 
 // ThinkingIgnoredHint 是配置关闭了思考、模型却仍在思考时的提示，连接测试和各功能出错时共用。

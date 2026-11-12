@@ -46,8 +46,8 @@ func TestExplain(t *testing.T) {
 
 func TestPrintExplanation(t *testing.T) {
 	var out bytes.Buffer
-	printExplanation(&out, &llm.Explanation{Text: "解读", Model: "m", Profile: "p", Disclaimer: "免责", Cached: true, Truncated: true, Check: llm.Check{Numbers: 3}})
-	for _, text := range []string{"生成的缓存", "输出达到上限", "3 个数字都能在数据中找到", "免责"} {
+	printExplanation(&out, &llm.Explanation{Text: "解读", Model: "m", Profile: "p", Disclaimer: "免责", Cached: true, Truncated: true, TruncationHint: "（思考模型的推理也计入输出上限）。可以关闭思考后重试", Check: llm.Check{Numbers: 3}})
+	for _, text := range []string{"生成的缓存", "输出达到上限，解读不完整（思考模型的推理也计入输出上限）。可以关闭思考后重试", "3 个数字都能在数据中找到", "免责"} {
 		require.Contains(t, out.String(), text)
 	}
 	out.Reset()
