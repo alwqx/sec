@@ -55,7 +55,7 @@ flowchart TB
 
 模型配置放在已有的 `config/` 包（`~/.sec/config.json`），不新建配置文件。
 
-`cmd/` 和 `desktop/` 只做入口：参数解析和终端输出、HTTP 接口和界面。凡是两边共用或要在 Linux CI 上测的逻辑（工具输出、提示词组装、agent loop、数字核对）都放在 `aitool/` 和 `llm/` 里，`desktop/` 只能在 Windows 和 macOS 上编译，不放这些逻辑。
+`cmd/` 和 `desktop/` 只做入口：参数解析和终端输出、HTTP 接口和界面。凡是两边共用或要在 Linux CI 上测的逻辑（工具输出、提示词组装、agent loop、数字核对）都放在 `aitool/` 和 `llm/` 里，`desktop/` 只放接口和界面，不放这些逻辑。
 
 ## 工具注册表（aitool）
 
