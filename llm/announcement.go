@@ -31,6 +31,10 @@ const announcementChunkRunes = 12000
 // announcementConcurrency 是同时请求模型的分块数上限。
 const announcementConcurrency = 4
 
+// announcementMaxTokens 是分块和合并请求的输出上限。思考模型的推理也计入上限，8000 不够长公告的一块。
+// 按实测 deepseek-v4-pro 约 90 token/s，16000 约需 3 分钟，在 5 分钟的请求超时以内；更慢的模型可能先超时。
+const announcementMaxTokens = 16000
+
 var ErrSummary = errors.New("公告摘要生成失败")
 
 // SummarySection 的引用由代码验证后渲染，不相信模型在正文中生成的页码或链接。
@@ -111,7 +115,7 @@ func (s *AnnouncementSummarizer) Summarize(ctx context.Context, rawURL string) (
 			AsOf     string           `json:"as_of"`
 			Sections []SummarySection `json:"sections"`
 		}{"合并分块摘要，保留关键事实、条件、风险和页码引用", meta.AsOf, sections}
-		merged, mergeModel, err := s.summarizePart(ctx, input, allowed, 12, 800)
+		merged, mergeModel, err := s.summarizePart(ctx, input, allowed, true, 12, 800)
 		if err != nil {
 			return nil, err
 		}
@@ -175,7 +179,7 @@ func (s *AnnouncementSummarizer) summarizeChunks(ctx context.Context, asOf strin
 			for _, page := range chunk {
 				allowed[page.Number] = true
 			}
-			part, model, err := s.summarizePart(ctx, input, allowed, 4, 400)
+			part, model, err := s.summarizePart(ctx, input, allowed, false, 4, 400)
 			if err != nil {
 				once.Do(func() { firstErr = err; cancel() })
 				return
@@ -219,7 +223,8 @@ func chunkAnnouncement(pages []cninfo.DocumentPage) [][]cninfo.DocumentPage {
 	return chunks
 }
 
-func (s *AnnouncementSummarizer) summarizePart(ctx context.Context, input any, allowed map[int]bool, maxSections, maxRunes int) ([]SummarySection, string, error) {
+// summarizePart 请求一次分块摘要或合并（merge），按停止原因给出可操作的错误。
+func (s *AnnouncementSummarizer) summarizePart(ctx context.Context, input any, allowed map[int]bool, merge bool, maxSections, maxRunes int) ([]SummarySection, string, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, "", err
 	}
@@ -227,12 +232,26 @@ func (s *AnnouncementSummarizer) summarizePart(ctx context.Context, input any, a
 	if err != nil {
 		return nil, "", err
 	}
-	resp, err := s.Client.Chat(ctx, Request{System: announcementPrompt, Messages: []Message{{Role: RoleUser, Text: string(data)}}, MaxTokens: 8000})
+	resp, err := s.Client.Chat(ctx, Request{System: announcementPrompt, Messages: []Message{{Role: RoleUser, Text: string(data)}}, MaxTokens: announcementMaxTokens})
 	if err != nil {
 		return nil, "", err
 	}
-	if resp == nil || resp.StopReason != StopEnd || len(resp.Message.ToolCalls) > 0 {
-		return nil, "", fmt.Errorf("%w：模型拒绝、回复截断或未正常结束，请重试或更换模型", ErrSummary)
+	switch {
+	case resp == nil:
+		return nil, "", fmt.Errorf("%w：模型没有返回回复，请重试或更换模型", ErrSummary)
+	case resp.StopReason == StopMaxTokens && merge:
+		// 合并只输入分块摘要，被截断通常是分块太多，不是推理太长。
+		return nil, "", fmt.Errorf("%w：合并分块摘要时回复超过 %d token 的输出上限被截断，公告可能太长，请重试或更换模型", ErrSummary, announcementMaxTokens)
+	case resp.StopReason == StopMaxTokens:
+		return nil, "", fmt.Errorf("%w：分块摘要时回复超过 %d token 的输出上限被截断（思考模型的推理也计入上限），请重试，或换用非思考模型或其他配置", ErrSummary, announcementMaxTokens)
+	case len(resp.Message.ToolCalls) > 0:
+		return nil, "", fmt.Errorf("%w：模型调用了工具，公告摘要不提供工具，请重试或更换模型", ErrSummary)
+	case resp.StopReason != StopEnd:
+		reason := ""
+		if resp.RawStopReason != "" {
+			reason = "（停止原因 " + resp.RawStopReason + "）"
+		}
+		return nil, "", fmt.Errorf("%w：模型拒绝或未正常结束%s，请重试或更换模型", ErrSummary, reason)
 	}
 	text := stripJSONFence(resp.Message.Text)
 	var output struct {

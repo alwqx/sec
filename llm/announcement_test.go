@@ -63,6 +63,7 @@ func TestAnnouncementSummary(t *testing.T) {
 	require.Equal(t, "test", result.Model)
 	require.Len(t, fake.Requests, 1)
 	require.Empty(t, fake.Requests[0].Tools)
+	require.Equal(t, announcementMaxTokens, fake.Requests[0].MaxTokens, "思考模型的推理也计入输出上限，不能用太小的上限")
 	require.Contains(t, fake.Requests[0].System, "不可信")
 	require.Contains(t, fake.Requests[0].Messages[0].Text, `"page":1`)
 	require.NotContains(t, fake.Requests[0].Messages[0].Text, `"page":2`, "空白页不发送模型")
@@ -153,10 +154,32 @@ func TestAnnouncementSummaryRejectsInvalidOutput(t *testing.T) {
 		require.NoError(t, err)
 		require.Empty(t, files)
 	}
+	// 截断单独说明原因，不和拒绝、未正常结束混在一起。
+	s := AnnouncementSummarizer{Client: &Fake{Replies: []FakeReply{{Response: &Response{StopReason: StopMaxTokens, RawStopReason: "length"}}}}, Read: summaryReader("原文")}
+	_, err := s.Summarize(context.Background(), summaryURL)
+	require.ErrorIs(t, err, ErrSummary)
+	require.ErrorContains(t, err, "分块摘要时回复超过 16000 token 的输出上限被截断")
+	require.ErrorContains(t, err, "思考模型")
+	// 合并被截断时不归咎于推理，换非思考模型帮不上忙。两块都只有第 1 页，分块回复相同，合并在最后。
+	truncated := FakeReply{Response: &Response{StopReason: StopMaxTokens, RawStopReason: "length"}}
+	s = AnnouncementSummarizer{Client: &Fake{Replies: []FakeReply{summaryReply("事项", 1), summaryReply("事项", 1), truncated}}, Read: summaryReader(strings.Repeat("文", announcementChunkRunes+1))}
+	_, err = s.Summarize(context.Background(), summaryURL)
+	require.ErrorContains(t, err, "合并分块摘要时回复超过 16000 token 的输出上限被截断")
+	require.NotContains(t, err.Error(), "思考模型")
+	for reply, want := range map[*Response]string{
+		{StopReason: StopRefusal, RawStopReason: "content_filter"}: "模型拒绝或未正常结束（停止原因 content_filter）",
+		{StopReason: StopOther}: "模型拒绝或未正常结束，请重试",
+		{StopReason: StopToolUse, Message: Message{ToolCalls: []ToolCall{{Name: "x"}}}}: "模型调用了工具",
+		{StopReason: StopEnd, Message: Message{ToolCalls: []ToolCall{{Name: "x"}}}}:     "模型调用了工具",
+	} {
+		s = AnnouncementSummarizer{Client: &Fake{Replies: []FakeReply{{Response: reply}}}, Read: summaryReader("原文")}
+		_, err = s.Summarize(context.Background(), summaryURL)
+		require.ErrorContains(t, err, want)
+	}
 	// 合并不能添加分块摘要里没有的页码，即使那页在 PDF 里真实存在。
 	fake := &Fake{Replies: []FakeReply{summaryReply("事项", 1), summaryReply("事项", 1), summaryReply("事项", 2)}}
-	s := AnnouncementSummarizer{Client: fake, Read: summaryReader(strings.Repeat("文", announcementChunkRunes+1), "存在但未被分块摘要引用")}
-	_, err := s.Summarize(context.Background(), summaryURL)
+	s = AnnouncementSummarizer{Client: fake, Read: summaryReader(strings.Repeat("文", announcementChunkRunes+1), "存在但未被分块摘要引用")}
+	_, err = s.Summarize(context.Background(), summaryURL)
 	require.ErrorIs(t, err, ErrSummary)
 }
 
