@@ -115,7 +115,7 @@ func TestAIProfileEditKeepsThinking(t *testing.T) {
 	require.Equal(t, config.AIThinkingOff, got.Profiles[0].Thinking)
 	require.Empty(t, got.Notice)
 	// 换到不支持关闭思考的厂商时恢复默认并说明，不让保存失败。
-	code, got, _ = aiChange(t, srv, http.MethodPut, "/api/v1/ai/profiles/ds", `{"provider":"qwen","model":"qwen-plus"}`)
+	code, got, _ = aiChange(t, srv, http.MethodPut, "/api/v1/ai/profiles/ds", `{"provider":"moonshot","model":"kimi-k2.6"}`)
 	require.Equal(t, http.StatusOK, code)
 	require.Empty(t, got.Profiles[0].Thinking)
 	require.Contains(t, got.Notice, "不支持关闭思考，已恢复默认")

@@ -16,6 +16,7 @@ import (
 
 	"github.com/alwqx/sec/config"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/h2non/gock.v1"
 )
 
 func TestProbeHint(t *testing.T) {
@@ -81,6 +82,22 @@ func TestProbeProfile(t *testing.T) {
 	require.False(t, got.Sent)
 	require.Contains(t, got.Error, "Key")
 	require.Len(t, rec.bodies, 2)
+}
+
+// 连接测试是确认关闭思考是否生效的地方：模型忽略了关闭参数时给出警告。关闭思考只允许官方地址，用 gock 拦截。
+func TestProbeProfileThinkingIgnored(t *testing.T) {
+	defer gock.Off()
+	gock.New("https://api.deepseek.com").Post("/chat/completions").Reply(200).
+		BodyString(`{"model":"deepseek-reasoner","choices":[{"finish_reason":"stop","message":{"role":"assistant","content":"OK","reasoning_content":"想一想"}}]}`)
+	gock.New("https://api.deepseek.com").Post("/chat/completions").Reply(200).
+		BodyString(`{"choices":[{"finish_reason":"tool_calls","message":{"role":"assistant","content":null,"tool_calls":[{"id":"c1","type":"function","function":{"name":"ping","arguments":"{}"}}]}}]}`)
+	var ai config.AIConfig
+	require.NoError(t, ai.Add("ds", config.AIProfile{Provider: "deepseek", Model: "deepseek-reasoner", Thinking: config.AIThinkingOff}))
+	secret := config.NewAISecret(t.TempDir() + "/secret.key")
+	got := ProbeProfile(context.Background(), &ai, "ds", secret, func(string) string { return "sk-test-abcdef123456" })
+	require.True(t, got.OK, got.Error)
+	require.Contains(t, got.Warning, "仍在思考")
+	require.True(t, gock.IsDone())
 }
 
 func TestProbeProfileAnthropic(t *testing.T) {

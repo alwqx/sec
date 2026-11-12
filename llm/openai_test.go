@@ -170,8 +170,41 @@ func TestOpenAIThinkingOff(t *testing.T) {
 	body, _, err = on.(*openAIClient).request(req)
 	require.NoError(t, err)
 	require.NotContains(t, body, "thinking")
+	// 各厂商按官方文档的参数关闭思考。
+	for provider, want := range map[string]map[string]any{
+		"deepseek": {"thinking": map[string]string{"type": "disabled"}},
+		"zhipu":    {"thinking": map[string]string{"type": "disabled"}},
+		"qwen":     {"enable_thinking": false},
+	} {
+		require.Equal(t, want, openAIExtraParams(config.AIProfile{Provider: provider, Model: "m", Thinking: config.AIThinkingOff}), provider)
+	}
 	// 校验之外直接构造时，没有实现的厂商不猜参数。
-	require.Empty(t, openAIExtraParams(config.AIProfile{Provider: "qwen", Model: "m", Thinking: config.AIThinkingOff}))
+	require.Empty(t, openAIExtraParams(config.AIProfile{Provider: "moonshot", Model: "m", Thinking: config.AIThinkingOff}))
+}
+
+// 只思考的模型可能忽略关闭参数，回复里仍有推理内容或推理 token 时标出来。
+func TestOpenAIThinkingIgnored(t *testing.T) {
+	reply := func(reasoning string, tokens int) openAIResponse {
+		var resp openAIResponse
+		resp.Choices = []openAIChoice{{FinishReason: "stop", Message: openAIReply{Content: []byte(`"OK"`), ReasoningContent: reasoning}}}
+		resp.Usage.CompletionTokensDetails.ReasoningTokens = tokens
+		return resp
+	}
+	off := &openAIClient{name: "通义千问", provider: "qwen", thinkingOff: true}
+	for name, c := range map[string]struct {
+		client *openAIClient
+		resp   openAIResponse
+		want   bool
+	}{
+		"关闭后仍有推理内容":     {off, reply("想一想", 0), true},
+		"关闭后仍有推理 token": {off, reply("", 12), true},
+		"关闭且生效":         {off, reply("", 0), false},
+		"没有关闭时正常推理":     {&openAIClient{provider: "qwen"}, reply("想一想", 12), false},
+	} {
+		resp, err := c.client.response(context.Background(), c.resp)
+		require.NoError(t, err, name)
+		require.Equal(t, c.want, resp.ThinkingIgnored, name)
+	}
 }
 
 // TestThinkingOffSupportedSendsParams 检查 config 允许关闭思考的每个厂商和协议，客户端都真的发出了关闭参数，

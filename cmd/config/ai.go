@@ -120,7 +120,7 @@ func profileFlags(cmd *cobra.Command) {
 	cmd.Flags().String("base-url", "", "Base URL; defaults to the provider's official one, required for custom")
 	cmd.Flags().String("model", "", "Model, e.g. deepseek-chat")
 	cmd.Flags().String("api-key-env", "", "Read the API key from this environment variable instead of the stored key")
-	cmd.Flags().String("thinking", "", "Set to off to turn off model thinking (reasoning), empty for the provider default; DeepSeek only for now")
+	cmd.Flags().String("thinking", "", "Set to off to turn off model thinking (reasoning), empty for the provider default; only some providers support it, see docs/ai.md")
 	_ = cmd.RegisterFlagCompletionFunc("thinking", cobra.FixedCompletions([]string{config.AIThinkingOff}, cobra.ShellCompDirectiveNoFileComp))
 	_ = cmd.RegisterFlagCompletionFunc("provider", func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
 		return config.AIProviderIDs(), cobra.ShellCompDirectiveNoFileComp

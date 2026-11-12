@@ -141,10 +141,10 @@ func TestConfigAIThinking(t *testing.T) {
 	output, err = run(t, "ai", "edit", "ds", "--thinking", "OFF")
 	require.NoError(t, err, "不区分大小写")
 	require.Contains(t, output, "思考关闭")
-	_, err = run(t, "ai", "edit", "ds", "--provider", "qwen")
+	_, err = run(t, "ai", "edit", "ds", "--provider", "moonshot")
 	require.ErrorContains(t, err, "暂不支持关闭思考", "换到不支持的厂商时提示，不悄悄保留无效设置")
 	require.ErrorContains(t, err, `--thinking ""`, "说明怎么改")
-	output, err = run(t, "ai", "edit", "ds", "--provider", "qwen", "--thinking", "")
+	output, err = run(t, "ai", "edit", "ds", "--provider", "moonshot", "--thinking", "")
 	require.NoError(t, err)
 	require.Contains(t, output, "思考默认")
 }
