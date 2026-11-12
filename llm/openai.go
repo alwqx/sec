@@ -120,7 +120,7 @@ func (c *openAIClient) maxTokensField() string {
 // openAIExtraParams 是按配置加到每个请求里的参数。关闭思考的参数各家不同，能否关闭由 config.AIProfile.ThinkingOffSupported
 // 判断，配置校验已拒绝其他厂商；这里遇到未知厂商不加参数，不猜。两处的一致性由 TestThinkingOffSupportedSendsParams 检查。
 func openAIExtraParams(profile config.AIProfile) map[string]any {
-	if profile.Thinking != config.AIThinkingOff {
+	if !profile.ThinkingDisabled() {
 		return nil
 	}
 	switch profile.Provider {
@@ -203,13 +203,15 @@ func (c *openAIClient) response(ctx context.Context, resp openAIResponse) (*Resp
 		slog.WarnContext(ctx, "模型返回了未处理的停止原因", "provider", c.name, "finish_reason", choice.FinishReason)
 	}
 	// 关闭参数按厂商文档发出，但只思考的模型（如部分 qwq、GLM-4.7）可能忽略它；从回复里发现这种情况，不让用户以为已经关闭。
-	ignored := c.thinkingOff && (choice.Message.ReasoningContent != "" || resp.Usage.CompletionTokensDetails.ReasoningTokens > 0)
+	reasoned := choice.Message.ReasoningContent != "" || resp.Usage.CompletionTokensDetails.ReasoningTokens > 0
+	ignored := c.thinkingOff && reasoned
 	if ignored {
 		slog.WarnContext(ctx, "配置关闭了思考，但模型仍在思考，这个模型可能不支持关闭", "provider", c.name, "model", resp.Model)
 	}
 	return &Response{
 		Message: msg, StopReason: stop, RawStopReason: choice.FinishReason, Model: resp.Model,
 		Usage:           Usage{InputTokens: resp.Usage.PromptTokens, OutputTokens: resp.Usage.CompletionTokens},
+		Reasoned:        reasoned,
 		ThinkingIgnored: ignored,
 	}, nil
 }

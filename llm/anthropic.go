@@ -113,8 +113,11 @@ func (c *anthropicClient) response(ctx context.Context, resp anthropicResponse) 
 	}
 	msg := Message{Role: RoleAssistant}
 	var text []string
+	reasoned := false
 	for _, b := range blocks {
 		switch b.Type {
+		case "thinking", "redacted_thinking":
+			reasoned = true
 		case "text":
 			text = append(text, b.Text)
 		case "tool_use":
@@ -132,7 +135,8 @@ func (c *anthropicClient) response(ctx context.Context, resp anthropicResponse) 
 	}
 	return &Response{
 		Message: msg, StopReason: stop, RawStopReason: resp.StopReason, Model: resp.Model,
-		Usage: Usage{InputTokens: resp.Usage.InputTokens, OutputTokens: resp.Usage.OutputTokens},
+		Usage:    Usage{InputTokens: resp.Usage.InputTokens, OutputTokens: resp.Usage.OutputTokens},
+		Reasoned: reasoned,
 	}, nil
 }
 

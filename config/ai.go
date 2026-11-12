@@ -175,6 +175,9 @@ func (p AIProfile) Validate() error {
 	return nil
 }
 
+// ThinkingDisabled 判断配置是否关闭了思考。能否真的关闭见 ThinkingOffSupported。
+func (p AIProfile) ThinkingDisabled() bool { return p.Thinking == AIThinkingOff }
+
 // ThinkingOffSupported 判断能否关闭思考。各厂商关闭思考的参数不同，只在实现并核实过参数的厂商、协议和官方地址上允许，
 // 避免发出厂商不认识的参数后被拒绝，或被忽略而以为已经关闭。改了地址的配置可能是转发同一模型的第三方服务，参数不一定相同。
 // 只思考的模型仍可能忽略关闭参数，llm 从回复里发现并提示（Response.ThinkingIgnored）。不支持的有：Anthropic 协议（Claude

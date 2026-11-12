@@ -123,7 +123,9 @@ type Response struct {
 	RawStopReason string // 厂商返回的原始值
 	Model         string // 厂商返回的实际模型
 	Usage         Usage
-	// ThinkingIgnored 表示配置关闭了思考，但回复里仍有推理内容或推理 token：这个模型可能不支持关闭，设置没有生效。
+	// Reasoned 表示回复里有推理内容或推理 token。部分厂商不返回这两样，为 false 时不代表一定没有推理。
+	Reasoned bool
+	// ThinkingIgnored 表示配置关闭了思考，但回复里仍有推理（Reasoned）：这个模型可能不支持关闭，设置没有生效。
 	ThinkingIgnored bool
 }
 
@@ -183,7 +185,7 @@ func New(profile config.AIProfile, key string) (Client, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &openAIClient{name: provider.Name, provider: profile.Provider, url: endpoint, model: profile.Model, key: key, extra: openAIExtraParams(profile), thinkingOff: profile.Thinking == config.AIThinkingOff}, nil
+		return &openAIClient{name: provider.Name, provider: profile.Provider, url: endpoint, model: profile.Model, key: key, extra: openAIExtraParams(profile), thinkingOff: profile.ThinkingDisabled()}, nil
 	}
 	return nil, fmt.Errorf("不支持的接口协议：%s", profile.EffectiveAPI())
 }

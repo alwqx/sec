@@ -35,6 +35,8 @@ func TestAIProfileValidate(t *testing.T) {
 	require.NotContains(t, AIProfile{Provider: "sk-p4ss", Model: "m"}.Validate().Error(), "p4ss", "不回显厂商")
 	require.NotContains(t, AIProfile{Provider: "openai", API: "sk-p4ss", Model: "m"}.Validate().Error(), "p4ss", "不回显协议")
 	require.NoError(t, AIProfile{Provider: AIProviderCustom, API: AIAPIOpenAI, Model: "m", BaseURL: "https://x.openai.azure.com/openai/v1?api-version=preview"}.Validate(), "普通查询参数可以保留")
+	require.True(t, AIProfile{Thinking: AIThinkingOff}.ThinkingDisabled())
+	require.False(t, AIProfile{}.ThinkingDisabled())
 	for _, provider := range []string{"deepseek", "qwen", "zhipu"} {
 		require.NoError(t, AIProfile{Provider: provider, Model: "m", Thinking: AIThinkingOff}.Validate(), provider)
 	}
