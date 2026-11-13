@@ -63,7 +63,7 @@ func TestAnnouncementSummary(t *testing.T) {
 	require.Equal(t, "test", result.Model)
 	require.Len(t, fake.Requests, 1)
 	require.Empty(t, fake.Requests[0].Tools)
-	require.Equal(t, announcementMaxTokens, fake.Requests[0].MaxTokens, "思考模型的推理也计入输出上限，不能用太小的上限")
+	require.Equal(t, summaryMaxTokens, fake.Requests[0].MaxTokens, "思考模型的推理也计入输出上限，不能用太小的上限")
 	require.Contains(t, fake.Requests[0].System, "不可信")
 	require.Contains(t, fake.Requests[0].Messages[0].Text, `"page":1`)
 	require.NotContains(t, fake.Requests[0].Messages[0].Text, `"page":2`, "空白页不发送模型")

@@ -36,6 +36,9 @@ const (
 	minInterval = 110 * time.Millisecond
 )
 
+// errTooLarge 表示文件超过 getLimit 的上限。
+var errTooLarge = errors.New("文件太大")
+
 // ErrNotFound 表示 SEC 没有这个股票代码，比如只在美国上市交易、不向 SEC 申报的证券。
 var ErrNotFound = errors.New("SEC EDGAR 没有这个股票代码")
 
@@ -83,6 +86,11 @@ func (c *Client) userAgent() string { return "alwqx-sec/" + version.Version + " 
 
 // get 请求 EDGAR，返回正文。403 时说明多半是联系邮箱缺失或被拒绝。
 func (c *Client) get(ctx context.Context, link string) ([]byte, error) {
+	return c.getLimit(ctx, link, 0)
+}
+
+// getLimit 同 get，limit 大于 0 时正文最多读 limit 字节，超过时报错，不把整个文件读进内存。
+func (c *Client) getLimit(ctx context.Context, link string, limit int64) ([]byte, error) {
 	if c.Email == "" {
 		return nil, errors.New("没有配置 SEC 联系邮箱，请用 sec config set sec-edgar-email 设置")
 	}
@@ -105,7 +113,17 @@ func (c *Client) get(ctx context.Context, link string) ([]byte, error) {
 	if err := utils.CheckStatus(resp); err != nil {
 		return nil, err
 	}
-	return io.ReadAll(resp.Body)
+	if limit <= 0 {
+		return io.ReadAll(resp.Body)
+	}
+	if resp.ContentLength > limit {
+		return nil, errTooLarge
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, limit+1))
+	if err == nil && int64(len(body)) > limit {
+		return nil, errTooLarge
+	}
+	return body, err
 }
 
 func (c *Client) cacheDir() (string, error) {

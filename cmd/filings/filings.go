@@ -7,10 +7,12 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/alwqx/sec/cmd/internal/termtable"
 	"github.com/alwqx/sec/config"
+	"github.com/alwqx/sec/llm"
 	"github.com/alwqx/sec/provider/edgar"
 	"github.com/alwqx/sec/utils"
 	"github.com/spf13/cobra"
@@ -23,8 +25,10 @@ func NewFilingsCLI() *cobra.Command {
 		Example: `  sec filings AAPL
   sec filings AAPL --form 10-K -n 5
   sec filings TSM --form 20-F,6-K -b 20250101
-  sec filings AAPL --form 10-K -n 1 -o ~/Downloads`,
-		Args: cobra.ExactArgs(1),
+  sec filings AAPL --form 10-K -n 1 -o ~/Downloads
+  sec filings AAPL --form 8-K --summary 1
+  sec filings --summary https://www.sec.gov/Archives/edgar/data/320193/000032019326000024/aapl-20261102.htm`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: filingsHandler,
 	}
 	cmd.Flags().StringP("form", "f", strings.Join(edgar.DefaultForms, ","), "Comma-separated form types; 10-K also matches 10-K/A; \"all\" for every form")
@@ -33,6 +37,8 @@ func NewFilingsCLI() *cobra.Command {
 	cmd.Flags().IntP("limit", "n", 20, "Maximum number of filings")
 	cmd.Flags().StringP("output", "o", "", "Download the primary documents of the listed filings into this directory")
 	cmd.Flags().Bool("json", false, "Output JSON")
+	cmd.Flags().String("summary", "", "AI summary of an 8-K: row number in the list (from 1) or SEC filing link")
+	cmd.Flags().String("ai", "", "Model profile for --summary, default profile if empty")
 	return cmd
 }
 
@@ -44,8 +50,33 @@ func filingsHandler(cmd *cobra.Command, args []string) error {
 	limit, _ := flags.GetInt("limit")
 	output, _ := flags.GetString("output")
 	asJSON, _ := flags.GetBool("json")
+	selector, _ := flags.GetString("summary")
 	if limit <= 0 {
 		return fmt.Errorf("--limit 须大于 0")
+	}
+	if flags.Changed("ai") && selector == "" {
+		return fmt.Errorf("--ai 只能和 --summary 一起用")
+	}
+	if flags.Changed("summary") && selector == "" {
+		return fmt.Errorf("--summary 需要列表序号或 SEC 申报文件链接")
+	}
+	if selector != "" && output != "" {
+		return fmt.Errorf("--summary 不能和 --output 一起用")
+	}
+	var index int
+	var direct string
+	if selector != "" {
+		var err error
+		if index, direct, err = summarySelector(selector); err != nil {
+			return err
+		}
+	}
+	if direct == "" && len(args) != 1 {
+		return fmt.Errorf("请提供股票代码，或用 --summary 指定 SEC 申报文件链接")
+	}
+	// 链接已经确定了申报，代码和筛选条件用不上，给了说明用户以为在筛选，直接报错，不悄悄忽略。
+	if direct != "" && (len(args) > 0 || flags.Changed("form") || flags.Changed("limit") || flags.Changed("begin") || flags.Changed("end")) {
+		return fmt.Errorf("--summary 用链接时不需要股票代码和 --form、-n、-b、-e；要按列表摘要，请用序号")
 	}
 	query := edgar.FilingQuery{Want: limit}
 	if !strings.EqualFold(strings.TrimSpace(formText), "all") {
@@ -63,9 +94,23 @@ func filingsHandler(cmd *cobra.Command, args []string) error {
 		query.Begin, query.End = begin.Format(utils.LayoutYYMMDD), end.Format(utils.LayoutYYMMDD)
 	}
 
-	cfg, err := config.LoadOrWarn(cmd.Context(), cmd.ErrOrStderr())
-	if err != nil {
-		return err
+	// 摘要时先检查模型配置，配置有问题时不请求 EDGAR。
+	var summarizer *llm.FilingSummarizer
+	var cfg *config.Config
+	if selector != "" {
+		var err error
+		if summarizer, cfg, err = openSummarizer(cmd); err != nil {
+			return err
+		}
+		if direct != "" {
+			return printSummary(cmd, summarizer, direct, asJSON)
+		}
+	} else {
+		loaded, err := config.LoadOrWarn(cmd.Context(), cmd.ErrOrStderr())
+		if err != nil {
+			return err
+		}
+		cfg = &loaded
 	}
 	client := &edgar.Client{Email: cfg.SECEmail}
 	company, err := client.Lookup(cmd.Context(), args[0])
@@ -79,6 +124,13 @@ func filingsHandler(cmd *cobra.Command, args []string) error {
 	profile, filings := result.Profile, result.Filings
 	if len(filings) > limit {
 		filings = filings[:limit]
+	}
+	if summarizer != nil {
+		target, err := summaryTarget(filings, index)
+		if err != nil {
+			return err
+		}
+		return printSummary(cmd, summarizer, target, asJSON)
 	}
 	if output != "" {
 		if err := download(cmd, client, company.Ticker, filings, output); err != nil {
@@ -105,16 +157,16 @@ func printFilings(out io.Writer, company edgar.Company, p *edgar.Profile, filing
 		fmt.Fprintln(out, "没有符合条件的申报。")
 		return
 	}
-	table := termtable.New(out, []string{"申报日", "类型", "报告期", "说明", "链接"}, termtable.Compact, termtable.NoWrap)
-	for _, f := range filings {
+	table := termtable.New(out, []string{"序号", "申报日", "类型", "报告期", "说明", "链接"}, termtable.Compact, termtable.NoWrap)
+	for i, f := range filings {
 		report := f.ReportDate
 		if report == "" {
 			report = "-"
 		}
-		table.Append([]string{f.FilingDate, f.Form, report, f.Description, f.URL})
+		table.Append([]string{strconv.Itoa(i + 1), f.FilingDate, f.Form, report, f.Description, f.URL})
 	}
 	table.Render()
-	fmt.Fprintln(out, "\n数据来自 SEC EDGAR。10-K 年报、10-Q 季报、8-K 重大事项、20-F/6-K 外国公司年报和临时报告；用 --form all 列出全部类型。")
+	fmt.Fprintln(out, "\n数据来自 SEC EDGAR。10-K 年报、10-Q 季报、8-K 重大事项、20-F/6-K 外国公司年报和临时报告；用 --form all 列出全部类型；--summary <序号> 用 AI 摘要 8-K。")
 }
 
 // download 下载主文件，文件名为 代码-申报日-类型-申报编号.扩展名。

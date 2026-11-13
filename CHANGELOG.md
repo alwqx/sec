@@ -35,6 +35,7 @@
 31. Add a thinking-off switch to the Desktop AI profile form and show the setting in the profile list.
 32. Suggest turning off thinking when reasoning truncates an announcement summary, and mark the output limit TODO done.
 33. Show truncation advice, such as turning off thinking, for cut-off valuation explanations.
+34. Add `sec filings --summary` to summarize an 8-K by item with an AI model.
 
 ### v0.4.8
 
