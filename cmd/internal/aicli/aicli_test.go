@@ -17,7 +17,10 @@ import (
 
 func TestError(t *testing.T) {
 	err := Error("公告摘要", fmt.Errorf("分块：%w", &llm.APIError{Provider: "DeepSeek", Status: 401, Message: "invalid key sk-secret"}))
-	require.EqualError(t, err, "公告摘要失败：模型接口返回 HTTP 401，请检查模型配置或稍后重试")
+	require.EqualError(t, err, "公告摘要失败：DeepSeek 接口返回 HTTP 401，请检查模型配置或稍后重试")
+	// 流内的模型错误也只显示厂商和类型代码，不显示正文。
+	err = Error("估值解读", &llm.StreamError{Provider: "DeepSeek", Type: "invalid_request_error", Message: "invalid api key sk-secret"})
+	require.EqualError(t, err, "估值解读失败：DeepSeek 流式回复出错（invalid_request_error），请检查模型配置或稍后重试")
 	cause := errors.New("offline")
 	err = Error("申报摘要", cause)
 	require.EqualError(t, err, "申报摘要失败：offline")

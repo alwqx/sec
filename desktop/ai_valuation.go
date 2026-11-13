@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -143,9 +142,8 @@ func explanationFailure(ctx context.Context, err error) (int, string) {
 		return http.StatusGatewayTimeout, "模型解读超时，请稍后重试或选择其他模型"
 	}
 	// 厂商错误正文可能回显 Key，不回传也不写日志。
-	var apiErr *llm.APIError
-	if errors.As(err, &apiErr) {
-		return http.StatusBadGateway, fmt.Sprintf("模型接口返回 HTTP %d，请检查模型配置或稍后重试", apiErr.Status)
+	if message, ok := llm.PublicError(err); ok {
+		return http.StatusBadGateway, message + "，请检查模型配置或稍后重试"
 	}
 	return http.StatusBadGateway, "估值解读失败，流式回复可能中断或模型没有返回可用解读，请检查模型配置或稍后重试"
 }

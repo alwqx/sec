@@ -14,6 +14,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"syscall"
@@ -147,6 +148,36 @@ func (e *APIError) Error() string {
 		text += "：" + e.Message
 	}
 	return text
+}
+
+// errorType 匹配厂商的错误类型代码，如 rate_limit_error、insufficient_quota；不是这种格式的不显示。
+var errorType = regexp.MustCompile(`^[A-Za-z0-9_.-]{1,64}$`)
+
+// PublicError 返回模型调用错误里可以给用户看的部分：厂商、HTTP 状态码或流内错误、错误类型代码，
+// 不含厂商的错误正文（可能回显 Key）。CLI 和 Desktop 都用它，不在别处各写一份。err 不是模型接口错误时 ok 为 false。
+func PublicError(err error) (message string, ok bool) {
+	var apiErr *APIError
+	var streamErr *StreamError
+	var provider, kind string
+	switch {
+	case errors.As(err, &apiErr):
+		provider, kind = apiErr.Provider, apiErr.Type
+		message = fmt.Sprintf("接口返回 HTTP %d", apiErr.Status)
+	case errors.As(err, &streamErr):
+		provider, kind = streamErr.Provider, streamErr.Type
+		message = "流式回复出错"
+	default:
+		return "", false
+	}
+	if provider == "" {
+		message = "模型" + message
+	} else {
+		message = provider + " " + message
+	}
+	if errorType.MatchString(kind) {
+		message += "（" + kind + "）"
+	}
+	return message, true
 }
 
 // Retryable 判断稍后重试是否可能成功：限流、超时、过载和服务端错误可以，参数错误、认证失败不行。

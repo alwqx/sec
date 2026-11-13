@@ -60,11 +60,10 @@ func Open(cmd *cobra.Command, kind string) (*Setup, error) {
 }
 
 // Error 把模型调用的失败改写成给用户看的错误，what 是功能名，如「公告摘要」。
-// 模型接口的错误正文可能回显 Key，只保留状态码。
+// 模型接口和流内的错误正文可能回显 Key，只保留 llm.PublicError 给出的部分。
 func Error(what string, err error) error {
-	var apiErr *llm.APIError
-	if errors.As(err, &apiErr) {
-		return fmt.Errorf("%s失败：模型接口返回 HTTP %d，请检查模型配置或稍后重试", what, apiErr.Status)
+	if message, ok := llm.PublicError(err); ok {
+		return fmt.Errorf("%s失败：%s，请检查模型配置或稍后重试", what, message)
 	}
 	return fmt.Errorf("%s失败：%w", what, err)
 }
