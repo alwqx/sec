@@ -42,6 +42,12 @@ func TestExplain(t *testing.T) {
 
 	fake.Replies = []llm.FakeReply{llm.FakeText("")}
 	require.ErrorContains(t, explain(context.Background(), &out, e, nil, sec, r, false), "估值解读失败")
+
+	// 模型接口的错误正文可能回显 Key，只显示状态码。
+	fake.Replies = []llm.FakeReply{{Err: &llm.APIError{Status: 401, Message: "invalid key sk-secret"}}}
+	err := explain(context.Background(), &out, e, json.RawMessage(`{"code":"600036"}`), sec, r, false)
+	require.ErrorContains(t, err, "HTTP 401")
+	require.NotContains(t, err.Error(), "sk-secret")
 }
 
 func TestPrintExplanation(t *testing.T) {

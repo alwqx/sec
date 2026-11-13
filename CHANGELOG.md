@@ -36,6 +36,7 @@
 32. Suggest turning off thinking when reasoning truncates an announcement summary, and mark the output limit TODO done.
 33. Show truncation advice, such as turning off thinking, for cut-off valuation explanations.
 34. Add `sec filings --summary` to summarize an 8-K by item with an AI model.
+35. Hide model API error text in `sec valuation --explain` errors, as the summaries already do.
 
 ### v0.4.8
 
