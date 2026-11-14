@@ -106,7 +106,7 @@ func TestAIFilingErrors(t *testing.T) {
 	mockFilingIndex("10-K")
 	w := aiFilingRequest(s, `{"url":"`+desktopFilingURL+`"}`)
 	require.Equal(t, http.StatusUnprocessableEntity, w.Code, w.Body.String())
-	require.Contains(t, w.Body.String(), "目前只支持摘要 8-K")
+	require.Contains(t, w.Body.String(), "需要 8-K，这份申报是 10-K")
 
 	gock.New("https://www.sec.gov").Get(desktopFilingFolder + "0000320193-26-000024-index.htm").Reply(500)
 	w = aiFilingRequest(s, `{"url":"`+desktopFilingURL+`"}`)

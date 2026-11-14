@@ -118,7 +118,7 @@ func TestRead8KRejects(t *testing.T) {
 
 	gock.New("https://www.sec.gov").Get(docIndex).Reply(200).BodyString(filingIndex("10-K", [2]string{docFolder + "a.htm", "10-K"}))
 	_, err := client.Read8K(context.Background(), link)
-	require.ErrorContains(t, err, "目前只支持摘要 8-K，这份申报是 10-K")
+	require.ErrorContains(t, err, "需要 8-K，这份申报是 10-K")
 	require.ErrorIs(t, err, ErrUnsupportedForm)
 
 	gock.New("https://www.sec.gov").Get(docIndex).Reply(200).BodyString(filingIndex("8-K", [2]string{docFolder + "a.pdf", "8-K"}))
