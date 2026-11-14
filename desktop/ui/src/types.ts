@@ -277,6 +277,27 @@ export interface AnnouncementSummary {
   created_at: string
 }
 
+// FilingSummary 是 8-K 事项摘要（llm.FilingSummary）：每段引用 Item 或 Exhibit 的标签，sources 给出各节原文地址。
+export interface FilingSummary {
+  document_id: string
+  form: string
+  source_url: string
+  index_url: string
+  as_of: string
+  report_date: string
+  sources: { label: string; url: string }[]
+  sections: { text: string; refs: string[] }[]
+  text: string
+  notes: string[]
+  check: ValuationExplanation['check']
+  disclaimer: string
+  model: string
+  profile: string
+  prompt_version: string
+  cached: boolean
+  created_at: string
+}
+
 export type ValuationExplanationMeta = Pick<ValuationExplanation, 'ex_code' | 'name' | 'as_of' | 'model' | 'profile' | 'disclaimer' | 'cached'>
 export type ExplanationStreamEvent =
   | { type: 'status'; text: string }

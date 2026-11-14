@@ -207,6 +207,12 @@ export function summarizeAnnouncement(url: string, profile: string, signal?: Abo
   })
 }
 
+export function summarizeFiling(url: string, profile: string, signal?: AbortSignal): Promise<import('./types').FilingSummary> {
+  return request('/api/v1/ai/filings/summary', signal, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, profile }),
+  })
+}
+
 export async function streamValuation(input: import('./aiValuation').ValuationExplanationInput, emit: (event: import('./types').ExplanationStreamEvent) => void, signal?: AbortSignal): Promise<import('./types').ValuationExplanation> {
   const response = await fetch('/api/v1/ai/valuation', {
     method: 'POST', signal, headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' }, body: JSON.stringify(input),

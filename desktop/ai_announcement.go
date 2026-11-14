@@ -5,10 +5,8 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"os"
 	"time"
 
-	"github.com/alwqx/sec/config"
 	"github.com/alwqx/sec/llm"
 	"github.com/alwqx/sec/provider/cninfo"
 )
@@ -27,29 +25,8 @@ func (s *desktopServer) handleAIAnnouncement(w http.ResponseWriter, r *http.Requ
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	path, err := s.configPath()
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "读取模型配置失败")
-		return
-	}
-	cfg, err := config.LoadFile(r.Context(), path)
-	switch {
-	case errors.Is(err, config.ErrInvalidAI), errors.Is(err, config.ErrInvalidJSON):
-		writeError(w, http.StatusConflict, "读取模型配置有问题，请先手动修正配置文件："+err.Error())
-		return
-	case errors.Is(err, config.ErrInvalid):
-	case err != nil:
-		writeError(w, http.StatusInternalServerError, "读取模型配置失败")
-		return
-	}
-	secret, err := s.aiSecret()
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "读取模型 Key 失败")
-		return
-	}
-	client, model, err := llm.Open(&cfg.AI, in.Profile, secret, os.Getenv)
-	if err != nil {
-		writeError(w, http.StatusConflict, err.Error()+"；请在设置页「AI 模型」中检查配置")
+	client, model, _, ok := s.openAIModel(w, r, in.Profile)
+	if !ok {
 		return
 	}
 	cacheDir, err := llm.DefaultCacheDir("announcements")
@@ -61,23 +38,16 @@ func (s *desktopServer) handleAIAnnouncement(w http.ResponseWriter, r *http.Requ
 	summarizer := llm.AnnouncementSummarizer{Client: client, Model: model, CacheDir: cacheDir}
 	result, err := summarizer.Summarize(ctx, doc.URL)
 	if err != nil {
-		if r.Context().Err() != nil {
-			return
-		}
-		status, message := http.StatusBadGateway, "公告摘要失败，请重试或选择其他模型"
-		public, isModelErr := llm.PublicError(err)
-		switch {
-		case errors.Is(err, context.DeadlineExceeded), ctx.Err() != nil:
-			status, message = http.StatusGatewayTimeout, "公告摘要超时，请稍后重试或选择其他模型"
-		case isModelErr:
-			message = public + "，请检查模型配置或稍后重试"
-		case errors.Is(err, cninfo.ErrDocument):
-			// 下载错误可能含远端响应，给前端稳定、可操作的错误。
-			message = "公告 PDF 无法读取：可能下载失败、损坏、加密、为扫描件或超过限制（20 MB、200 页、40 万字）；请查看原文"
-		case errors.Is(err, llm.ErrSummary):
-			message = err.Error()
-		}
-		writeError(w, status, message)
+		writeSummaryError(w, r, ctx, err, "公告摘要", func(err error) (int, string, bool) {
+			switch {
+			case errors.Is(err, cninfo.ErrDocument):
+				// 下载错误可能含远端响应，给前端稳定、可操作的错误。
+				return http.StatusBadGateway, "公告 PDF 无法读取：可能下载失败、损坏、加密、为扫描件或超过限制（20 MB、200 页、40 万字）；请查看原文", true
+			case errors.Is(err, llm.ErrSummary):
+				return http.StatusBadGateway, err.Error(), true
+			}
+			return 0, "", false
+		})
 		return
 	}
 	writeJSON(w, result)

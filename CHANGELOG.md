@@ -38,6 +38,7 @@
 34. Add `sec filings --summary` to summarize an 8-K by item with an AI model.
 35. Show only the provider, HTTP status and error code for AI model errors, including errors in streamed replies, never the error text.
 36. Share one summary pipeline between announcement and filing summaries.
+37. Add an AI summary button to 8-K rows in the Desktop SEC filings list.
 
 ### v0.4.8
 
