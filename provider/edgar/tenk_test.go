@@ -75,15 +75,74 @@ func TestRead10KShortSections(t *testing.T) {
 	gock.New("https://www.sec.gov").Get(docIndex).Reply(200).BodyString(filingIndex("8-K", [2]string{docFolder + "a.htm", "8-K"}))
 	_, err = client.Read10K(context.Background(), "https://www.sec.gov"+docIndex)
 	require.ErrorIs(t, err, ErrUnsupportedForm)
-	require.ErrorContains(t, err, "需要 10-K，这份申报是 8-K")
+	require.ErrorIs(t, err, ErrDocument, "Desktop 按 ErrDocument 返回 422")
+	require.EqualError(t, err, "这份申报是 8-K，不是 10-K")
 	require.True(t, gock.IsDone())
 }
 
 func TestPageFurniture(t *testing.T) {
-	for _, line := range []string{"12", "Page 5", "5 of 120", "Table of Contents", "PART II", "Parts II and III", "Item 1A", "Item 1B, 1C", "Apple Inc. | 2026 Form 10-K | 7"} {
+	for _, line := range []string{"Table of Contents", "PART II", "Parts II and III", "Item 1A", "Item 1A.", "Item 1B, 1C", "Apple Inc. | 2026 Form 10-K | 7"} {
 		require.True(t, pageFurniture(line), line)
 	}
-	for _, line := range []string{"2026 Change 2025", "(In millions)", "Item 7. Management’s Discussion", "Competition", "This Annual Report on Form 10-K contains forward-looking statements within the meaning of the Private Securities Litigation Reform Act."} {
+	for _, line := range []string{"2026 Change 2025", "(In millions)", "Item 7. Management’s Discussion", "Competition", "394",
+		"See Note 5 in Part II, Item 8 of this Form 10-K.", "This Annual Report on Form 10-K contains forward-looking statements."} {
 		require.False(t, pageFurniture(line), line)
 	}
+}
+
+// section 用纯文字的行测试章节查找，item 用小写编号。
+func section(text, item, title string) string {
+	lines := strings.Split(text, "\n")
+	return findSection(lines, scanTenK(lines), item, title)
+}
+
+func TestFindSection(t *testing.T) {
+	body := strings.Repeat("Demand could decline. ", 5)
+	for name, c := range map[string]struct {
+		text, item, title, want string
+	}{
+		"编号和标题分成两行": {
+			text: "Item 1A. Risk Factors 5\nItem 1B. Unresolved Staff Comments 20\nItem 1A.\nRisk Factors\n" + body + "\nItem 1B.\nUnresolved Staff Comments\nNone.",
+			item: "1a", title: "risk factors", want: "Item 1A.\nRisk Factors\n" + body,
+		},
+		"下一个标题和正文在同一段": {
+			text: "Item 1A. Risk Factors\n" + body + "\nItem 1B. Unresolved Staff Comments. " + strings.Repeat("We have no unresolved comments from the staff. ", 5),
+			item: "1a", title: "risk factors", want: "Item 1A. Risk Factors\n" + body,
+		},
+		"以 Item 开头的长句不是标题": {
+			text: "Item 7. Management’s Discussion\n" + body + "\nItem 8 of this Form 10-K contains the consolidated financial statements, which should be read together with this discussion; the notes describe the accounting policies and estimates used in more detail.\nMore discussion.\nItem 7A. Market Risk",
+			item: "7", title: "management", want: "Item 7. Management’s Discussion\n" + body + "\nItem 8 of this Form 10-K contains the consolidated financial statements, which should be read together with this discussion; the notes describe the accounting policies and estimates used in more detail.\nMore discussion.",
+		},
+		"到 SIGNATURES 为止": {
+			text: "Item 7. Management’s Discussion\n" + body + "\nSIGNATURES\nPursuant to the requirements of the Act.\nEXHIBIT INDEX",
+			item: "7", title: "management", want: "Item 7. Management’s Discussion\n" + body,
+		},
+		"Items 复数标题": {
+			text: "Items 7 and 7A. Management’s Discussion and Market Risk\n" + body + "\nItems 8 and 9. Financial Statements\nBalance sheet.",
+			item: "7", title: "management", want: "Items 7 and 7A. Management’s Discussion and Market Risk\n" + body,
+		},
+		"Items 7A and 8 结束 Item 7": {
+			text: "Item 7. Management’s Discussion\n" + body + "\nItems 7A and 8. Market Risk and Financial Statements\nBalance sheet.",
+			item: "7", title: "management", want: "Item 7. Management’s Discussion\n" + body,
+		},
+		"单独一行的数字挨着页眉页脚才是页码": {
+			text: "Item 7. Management’s Discussion\nNet sales\n394\n" + body + "\n31\nTable of Contents\nMore.\nSee Note 5 in Part II, Item 8 of this Form 10-K.\nItem 7A. Market Risk",
+			item: "7", title: "management", want: "Item 7. Management’s Discussion\nNet sales\n394\n" + body + "\nMore.\nSee Note 5 in Part II, Item 8 of this Form 10-K.",
+		},
+		"连续递增的单独数字是页码": {
+			text: "Item 7. Management’s Discussion\n" + body + "\n31\nMore.\n32\nEven more.\n34\nItem 7A. Market Risk",
+			item: "7", title: "management", want: "Item 7. Management’s Discussion\n" + body + "\nMore.\nEven more.",
+		},
+		"每页重复完整页眉": {
+			text: strings.Repeat("Item 1A. Risk Factors\n"+body+"\n", 3) + "Item 1B. Unresolved Staff Comments",
+			item: "1a", title: "risk factors", want: strings.TrimSuffix(strings.Repeat("Item 1A. Risk Factors\n"+body+"\n", 3), "\n"),
+		},
+		"只有编号的页眉不截断章节": {
+			text: "Item 1A. Risk Factors\n" + body + "\nItem 1A\n" + body + "\nItem 1B. Unresolved Staff Comments",
+			item: "1a", title: "risk factors", want: "Item 1A. Risk Factors\n" + body + "\n" + body,
+		},
+	} {
+		require.Equal(t, c.want, section(c.text, c.item, c.title), name)
+	}
+	require.Empty(t, section("Item 1. Business\nText.", "1a", "risk factors"))
 }

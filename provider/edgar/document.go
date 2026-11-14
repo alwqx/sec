@@ -33,8 +33,19 @@ var ErrDocument = errors.New("SEC 申报原文无法读取")
 // 是申报内容的问题（不是 8-K、没有 Item、超过大小），重试也不会成功。它也是 ErrDocument。
 var ErrDownload = fmt.Errorf("%w：从 SEC 下载失败", ErrDocument)
 
-// ErrUnsupportedForm 表示申报类型不是读取的那一种（比如用 Read8K 读 10-K），不能摘要。它也是 ErrDocument。
-var ErrUnsupportedForm = fmt.Errorf("%w：不支持摘要这类申报", ErrDocument)
+// ErrUnsupportedForm 表示申报类型不是读取的那一种（比如用 Read8K 读 10-K），不能摘要。返回的错误也是 ErrDocument。
+var ErrUnsupportedForm = errors.New("申报类型不支持")
+
+// unsupportedForm 是 ErrUnsupportedForm 的具体错误，说明实际和需要的类型，不带层层前缀，Desktop 直接显示。
+type unsupportedForm struct{ got, want string }
+
+func (e unsupportedForm) Error() string {
+	return fmt.Sprintf("这份申报是 %s，不是 %s", e.got, e.want)
+}
+
+func (e unsupportedForm) Is(target error) bool {
+	return target == ErrUnsupportedForm || target == ErrDocument
+}
 
 var (
 	filingPath   = regexp.MustCompile(`^/Archives/edgar/data/(\d+)/(\d{18})/[^/]+$`)
@@ -105,8 +116,8 @@ type indexDocument struct {
 }
 
 // readPrimary 读取申报目录页和主文件的文字，是 Read8K、Read10K 共用的部分。forms 是可以读取的基本类型（不含 /A），
-// want 是错误说明里的类型名。返回申报信息、目录页的文件表和主文件文字。
-func (c *Client) readPrimary(ctx context.Context, raw string, forms []string, want string) (*FilingDocument, []indexDocument, string, error) {
+// 第一个用在错误说明里。返回申报信息、目录页的文件表和主文件文字。
+func (c *Client) readPrimary(ctx context.Context, raw string, forms ...string) (*FilingDocument, []indexDocument, string, error) {
 	ref, err := ParseFilingURL(raw)
 	if err != nil {
 		return nil, nil, "", err
@@ -121,7 +132,7 @@ func (c *Client) readPrimary(ctx context.Context, raw string, forms []string, wa
 		return nil, nil, "", err
 	}
 	if base, _ := strings.CutSuffix(doc.Form, "/A"); !slices.Contains(forms, base) {
-		return nil, nil, "", fmt.Errorf("%w：需要 %s，这份申报是 %s", ErrUnsupportedForm, want, doc.Form)
+		return nil, nil, "", unsupportedForm{got: doc.Form, want: forms[0]}
 	}
 	for _, d := range docs {
 		if strings.EqualFold(d.Type, doc.Form) {
@@ -130,7 +141,7 @@ func (c *Client) readPrimary(ctx context.Context, raw string, forms []string, wa
 		}
 	}
 	if doc.URL == "" || !textDocument[strings.ToLower(path.Ext(doc.URL))] {
-		return nil, nil, "", fmt.Errorf("%w：申报目录里没有 HTML 或文本格式的 %s 主文件", ErrDocument, want)
+		return nil, nil, "", fmt.Errorf("%w：申报目录里没有 HTML 或文本格式的 %s 主文件", ErrDocument, forms[0])
 	}
 	text, err := c.documentText(ctx, doc.URL)
 	if err != nil {
@@ -142,7 +153,7 @@ func (c *Client) readPrimary(ctx context.Context, raw string, forms []string, wa
 // Read8K 读取一份 8-K（含 8-K/A）：主文件按 Item 切分（不含封面、签名和 Item 9.01 附件清单），
 // EX-99 附件（新闻稿、演示材料等）各为一节。raw 是该申报目录下任意文件的地址。
 func (c *Client) Read8K(ctx context.Context, raw string) (*FilingDocument, error) {
-	doc, docs, text, err := c.readPrimary(ctx, raw, []string{"8-K"}, "8-K")
+	doc, docs, text, err := c.readPrimary(ctx, raw, "8-K")
 	if err != nil {
 		return nil, err
 	}
