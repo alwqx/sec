@@ -2,14 +2,10 @@ package announcements
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"log/slog"
-	"os"
 	"strconv"
-	"time"
 
-	"github.com/alwqx/sec/config"
+	"github.com/alwqx/sec/cmd/internal/aicli"
 	"github.com/alwqx/sec/llm"
 	"github.com/alwqx/sec/provider/cninfo"
 	"github.com/alwqx/sec/utils"
@@ -29,44 +25,19 @@ func summarySelector(value string) (int, string, error) {
 
 // 先检查配置，再查公告或下载 PDF；测试时可替换为假客户端。
 var openSummarizer = func(cmd *cobra.Command) (*llm.AnnouncementSummarizer, error) {
-	cfg, err := config.Load(cmd.Context())
-	switch {
-	case errors.Is(err, config.ErrInvalidAI):
-		return nil, fmt.Errorf("%w；请先手动修正 ai 段", err)
-	case errors.Is(err, config.ErrInvalid) && len(cfg.AI.Profiles) == 0:
-		return nil, fmt.Errorf("%w；读不到模型配置，请先修正配置文件", err)
-	case errors.Is(err, config.ErrInvalid):
-		fmt.Fprintln(cmd.ErrOrStderr(), err)
-	case err != nil:
-		return nil, err
-	}
-	secret, err := config.DefaultAISecret()
+	setup, err := aicli.Open(cmd, "announcements")
 	if err != nil {
 		return nil, err
 	}
-	name, _ := cmd.Flags().GetString("ai")
-	client, model, err := llm.Open(&cfg.AI, name, secret, os.Getenv)
-	if err != nil {
-		return nil, err
-	}
-	cacheDir, err := llm.DefaultCacheDir("announcements")
-	if err != nil {
-		slog.WarnContext(cmd.Context(), "无法创建公告摘要缓存目录，本次不缓存", "error", err)
-	}
-	return &llm.AnnouncementSummarizer{Client: client, Model: model, CacheDir: cacheDir}, nil
+	return &llm.AnnouncementSummarizer{Client: setup.Client, Model: setup.Model, CacheDir: setup.CacheDir}, nil
 }
 
 func printSummary(cmd *cobra.Command, summarizer *llm.AnnouncementSummarizer, url string, asJSON bool) error {
-	ctx, cancel := context.WithTimeout(cmd.Context(), 10*time.Minute)
+	ctx, cancel := context.WithTimeout(cmd.Context(), aicli.SummaryTimeout)
 	defer cancel()
 	result, err := summarizer.Summarize(ctx, url)
 	if err != nil {
-		// 模型接口可能回显 Key，错误正文不直接交给用户。
-		var apiErr *llm.APIError
-		if errors.As(err, &apiErr) {
-			return fmt.Errorf("公告摘要失败：模型接口返回 HTTP %d，请检查模型配置或稍后重试", apiErr.Status)
-		}
-		return fmt.Errorf("公告摘要失败：%w", err)
+		return aicli.Error("公告摘要", err)
 	}
 	if asJSON {
 		return utils.PrintJSON(cmd.OutOrStdout(), result)
@@ -77,13 +48,6 @@ func printSummary(cmd *cobra.Command, summarizer *llm.AnnouncementSummarizer, ur
 		fmt.Fprintf(out, "缓存生成于 %s\n", result.CreatedAt.Local().Format(utils.StandardTimeLayout))
 	}
 	fmt.Fprintf(out, "原文：%s\n\n%s\n\n", result.SourceURL, result.Text)
-	fmt.Fprintf(out, "核对：%s\n", result.Check.String())
-	for _, warning := range result.Check.Warnings() {
-		fmt.Fprintf(out, "核对：%s\n", warning)
-	}
-	for _, note := range result.Notes {
-		fmt.Fprintln(out, note)
-	}
-	fmt.Fprintln(out, result.Disclaimer)
+	aicli.PrintSummaryFooter(out, result.Check, result.Notes, result.Disclaimer)
 	return nil
 }

@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -66,12 +65,12 @@ func (s *desktopServer) handleAIAnnouncement(w http.ResponseWriter, r *http.Requ
 			return
 		}
 		status, message := http.StatusBadGateway, "公告摘要失败，请重试或选择其他模型"
-		var apiErr *llm.APIError
+		public, isModelErr := llm.PublicError(err)
 		switch {
 		case errors.Is(err, context.DeadlineExceeded), ctx.Err() != nil:
 			status, message = http.StatusGatewayTimeout, "公告摘要超时，请稍后重试或选择其他模型"
-		case errors.As(err, &apiErr):
-			message = fmt.Sprintf("模型接口返回 HTTP %d，请检查模型配置或稍后重试", apiErr.Status)
+		case isModelErr:
+			message = public + "，请检查模型配置或稍后重试"
 		case errors.Is(err, cninfo.ErrDocument):
 			// 下载错误可能含远端响应，给前端稳定、可操作的错误。
 			message = "公告 PDF 无法读取：可能下载失败、损坏、加密、为扫描件或超过限制（20 MB、200 页、40 万字）；请查看原文"

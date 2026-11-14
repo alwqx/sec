@@ -267,3 +267,20 @@ func TestFakeEmptyReply(t *testing.T) {
 	_, err := fake.Chat(context.Background(), Request{})
 	require.ErrorIs(t, err, ErrFakeEmptyReply)
 }
+
+func TestPublicError(t *testing.T) {
+	for err, want := range map[error]string{
+		&APIError{Provider: "DeepSeek", Status: 429, Type: "insufficient_quota", Message: "sk-secret"}: "DeepSeek 接口返回 HTTP 429（insufficient_quota）",
+		fmt.Errorf("分块：%w", &APIError{Status: 500, Message: "sk-secret"}):                              "模型接口返回 HTTP 500",
+		&StreamError{Provider: "OpenAI", Type: "server_error", Message: "sk-secret"}:                   "OpenAI 流式回复出错（server_error）",
+		// 类型不是代码格式时可能是厂商正文，不显示。
+		&APIError{Provider: "X", Status: 401, Type: "invalid key sk-secret"}: "X 接口返回 HTTP 401",
+	} {
+		message, ok := PublicError(err)
+		require.True(t, ok)
+		require.Equal(t, want, message)
+		require.NotContains(t, message, "sk-secret")
+	}
+	_, ok := PublicError(errors.New("offline"))
+	require.False(t, ok)
+}

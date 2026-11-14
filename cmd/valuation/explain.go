@@ -3,13 +3,12 @@ package valuation
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"os"
 
 	"github.com/alwqx/sec/aitool"
+	"github.com/alwqx/sec/cmd/internal/aicli"
 	"github.com/alwqx/sec/config"
 	"github.com/alwqx/sec/llm"
 	"github.com/alwqx/sec/provider/sina"
@@ -22,34 +21,11 @@ import (
 // openExplainer 按 --ai 创建估值解读用的客户端，不写时用 default，同时返回读到的配置，美股估值复用。
 // 在请求估值数据之前调用，配置有问题时不发请求。测试时替换。
 var openExplainer = func(cmd *cobra.Command) (*llm.ValuationExplainer, *config.Config, error) {
-	cfg, err := config.Load(cmd.Context())
-	switch {
-	// 删除 ai 段不能让解读成功，只提示修正。
-	case errors.Is(err, config.ErrInvalidAI):
-		return nil, nil, fmt.Errorf("%w；请先手动修正 ai 段", err)
-	// 整个文件无效时 ai 段也换成了默认值，不能报「还没有模型配置」：照着 add 会覆盖文件、丢掉已存的 Key。
-	case errors.Is(err, config.ErrInvalid) && len(cfg.AI.Profiles) == 0:
-		return nil, nil, fmt.Errorf("%w；读不到模型配置，请先修正配置文件", err)
-	case errors.Is(err, config.ErrInvalid):
-		fmt.Fprintln(cmd.ErrOrStderr(), err)
-	case err != nil:
-		return nil, nil, err
-	}
-	secret, err := config.DefaultAISecret()
+	setup, err := aicli.Open(cmd, "valuation")
 	if err != nil {
 		return nil, nil, err
 	}
-	name, _ := cmd.Flags().GetString("ai")
-	client, model, err := llm.Open(&cfg.AI, name, secret, os.Getenv)
-	if err != nil {
-		return nil, nil, err
-	}
-	// 缓存目录建不了时不缓存，不影响解读。
-	cacheDir, err := llm.DefaultCacheDir("valuation")
-	if err != nil {
-		slog.WarnContext(cmd.Context(), "无法创建解读缓存目录，本次不缓存", "error", err)
-	}
-	return &llm.ValuationExplainer{Client: client, Model: model, CacheDir: cacheDir}, &cfg, nil
+	return &llm.ValuationExplainer{Client: setup.Client, Model: setup.Model, CacheDir: setup.CacheDir}, setup.Config, nil
 }
 
 // explainInput 是 get_valuation 的参数：代码和用户改过的 DCF 参数。没改的参数不写，和默认参数共用缓存。
@@ -74,7 +50,7 @@ func explain(ctx context.Context, out io.Writer, explainer *llm.ValuationExplain
 	}
 	explanation, err := e.Explain(ctx, input)
 	if err != nil {
-		return fmt.Errorf("估值解读失败：%w", err)
+		return aicli.Error("估值解读", err)
 	}
 	if asJSON {
 		return utils.PrintJSON(out, explanation)
@@ -146,7 +122,7 @@ func explainStreaming(ctx context.Context, out io.Writer, explainer *llm.Valuati
 		if wroteText {
 			fmt.Fprintln(out, "\n注意：以上为未完成核对的草稿。")
 		}
-		return fmt.Errorf("估值解读失败：%w", err)
+		return aicli.Error("估值解读", err)
 	}
 	if !wroteText {
 		if _, err := io.WriteString(out, x.Text); err != nil {
