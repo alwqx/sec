@@ -41,6 +41,7 @@
 37. Add an AI summary button to 8-K rows in the Desktop SEC filings list.
 38. Stop flagging "目标价值" and "建仓期" as investment advice in AI summaries when the source uses those terms.
 39. Share model config loading across the Desktop AI endpoints.
+40. Add a 10-K reader that extracts the risk factors and MD&A sections for upcoming 10-K summaries.
 
 ### v0.4.8
 
