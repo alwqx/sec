@@ -108,6 +108,7 @@ func TestAnnouncementSummaryChunksAndMerge(t *testing.T) {
 	require.Len(t, fake.Requests, 3)
 	require.Contains(t, fake.Requests[2].Messages[0].Text, "合并分块摘要")
 	require.NotContains(t, fake.Requests[2].Messages[0].Text, strings.Repeat("文", 100), "合并只发分块摘要")
+	require.Contains(t, fake.Requests[2].Messages[0].Text, `{"text":"收入 1200 万元。","pages":[1]}`, "合并输入和模型输出的格式一致，text 在前")
 	require.Len(t, result.Sections, 2)
 	require.True(t, result.Check.OK())
 	doc, err := read(context.Background(), summaryURL)
@@ -137,8 +138,11 @@ func TestAnnouncementSummaryChecksCitedPages(t *testing.T) {
 	files, err := os.ReadDir(s.CacheDir)
 	require.NoError(t, err)
 	require.Empty(t, files, "有警告的摘要不缓存")
-	_, check := checkSummary([]SummarySection{{Text: "摘要。", Pages: []int{1}}, {Text: "金额 9999 元。", Pages: []int{1}}}, []cninfo.DocumentPage{{Number: 1, Text: "金额 1200 元。"}})
-	require.Equal(t, utf8.RuneCountInString("摘要。（PDF 第 1 页）\n\n金额 "), check.Unsourced[0].Start)
+	// 第二段的位置按带引用的全文计算。
+	s = AnnouncementSummarizer{Client: &Fake{Replies: []FakeReply{FakeText(`{"sections":[{"text":"摘要。","pages":[1]},{"text":"金额 9999 元。","pages":[1]}]}`)}}, Read: summaryReader("金额 1200 元。")}
+	result, err = s.Summarize(context.Background(), summaryURL)
+	require.NoError(t, err)
+	require.Equal(t, utf8.RuneCountInString("摘要。（PDF 第 1 页）\n\n金额 "), result.Check.Unsourced[0].Start)
 }
 
 func TestAnnouncementSummaryRejectsInvalidOutput(t *testing.T) {
@@ -256,7 +260,7 @@ func TestAnnouncementSummaryFailuresAndCancellation(t *testing.T) {
 
 func TestAnnouncementSummaryTolerantOutput(t *testing.T) {
 	body := `{"sections":[{"text":"摘要","pages":[1,1]}]}`
-	for _, text := range []string{body, "```json\n" + body + "\n```", "```\n" + body + "\n```", "```JSON\r\n" + body + "\r\n```", "  ```json\n" + body + "\n```  "} {
+	for _, text := range []string{body, `{"Sections":[{"Text":"摘要","Pages":[1]}]}`, "```json\n" + body + "\n```", "```\n" + body + "\n```", "```JSON\r\n" + body + "\r\n```", "  ```json\n" + body + "\n```  "} {
 		s := AnnouncementSummarizer{Client: &Fake{Replies: []FakeReply{FakeText(text)}}, Read: summaryReader("原文")}
 		result, err := s.Summarize(context.Background(), summaryURL)
 		require.NoError(t, err, text)

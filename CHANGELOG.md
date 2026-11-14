@@ -37,6 +37,7 @@
 33. Show truncation advice, such as turning off thinking, for cut-off valuation explanations.
 34. Add `sec filings --summary` to summarize an 8-K by item with an AI model.
 35. Show only the provider, HTTP status and error code for AI model errors, including errors in streamed replies, never the error text.
+36. Share one summary pipeline between announcement and filing summaries.
 
 ### v0.4.8
 

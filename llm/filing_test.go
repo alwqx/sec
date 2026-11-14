@@ -85,6 +85,14 @@ func TestFilingSummary(t *testing.T) {
 	require.NotEqual(t, key, other.summaryKey(ref))
 }
 
+func TestFilingSummaryTrimsRefs(t *testing.T) {
+	fake := &Fake{Replies: []FakeReply{FakeText(`{"sections":[{"text":"公司发布业绩新闻稿。","refs":["Item 2.02 "," Exhibit 99.1"]}]}`)}}
+	s := FilingSummarizer{Client: fake, Read: filingReader(itemText, exhibitText)}
+	result, err := s.Summarize(context.Background(), filingURL)
+	require.NoError(t, err, "引用前后的空格去掉后再和输入比较")
+	require.Equal(t, []string{"Item 2.02", "Exhibit 99.1"}, result.Sections[0].Refs)
+}
+
 func TestFilingSummaryCheckWarnings(t *testing.T) {
 	// 每段只和引用的节核对：12% 只在附件里，只引用 Item 2.02 时找不到；December 不在原文里，12 月也找不到。
 	fake := &Fake{Replies: []FakeReply{filingReply("营收同比增长 12%，将于 12 月公布。", "Item 2.02")}}
@@ -137,6 +145,7 @@ func TestFilingSummaryFailures(t *testing.T) {
 		{StopReason: StopToolUse, Message: Message{ToolCalls: []ToolCall{{Name: "x"}}}}:                                                                   "申报摘要不提供工具",
 		{StopReason: StopEnd, Message: Message{Text: `{"sections":[{"text":"事项"}]}`}}:                                                                     "段落缺少有效引用",
 		{StopReason: StopEnd, Message: Message{Text: `{"sections":[{"text":"` + strings.Repeat("长", filingSectionRunes+1) + `","refs":["Item 2.02"]}]}`}}: "超过 600 字的上限",
+		{StopReason: StopEnd, Message: Message{Text: `{"sections":[{"text":"事项","refs":"Item 2.02"}]}`}}:                                                  "带引用的结构化摘要",
 		{StopReason: StopEnd, Message: Message{Text: "不是 JSON"}}:                                                                                          "带引用的结构化摘要",
 		{StopReason: StopEnd, Message: Message{Text: `{"sections":[{"text":"事项","refs":["Item 5.02"]}]}`}}:                                                "不存在的事项或附件",
 	} {
