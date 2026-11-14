@@ -144,10 +144,10 @@
   - [x] 公告摘要输出上限对思考模型不够：分块请求固定 `MaxTokens: 8000`，`deepseek-v4-pro` 摘要 25 页的三季报时推理用完全部输出 token，返回 `finish_reason=length` 且正文为空，整次摘要失败。提高分块请求的上限（先核实厂商允许的最大值），截断单独报错，说明是输出被截断、建议换非思考模型或配置，不再统一报「模型拒绝、回复截断或未正常结束」。 已解决：输出上限提高到 16000、截断单独报错（#295）；配置加 `thinking: off` 关闭思考（#300–#302，DeepSeek 实测，通义千问、智谱按文档并检测是否被忽略）；截断时按配置提示怎么关闭思考。实测 25 页三季报关闭思考后 18 秒完成。
   - [x] 公告 PDF 文本提取把数字拆到多行：`ledongthuc/pdf` 的 `GetPlainText` 在每个文本片段后加换行，`2026` 变成 `202⏎6`、`27,859.52` 变成 `27,⏎859⏎.52`，数字核对因此把原文里有的数字标为找不到来源（招商银行日常关联交易公告实测 3 个误报），也浪费 token。改用 `GetTextByRow()` 按行拼接：同一行的片段直接相连、间距大时加空格，只在行与行之间换行；不简单删除全部换行，以免把相邻表格单元格拼成一个数字、让核对误通过。补充数字跨片段的离线 fixture。
   - [x] 估值解读被截断时也给出关闭思考的建议：解读的输出上限是 4000，思考模型的推理也计入，被截断时只标 `Truncated`、没有建议；复用公告摘要的判断（`Response.Reasoned`、`Model.ThinkingOffSupported`），要先定在 CLI 和 Desktop 里截断的解读旁边怎么显示提示。 已完成：和公告摘要共用 `Model.TruncationAdvice`，CLI 和 Desktop 接在「解读不完整」后面显示；没有正文就被截断时报错并给出建议。
-  - [ ] 美股 8-K 事项摘要：按 Item 切分，附带 EX-99 附件。拆成以下几个 PR：
+  - [x] 美股 8-K 事项摘要：按 Item 切分，附带 EX-99 附件。拆成以下几个 PR：
     - [x] `provider/edgar.Read8K`、`llm.FilingSummarizer` 和 CLI `sec filings --summary <序号或链接>`，与公告摘要共用分块、并发和截断建议（`llm/summary.go`）。
     - [x] Desktop 申报列表行内「摘要」按钮和 `POST /api/v1/ai/filings/summary`。
-    - [ ] 重构：Desktop 估值解读接口（`desktop/ai_valuation.go`）仍有一份读取模型配置的代码（配置错误分支、`aiSecret`、`llm.Open`），改用公告和申报摘要共用的 `openAIModel`。
+    - [x] 重构：Desktop 估值解读接口（`desktop/ai_valuation.go`）仍有一份读取模型配置的代码（配置错误分支、`aiSecret`、`llm.Open`），改用公告和申报摘要共用的 `openAIModel`。 已完成，三个 AI 接口都用 `openAIModel`。
     - [x] 数字核对把「目标价值」（8-K Item 5.02 股权奖励的 target value）误报为建议用语「目标价」，`llm.Verify` 的建议用语要排除这种复合词。 已完成：`adviceCompounds` 列出意思不同的复合词（目标价值、建仓期），只有来源里有对应原文（如 target value）时才不算建议用语。
     - [x] 重构：`cmd/filings`、`cmd/announcements` 和 `cmd/valuation` 的 `openSummarizer`/`openExplainer` 几乎一样（配置错误分支、`DefaultAISecret`、`llm.Open`、缓存目录），抽成共用函数。
     - [x] 重构：`cmd/filings` 和 `cmd/announcements` 的 `printSummary` 重复了 10 分钟超时、隐藏模型接口错误正文（防止回显 Key）和核对、说明、免责声明的输出，抽成共用函数，隐藏错误正文的规则只留一份。和上一项一起做。 已完成：共用部分在 `cmd/internal/aicli`；能给用户看的错误部分由 `llm.PublicError` 统一生成（厂商、HTTP 状态码或流内错误、错误类型代码），CLI 和 Desktop 都用它。估值解读原来没有隐藏错误正文，流式回复里的模型错误也一样，现在都不显示正文。

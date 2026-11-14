@@ -6,12 +6,10 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
 	"github.com/alwqx/sec/aitool"
-	"github.com/alwqx/sec/config"
 	"github.com/alwqx/sec/llm"
 	"github.com/alwqx/sec/provider/sina"
 	"github.com/alwqx/sec/valuation"
@@ -77,29 +75,8 @@ func (s *desktopServer) handleAIValuation(w http.ResponseWriter, r *http.Request
 		writeError(w, http.StatusBadRequest, "DCF 参数无效")
 		return
 	}
-	path, err := s.configPath()
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "读取模型配置失败")
-		return
-	}
-	cfg, err := config.LoadFile(r.Context(), path)
-	switch {
-	case errors.Is(err, config.ErrInvalidAI), errors.Is(err, config.ErrInvalidJSON):
-		writeError(w, http.StatusConflict, "读取模型配置有问题，请先手动修正配置文件："+err.Error())
-		return
-	case errors.Is(err, config.ErrInvalid):
-	case err != nil:
-		writeError(w, http.StatusInternalServerError, "读取模型配置失败")
-		return
-	}
-	secret, err := s.aiSecret()
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "读取模型 Key 失败")
-		return
-	}
-	client, model, err := llm.Open(&cfg.AI, in.Profile, secret, os.Getenv)
-	if err != nil {
-		writeError(w, http.StatusConflict, err.Error()+"；请在设置页「AI 模型」中检查配置")
+	client, model, _, ok := s.openAIModel(w, r, in.Profile)
+	if !ok {
 		return
 	}
 	if wantsAIStream(r) {
