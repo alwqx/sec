@@ -28,6 +28,13 @@ const (
 // ErrDocument 表示申报原文无法读取或不能摘要。
 var ErrDocument = errors.New("SEC 申报原文无法读取")
 
+// ErrDownload 表示从 SEC 读取申报目录或文件失败（网络错误、HTTP 错误），稍后重试可能成功；其他 ErrDocument
+// 是申报内容的问题（不是 8-K、没有 Item、超过大小），重试也不会成功。它也是 ErrDocument。
+var ErrDownload = fmt.Errorf("%w：从 SEC 下载失败", ErrDocument)
+
+// ErrUnsupportedForm 表示申报不是 8-K（含 8-K/A），目前不能摘要。它也是 ErrDocument。
+var ErrUnsupportedForm = fmt.Errorf("%w：目前只支持摘要 8-K", ErrDocument)
+
 var (
 	filingPath   = regexp.MustCompile(`^/Archives/edgar/data/(\d+)/(\d{18})/[^/]+$`)
 	itemHeading  = regexp.MustCompile(`(?i)^item\s*(\d{1,2}\.\d{2})\b`)
@@ -105,7 +112,7 @@ func (c *Client) Read8K(ctx context.Context, raw string) (*FilingDocument, error
 	}
 	body, err := c.get(ctx, ref.IndexURL)
 	if err != nil {
-		return nil, fmt.Errorf("%w：读取申报目录失败：%w", ErrDocument, err)
+		return nil, fmt.Errorf("%w（申报目录）：%w", ErrDownload, err)
 	}
 	doc := &FilingDocument{FilingRef: *ref}
 	docs, err := parseFilingIndex(body, ref, doc)
@@ -113,7 +120,7 @@ func (c *Client) Read8K(ctx context.Context, raw string) (*FilingDocument, error
 		return nil, err
 	}
 	if base, _ := strings.CutSuffix(doc.Form, "/A"); base != "8-K" {
-		return nil, fmt.Errorf("%w：目前只支持摘要 8-K，这份申报是 %s", ErrDocument, doc.Form)
+		return nil, fmt.Errorf("%w，这份申报是 %s", ErrUnsupportedForm, doc.Form)
 	}
 	var exhibits []indexDocument
 	for _, d := range docs {
@@ -227,7 +234,7 @@ func (c *Client) documentText(ctx context.Context, link string) (string, error) 
 		return "", fmt.Errorf("%w：%s 超过 20 MB", ErrDocument, path.Base(link))
 	}
 	if err != nil {
-		return "", fmt.Errorf("%w：下载 %s 失败：%w", ErrDocument, path.Base(link), err)
+		return "", fmt.Errorf("%w（%s）：%w", ErrDownload, path.Base(link), err)
 	}
 	if strings.EqualFold(path.Ext(link), ".txt") {
 		return cleanLines(string(body)), nil

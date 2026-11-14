@@ -50,6 +50,66 @@ func (s *desktopServer) aiSecret() (*config.AISecret, error) {
 	return config.DefaultAISecret()
 }
 
+// openAIModel 读取共享配置并按 profile 创建模型客户端，profile 为空时用 default；估值解读和各类摘要共用。
+// 配置有问题时写出错误响应（配置无效或不可用 409，读不到 500）并返回 ok=false，调用方直接返回，不请求上游数据。
+// 返回的配置供调用方复用其他设置，比如 SEC 联系邮箱。
+func (s *desktopServer) openAIModel(w http.ResponseWriter, r *http.Request, profile string) (llm.Client, llm.Model, config.Config, bool) {
+	path, err := s.configPath()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "读取模型配置失败")
+		return nil, llm.Model{}, config.Config{}, false
+	}
+	cfg, err := config.LoadFile(r.Context(), path)
+	switch {
+	case errors.Is(err, config.ErrInvalidAI), errors.Is(err, config.ErrInvalidJSON):
+		writeError(w, http.StatusConflict, "读取模型配置有问题，请先手动修正配置文件："+err.Error())
+		return nil, llm.Model{}, config.Config{}, false
+	case errors.Is(err, config.ErrInvalid):
+	case err != nil:
+		writeError(w, http.StatusInternalServerError, "读取模型配置失败")
+		return nil, llm.Model{}, config.Config{}, false
+	}
+	secret, err := s.aiSecret()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "读取模型 Key 失败")
+		return nil, llm.Model{}, config.Config{}, false
+	}
+	client, model, err := llm.Open(&cfg.AI, profile, secret, os.Getenv)
+	if err != nil {
+		writeError(w, http.StatusConflict, err.Error()+"；请在设置页「AI 模型」中检查配置")
+		return nil, llm.Model{}, config.Config{}, false
+	}
+	return client, model, cfg, true
+}
+
+// writeSummaryError 写出摘要失败的响应，公告和申报摘要共用。what 是功能名，如「公告摘要」；ctx 是整次摘要的时限。
+// 请求已取消时不写。只有整次摘要的时限到了才说是摘要超时：单次下载的超时（如 SEC 文件 60 秒）也是 DeadlineExceeded，
+// 但那是原文读不到，不能让用户去换模型。模型错误只给 llm.PublicError 的部分；文档相关的错误由 classify 给出状态码和提示，
+// 返回 ok=false 时继续按通用规则处理。
+func writeSummaryError(w http.ResponseWriter, r *http.Request, ctx context.Context, err error, what string, classify func(error) (int, string, bool)) {
+	if r.Context().Err() != nil {
+		return
+	}
+	if ctx.Err() != nil {
+		writeError(w, http.StatusGatewayTimeout, what+"超时，请稍后重试或选择其他模型")
+		return
+	}
+	if public, ok := llm.PublicError(err); ok {
+		writeError(w, http.StatusBadGateway, public+"，请检查模型配置或稍后重试")
+		return
+	}
+	if status, message, ok := classify(err); ok {
+		writeError(w, status, message)
+		return
+	}
+	// 文档的错误已经由 classify 处理，剩下的超时是单次模型请求超时。
+	if errors.Is(err, context.DeadlineExceeded) {
+		writeError(w, http.StatusGatewayTimeout, "模型响应超时，请稍后重试或选择其他模型")
+		return
+	}
+	writeError(w, http.StatusBadGateway, what+"失败，请重试或选择其他模型")
+}
+
 // loadAISettings 读取模型配置。ai 段或整个文件无效时不报错，原因放在 Invalid 里。
 func (s *desktopServer) loadAISettings(ctx context.Context) (aiSettings, error) {
 	path, err := s.configPath()

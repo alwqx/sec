@@ -119,6 +119,7 @@ func TestRead8KRejects(t *testing.T) {
 	gock.New("https://www.sec.gov").Get(docIndex).Reply(200).BodyString(filingIndex("10-K", [2]string{docFolder + "a.htm", "10-K"}))
 	_, err := client.Read8K(context.Background(), link)
 	require.ErrorContains(t, err, "目前只支持摘要 8-K，这份申报是 10-K")
+	require.ErrorIs(t, err, ErrUnsupportedForm)
 
 	gock.New("https://www.sec.gov").Get(docIndex).Reply(200).BodyString(filingIndex("8-K", [2]string{docFolder + "a.pdf", "8-K"}))
 	_, err = client.Read8K(context.Background(), link)
@@ -135,6 +136,7 @@ func TestRead8KRejects(t *testing.T) {
 
 	gock.New("https://www.sec.gov").Get(docIndex).Reply(404)
 	_, err = client.Read8K(context.Background(), link)
+	require.ErrorIs(t, err, ErrDownload, "下载失败可以稍后重试，和内容问题分开")
 	require.ErrorIs(t, err, ErrDocument)
 	require.True(t, gock.IsDone())
 }
@@ -186,4 +188,5 @@ func TestRead8KTooLarge(t *testing.T) {
 	_, err := client.Read8K(context.Background(), "https://www.sec.gov"+docIndex)
 	require.ErrorIs(t, err, ErrDocument)
 	require.ErrorContains(t, err, "a.htm 超过 20 MB")
+	require.NotErrorIs(t, err, ErrDownload, "文件太大是内容问题，重试也不会成功")
 }

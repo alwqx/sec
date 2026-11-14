@@ -146,7 +146,8 @@
   - [x] 估值解读被截断时也给出关闭思考的建议：解读的输出上限是 4000，思考模型的推理也计入，被截断时只标 `Truncated`、没有建议；复用公告摘要的判断（`Response.Reasoned`、`Model.ThinkingOffSupported`），要先定在 CLI 和 Desktop 里截断的解读旁边怎么显示提示。 已完成：和公告摘要共用 `Model.TruncationAdvice`，CLI 和 Desktop 接在「解读不完整」后面显示；没有正文就被截断时报错并给出建议。
   - [ ] 美股 8-K 事项摘要：按 Item 切分，附带 EX-99 附件。拆成以下几个 PR：
     - [x] `provider/edgar.Read8K`、`llm.FilingSummarizer` 和 CLI `sec filings --summary <序号或链接>`，与公告摘要共用分块、并发和截断建议（`llm/summary.go`）。
-    - [ ] Desktop 申报列表行内「摘要」按钮和 `POST /api/v1/ai/filings/summary`。
+    - [x] Desktop 申报列表行内「摘要」按钮和 `POST /api/v1/ai/filings/summary`。
+    - [ ] 重构：Desktop 估值解读接口（`desktop/ai_valuation.go`）仍有一份读取模型配置的代码（配置错误分支、`aiSecret`、`llm.Open`），改用公告和申报摘要共用的 `openAIModel`。
     - [ ] 数字核对把「目标价值」（8-K Item 5.02 股权奖励的 target value）误报为建议用语「目标价」，`llm.Verify` 的建议用语要排除这种复合词。
     - [x] 重构：`cmd/filings`、`cmd/announcements` 和 `cmd/valuation` 的 `openSummarizer`/`openExplainer` 几乎一样（配置错误分支、`DefaultAISecret`、`llm.Open`、缓存目录），抽成共用函数。
     - [x] 重构：`cmd/filings` 和 `cmd/announcements` 的 `printSummary` 重复了 10 分钟超时、隐藏模型接口错误正文（防止回显 Key）和核对、说明、免责声明的输出，抽成共用函数，隐藏错误正文的规则只留一份。和上一项一起做。 已完成：共用部分在 `cmd/internal/aicli`；能给用户看的错误部分由 `llm.PublicError` 统一生成（厂商、HTTP 状态码或流内错误、错误类型代码），CLI 和 Desktop 都用它。估值解读原来没有隐藏错误正文，流式回复里的模型错误也一样，现在都不显示正文。
