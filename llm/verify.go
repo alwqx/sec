@@ -92,6 +92,21 @@ var approxLinks = []string{"为", "是", "在"}
 // adviceTerms 是投资建议用语。前面有否定时不算，比如「不构成买入或卖出建议」。
 var adviceTerms = []string{"买入", "卖出", "加仓", "减仓", "建仓", "清仓", "抄底", "止损", "止盈", "目标价", "逢低吸纳", "逢高减持", "满仓", "重仓"}
 
+// adviceCompound 是包含建议用语、意思却不同的词，比如「目标价值」是股权奖励的目标金额（8-K Item 5.02 常见），
+// 「建仓期」是基金合同约定的建仓期限（基金公告常见）。同样的词也能用来给建议（「该股目标价值 50 元」「当前是较好的建仓期」），
+// 所以只有来源里有 evidence 之一（不分大小写）时才不算：摘要里这个词转述的是原文；估值解读的来源是工具数据，没有这些词，
+// 照常提示。notBefore 是紧跟在词后面时说明切分不同的字：「目标价值得参考」是「目标价 / 值得」。「目标价格」就是目标价，不排除。
+type adviceCompound struct {
+	word      string
+	evidence  []string
+	notBefore string
+}
+
+var adviceCompounds = []adviceCompound{
+	{word: "目标价值", evidence: []string{"目标价值", "target value"}, notBefore: "得"},
+	{word: "建仓期", evidence: []string{"建仓期"}},
+}
+
 // negations 是否定短语，出现在同一句里建议用语前面不远处时不算给建议。只用短语，不用单字：
 // 「非常」「无论」「不断」「不错」里的非、无、不不是否定。
 var negations = []string{"不构成", "不建议", "不能", "不会", "不提供", "不给", "不应", "不宜", "不要", "不是", "并非", "无法", "没有", "勿"}
@@ -140,7 +155,7 @@ func Verify(answer string, sources ...string) Check {
 			check.Unsourced = append(check.Unsourced, n.ref)
 		}
 	}
-	check.AdviceTerms = append(check.AdviceTerms, findAdvice(answer)...)
+	check.AdviceTerms = append(check.AdviceTerms, findAdvice(answer, sources)...)
 	return check
 }
 
@@ -346,8 +361,9 @@ func followedBy(after, word string, gap int) bool {
 	return false
 }
 
-// findAdvice 找出投资建议用语，前面有否定的不算。
-func findAdvice(answer string) []TermRef {
+// findAdvice 找出投资建议用语，前面有否定的不算，出现在来源支持的复合词里的也不算（见 adviceCompound）。
+func findAdvice(answer string, sources []string) []TermRef {
+	compounds := supportedCompounds(answer, sources)
 	var out []TermRef
 	for _, term := range adviceTerms {
 		offset := 0
@@ -359,7 +375,7 @@ func findAdvice(answer string) []TermRef {
 			start := offset + i
 			end := start + len(term)
 			offset = end
-			if negated(answer[:start]) {
+			if negated(answer[:start]) || inCompound(answer, start, term, compounds) {
 				continue
 			}
 			out = append(out, TermRef{Text: term, Start: utf8.RuneCountInString(answer[:start]), End: utf8.RuneCountInString(answer[:end])})
@@ -368,6 +384,50 @@ func findAdvice(answer string) []TermRef {
 	// 按出现位置排序，方便界面依次标出。
 	slices.SortFunc(out, func(a, b TermRef) int { return a.Start - b.Start })
 	return out
+}
+
+// supportedCompounds 返回回答里出现、并且来源里有对应原文的复合词。回答里没有复合词时不看来源，大来源（如 K 线）不必转小写。
+func supportedCompounds(answer string, sources []string) []adviceCompound {
+	var candidates []adviceCompound
+	for _, c := range adviceCompounds {
+		if strings.Contains(answer, c.word) {
+			candidates = append(candidates, c)
+		}
+	}
+	if len(candidates) == 0 {
+		return nil
+	}
+	lower := make([]string, len(sources))
+	for i, source := range sources {
+		lower[i] = strings.ToLower(source)
+	}
+	var out []adviceCompound
+	for _, c := range candidates {
+		if slices.ContainsFunc(c.evidence, func(e string) bool {
+			return slices.ContainsFunc(lower, func(source string) bool { return strings.Contains(source, e) })
+		}) {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// inCompound 判断 answer 中从 start 开始的建议用语 term 是否是 compounds 里某个词的一部分；term 在词里出现几次都检查。
+func inCompound(answer string, start int, term string, compounds []adviceCompound) bool {
+	for _, c := range compounds {
+		for k := 0; ; {
+			i := strings.Index(c.word[k:], term)
+			if i < 0 {
+				break
+			}
+			k += i
+			if begin := start - k; begin >= 0 && strings.HasPrefix(answer[begin:], c.word) && (c.notBefore == "" || !strings.HasPrefix(answer[begin+len(c.word):], c.notBefore)) {
+				return true
+			}
+			k += len(term)
+		}
+	}
+	return false
 }
 
 // negated 判断建议用语前面是否否定：紧挨着不、勿、别，或同一句里前面 negationWindow 个字以内有否定短语。
