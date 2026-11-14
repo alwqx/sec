@@ -1,11 +1,20 @@
 package llm
 
 import (
+	"cmp"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
+	"unicode/utf8"
+
+	"github.com/alwqx/sec/watchlist"
 )
 
 // 公告和申报摘要共用的部分：分块、并发请求、按停止原因说明错误、去掉 Markdown 围栏。
@@ -158,4 +167,214 @@ func stripJSONFence(text string) string {
 		return text
 	}
 	return strings.TrimSpace(body[newline+1:])
+}
+
+// maxSummaryChunks 是一份文档最多的文本块数。
+const maxSummaryChunks = 40
+
+// citedSection 是一段摘要和它引用的原文位置：公告是 PDF 页码（int），申报是节标签（string）。
+// 引用由代码验证后渲染，不相信模型在正文中生成的页码或链接。
+type citedSection[R cmp.Ordered] struct {
+	Text string
+	Refs []R
+}
+
+// citedJSON 是模型输出和合并输入里的一段：text 在前，引用按文档用 pages（公告）或 refs（申报）。
+// 用结构体而不是 map 编解码：解码时键名不分大小写，编码时字段顺序固定。
+type citedJSON[R cmp.Ordered] struct {
+	Text  string `json:"text"`
+	Pages []R    `json:"pages,omitempty"`
+	Refs  []R    `json:"refs,omitempty"`
+}
+
+// sectionLimit 是摘要的段数和每段字数上限。
+type sectionLimit struct{ sections, runes int }
+
+// summaryDoc 描述一种文档怎么摘要，C 是分块的元素（公告的页、申报的节），R 是引用的类型。
+type summaryDoc[C any, R cmp.Ordered] struct {
+	call summaryCall
+	// pages 为 true 时引用写在 pages 字段（公告），否则写在 refs 字段（申报）。
+	pages bool
+	// refName 是错误说明里引用的叫法（页码、引用），refWhat 是引用指向的东西（PDF 页码、事项或附件）。
+	refName, refWhat string
+	// order 是一段里引用的排列顺序，为空时按值排序。
+	order func(a, b R) int
+	// chunkInput 返回一块的模型输入和这块可以引用的位置；mergeInput 用分块摘要生成合并的模型输入。
+	chunkInput func([]C) (any, []R)
+	mergeInput func(sections []citedJSON[R]) any
+	chunkLimit sectionLimit
+	mergeLimit sectionLimit
+	// source 返回一个引用位置的原文，用于数字核对；cite 把一段的引用写成正文后面括号里的文字。
+	source func(R) []string
+	cite   func([]R) string
+}
+
+// summarize 并发摘要各块，多块时再合并；合并只能引用分块摘要引用过的位置，即使别的位置在原文里真实存在。
+// 返回段落和实际模型名。
+func (d summaryDoc[C, R]) summarize(ctx context.Context, chunks [][]C) ([]citedSection[R], string, error) {
+	if len(chunks) == 0 || len(chunks) > maxSummaryChunks {
+		return nil, "", fmt.Errorf("%w：%s为空或超过 %d 个文本块", d.call.err, d.call.what, maxSummaryChunks)
+	}
+	parts, model, err := summarizeChunks(ctx, chunks, d.call.model.Name, func(ctx context.Context, chunk []C) ([]citedSection[R], string, error) {
+		input, refs := d.chunkInput(chunk)
+		allowed := map[R]bool{}
+		for _, ref := range refs {
+			allowed[ref] = true
+		}
+		return d.part(ctx, input, allowed, false, d.chunkLimit)
+	})
+	if err != nil {
+		return nil, "", err
+	}
+	var sections []citedSection[R]
+	for _, part := range parts {
+		sections = append(sections, part...)
+	}
+	if len(chunks) == 1 {
+		return sections, model, nil
+	}
+	allowed := map[R]bool{}
+	for _, section := range sections {
+		for _, ref := range section.Refs {
+			allowed[ref] = true
+		}
+	}
+	merged, mergeModel, err := d.part(ctx, d.mergeInput(d.encode(sections)), allowed, true, d.mergeLimit)
+	if err != nil {
+		return nil, "", err
+	}
+	if mergeModel != "" {
+		model = mergeModel
+	}
+	return merged, model, nil
+}
+
+// encode 把段落写成模型输出的格式，合并时交给模型。
+func (d summaryDoc[C, R]) encode(sections []citedSection[R]) []citedJSON[R] {
+	out := make([]citedJSON[R], 0, len(sections))
+	for _, s := range sections {
+		section := citedJSON[R]{Text: s.Text}
+		if d.pages {
+			section.Pages = s.Refs
+		} else {
+			section.Refs = s.Refs
+		}
+		out = append(out, section)
+	}
+	return out
+}
+
+// part 请求一次分块摘要或合并（merge），校验段落和引用；引用去重后按 order 排列。
+func (d summaryDoc[C, R]) part(ctx context.Context, input any, allowed map[R]bool, merge bool, limit sectionLimit) ([]citedSection[R], string, error) {
+	text, model, err := d.call.chat(ctx, input, merge)
+	if err != nil {
+		return nil, "", err
+	}
+	var output struct {
+		Sections []citedJSON[R] `json:"sections"`
+	}
+	if json.Unmarshal([]byte(text), &output) != nil || len(output.Sections) < 1 || len(output.Sections) > limit.sections {
+		return nil, "", fmt.Errorf("%w：模型没有返回带%s的结构化摘要，请重试或更换模型", d.call.err, d.refName)
+	}
+	order := d.order
+	if order == nil {
+		order = cmp.Compare[R]
+	}
+	sections := make([]citedSection[R], len(output.Sections))
+	for i, raw := range output.Sections {
+		section := &sections[i]
+		section.Text, section.Refs = raw.Text, raw.Refs
+		if d.pages {
+			section.Refs = raw.Pages
+		}
+		// 模型可能在节标签前后多带空格，去掉后再和输入比较。
+		if labels, ok := any(section.Refs).([]string); ok {
+			for j := range labels {
+				labels[j] = strings.TrimSpace(labels[j])
+			}
+		}
+		section.Text = strings.TrimSpace(section.Text)
+		slices.SortFunc(section.Refs, order)
+		section.Refs = slices.Compact(section.Refs)
+		switch n := utf8.RuneCountInString(section.Text); {
+		case n == 0:
+			return nil, "", fmt.Errorf("%w：模型返回了空段落，请重试或更换模型", d.call.err)
+		case n > limit.runes:
+			return nil, "", fmt.Errorf("%w：模型返回的段落有 %d 字，超过 %d 字的上限，请重试或更换模型", d.call.err, n, limit.runes)
+		case len(section.Refs) == 0:
+			return nil, "", fmt.Errorf("%w：段落缺少有效%s，请重试或更换模型", d.call.err, d.refName)
+		}
+		for _, ref := range section.Refs {
+			if !allowed[ref] {
+				return nil, "", fmt.Errorf("%w：模型引用了输入中不存在的%s", d.call.err, d.refWhat)
+			}
+		}
+	}
+	return sections, model, nil
+}
+
+// check 逐段核对数字和建议用语，返回带引用的全文。每段只与其引用的原文核对，不能用别处恰好相同的数字给错误引用背书。
+func (d summaryDoc[C, R]) check(sections []citedSection[R]) (string, Check) {
+	check := Check{Unsourced: []NumberRef{}, AdviceTerms: []TermRef{}}
+	var text strings.Builder
+	offset := 0 // text 已有的字符数，逐段累加，不每段重新数一遍
+	for i, section := range sections {
+		if i > 0 {
+			text.WriteString("\n\n")
+			offset += 2
+		}
+		var sources []string
+		for _, ref := range section.Refs {
+			sources = append(sources, d.source(ref)...)
+		}
+		c := Verify(section.Text, sources...)
+		check.Numbers += c.Numbers
+		for _, n := range c.Unsourced {
+			n.Start, n.End = n.Start+offset, n.End+offset
+			check.Unsourced = append(check.Unsourced, n)
+		}
+		for _, term := range c.AdviceTerms {
+			term.Start, term.End = term.Start+offset, term.End+offset
+			check.AdviceTerms = append(check.AdviceTerms, term)
+		}
+		cited := fmt.Sprintf("%s（%s）", section.Text, d.cite(section.Refs))
+		text.WriteString(cited)
+		offset += utf8.RuneCountInString(cited)
+	}
+	return text.String(), check
+}
+
+// summaryCacheKey 是摘要缓存的文件名，parts 是文档标识、模型和提示词；dir 为空时不缓存，返回空字符串。
+func summaryCacheKey(dir string, parts ...string) string {
+	if dir == "" {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(strings.Join(parts, "\x00")))
+	return hex.EncodeToString(sum[:])
+}
+
+// readSummaryCache 读取缓存的摘要，valid 检查是否属于这份文档和这一版提示词；读不到或不合格时返回 nil，重新生成。
+func readSummaryCache[T any](dir, key string, valid func(*T) bool) *T {
+	if key == "" {
+		return nil
+	}
+	data, err := os.ReadFile(filepath.Join(dir, key+".json"))
+	if err != nil {
+		return nil
+	}
+	var result T
+	if json.Unmarshal(data, &result) != nil || !valid(&result) {
+		return nil
+	}
+	return &result
+}
+
+// writeSummaryCache 写入缓存。调用方只缓存完整、正常结束且核对无警告的结果；失败、截断和取消都不写入。
+func writeSummaryCache(dir, key string, result any) {
+	if key == "" {
+		return
+	}
+	if data, err := json.MarshalIndent(result, "", "  "); err == nil {
+		_ = watchlist.AtomicWrite(filepath.Join(dir, key+".json"), data)
+	}
 }
