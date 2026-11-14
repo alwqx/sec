@@ -197,6 +197,38 @@ func TestVerifyNegationWords(t *testing.T) {
 	}
 }
 
+func TestVerifyAdviceCompounds(t *testing.T) {
+	const award = "The Compensation Committee approved an annual equity award with a Target Value of $55 million."
+	const fund = "基金合同生效之日起六个月内为建仓期。"
+	terms := func(answer string, sources ...string) []string {
+		var out []string
+		for _, term := range Verify(answer, sources...).AdviceTerms {
+			out = append(out, term.Text)
+		}
+		return out
+	}
+	// 来源里有对应原文时，复合词转述的是原文，不算建议；同一句里真正的建议用语照常列出。
+	for answer, c := range map[string]struct {
+		source string
+		want   []string
+	}{
+		"批准目标价值 5500 万美元的年度股权奖励。":         {award, nil},
+		"基金合同生效后六个月内为建仓期。":                {fund, nil},
+		"股权奖励目标价值 250 万美元，分析师目标价 300 美元。": {award, []string{"目标价"}},
+		"给出目标价格 300 元。":                   {award, []string{"目标价"}},
+		"建仓期结束后可以加仓。":                     {fund, []string{"加仓"}},
+		// 「目标价值得参考」是「目标价 / 值得」，不是复合词。
+		"分析师给出的目标价值得参考。": {award, []string{"目标价"}},
+	} {
+		require.Equal(t, c.want, terms(answer, c.source), answer)
+	}
+	// 来源里没有这些词（如估值解读的工具数据）时，同样的词是在给建议。
+	for _, answer := range []string{"该股目标价值 50 元。", "当前是较好的建仓期。"} {
+		require.NotEmpty(t, terms(answer, `{"pe":10}`), answer)
+		require.NotEmpty(t, terms(answer), answer)
+	}
+}
+
 func TestVerifyLargeSource(t *testing.T) {
 	// 几万个数字的大来源（如 K 线）：位置只在回答里算，来源去重排序后二分查找。
 	var b strings.Builder

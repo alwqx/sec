@@ -39,6 +39,7 @@
 35. Show only the provider, HTTP status and error code for AI model errors, including errors in streamed replies, never the error text.
 36. Share one summary pipeline between announcement and filing summaries.
 37. Add an AI summary button to 8-K rows in the Desktop SEC filings list.
+38. Stop flagging "目标价值" and "建仓期" as investment advice in AI summaries when the source uses those terms.
 
 ### v0.4.8
 

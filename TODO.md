@@ -148,7 +148,7 @@
     - [x] `provider/edgar.Read8K`、`llm.FilingSummarizer` 和 CLI `sec filings --summary <序号或链接>`，与公告摘要共用分块、并发和截断建议（`llm/summary.go`）。
     - [x] Desktop 申报列表行内「摘要」按钮和 `POST /api/v1/ai/filings/summary`。
     - [ ] 重构：Desktop 估值解读接口（`desktop/ai_valuation.go`）仍有一份读取模型配置的代码（配置错误分支、`aiSecret`、`llm.Open`），改用公告和申报摘要共用的 `openAIModel`。
-    - [ ] 数字核对把「目标价值」（8-K Item 5.02 股权奖励的 target value）误报为建议用语「目标价」，`llm.Verify` 的建议用语要排除这种复合词。
+    - [x] 数字核对把「目标价值」（8-K Item 5.02 股权奖励的 target value）误报为建议用语「目标价」，`llm.Verify` 的建议用语要排除这种复合词。 已完成：`adviceCompounds` 列出意思不同的复合词（目标价值、建仓期），只有来源里有对应原文（如 target value）时才不算建议用语。
     - [x] 重构：`cmd/filings`、`cmd/announcements` 和 `cmd/valuation` 的 `openSummarizer`/`openExplainer` 几乎一样（配置错误分支、`DefaultAISecret`、`llm.Open`、缓存目录），抽成共用函数。
     - [x] 重构：`cmd/filings` 和 `cmd/announcements` 的 `printSummary` 重复了 10 分钟超时、隐藏模型接口错误正文（防止回显 Key）和核对、说明、免责声明的输出，抽成共用函数，隐藏错误正文的规则只留一份。和上一项一起做。 已完成：共用部分在 `cmd/internal/aicli`；能给用户看的错误部分由 `llm.PublicError` 统一生成（厂商、HTTP 状态码或流内错误、错误类型代码），CLI 和 Desktop 都用它。估值解读原来没有隐藏错误正文，流式回复里的模型错误也一样，现在都不显示正文。
     - [x] 重构：`llm.FilingSummarizer` 和 `AnnouncementSummarizer` 的 `Summarize` 流程（缓存、限定引用的合并、组装结果、核对、只缓存无警告的结果）、`checkFilingSummary`/`checkSummary` 和 `readSummaryCache` 仍是两份，按引用类型（页码 int / 节标签 string）做成共用流程。已完成：共用流程是 `llm/summary.go` 的 `summaryDoc`，按引用类型泛型，10-K 摘要（8c）直接复用。
