@@ -1,11 +1,16 @@
 package filings
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
+	"github.com/alwqx/sec/config"
+	"github.com/alwqx/sec/llm"
 	"github.com/alwqx/sec/provider/edgar"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/h2non/gock.v1"
 )
@@ -68,7 +73,9 @@ func TestRisksArgs(t *testing.T) {
 		{"AAPL", "--risks=", "", ""}:            "--risks 需要列表序号",
 		{"--risks", "https://evil.test/a.htm"}:  "--risks 需要从 1 开始的列表序号",
 		{"AAPL", "--risks", cliTenKURL, ""}:     "--risks 用链接时不需要股票代码",
-		{"AAPL", "--risks", "1", "--ai=x"}:      "--ai 只能和 --summary 一起用",
+		{"AAPL", "--risks", "1", "--ai=x"}:      "--ai 只能和 --summary 或 --risks --explain 一起用",
+		{"AAPL", "--explain", "", ""}:           "--explain 只能和 --risks 一起用",
+		{"AAPL", "--risks=", "--explain", ""}:   "--risks 需要列表序号",
 		{"--risks", "1", "", ""}:                "请提供股票代码",
 	} {
 		var list []string
@@ -83,4 +90,81 @@ func TestRisksArgs(t *testing.T) {
 	mockSEC()
 	_, err := run(t, "AAPL", "--risks", "2")
 	require.ErrorContains(t, err, "第 2 条是 8-K，风险因素对比只支持 10-K")
+}
+
+func fakeRiskExplainer(t *testing.T, changes *edgar.RiskChanges) *llm.Fake {
+	t.Helper()
+	fake := &llm.Fake{Replies: []llm.FakeReply{llm.FakeText(`{"sections":[{"text":"今年新增人工智能风险，ESG 风险不再单独列出。","refs":["新增 1","删除 1"]}]}`)}}
+	old := openRiskExplainer
+	openRiskExplainer = func(cmd *cobra.Command) (*llm.RiskExplainer, *config.Config, error) {
+		return &llm.RiskExplainer{Client: fake, Model: llm.Model{Profile: "test", Name: "fake"}, Read: func(ctx context.Context, url string) (*edgar.RiskChanges, error) {
+			require.Equal(t, cliTenKURL, url)
+			return changes, ctx.Err()
+		}}, &config.Config{SECEmail: "sec_dev@example.com"}, nil
+	}
+	t.Cleanup(func() { openRiskExplainer = old })
+	return fake
+}
+
+func TestRisksExplain(t *testing.T) {
+	changes := &edgar.RiskChanges{
+		Current:  edgar.RiskFiling{Accession: "0000320193-26-000026", Form: "10-K", ReportDate: "2026-09-26", URL: cliTenKURL, Count: 1},
+		Previous: edgar.RiskFiling{Accession: "0000320193-25-000079", Form: "10-K", ReportDate: "2025-09-27", Count: 1},
+		RiskComparison: edgar.RiskComparison{Added: []edgar.RiskFactor{{Title: "AI may harm the Company.", Text: "AI outputs may be wrong."}},
+			Removed: []edgar.RiskFactor{{Title: "ESG scrutiny may result in costs.", Text: "ESG."}}, Revised: []edgar.RiskRevision{}, Kept: []edgar.RiskFactor{}},
+		Notes: []string{"对比说明。"},
+	}
+	fakeRiskExplainer(t, changes)
+	out, err := run(t, "--risks", cliTenKURL, "--explain", "--ai", "test")
+	require.NoError(t, err)
+	for _, text := range []string{"新增（1）：\n  1. AI may harm the Company.", "【AI 解读】模型 fake · 配置 test", "今年新增人工智能风险，ESG 风险不再单独列出。（新增 1、删除 1）",
+		"核对：", "对比说明。", "改写只看两年正文里不同的句子", "不构成投资建议"} {
+		require.Contains(t, out, text)
+	}
+
+	// 申报内容的问题和不加 --explain 时一样直接报错。
+	old := openRiskExplainer
+	openRiskExplainer = func(cmd *cobra.Command) (*llm.RiskExplainer, *config.Config, error) {
+		return &llm.RiskExplainer{Client: &llm.Fake{}, Read: func(context.Context, string) (*edgar.RiskChanges, error) {
+			return nil, fmt.Errorf("%w：没有找到上一份 10-K", edgar.ErrDocument)
+		}}, &config.Config{}, nil
+	}
+	_, err = run(t, "--risks", cliTenKURL, "--explain")
+	openRiskExplainer = old
+	require.EqualError(t, err, "SEC 申报原文无法读取：没有找到上一份 10-K")
+
+	fake := fakeRiskExplainer(t, changes)
+	out, err = run(t, "--risks", cliTenKURL, "--explain", "--json")
+	require.NoError(t, err)
+	var result llm.RiskExplanation
+	require.NoError(t, json.Unmarshal([]byte(out), &result), "JSON 模式只输出解读对象")
+	require.Equal(t, "0000320193-26-000026", result.Changes.Current.Accession)
+	require.Len(t, fake.Requests, 1)
+}
+
+func TestRisksExplainRejectsBeforeRequests(t *testing.T) {
+	defer gock.Off()
+	gock.Intercept()
+	gock.CleanUnmatchedRequest()
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	_, err := run(t, "AAPL", "--risks", "1", "--explain")
+	require.ErrorIs(t, err, llm.ErrNoProfile)
+	require.Empty(t, gock.GetUnmatchedRequests(), "模型配置有问题时不请求 EDGAR")
+}
+
+func TestRisksExplainReusesClient(t *testing.T) {
+	defer gock.Off()
+	t.Setenv("HOME", t.TempDir())
+	old := openRiskExplainer
+	openRiskExplainer = func(cmd *cobra.Command) (*llm.RiskExplainer, *config.Config, error) {
+		return &llm.RiskExplainer{Client: &llm.Fake{}}, &config.Config{SECEmail: "sec_dev@example.com"}, nil
+	}
+	t.Cleanup(func() { openRiskExplainer = old })
+	// 申报列表只 mock 一次：找上一年 10-K 时复用列表的客户端，不再下载。列表里只有一份 10-K。
+	mockSEC()
+	mockTenK("/Archives/edgar/data/320193/000032019326000026/", "0000320193-26-000026", "2026-11-03", riskDoc("The Company depends on component suppliers."))
+	_, err := run(t, "AAPL", "--risks", "1", "--explain")
+	require.EqualError(t, err, "SEC 申报原文无法读取：没有找到 2026-11-03 之前的上一份 10-K")
 }

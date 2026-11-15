@@ -29,6 +29,7 @@ func NewFilingsCLI() *cobra.Command {
   sec filings AAPL --form 8-K --summary 1
   sec filings AAPL --form 10-K --summary 1
   sec filings AAPL --form 10-K --risks 1
+  sec filings AAPL --form 10-K --risks 1 --explain
   sec filings --summary https://www.sec.gov/Archives/edgar/data/320193/000032019326000024/aapl-20261102.htm`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: filingsHandler,
@@ -40,8 +41,9 @@ func NewFilingsCLI() *cobra.Command {
 	cmd.Flags().StringP("output", "o", "", "Download the primary documents of the listed filings into this directory")
 	cmd.Flags().Bool("json", false, "Output JSON")
 	cmd.Flags().String("summary", "", "AI summary of an 8-K or 10-K: row number in the list (from 1) or SEC filing link")
-	cmd.Flags().String("ai", "", "Model profile for --summary, default profile if empty")
+	cmd.Flags().String("ai", "", "Model profile for --summary or --risks --explain, default profile if empty")
 	cmd.Flags().String("risks", "", "Compare the risk factors of a 10-K with the previous year's: row number in the list (from 1) or SEC filing link")
+	cmd.Flags().Bool("explain", false, "With --risks, have the AI model explain the risk factor changes")
 	return cmd
 }
 
@@ -58,8 +60,12 @@ func filingsHandler(cmd *cobra.Command, args []string) error {
 	if limit <= 0 {
 		return fmt.Errorf("--limit 须大于 0")
 	}
-	if flags.Changed("ai") && summary == "" {
-		return fmt.Errorf("--ai 只能和 --summary 一起用")
+	explain, _ := flags.GetBool("explain")
+	if explain && !flags.Changed("risks") {
+		return fmt.Errorf("--explain 只能和 --risks 一起用")
+	}
+	if flags.Changed("ai") && summary == "" && !explain {
+		return fmt.Errorf("--ai 只能和 --summary 或 --risks --explain 一起用")
 	}
 	// --summary 和 --risks 都选一份申报，参数规则相同；flag 是用到的参数，name 用在错误说明里。
 	selector, flag := summary, "summary"
@@ -107,10 +113,12 @@ func filingsHandler(cmd *cobra.Command, args []string) error {
 		query.Begin, query.End = begin.Format(utils.LayoutYYMMDD), end.Format(utils.LayoutYYMMDD)
 	}
 
-	// 摘要时先检查模型配置，配置有问题时不请求 EDGAR。
+	// 摘要和解读时先检查模型配置，配置有问题时不请求 EDGAR。
 	var summarizer *llm.FilingSummarizer
+	var explainer *llm.RiskExplainer
 	var cfg *config.Config
-	if summary != "" {
+	switch {
+	case summary != "":
 		var err error
 		if summarizer, cfg, err = openSummarizer(cmd); err != nil {
 			return err
@@ -118,7 +126,12 @@ func filingsHandler(cmd *cobra.Command, args []string) error {
 		if direct != "" {
 			return printSummary(cmd, summarizer, direct, asJSON)
 		}
-	} else {
+	case explain:
+		var err error
+		if explainer, cfg, err = openRiskExplainer(cmd); err != nil {
+			return err
+		}
+	default:
 		loaded, err := config.LoadOrWarn(cmd.Context(), cmd.ErrOrStderr())
 		if err != nil {
 			return err
@@ -126,8 +139,12 @@ func filingsHandler(cmd *cobra.Command, args []string) error {
 		cfg = &loaded
 	}
 	client := &edgar.Client{Email: cfg.SECEmail}
+	// 解读和列表共用一个 EDGAR 客户端，找上一年 10-K 时不再下载一遍申报列表。
+	if explainer != nil && explainer.Read == nil {
+		explainer.Read = client.RiskChanges
+	}
 	if risks != "" && direct != "" {
-		return printRisks(cmd, client, direct, asJSON)
+		return printRisks(cmd, client, explainer, direct, asJSON)
 	}
 	company, err := client.Lookup(cmd.Context(), args[0])
 	if err != nil {
@@ -153,7 +170,7 @@ func filingsHandler(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return err
 		}
-		return printRisks(cmd, client, target, asJSON)
+		return printRisks(cmd, client, explainer, target, asJSON)
 	}
 	if output != "" {
 		if err := download(cmd, client, company.Ticker, filings, output); err != nil {
@@ -189,7 +206,7 @@ func printFilings(out io.Writer, company edgar.Company, p *edgar.Profile, filing
 		table.Append([]string{strconv.Itoa(i + 1), f.FilingDate, f.Form, report, f.Description, f.URL})
 	}
 	table.Render()
-	fmt.Fprintln(out, "\n数据来自 SEC EDGAR。10-K 年报、10-Q 季报、8-K 重大事项、20-F/6-K 外国公司年报和临时报告；用 --form all 列出全部类型；--summary <序号> 用 AI 摘要 8-K 或 10-K；--risks <序号> 对比 10-K 和上一年的风险因素。")
+	fmt.Fprintln(out, "\n数据来自 SEC EDGAR。10-K 年报、10-Q 季报、8-K 重大事项、20-F/6-K 外国公司年报和临时报告；用 --form all 列出全部类型；--summary <序号> 用 AI 摘要 8-K 或 10-K；--risks <序号> 对比 10-K 和上一年的风险因素，加 --explain 用 AI 解读变化。")
 }
 
 // download 下载主文件，文件名为 代码-申报日-类型-申报编号.扩展名。

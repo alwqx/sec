@@ -293,6 +293,10 @@ func dice(a, b map[string]bool) float64 {
 	return 2 * float64(common) / float64(len(a)+len(b))
 }
 
+// RiskComparisonVersion 是识别风险因素小标题和对比规则的版本。规则改了（小标题、类别的识别，相似度的计算和阈值）
+// 要改这个值，依赖对比结果的缓存（如模型的解读）随之失效。
+const RiskComparisonVersion = "1"
+
 // RiskFiling 是参与对比的一份 10-K。
 type RiskFiling struct {
 	Accession  string `json:"accession"`

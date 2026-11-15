@@ -44,6 +44,7 @@
 40. Add a 10-K reader that extracts the risk factors and MD&A sections for upcoming 10-K summaries.
 41. Summarize the risk factors and MD&A of a 10-K with `sec filings --summary`.
 42. Compare a 10-K's risk factors with the previous year's using `sec filings --risks`, without a model.
+43. Explain the risk factor changes with an AI model using `sec filings --risks --explain`.
 
 ### v0.4.8
 
