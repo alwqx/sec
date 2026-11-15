@@ -207,6 +207,11 @@ type summaryDoc[C any, R cmp.Ordered] struct {
 	// source 返回一个引用位置的原文，用于数字核对；cite 把一段的引用写成正文后面括号里的文字。
 	source func(R) []string
 	cite   func([]R) string
+	// normalizeRef 在校验前规范化模型写的引用，比如把「改写3」写成输入里的「改写 3」；为空时只去掉前后空格（字符串引用）。
+	normalizeRef func(R) R
+	// mask 在数字核对前处理段落文字，比如去掉正文里写出的引用标签（改写 13）；必须保持字符数不变，
+	// 核对结果的位置才对得上。为空时不处理。
+	mask func(string) string
 }
 
 // summarize 并发摘要各块，多块时再合并；合并只能引用分块摘要引用过的位置，即使别的位置在原文里真实存在。
@@ -293,6 +298,11 @@ func (d summaryDoc[C, R]) part(ctx context.Context, input any, allowed map[R]boo
 				labels[j] = strings.TrimSpace(labels[j])
 			}
 		}
+		if d.normalizeRef != nil {
+			for j := range section.Refs {
+				section.Refs[j] = d.normalizeRef(section.Refs[j])
+			}
+		}
 		section.Text = strings.TrimSpace(section.Text)
 		slices.SortFunc(section.Refs, order)
 		section.Refs = slices.Compact(section.Refs)
@@ -327,7 +337,11 @@ func (d summaryDoc[C, R]) check(sections []citedSection[R]) (string, Check) {
 		for _, ref := range section.Refs {
 			sources = append(sources, d.source(ref)...)
 		}
-		c := Verify(section.Text, sources...)
+		checked := section.Text
+		if d.mask != nil {
+			checked = d.mask(checked)
+		}
+		c := Verify(checked, sources...)
 		check.Numbers += c.Numbers
 		for _, n := range c.Unsourced {
 			n.Start, n.End = n.Start+offset, n.End+offset
