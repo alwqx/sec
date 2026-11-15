@@ -171,8 +171,9 @@ func TestRiskChanges(t *testing.T) {
 func TestRiskFactorsIgnoreSummaryLimit(t *testing.T) {
 	defer gock.Off()
 	client := &Client{Email: "test@example.com", CacheDir: t.TempDir()}
-	// MD&A 很长时摘要超过字数上限，风险因素对比不受影响。
-	long := strings.Replace(riskTenK("The Company depends on component suppliers in Asia."), "Net sales increased 6%. ", strings.Repeat("Net sales increased 6%. ", MaxDocumentRunes/20), 1)
+	// 风险因素很长时摘要超过字数上限（MD&A 有自己的上限，见 TestReadTenKLongMDNA），风险因素对比不受影响。
+	sentence := "Supply constraints could increase component costs and delay shipments. "
+	long := strings.Replace(riskTenK("The Company depends on component suppliers in Asia."), sentence, strings.Repeat(sentence, MaxDocumentRunes/len(sentence)+1), 1)
 	mock10K("10-K", long)
 	_, err := client.Read10K(context.Background(), "https://www.sec.gov"+docIndex)
 	require.ErrorContains(t, err, "超过 400000 字")

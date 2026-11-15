@@ -46,6 +46,7 @@
 42. Compare a 10-K's risk factors with the previous year's using `sec filings --risks`, without a model.
 43. Explain the risk factor changes with an AI model using `sec filings --risks --explain`.
 44. Add 10-K summaries and risk factor changes to the Desktop SEC filings list.
+45. Find the MD&A of banks whose 10-K Item 7 only points to the annual report, and summarize the first 100,000 characters of long MD&As.
 
 ### v0.4.8
 

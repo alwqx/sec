@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -24,7 +25,7 @@ var (
 	pageNumber = regexp.MustCompile(`(?i)^(page\s+)?\d{1,3}(\s+of\s+\d{1,3})?$`)
 	partHeader = regexp.MustCompile(`(?i)^parts?\s+[ivx]+(\s*(,|and|&)\s*[ivx]+)*$`)
 	bareItem   = regexp.MustCompile(`(?i)^items?\s*\d{1,2}[a-c]?\.?(\s*(,|and|&)\s*\d{1,2}[a-c]?)*$`)
-	formFooter = regexp.MustCompile(`(?i)form\s+10-k\b.*\b\d{1,3}$`)
+	formFooter = regexp.MustCompile(`(?i)(form\s+10-k\b.*\b\d{1,3}$)|(^\d{1,3}\s.*\b(19|20)\d{2}\s+form\s+10-k$)`)
 	// tenKTitles 是 10-K 各 Item 标准标题的开头（小写），用来识别标题和正文写在同一段、或编号和标题分成两行的标题。
 	tenKTitles = map[string][]string{
 		"1": {"business"}, "1a": {"risk factors"}, "1b": {"unresolved staff comments"}, "1c": {"cybersecurity"},
@@ -83,6 +84,22 @@ func read10K(doc *FilingDocument, docLines []docLine) (*FilingDocument, error) {
 		start, end := findSection(lines, scanned, want.item, want.title)
 		section := sectionText(lines, scanned, start, end)
 		n := utf8.RuneCountInString(section)
+		var notes []string
+		// 银行等公司的 Item 7 只写「见年报第 X 页」，管理层讨论与分析在年报正文里，按标题找。
+		if want.item == "7" && n < minSectionRunes {
+			if text := mdnaByTitle(docLines, scanned); utf8.RuneCountInString(text) >= minSectionRunes {
+				where := "Item 7 只是引用年报的其他部分"
+				if section == "" {
+					where = "10-K 正文里没有 Item 7 标题"
+				}
+				section, n = text, utf8.RuneCountInString(text)
+				notes = append(notes, where+"，按「Management’s discussion and analysis」标题在年报正文里取出管理层讨论与分析。")
+			}
+		}
+		if want.item == "7" && n > maxMDNARunes {
+			section = truncateLines(section, maxMDNARunes)
+			notes = append(notes, fmt.Sprintf("管理层讨论与分析有 %d 字，只摘要开头的 %d 字（通常是概览、经营结果和财务状况），后面的部分未参与摘要。", n, utf8.RuneCountInString(section)))
+		}
 		switch {
 		case section == "":
 			doc.Notes = append(doc.Notes, fmt.Sprintf("10-K 正文里没有找到 %s。", want.label))
@@ -90,6 +107,7 @@ func read10K(doc *FilingDocument, docLines []docLine) (*FilingDocument, error) {
 			doc.Notes = append(doc.Notes, fmt.Sprintf(want.short, n))
 		default:
 			doc.Sections = append(doc.Sections, DocumentSection{Label: want.label, URL: doc.URL, Text: section})
+			doc.Notes = append(doc.Notes, notes...)
 			if want.item == "1a" {
 				doc.RiskFactors = riskFactors(docLines, scanned, start, end)
 			}
@@ -99,6 +117,85 @@ func read10K(doc *FilingDocument, docLines []docLine) (*FilingDocument, error) {
 		return nil, fmt.Errorf("%w：10-K 正文里没有可摘要的 Item 1A 或 Item 7", ErrDocument)
 	}
 	return doc, nil
+}
+
+// maxMDNARunes 是参与摘要的管理层讨论与分析的字数上限。大银行的 MD&A 有 30 多万字（高盛的 Item 7、摩根大通年报里的
+// MD&A），全部摘要要十几块、加上 Item 1A 超过 MaxDocumentRunes；开头的 10 万字通常已经包括概览、经营结果和财务状况。
+const maxMDNARunes = 100000
+
+// mdnaEnds 是年报里管理层讨论与分析之后的部分的标题（规范化后的开头）。
+var mdnaEnds = []string{"report of independent registered public accounting firm", "management's report on internal control"}
+
+// maxHeadingRunes 是按标题找章节时标题行的最大字数，更长的是正文。
+const maxHeadingRunes = 120
+
+// mdnaByTitle 在年报正文里按标题找管理层讨论与分析：从加粗或斜体的「Management's discussion and analysis」标题行
+// （以冒号结尾的是目录）到下一个结束行（审计报告或管理层内部控制报告的标题或目录行、Item 8、SIGNATURES），
+// 和 findSection 一样取正文最长的一段：目录、每页重复的同名页眉开始的段都更短。每页的同名页眉和其他页眉页脚不放进正文。
+// 找不到时返回空字符串。
+func mdnaByTitle(lines []docLine, scanned []tenKLine) string {
+	// heading 返回短行规范化后的文字，长行返回空字符串，不必为正文做规范化。
+	heading := func(i int) string {
+		if len(lines[i].text) > maxHeadingRunes*4 || utf8.RuneCountInString(lines[i].text) > maxHeadingRunes {
+			return ""
+		}
+		return normalizeTitle(lines[i].text)
+	}
+	// 结束行不要求加粗：目录里「Report of Independent Registered Public Accounting Firm 162」这样的行也结束目录开始的段。
+	isEnd := func(i int) bool {
+		if scanned[i].end || scanned[i].item == "8" {
+			return true
+		}
+		t := heading(i)
+		return t != "" && slices.ContainsFunc(mdnaEnds, func(end string) bool { return strings.HasPrefix(t, end) })
+	}
+	var best []string
+	bestRunes := 0
+	for start, l := range lines {
+		if !l.emphasized || scanned[start].furniture {
+			continue
+		}
+		header := heading(start)
+		if !strings.HasPrefix(header, "management's discussion and analysis") || strings.HasSuffix(header, ":") {
+			continue
+		}
+		section, n := []string{l.text}, utf8.RuneCountInString(l.text)
+		for i := start + 1; i < len(lines) && !isEnd(i); i++ {
+			if scanned[i].furniture || (lines[i].emphasized && heading(i) == header) {
+				continue
+			}
+			section, n = append(section, lines[i].text), n+utf8.RuneCountInString(lines[i].text)
+		}
+		if n > bestRunes {
+			best, bestRunes = section, n
+		}
+	}
+	return strings.Join(best, "\n")
+}
+
+// truncateLines 截取不超过 n 个字的开头部分，尽量按整行截；按整行截剩下不到一半时（后面是很长的一行）截这一行的开头。
+func truncateLines(text string, n int) string {
+	var b strings.Builder
+	total := 0
+	for i, line := range strings.Split(text, "\n") {
+		sep := min(i, 1)
+		k := utf8.RuneCountInString(line)
+		if total+sep+k > n {
+			if room := n - total - sep; total < n/2 && room > 0 {
+				if sep > 0 {
+					b.WriteByte('\n')
+				}
+				b.WriteString(string([]rune(line)[:room]))
+			}
+			return b.String()
+		}
+		if sep > 0 {
+			b.WriteByte('\n')
+		}
+		b.WriteString(line)
+		total += sep + k
+	}
+	return text
 }
 
 // tenKLine 是一行的分类结果。
@@ -131,6 +228,10 @@ func scanTenK(lines []string) []tenKLine {
 		// 以「Item 8 of this Form 10-K」开头的长句不是标题；标题和正文在同一段时，标题必须是标准标题。
 		case len(line) > maxHeadingBytes && !standardTitle(l.item, l.title):
 			l.item, l.title = "", ""
+		// 编号后面不是标准标题、标准标题在下一行（美国银行的「Item 7. Bank of America Corporation and Subsidiaries」
+		// 下一行是「Management's Discussion and Analysis…」）。
+		case !standardTitle(l.item, l.title) && i+1 < len(lines) && utf8.RuneCountInString(lines[i+1]) <= 100 && standardTitle(l.item, lines[i+1]):
+			l.title = lines[i+1]
 		}
 	}
 	markPageNumbers(lines, out)
@@ -224,8 +325,9 @@ func sectionText(lines []string, scanned []tenKLine, start, end int) string {
 	return strings.Join(section, "\n")
 }
 
-// pageFurniture 判断一行是不是页眉页脚：Table of Contents、PART 标题、只有编号的 Item 页眉，以及以页码结尾、
-// 带 Form 10-K 字样的短行（如 Apple Inc. | 2026 Form 10-K | 5）。正文里提到「this Form 10-K.」的句子不算。
+// pageFurniture 判断一行是不是页眉页脚：Table of Contents、PART 标题、只有编号的 Item 页眉，以及以页码结尾或开头、
+// 带 Form 10-K 字样的短行（如 Apple Inc. | 2026 Form 10-K | 5，摩根大通偶数页的 160 JPMorgan Chase & Co./2025 Form 10-K；
+// 页码在开头时要求 Form 10-K 前面是年份，「1 See Note 2 of this Form 10-K」这样的脚注不算）。正文里提到「this Form 10-K.」的句子不算。
 // 不按重复次数判断：MD&A 表格的表头（如 2026 Change 2025）也会反复出现，不能删。单独一行的页码见 scanTenK。
 func pageFurniture(line string) bool {
 	switch {
