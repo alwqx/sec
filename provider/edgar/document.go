@@ -115,8 +115,8 @@ type indexDocument struct {
 	Type, URL string
 }
 
-// readPrimary 读取申报目录页和主文件的文字，是 Read8K、Read10K 共用的部分。forms 是可以读取的基本类型（不含 /A），
-// 第一个用在错误说明里。返回申报信息、目录页的文件表和主文件文字。
+// readPrimary 读取申报目录页和主文件的文字，是 Read8K、Read10K 和 ReadFiling 共用的部分。forms 是可以读取的基本类型
+// （不含 /A），类型不对时在错误说明里列出。返回申报信息、目录页的文件表和主文件文字。
 func (c *Client) readPrimary(ctx context.Context, raw string, forms ...string) (*FilingDocument, []indexDocument, string, error) {
 	ref, err := ParseFilingURL(raw)
 	if err != nil {
@@ -131,8 +131,12 @@ func (c *Client) readPrimary(ctx context.Context, raw string, forms ...string) (
 	if err != nil {
 		return nil, nil, "", err
 	}
-	if base, _ := strings.CutSuffix(doc.Form, "/A"); !slices.Contains(forms, base) {
-		return nil, nil, "", unsupportedForm{got: doc.Form, want: forms[0]}
+	if !slices.Contains(forms, BaseForm(doc.Form)) {
+		want := forms[len(forms)-1]
+		if len(forms) > 1 {
+			want = strings.Join(forms[:len(forms)-1], "、") + " 或 " + want
+		}
+		return nil, nil, "", unsupportedForm{got: doc.Form, want: want}
 	}
 	for _, d := range docs {
 		if strings.EqualFold(d.Type, doc.Form) {
@@ -141,13 +145,40 @@ func (c *Client) readPrimary(ctx context.Context, raw string, forms ...string) (
 		}
 	}
 	if doc.URL == "" || !textDocument[strings.ToLower(path.Ext(doc.URL))] {
-		return nil, nil, "", fmt.Errorf("%w：申报目录里没有 HTML 或文本格式的 %s 主文件", ErrDocument, forms[0])
+		return nil, nil, "", fmt.Errorf("%w：申报目录里没有 HTML 或文本格式的 %s 主文件", ErrDocument, doc.Form)
 	}
 	text, err := c.documentText(ctx, doc.URL)
 	if err != nil {
 		return nil, nil, "", err
 	}
 	return doc, docs, text, nil
+}
+
+// BaseForm 去掉修订版的 /A，如 10-K/A 是 10-K。
+func BaseForm(form string) string {
+	base, _ := strings.CutSuffix(form, "/A")
+	return base
+}
+
+// SummarizableForms 是 ReadFiling 能读取、可以摘要的基本类型（都含修订版）。CLI 选择列表行和 llm 选择提示词都按它判断。
+var SummarizableForms = []string{"8-K", "10-K", "10-KT"}
+
+// Summarizable 判断申报类型（含修订版）能不能用 ReadFiling 读取并摘要。
+func Summarizable(form string) bool {
+	return slices.Contains(SummarizableForms, BaseForm(form))
+}
+
+// ReadFiling 按申报类型读取可以摘要的申报：8-K 同 Read8K，10-K 和 10-KT 同 Read10K（都含修订版）。
+// 只用链接摘要时事先不知道类型，申报目录页只读一次。
+func (c *Client) ReadFiling(ctx context.Context, raw string) (*FilingDocument, error) {
+	doc, docs, text, err := c.readPrimary(ctx, raw, SummarizableForms...)
+	if err != nil {
+		return nil, err
+	}
+	if BaseForm(doc.Form) == "8-K" {
+		return c.read8K(ctx, doc, docs, text)
+	}
+	return read10K(doc, text)
 }
 
 // Read8K 读取一份 8-K（含 8-K/A）：主文件按 Item 切分（不含封面、签名和 Item 9.01 附件清单），
@@ -157,6 +188,11 @@ func (c *Client) Read8K(ctx context.Context, raw string) (*FilingDocument, error
 	if err != nil {
 		return nil, err
 	}
+	return c.read8K(ctx, doc, docs, text)
+}
+
+// read8K 切分已读到的 8-K 主文件，并读取 EX-99 附件。
+func (c *Client) read8K(ctx context.Context, doc *FilingDocument, docs []indexDocument, text string) (*FilingDocument, error) {
 	var exhibits []indexDocument
 	for _, d := range docs {
 		if exhibitType.MatchString(d.Type) {

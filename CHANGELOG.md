@@ -42,6 +42,7 @@
 38. Stop flagging "目标价值" and "建仓期" as investment advice in AI summaries when the source uses those terms.
 39. Share model config loading across the Desktop AI endpoints.
 40. Add a 10-K reader that extracts the risk factors and MD&A sections for upcoming 10-K summaries.
+41. Summarize the risk factors and MD&A of a 10-K with `sec filings --summary`.
 
 ### v0.4.8
 
