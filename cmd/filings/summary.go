@@ -3,6 +3,7 @@ package filings
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -14,13 +15,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// summarySelector 解析 --summary：列表序号（从 1 开始），或申报目录下的文件链接。
-func summarySelector(value string) (int, string, error) {
+// summarySelector 解析 --summary 或 --risks（name）：列表序号（从 1 开始），或申报目录下的文件链接。
+func summarySelector(name, value string) (int, string, error) {
 	if index, err := strconv.Atoi(value); err == nil && index > 0 {
 		return index, "", nil
 	}
 	if _, err := edgar.ParseFilingURL(value); err != nil {
-		return 0, "", fmt.Errorf("--summary 需要从 1 开始的列表序号，或 SEC 申报文件链接")
+		return 0, "", fmt.Errorf("%s 需要从 1 开始的列表序号，或 SEC 申报文件链接", name)
 	}
 	return 0, value, nil
 }
@@ -38,12 +39,17 @@ var openSummarizer = func(cmd *cobra.Command) (*llm.FilingSummarizer, *config.Co
 
 // summaryTarget 返回列表第 index 条申报的地址；只支持 edgar.SummarizableForms（含修订版），其他类型不读原文直接报错。
 func summaryTarget(filings []edgar.Filing, index int) (string, error) {
+	return rowTarget(filings, index, edgar.SummarizableForms, "目前只支持摘要")
+}
+
+// rowTarget 返回列表第 index 条申报的地址。forms 是支持的基本类型（含修订版），其他类型报「第 n 条是 X，<what> <forms>」。
+func rowTarget(filings []edgar.Filing, index int, forms []string, what string) (string, error) {
 	if index > len(filings) {
 		return "", fmt.Errorf("申报序号超出列表范围（共 %d 条），请先查看申报列表", len(filings))
 	}
 	f := filings[index-1]
-	if !edgar.Summarizable(f.Form) {
-		return "", fmt.Errorf("第 %d 条是 %s，目前只支持摘要 %s", index, f.Form, strings.Join(edgar.SummarizableForms, "、"))
+	if !slices.Contains(forms, edgar.BaseForm(f.Form)) {
+		return "", fmt.Errorf("第 %d 条是 %s，%s %s", index, f.Form, what, strings.Join(forms, "、"))
 	}
 	return f.URL, nil
 }

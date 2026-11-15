@@ -43,6 +43,7 @@
 39. Share model config loading across the Desktop AI endpoints.
 40. Add a 10-K reader that extracts the risk factors and MD&A sections for upcoming 10-K summaries.
 41. Summarize the risk factors and MD&A of a 10-K with `sec filings --summary`.
+42. Compare a 10-K's risk factors with the previous year's using `sec filings --risks`, without a model.
 
 ### v0.4.8
 

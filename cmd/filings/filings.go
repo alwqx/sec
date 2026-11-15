@@ -28,6 +28,7 @@ func NewFilingsCLI() *cobra.Command {
   sec filings AAPL --form 10-K -n 1 -o ~/Downloads
   sec filings AAPL --form 8-K --summary 1
   sec filings AAPL --form 10-K --summary 1
+  sec filings AAPL --form 10-K --risks 1
   sec filings --summary https://www.sec.gov/Archives/edgar/data/320193/000032019326000024/aapl-20261102.htm`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: filingsHandler,
@@ -40,6 +41,7 @@ func NewFilingsCLI() *cobra.Command {
 	cmd.Flags().Bool("json", false, "Output JSON")
 	cmd.Flags().String("summary", "", "AI summary of an 8-K or 10-K: row number in the list (from 1) or SEC filing link")
 	cmd.Flags().String("ai", "", "Model profile for --summary, default profile if empty")
+	cmd.Flags().String("risks", "", "Compare the risk factors of a 10-K with the previous year's: row number in the list (from 1) or SEC filing link")
 	return cmd
 }
 
@@ -51,33 +53,43 @@ func filingsHandler(cmd *cobra.Command, args []string) error {
 	limit, _ := flags.GetInt("limit")
 	output, _ := flags.GetString("output")
 	asJSON, _ := flags.GetBool("json")
-	selector, _ := flags.GetString("summary")
+	summary, _ := flags.GetString("summary")
+	risks, _ := flags.GetString("risks")
 	if limit <= 0 {
 		return fmt.Errorf("--limit 须大于 0")
 	}
-	if flags.Changed("ai") && selector == "" {
+	if flags.Changed("ai") && summary == "" {
 		return fmt.Errorf("--ai 只能和 --summary 一起用")
 	}
-	if flags.Changed("summary") && selector == "" {
-		return fmt.Errorf("--summary 需要列表序号或 SEC 申报文件链接")
+	// --summary 和 --risks 都选一份申报，参数规则相同；flag 是用到的参数，name 用在错误说明里。
+	selector, flag := summary, "summary"
+	switch {
+	case flags.Changed("summary") && flags.Changed("risks"):
+		return fmt.Errorf("--summary 和 --risks 不能一起用")
+	case flags.Changed("risks"):
+		selector, flag = risks, "risks"
+	}
+	name := "--" + flag
+	if flags.Changed(flag) && selector == "" {
+		return fmt.Errorf("%s 需要列表序号或 SEC 申报文件链接", name)
 	}
 	if selector != "" && output != "" {
-		return fmt.Errorf("--summary 不能和 --output 一起用")
+		return fmt.Errorf("%s 不能和 --output 一起用", name)
 	}
 	var index int
 	var direct string
 	if selector != "" {
 		var err error
-		if index, direct, err = summarySelector(selector); err != nil {
+		if index, direct, err = summarySelector(name, selector); err != nil {
 			return err
 		}
 	}
 	if direct == "" && len(args) != 1 {
-		return fmt.Errorf("请提供股票代码，或用 --summary 指定 SEC 申报文件链接")
+		return fmt.Errorf("请提供股票代码，或用 --summary、--risks 指定 SEC 申报文件链接")
 	}
 	// 链接已经确定了申报，代码和筛选条件用不上，给了说明用户以为在筛选，直接报错，不悄悄忽略。
 	if direct != "" && (len(args) > 0 || flags.Changed("form") || flags.Changed("limit") || flags.Changed("begin") || flags.Changed("end")) {
-		return fmt.Errorf("--summary 用链接时不需要股票代码和 --form、-n、-b、-e；要按列表摘要，请用序号")
+		return fmt.Errorf("%s 用链接时不需要股票代码和 --form、-n、-b、-e；要按列表选择，请用序号", name)
 	}
 	query := edgar.FilingQuery{Want: limit}
 	if !strings.EqualFold(strings.TrimSpace(formText), "all") {
@@ -98,7 +110,7 @@ func filingsHandler(cmd *cobra.Command, args []string) error {
 	// 摘要时先检查模型配置，配置有问题时不请求 EDGAR。
 	var summarizer *llm.FilingSummarizer
 	var cfg *config.Config
-	if selector != "" {
+	if summary != "" {
 		var err error
 		if summarizer, cfg, err = openSummarizer(cmd); err != nil {
 			return err
@@ -114,6 +126,9 @@ func filingsHandler(cmd *cobra.Command, args []string) error {
 		cfg = &loaded
 	}
 	client := &edgar.Client{Email: cfg.SECEmail}
+	if risks != "" && direct != "" {
+		return printRisks(cmd, client, direct, asJSON)
+	}
 	company, err := client.Lookup(cmd.Context(), args[0])
 	if err != nil {
 		return err
@@ -132,6 +147,13 @@ func filingsHandler(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		return printSummary(cmd, summarizer, target, asJSON)
+	}
+	if risks != "" {
+		target, err := risksTarget(filings, index)
+		if err != nil {
+			return err
+		}
+		return printRisks(cmd, client, target, asJSON)
 	}
 	if output != "" {
 		if err := download(cmd, client, company.Ticker, filings, output); err != nil {
@@ -167,7 +189,7 @@ func printFilings(out io.Writer, company edgar.Company, p *edgar.Profile, filing
 		table.Append([]string{strconv.Itoa(i + 1), f.FilingDate, f.Form, report, f.Description, f.URL})
 	}
 	table.Render()
-	fmt.Fprintln(out, "\n数据来自 SEC EDGAR。10-K 年报、10-Q 季报、8-K 重大事项、20-F/6-K 外国公司年报和临时报告；用 --form all 列出全部类型；--summary <序号> 用 AI 摘要 8-K 或 10-K。")
+	fmt.Fprintln(out, "\n数据来自 SEC EDGAR。10-K 年报、10-Q 季报、8-K 重大事项、20-F/6-K 外国公司年报和临时报告；用 --form all 列出全部类型；--summary <序号> 用 AI 摘要 8-K 或 10-K；--risks <序号> 对比 10-K 和上一年的风险因素。")
 }
 
 // download 下载主文件，文件名为 代码-申报日-类型-申报编号.扩展名。

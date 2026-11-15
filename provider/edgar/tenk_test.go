@@ -93,7 +93,9 @@ func TestPageFurniture(t *testing.T) {
 // section 用纯文字的行测试章节查找，item 用小写编号。
 func section(text, item, title string) string {
 	lines := strings.Split(text, "\n")
-	return findSection(lines, scanTenK(lines), item, title)
+	scanned := scanTenK(lines)
+	start, end := findSection(lines, scanned, item, title)
+	return sectionText(lines, scanned, start, end)
 }
 
 func TestFindSection(t *testing.T) {
