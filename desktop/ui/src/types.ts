@@ -277,7 +277,8 @@ export interface AnnouncementSummary {
   created_at: string
 }
 
-// FilingSummary 是 8-K 事项摘要（llm.FilingSummary）：每段引用 Item 或 Exhibit 的标签，sources 给出各节原文地址。
+// FilingSummary 是 8-K 事项摘要或 10-K 风险因素和 MD&A 摘要（llm.FilingSummary）：每段引用 Item 或 Exhibit 的标签，
+// sources 给出各节原文地址；report_date 在 8-K 是最早事项的发生日，在 10-K 是财年截止日。
 export interface FilingSummary {
   document_id: string
   form: string
@@ -286,6 +287,34 @@ export interface FilingSummary {
   as_of: string
   report_date: string
   sources: { label: string; url: string }[]
+  sections: { text: string; refs: string[] }[]
+  text: string
+  notes: string[]
+  check: ValuationExplanation['check']
+  disclaimer: string
+  model: string
+  profile: string
+  prompt_version: string
+  cached: boolean
+  created_at: string
+}
+
+// RiskChanges 是一份 10-K 和上一年 10-K 的风险因素对比（edgar.RiskChanges），确定性规则，不调用模型；不含正文。
+export interface RiskFactor { category?: string; title: string }
+export interface RiskFiling { accession: string; form: string; filing_date: string; report_date: string; url: string; count: number }
+export interface RiskChanges {
+  current: RiskFiling
+  previous: RiskFiling
+  added: RiskFactor[]
+  removed: RiskFactor[]
+  revised: { old: RiskFactor; new: RiskFactor; title_similarity: number; text_similarity: number }[]
+  kept: RiskFactor[]
+  notes: string[]
+}
+
+// RiskExplanation 是风险因素变化的 AI 解读（llm.RiskExplanation）：每段引用变化标签，如「新增 1」「改写 3」，对应 changes 里的序号。
+export interface RiskExplanation {
+  changes: RiskChanges
   sections: { text: string; refs: string[] }[]
   text: string
   notes: string[]

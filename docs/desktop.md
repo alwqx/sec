@@ -297,6 +297,8 @@ macOS 按当前进程架构匹配 `sec-<tag>-desktop-darwin-<arch>.dmg`，不将
 | GET | `/api/v1/ipo?page=1&since=2024-01-01&until=2024-12-31` | 每页 30 条新股，since/until 为可选上市日期边界（YYYY-MM-DD），返回筛选后的 total 与 has_more |
 | GET | `/api/v1/announcements?page=1&code=SH600036&key=年度报告&type=annual` | code 可省略以查询最新披露，支持分页与标题关键字；type 可省略查询全部，或为 annual/halfyear/q1/q3，对应巨潮公告分类 |
 | GET | `/api/v1/filings?code=$AAPL&type=periodic&page=1` | 美股 SEC 申报：`company`、`ticker`、`total`、`has_more`、`results`；type 为 periodic（10-K/10-Q/20-F/40-F）、current（8-K/6-K）、insider（Form 3/4/5/144）、all，留空为主要申报；`truncated` 为 true 表示更早的申报没有读取；SEC 没有这家公司时 404 |
+| GET | `/api/v1/filings/risks?url=<10-K 链接>` | 对比一份 10-K 和上一年 10-K 的风险因素小标题（`edgar.RiskChanges`）：`current`、`previous`、`added`、`removed`、`revised`、`kept`、`notes`，不含正文，不调用模型；不是 10-K、识别不出小标题或没有上一年的 10-K 时 422 |
+| POST | `/api/v1/ai/filings/risks` | 用模型解读风险因素变化（`llm.RiskExplanation`）：只接收 `url` 和可选 `profile`，和 `sec filings --risks --explain` 共用缓存；无效链接 400，模型配置不可用 409，申报内容的问题 422，SEC 下载失败 502，超过 10 分钟 504 |
 | GET | `/api/v1/fund/overview?code=OF005827` | 基金概况（`fund.Info`）：净值或货币基金收益、阶段收益率、基金档案和 `notes`；没有这只基金时 404，两个数据源都失败时 502 |
 | GET | `/api/v1/hk/company?code=HK00700` | 港股公司概况：公司资料、价格、市盈率、市净率和市值，`currency` 是交易币种，`equity` 为 false 时是基金、信托、权证等，`notes` 是东方财富失败或没有数据的说明；代码不存在时 404，新浪行情失败时 502 |
 | GET | `/api/v1/us/company?code=$AAPL` | 美股公司资料：`info`（`company` 为 SEC EDGAR 公司信息，`quote` 为新浪行情和估值，失败的一方为 null）和 `notes`（失败原因）；两方都失败时 502 |

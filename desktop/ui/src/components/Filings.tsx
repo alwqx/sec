@@ -1,11 +1,13 @@
 import { useCallback, useState } from 'react'
 import { filings } from '../api'
 import { useAIModels } from '../hooks/useAIModels'
-import { summarizableFiling } from '../aiSummary'
+import { riskFiling, summarizableFiling, summaryPrivacy } from '../aiSummary'
+import { openDisclosure } from '../disclosure'
 import { useResource } from '../hooks/useResource'
 import ResourceState from './ResourceState'
 import Pagination from './Pagination'
 import FilingSummary from './FilingSummary'
+import RiskChanges from './RiskChanges'
 import SummaryModelPicker from './SummaryModelPicker'
 
 const categories = { '': '主要申报', periodic: '年报和季报', current: '重大事项', insider: '内部人交易', all: '全部' }
@@ -22,6 +24,8 @@ export default function Filings({ code }: { code: string }) {
   const data = resource.data
   const summarizable = data?.results.some(item => summarizableFiling(item.form)) ?? false
   const models = useAIModels(summarizable)
+  const privacy = summaryPrivacy(data?.results.filter(item => summarizableFiling(item.form)).map(item => item.form) ?? [])
+  const open = openDisclosure(() => setCopyError('打开原文失败，请复制链接到浏览器。'))
   const { profile, unavailable } = models
   const copy = async (url: string) => {
     try { await navigator.clipboard.writeText(url); setCopied(url); setCopyError('') }
@@ -32,19 +36,16 @@ export default function Filings({ code }: { code: string }) {
     <div className="section-toolbar"><div className="segmented" role="group" aria-label="申报类别">{(Object.keys(categories) as Category[]).map(item => <button key={item} type="button" aria-pressed={category === item} onClick={() => { setCategory(item); setPage(1) }}>{categories[item]}</button>)}</div></div>
     {data && <p className="data-note">{data.company.name}（{data.ticker}，CIK {data.company.cik}）· {data.company.exchanges?.join('/')} · {data.company.industry}{fiscal}</p>}
     <p className="data-note">SEC EDGAR 官方申报 · {categories[category]} · 主要申报包括 10-K 年报、10-Q 季报、8-K 重大事项、20-F/6-K 外国公司年报和临时报告、委托书和招股书。联系邮箱可在设置中修改。</p>
-    {summarizable && <SummaryModelPicker models={models} sends="8-K 正文和 EX-99 附件的文本" extra="目前只支持摘要 8-K，引用对应 Item 和附件。" />}
+    {summarizable && <SummaryModelPicker models={models} sends={privacy.sends} extra={privacy.extra} />}
     {data?.truncated && <p className="data-note">这家公司申报很多，只查了最近一段时间，更早的申报没有列出；可以用命令行 sec filings -b 指定开始日期查全。</p>}
     {copyError && <p className="error" role="alert">{copyError}</p>}
     <ResourceState {...resource} retry={resource.reload} />
     {data && (data.results.length === 0 ? <div className="empty-state">暂无符合条件的申报</div> : <ul className="announcement-list">{data.results.map(item => <li key={item.accession}>
       <div className="announcement-meta"><time>{item.filing_date}</time><span>{item.form}{item.report_date ? ` · 报告期 ${item.report_date}` : ''}</span></div>
       <h3>{item.description || item.form}</h3>
-      <div className="announcement-actions"><a href={item.url} target="_blank" rel="noopener noreferrer" onClick={e => {
-        if (!window.secOpenDisclosure) return
-        e.preventDefault()
-        void window.secOpenDisclosure(item.url).catch(() => setCopyError('打开原文失败，请复制链接到浏览器。'))
-      }}>查看原文 ↗</a><button onClick={() => void copy(item.url)}>{copied === item.url ? '已复制链接' : '复制链接'}</button></div>
-      {summarizableFiling(item.form) && <FilingSummary url={item.url} profile={profile} unavailable={unavailable} />}
+      <div className="announcement-actions"><a href={item.url} target="_blank" rel="noopener noreferrer" onClick={open(item.url)}>查看原文 ↗</a><button onClick={() => void copy(item.url)}>{copied === item.url ? '已复制链接' : '复制链接'}</button></div>
+      {summarizableFiling(item.form) && <FilingSummary url={item.url} form={item.form} profile={profile} unavailable={unavailable} />}
+      {riskFiling(item.form) && <RiskChanges url={item.url} profile={profile} unavailable={unavailable} />}
     </li>)}</ul>)}
     {data && <Pagination page={page} total={data.total} hasMore={data.has_more} loading={resource.loading} onPage={setPage} />}
   </section>

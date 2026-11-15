@@ -155,6 +155,12 @@ func TestRiskChanges(t *testing.T) {
 	require.ErrorIs(t, err, ErrDocument)
 	require.ErrorContains(t, err, "没有找到 2026-11-02 之前的上一份 10-K")
 
+	// 读申报列表失败是下载失败。
+	mock10K("10-K", riskTenK("The Company depends on component suppliers in Asia."))
+	gock.New("https://data.sec.gov").Get("/submissions/CIK0000320193.json").Reply(500)
+	_, err = (&Client{Email: "test@example.com", CacheDir: t.TempDir()}).RiskChanges(context.Background(), "https://www.sec.gov"+docIndex)
+	require.ErrorIs(t, err, ErrDownload)
+
 	// 识别不出小标题时不去找上一年。
 	mock10K("10-K", `<p>Item 1A. Risk Factors</p><p>`+strings.Repeat("Adverse economic conditions could harm demand. ", 40)+
 		`</p><p>Item 7. Management’s Discussion and Analysis</p><p>`+strings.Repeat("Net sales increased 6%. ", 80)+`</p>`)
