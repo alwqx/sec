@@ -49,6 +49,7 @@ func (s *desktopServer) Handler() http.Handler {
 	mux.Handle("GET /api/v1/us/financials/charts", s.withAuth(s.withCORS(http.HandlerFunc(s.handleUSFinancialCharts))))
 	mux.Handle("GET /api/v1/us/dividends", s.withAuth(s.withCORS(http.HandlerFunc(s.handleUSDividends))))
 	mux.Handle("GET /api/v1/filings", s.withAuth(s.withCORS(http.HandlerFunc(s.handleFilings))))
+	mux.Handle("GET /api/v1/filings/risks", s.withAuth(s.withCORS(http.HandlerFunc(s.handleFilingRisks))))
 	mux.Handle("GET /api/v1/commodity", s.withAuth(s.withCORS(http.HandlerFunc(s.handleCommodities))))
 	mux.Handle("GET /api/v1/commodity/history", s.withAuth(s.withCORS(http.HandlerFunc(s.handleCommodityHistory))))
 	mux.Handle("GET /api/v1/macro/catalog", s.withAuth(http.HandlerFunc(s.handleMacroCatalog)))
@@ -78,6 +79,7 @@ func (s *desktopServer) Handler() http.Handler {
 	mux.Handle("POST /api/v1/ai/valuation", s.withAuth(http.HandlerFunc(s.handleAIValuation)))
 	mux.Handle("POST /api/v1/ai/announcements/summary", s.withAuth(http.HandlerFunc(s.handleAIAnnouncement)))
 	mux.Handle("POST /api/v1/ai/filings/summary", s.withAuth(http.HandlerFunc(s.handleAIFiling)))
+	mux.Handle("POST /api/v1/ai/filings/risks", s.withAuth(http.HandlerFunc(s.handleAIFilingRisks)))
 	mux.Handle("PUT /api/v1/ai/default", s.withAuth(http.HandlerFunc(s.handleAIDefault)))
 	mux.Handle("PUT /api/v1/ai/enabled", s.withAuth(http.HandlerFunc(s.handleAIEnabled)))
 

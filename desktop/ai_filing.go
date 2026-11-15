@@ -11,8 +11,7 @@ import (
 	"github.com/alwqx/sec/provider/edgar"
 )
 
-// handleAIFiling 摘要一份 8-K 或 10-K。前端目前只在 8-K 行上提供按钮；后端和 CLI 一样用 ReadFiling，
-// 和 CLI 共用缓存时，有没有缓存结果都一样。只接收 SEC 申报链接和临时模型配置，不接受浏览器提交的申报正文、日期或提示词。
+// handleAIFiling 摘要一份 8-K 或 10-K，和 CLI 一样用 ReadFiling、共用缓存。只接收 SEC 申报链接和临时模型配置，不接受浏览器提交的申报正文、日期或提示词。
 func (s *desktopServer) handleAIFiling(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		URL     string `json:"url"`
@@ -43,7 +42,7 @@ func (s *desktopServer) handleAIFiling(w http.ResponseWriter, r *http.Request) {
 			switch {
 			// 下载错误可能带网络细节和 SEC 联系邮箱，只给稳定的提示。
 			case errors.Is(err, edgar.ErrDownload):
-				return http.StatusBadGateway, "从 SEC 读取申报失败，请稍后重试；如果一直失败，请在设置中检查 SEC 联系邮箱", true
+				return http.StatusBadGateway, edgarDownloadError, true
 			// 其他原文错误是申报内容的问题（类型不支持、没有 Item、超过大小），重试也不会成功；文字由 sec 生成。
 			case errors.Is(err, edgar.ErrDocument):
 				return http.StatusUnprocessableEntity, err.Error(), true

@@ -360,8 +360,9 @@ func (c *Client) previousTenK(ctx context.Context, doc *FilingDocument) (*Filing
 	// 申报日不晚于 doc 的 10-K 里，最多是本年的 10-K、它的修订版、上一年的修订版和上一年的 10-K，4 份就够；
 	// 多要会让高盛、摩根大通这类申报很多的公司多读历史分页和全文检索。
 	result, err := c.Filings(ctx, doc.CIK, FilingQuery{Forms: []string{"10-K", "10-KT"}, End: doc.FilingDate, Want: 4})
+	// 读申报列表失败和下载主文件失败一样是 ErrDownload，调用方（如 Desktop）不会说成模型的问题。
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w（申报列表）：%w", ErrDownload, err)
 	}
 	for _, f := range result.Filings {
 		earlier := f.FilingDate < doc.FilingDate

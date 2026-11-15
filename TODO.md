@@ -157,7 +157,7 @@
     - [x] 10-K 摘要：`llm` 里按 Item 1A、Item 7 摘要（复用 `summaryDoc`），`sec filings --summary` 支持 10-K 行。
     - [x] 风险因素小标题和逐年对比：从 HTML 的粗体、斜体段落取出风险因素小标题，在 Go 里确定性地对比相邻两年 10-K 的新增、删除、保留，不调用模型。CLI 是 `sec filings --risks <序号或链接>`。
     - [x] 风险因素变化解读：把确定性对比的结果交给模型解释变化，模型不负责找差异。CLI 是 `sec filings --risks <序号或链接> --explain`。
-    - [ ] Desktop：申报列表 10-K 行的摘要按钮和风险因素变化。
+    - [x] Desktop：申报列表 10-K 行的摘要按钮和风险因素变化（列表不调用模型，「解读」按钮请求模型），摘要的报告日期按类型写成事项日或报告期。
     - [ ] 银行等公司的 MD&A 不在 Item 7（Item 7 只写「见年报第 X 页」，如摩根大通），按「Management’s discussion and analysis」标题在年报正文里找到它。
   - [ ] 招股书 PDF 问答（`sec ipo ask`），回答附页码引用。
 - [ ] `sec ask`：单次问答，agent loop 复用 `aitool/` 工具注册表；混合多个工具结果时带上各自截止日期，避免拼接不同时点的数据。
