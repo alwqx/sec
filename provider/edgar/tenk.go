@@ -51,6 +51,11 @@ func (c *Client) Read10K(ctx context.Context, raw string) (*FilingDocument, erro
 	if err != nil {
 		return nil, err
 	}
+	return read10K(doc, text)
+}
+
+// read10K 从已读到的 10-K 主文件里取出 Item 1A 和 Item 7。
+func read10K(doc *FilingDocument, text string) (*FilingDocument, error) {
 	lines := strings.Split(text, "\n")
 	scanned := scanTenK(lines)
 	total := 0

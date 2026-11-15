@@ -33,17 +33,17 @@ var openSummarizer = func(cmd *cobra.Command) (*llm.FilingSummarizer, *config.Co
 		return nil, nil, err
 	}
 	sec := &edgar.Client{Email: setup.Config.SECEmail}
-	return &llm.FilingSummarizer{Client: setup.Client, Model: setup.Model, CacheDir: setup.CacheDir, Read: sec.Read8K}, setup.Config, nil
+	return &llm.FilingSummarizer{Client: setup.Client, Model: setup.Model, CacheDir: setup.CacheDir, Read: sec.ReadFiling}, setup.Config, nil
 }
 
-// summaryTarget 返回列表第 index 条申报的地址；目前只支持 8-K，其他类型不读原文直接报错。
+// summaryTarget 返回列表第 index 条申报的地址；只支持 edgar.SummarizableForms（含修订版），其他类型不读原文直接报错。
 func summaryTarget(filings []edgar.Filing, index int) (string, error) {
 	if index > len(filings) {
 		return "", fmt.Errorf("申报序号超出列表范围（共 %d 条），请先查看申报列表", len(filings))
 	}
 	f := filings[index-1]
-	if base, _ := strings.CutSuffix(f.Form, "/A"); base != "8-K" {
-		return "", fmt.Errorf("第 %d 条是 %s，目前只支持摘要 8-K", index, f.Form)
+	if !edgar.Summarizable(f.Form) {
+		return "", fmt.Errorf("第 %d 条是 %s，目前只支持摘要 %s", index, f.Form, strings.Join(edgar.SummarizableForms, "、"))
 	}
 	return f.URL, nil
 }
@@ -59,7 +59,12 @@ func printSummary(cmd *cobra.Command, summarizer *llm.FilingSummarizer, url stri
 		return utils.PrintJSON(cmd.OutOrStdout(), result)
 	}
 	out := cmd.OutOrStdout()
-	fmt.Fprintf(out, "【AI 申报摘要】%s %s · 申报日 %s · 事项日 %s · 模型 %s · 配置 %s\n", result.Form, result.DocumentID, result.AsOf, result.ReportDate, result.Model, result.Profile)
+	// 8-K 的报告期是最早事项的发生日，10-K 是财年截止日。
+	reportDate := "事项日"
+	if edgar.BaseForm(result.Form) != "8-K" {
+		reportDate = "报告期"
+	}
+	fmt.Fprintf(out, "【AI 申报摘要】%s %s · 申报日 %s · %s %s · 模型 %s · 配置 %s\n", result.Form, result.DocumentID, result.AsOf, reportDate, result.ReportDate, result.Model, result.Profile)
 	if result.Cached {
 		fmt.Fprintf(out, "缓存生成于 %s\n", result.CreatedAt.Local().Format(utils.StandardTimeLayout))
 	}

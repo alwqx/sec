@@ -154,7 +154,7 @@
     - [x] 重构：`llm.FilingSummarizer` 和 `AnnouncementSummarizer` 的 `Summarize` 流程（缓存、限定引用的合并、组装结果、核对、只缓存无警告的结果）、`checkFilingSummary`/`checkSummary` 和 `readSummaryCache` 仍是两份，按引用类型（页码 int / 节标签 string）做成共用流程。已完成：共用流程是 `llm/summary.go` 的 `summaryDoc`，按引用类型泛型，10-K 摘要（8c）直接复用。
   - [ ] 10-K 的 Risk Factors 和 MD&A 摘要，逐年对比风险因素的增删。拆成以下几个 PR：
     - [x] `provider/edgar.Read10K`：从 10-K 主文件取出 Item 1A 和 Item 7，跳过目录、去掉页眉页脚和页码；章节太短（不适用、只是引用年报其他部分）时说明，不参与摘要。和 `Read8K` 共用读取申报目录和主文件的 `readPrimary`。
-    - [ ] 10-K 摘要：`llm` 里按 Item 1A、Item 7 摘要（复用 `summaryDoc`），`sec filings --summary` 支持 10-K 行。
+    - [x] 10-K 摘要：`llm` 里按 Item 1A、Item 7 摘要（复用 `summaryDoc`），`sec filings --summary` 支持 10-K 行。
     - [ ] 风险因素小标题和逐年对比：从 HTML 的粗体、斜体段落取出风险因素小标题，在 Go 里确定性地对比相邻两年 10-K 的新增、删除、保留，不调用模型。
     - [ ] 风险因素变化解读：把确定性对比的结果交给模型解释变化，模型不负责找差异。
     - [ ] Desktop：申报列表 10-K 行的摘要按钮和风险因素变化。

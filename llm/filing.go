@@ -2,7 +2,9 @@ package llm
 
 import (
 	"context"
+	"crypto/sha256"
 	_ "embed"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"regexp"
@@ -17,10 +19,20 @@ import (
 //go:embed prompts/filing_summary.md
 var filingPrompt string
 
-const FilingPromptVersion = "edgar-8k-summary-v1"
+//go:embed prompts/tenk_summary.md
+var tenKPrompt string
 
-// filingChunkRunes 是每块的字符数。申报原文是英文，同样字数的 token 比中文少，块可以比公告大。
+const (
+	FilingPromptVersion = "edgar-8k-summary-v1"
+	TenKPromptVersion   = "edgar-10k-summary-v1"
+)
+
+// filingChunkRunes 是 8-K 每块的字符数。申报原文是英文，同样字数的 token 比中文少，块可以比公告大。
 const filingChunkRunes = 20000
+
+// tenKChunkRunes 是 10-K 每块的字符数，约 1 万 token。Item 1A 和 Item 7 合计常有 10 万到 17 万字，
+// 按 8-K 的块大小要分 6 到 9 块、超过并发数分两轮请求；块大一些，大多数 10-K 一轮请求加一次合并就能完成。
+const tenKChunkRunes = 40000
 
 // filingSectionRunes 是分块摘要每段的字数上限。提示词要求 400 字，模型常把一个事项和它的附件写成一段、略超一点，
 // 留出余量，不因为多写几个字让整次摘要失败。合并后每段上限 800 字。
@@ -43,10 +55,10 @@ type FilingSource struct {
 type FilingSummary struct {
 	DocumentID    string          `json:"document_id"` // 申报编号，如 0000320193-26-000024
 	Form          string          `json:"form"`
-	SourceURL     string          `json:"source_url"` // 主文件
-	IndexURL      string          `json:"index_url"`  // 申报目录，包含全部附件
-	AsOf          string          `json:"as_of"`      // 申报日
-	ReportDate    string          `json:"report_date"`
+	SourceURL     string          `json:"source_url"`  // 主文件
+	IndexURL      string          `json:"index_url"`   // 申报目录，包含全部附件
+	AsOf          string          `json:"as_of"`       // 申报日
+	ReportDate    string          `json:"report_date"` // 8-K 是最早事项的发生日，10-K 是财年截止日
 	Sources       []FilingSource  `json:"sources"`
 	Sections      []FilingSection `json:"sections"`
 	Text          string          `json:"text"`
@@ -56,17 +68,71 @@ type FilingSummary struct {
 	Model         string          `json:"model"`
 	Profile       string          `json:"profile"`
 	PromptVersion string          `json:"prompt_version"`
+	PromptHash    string          `json:"prompt_hash"` // 提示词版本和内容的 SHA-256，读缓存时核对
 	Cached        bool            `json:"cached"`
 	CreatedAt     time.Time       `json:"created_at"`
 }
 
-// FilingSummarizer 生成 8-K 事项摘要，CLI 和 Desktop 共用。
+// FilingSummarizer 生成 8-K 事项摘要和 10-K 风险因素、管理层讨论与分析摘要，CLI 和 Desktop 共用。
 type FilingSummarizer struct {
 	Client   Client
 	Model    Model
 	CacheDir string
-	// Read 读取申报原文，一般是 (*edgar.Client).Read8K。没有默认值：EDGAR 要求请求带联系邮箱。
+	// Read 读取申报原文，一般是 (*edgar.Client).ReadFiling 或只读 8-K 的 Read8K。没有默认值：EDGAR 要求请求带联系邮箱。
 	Read func(context.Context, string) (*edgar.FilingDocument, error)
+}
+
+// filingKind 是一类申报的摘要设置。
+type filingKind struct {
+	prompt, version      string
+	hash                 string // 提示词版本和内容的摘要，存进结果，读缓存时核对
+	chunkRunes           int
+	chunkTask, mergeTask string
+	chunkLimit           sectionLimit
+	refWhat              string // 引用指向的东西，用于错误说明
+	notes                []string
+}
+
+var (
+	eightKKind = filingKind{
+		prompt: filingPrompt, version: FilingPromptVersion, hash: promptHash(FilingPromptVersion, filingPrompt), chunkRunes: filingChunkRunes,
+		chunkTask:  "分块摘要；filing_date 是申报日，report_date 是最早事项的发生日",
+		mergeTask:  "合并分块摘要，按事项保留关键事实、条件、风险和引用",
+		chunkLimit: sectionLimit{4, filingSectionRunes},
+		refWhat:    "事项或附件",
+		notes: []string{
+			"Item 是 8-K 正文的事项，Exhibit 是附件；封面、签名和 Item 9.01 附件清单不参与摘要。8-K 的报告期是最早事项的发生日。",
+			"摘要基于可提取的文字，不解析图片；请核对原文中的表格、口径（如 GAAP 与 non-GAAP）和前瞻性陈述的限定。",
+		},
+	}
+	tenKKind = filingKind{
+		prompt: tenKPrompt, version: TenKPromptVersion, hash: promptHash(TenKPromptVersion, tenKPrompt), chunkRunes: tenKChunkRunes,
+		chunkTask: "分块摘要；一节可能分成多块，只概括本块的内容；filing_date 是申报日，report_date 是财年截止日",
+		mergeTask: "合并分块摘要，风险因素和管理层讨论与分析分开成段，保留关键事实、原因和引用",
+		// 一块 4 万字的风险因素或 MD&A 内容密集，提示词要求最多 6 段、每段 400 字，模型常略超，上限留出余量。
+		chunkLimit: sectionLimit{6, 800},
+		refWhat:    "章节",
+		notes: []string{
+			"只摘要 10-K 的 Item 1A 风险因素和 Item 7 管理层讨论与分析；业务介绍、财务报表、附注和其他 Item 不参与摘要。10-K 的报告期是财年截止日。",
+			"风险因素按原文顺序概括，不代表风险大小；摘要基于可提取的文字，不解析图片，请核对原文中的表格、口径（如 GAAP 与 non-GAAP）和前瞻性陈述的限定。",
+		},
+	}
+)
+
+func promptHash(version, prompt string) string {
+	sum := sha256.Sum256([]byte(version + "\x00" + prompt))
+	return hex.EncodeToString(sum[:])
+}
+
+// kindOf 按申报类型（含修订版）选择摘要设置；edgar.Summarizable 以外的类型返回 false，不套用别的类型的提示词。
+func kindOf(form string) (filingKind, bool) {
+	switch edgar.BaseForm(form) {
+	case "8-K":
+		return eightKKind, true
+	case "10-K", "10-KT":
+		return tenKKind, true
+	}
+	return filingKind{}, false
 }
 
 // filingPart 是发给模型的一节原文，不带地址。
@@ -75,7 +141,7 @@ type filingPart struct {
 	Text  string `json:"text"`
 }
 
-// Summarize 摘要一份 8-K。rawURL 是该申报目录下任意文件的地址。
+// Summarize 摘要一份 8-K 或 10-K（由 Read 支持的类型决定）。rawURL 是该申报目录下任意文件的地址。
 func (s *FilingSummarizer) Summarize(ctx context.Context, rawURL string) (*FilingSummary, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -86,7 +152,7 @@ func (s *FilingSummarizer) Summarize(ctx context.Context, rawURL string) (*Filin
 	}
 	key := s.summaryKey(ref)
 	if cached := readSummaryCache(s.CacheDir, key, func(r *FilingSummary) bool {
-		return r.Text != "" && len(r.Sections) > 0 && r.DocumentID == ref.Accession && r.IndexURL == ref.IndexURL && r.PromptVersion == FilingPromptVersion && r.Check.OK()
+		return r.Text != "" && len(r.Sections) > 0 && r.DocumentID == ref.Accession && r.IndexURL == ref.IndexURL && r.Check.OK() && currentPrompt(r)
 	}); cached != nil {
 		cached.Profile, cached.Cached = s.Model.Profile, true
 		return cached, nil
@@ -101,15 +167,20 @@ func (s *FilingSummarizer) Summarize(ctx context.Context, rawURL string) (*Filin
 	if doc == nil || len(doc.Sections) == 0 {
 		return nil, fmt.Errorf("%w：申报没有可摘要的正文", ErrFilingSummary)
 	}
+	kind, ok := kindOf(doc.Form)
+	if !ok {
+		return nil, fmt.Errorf("%w：不支持摘要 %s 申报", ErrFilingSummary, doc.Form)
+	}
 	var parts []filingPart
 	order := map[string]int{}
+	sources := map[string][]string{}
 	for i, section := range doc.Sections {
 		parts = append(parts, filingPart{section.Label, section.Text})
 		order[section.Label] = i
 	}
 	d := summaryDoc[filingPart, string]{
-		call:    summaryCall{client: s.Client, model: s.Model, system: filingPrompt, err: ErrFilingSummary, what: "申报"},
-		refName: "引用", refWhat: "事项或附件",
+		call:    summaryCall{client: s.Client, model: s.Model, system: kind.prompt, err: ErrFilingSummary, what: "申报"},
+		refName: "引用", refWhat: kind.refWhat,
 		order: func(a, b string) int { return order[a] - order[b] },
 		chunkInput: func(chunk []filingPart) (any, []string) {
 			var labels []string
@@ -122,7 +193,7 @@ func (s *FilingSummarizer) Summarize(ctx context.Context, rawURL string) (*Filin
 				FilingDate string       `json:"filing_date"`
 				ReportDate string       `json:"report_date"`
 				Sections   []filingPart `json:"sections"`
-			}{"分块摘要；filing_date 是申报日，report_date 是最早事项的发生日", doc.Form, doc.FilingDate, doc.ReportDate, chunk}, labels
+			}{kind.chunkTask, doc.Form, doc.FilingDate, doc.ReportDate, chunk}, labels
 		},
 		mergeInput: func(sections []citedJSON[string]) any {
 			return struct {
@@ -130,21 +201,26 @@ func (s *FilingSummarizer) Summarize(ctx context.Context, rawURL string) (*Filin
 				Form       string              `json:"form"`
 				FilingDate string              `json:"filing_date"`
 				Sections   []citedJSON[string] `json:"sections"`
-			}{"合并分块摘要，按事项保留关键事实、条件、风险和引用", doc.Form, doc.FilingDate, sections}
+			}{kind.mergeTask, doc.Form, doc.FilingDate, sections}
 		},
-		chunkLimit: sectionLimit{4, filingSectionRunes}, mergeLimit: sectionLimit{12, 800},
+		chunkLimit: kind.chunkLimit, mergeLimit: sectionLimit{12, 800},
+		// 一节可能被多段引用，长章节的数字来源只准备一次；check 逐段顺序调用，不需要加锁。
 		source: func(label string) []string {
+			if texts, ok := sources[label]; ok {
+				return texts
+			}
 			var texts []string
 			for _, section := range doc.Sections {
 				if section.Label == label {
 					texts = append(texts, filingNumberSource(section.Text))
 				}
 			}
+			sources[label] = texts
 			return texts
 		},
 		cite: func(labels []string) string { return strings.Join(labels, "、") },
 	}
-	chunks := chunkText(parts, filingChunkRunes, func(p filingPart) string { return p.Text }, func(p filingPart, text string) filingPart {
+	chunks := chunkText(parts, kind.chunkRunes, func(p filingPart) string { return p.Text }, func(p filingPart, text string) filingPart {
 		return filingPart{p.Label, text}
 	})
 	cited, model, err := d.summarize(ctx, chunks)
@@ -154,11 +230,8 @@ func (s *FilingSummarizer) Summarize(ctx context.Context, rawURL string) (*Filin
 	result := &FilingSummary{
 		DocumentID: doc.Accession, Form: doc.Form, SourceURL: doc.URL, IndexURL: doc.IndexURL, AsOf: doc.FilingDate, ReportDate: doc.ReportDate,
 		Sources: []FilingSource{}, Sections: []FilingSection{},
-		Notes: []string{
-			"Item 是 8-K 正文的事项，Exhibit 是附件；封面、签名和 Item 9.01 附件清单不参与摘要。8-K 的报告期是最早事项的发生日。",
-			"摘要基于可提取的文字，不解析图片；请核对原文中的表格、口径（如 GAAP 与 non-GAAP）和前瞻性陈述的限定。",
-		},
-		Disclaimer: defaultDisclaimer, Model: model, Profile: s.Model.Profile, PromptVersion: FilingPromptVersion, CreatedAt: time.Now(),
+		Notes:      slices.Clone(kind.notes),
+		Disclaimer: defaultDisclaimer, Model: model, Profile: s.Model.Profile, PromptVersion: kind.version, PromptHash: kind.hash, CreatedAt: time.Now(),
 	}
 	for _, section := range cited {
 		result.Sections = append(result.Sections, FilingSection{Text: section.Text, Refs: section.Refs})
@@ -198,6 +271,14 @@ func filingNumberSource(text string) string {
 	return source + "\n" + strings.Join(slices.Compact(months), " ")
 }
 
+// currentPrompt 判断缓存的结果是不是用这类申报当前的提示词生成的。
+func currentPrompt(r *FilingSummary) bool {
+	kind, ok := kindOf(r.Form)
+	return ok && r.PromptHash == kind.hash
+}
+
+// summaryKey 是缓存的文件名。读到原文才知道申报类型，所以不含提示词：提示词记在结果的 PromptHash 里，
+// 读缓存时按结果的类型核对，修改一类申报的提示词不会让另一类的缓存失效。
 func (s *FilingSummarizer) summaryKey(ref *edgar.FilingRef) string {
-	return summaryCacheKey(s.CacheDir, ref.Accession, ref.IndexURL, s.Model.ID(), FilingPromptVersion, filingPrompt)
+	return summaryCacheKey(s.CacheDir, ref.Accession, ref.IndexURL, s.Model.ID(), "edgar-filing-summary")
 }

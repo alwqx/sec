@@ -27,6 +27,7 @@ func NewFilingsCLI() *cobra.Command {
   sec filings TSM --form 20-F,6-K -b 20250101
   sec filings AAPL --form 10-K -n 1 -o ~/Downloads
   sec filings AAPL --form 8-K --summary 1
+  sec filings AAPL --form 10-K --summary 1
   sec filings --summary https://www.sec.gov/Archives/edgar/data/320193/000032019326000024/aapl-20261102.htm`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: filingsHandler,
@@ -37,7 +38,7 @@ func NewFilingsCLI() *cobra.Command {
 	cmd.Flags().IntP("limit", "n", 20, "Maximum number of filings")
 	cmd.Flags().StringP("output", "o", "", "Download the primary documents of the listed filings into this directory")
 	cmd.Flags().Bool("json", false, "Output JSON")
-	cmd.Flags().String("summary", "", "AI summary of an 8-K: row number in the list (from 1) or SEC filing link")
+	cmd.Flags().String("summary", "", "AI summary of an 8-K or 10-K: row number in the list (from 1) or SEC filing link")
 	cmd.Flags().String("ai", "", "Model profile for --summary, default profile if empty")
 	return cmd
 }
@@ -166,7 +167,7 @@ func printFilings(out io.Writer, company edgar.Company, p *edgar.Profile, filing
 		table.Append([]string{strconv.Itoa(i + 1), f.FilingDate, f.Form, report, f.Description, f.URL})
 	}
 	table.Render()
-	fmt.Fprintln(out, "\n数据来自 SEC EDGAR。10-K 年报、10-Q 季报、8-K 重大事项、20-F/6-K 外国公司年报和临时报告；用 --form all 列出全部类型；--summary <序号> 用 AI 摘要 8-K。")
+	fmt.Fprintln(out, "\n数据来自 SEC EDGAR。10-K 年报、10-Q 季报、8-K 重大事项、20-F/6-K 外国公司年报和临时报告；用 --form all 列出全部类型；--summary <序号> 用 AI 摘要 8-K 或 10-K。")
 }
 
 // download 下载主文件，文件名为 代码-申报日-类型-申报编号.扩展名。

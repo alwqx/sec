@@ -400,7 +400,7 @@ sec announcements --latest --summary 1
 sec announcements --summary 'https://static.cninfo.com.cn/finalpage/2026-11-10/1225664110.PDF'
 ```
 
-`--summary` 必须带本页序号或巨潮 CDN PDF 直链，不接受公告详情页；`--ai` 只与 `--summary` 一起用。序号按本次查询返回的有效公告排列，使用同样的证券、类别和页码才能对应列表；所选公告没有 PDF 原文时直接报错；要固定文档请用 PDF 链接。模型配置先校验，AI 未启用或 Key 不可用时不查询公告、不下载 PDF。普通列表的 `--json` 保持原结构；`--summary --json` 只输出 `llm.AnnouncementSummary`，包括 `document_id`、`source_url`、`as_of`、`page_count`、`sections`（每段文字与 `pages`）、带引用的 `text`、`notes`、`check`、模型/配置和缓存元数据。`as_of` 来自巨潮 PDF 路径中的披露日期，不是报告期。
+`--summary` 必须带本页序号或巨潮 CDN PDF 直链，不接受公告详情页；`--ai` 只与 `--summary` 一起用。序号按本次查询返回的有效公告排列，使用同样的证券、类别和页码才能对应列表；所选公告没有 PDF 原文时直接报错；要固定文档请用 PDF 链接。模型配置先校验，AI 未启用或 Key 不可用时不查询公告、不下载 PDF。普通列表的 `--json` 保持原结构；`--summary --json` 只输出 `llm.AnnouncementSummary`，包括 `document_id`、`source_url`、`as_of`、`page_count`、`sections`（每段文字与 `pages`）、带引用的 `text`、`notes`、`check`、模型/配置、`prompt_version`、`prompt_hash` 和缓存元数据。`as_of` 来自巨潮 PDF 路径中的披露日期，不是报告期。
 
 Desktop 的公告列表每行提供「摘要」和生成中的「取消摘要」按钮，没有 PDF 原文的公告按钮不可用，列表上方可临时选择模型并刷新配置，点击前说明公告文本会发给所选厂商。结果展示披露日期、模型、配置、核对警告和可点击的页码引用；切换模型、证券、列表页或离开页面时取消请求，旧响应不能覆盖新页面。第一版为完整结果输出，不发送未经核对的摘要草稿。
 
@@ -428,11 +428,11 @@ sec filings AAPL --form 8-K --summary 2 --ai local --json
 sec filings --summary 'https://www.sec.gov/Archives/edgar/data/320193/000032019326000024/aapl-20261102.htm'
 ```
 
-`--summary` 接受列表序号，或 `www.sec.gov/Archives/edgar/data/<CIK>/<申报编号>/` 下的文件链接（CIK 可带前导零），也接受浏览器里内联 XBRL 查看器的地址 `https://www.sec.gov/ix?doc=/Archives/...`；用链接时不需要股票代码，给了代码或 `--form`、`-n`、`-b`、`-e` 时报错，不悄悄忽略；所选申报不是 8-K（或 8-K/A）时直接报错，不读原文。`--ai` 只与 `--summary` 一起用，`--summary` 不能和 `-o` 一起用。先校验模型配置，AI 未启用或 Key 不可用时不请求 EDGAR。`--summary --json` 只输出 `llm.FilingSummary`：`document_id`（申报编号）、`form`、`source_url`（主文件）、`index_url`（申报目录）、`as_of`（申报日）、`report_date`（最早事项的发生日）、`sources`（参与摘要的各节和地址）、`sections`（每段文字与 `refs`）、带引用的 `text`、`notes`、`check`、模型/配置和缓存元数据。
+`--summary` 接受列表序号，或 `www.sec.gov/Archives/edgar/data/<CIK>/<申报编号>/` 下的文件链接（CIK 可带前导零），也接受浏览器里内联 XBRL 查看器的地址 `https://www.sec.gov/ix?doc=/Archives/...`；用链接时不需要股票代码，给了代码或 `--form`、`-n`、`-b`、`-e` 时报错，不悄悄忽略；所选申报不是 8-K 或 10-K（含修订版和 10-KT，见下文 10-K 一节）时直接报错，不读原文。`--ai` 只与 `--summary` 一起用，`--summary` 不能和 `-o` 一起用。先校验模型配置，AI 未启用或 Key 不可用时不请求 EDGAR。`--summary --json` 只输出 `llm.FilingSummary`：`document_id`（申报编号）、`form`、`source_url`（主文件）、`index_url`（申报目录）、`as_of`（申报日）、`report_date`（8-K 是最早事项的发生日，10-K 是财年截止日）、`sources`（参与摘要的各节和地址）、`sections`（每段文字与 `refs`）、带引用的 `text`、`notes`、`check`、模型/配置和缓存元数据。
 
 Desktop 的美股「公告」标签页（SEC 申报列表）在 8-K 和 8-K/A 行上提供「摘要」和生成中的「取消摘要」按钮，其他类型的申报没有按钮；当前页有 8-K 时，列表上方可临时选择模型并刷新配置，点击前说明 8-K 正文和 EX-99 附件的文本会发给所选厂商，本机模型标明不出本机。结果展示表格类型、申报日、事项日、模型、配置、核对警告，每段的 Item 和 Exhibit 引用链接到对应的原文文件；切换模型、证券、申报类别、列表页或离开页面时取消请求，旧响应不能覆盖新页面；刷新模型配置时保留上次读到的配置，不打断正在进行或已完成的摘要。页面上没有 8-K 时不读取模型配置。公告和申报摘要共用请求状态（`useSummaryRequest`）、模型配置（`useAIModels`）、模型下拉框（`SummaryModelPicker`）和结果面板（`SummaryPanel`）。
 
-后端 `POST /api/v1/ai/filings/summary` 只接收 `url`（申报目录下的文件链接）和可选 `profile`，服务器自己读取 EDGAR 原文，不接受浏览器传入正文或提示词；沿用鉴权、同源和 AI 启用检查，SEC 联系邮箱用共享配置里的设置。无效链接返回 400，模型配置不可用返回 409；申报内容的问题（不是 8-K、没有 Item、超过大小等，重试也不会成功）返回 422 和 sec 生成的原因；从 SEC 下载失败（`edgar.ErrDownload`）返回 502 和固定提示，不回传网络细节和联系邮箱；模型错误返回 502，只含 `llm.PublicError` 给出的部分；整次摘要超过 10 分钟返回 504，单次模型请求超时也返回 504，单个 SEC 文件下载超时按下载失败处理，不让用户去换模型。与 CLI 共用 `~/.sec/cache/ai/filings/` 缓存。Desktop 的三个 AI 接口（估值解读、公告摘要、申报摘要）共用读取模型配置（`openAIModel`），两个摘要接口共用错误响应（`writeSummaryError`）。
+后端 `POST /api/v1/ai/filings/summary` 也接受 10-K（见下文 10-K 一节），只接收 `url`（申报目录下的文件链接）和可选 `profile`，服务器自己读取 EDGAR 原文，不接受浏览器传入正文或提示词；沿用鉴权、同源和 AI 启用检查，SEC 联系邮箱用共享配置里的设置。无效链接返回 400，模型配置不可用返回 409；申报内容的问题（类型不支持、没有 Item、超过大小等，重试也不会成功）返回 422 和 sec 生成的原因；从 SEC 下载失败（`edgar.ErrDownload`）返回 502 和固定提示，不回传网络细节和联系邮箱；模型错误返回 502，只含 `llm.PublicError` 给出的部分；整次摘要超过 10 分钟返回 504，单次模型请求超时也返回 504，单个 SEC 文件下载超时按下载失败处理，不让用户去换模型。与 CLI 共用 `~/.sec/cache/ai/filings/` 缓存。Desktop 的三个 AI 接口（估值解读、公告摘要、申报摘要）共用读取模型配置（`openAIModel`），两个摘要接口共用错误响应（`writeSummaryError`）。
 
 实现约定：
 
@@ -440,11 +440,25 @@ Desktop 的美股「公告」标签页（SEC 申报列表）在 8-K 和 8-K/A �
 - HTML 转文字用 `golang.org/x/net/html`：跳过脚本、样式和内联 XBRL 的隐藏数据（`ix:header`、`display:none`），块级标签换行，表格一行保持在一行、单元格之间加空格，`span` 等行内标签直接相连，不把一个数字拆开。旧申报的纯文本主文件保留原有换行。单个文件最多 20 MiB，下载时按上限读取，超过即报错，不把整个文件读进内存；正文超过 40 万字时报错，附件加上后超过时跳过并说明。
 - `llm.FilingSummarizer` 与公告摘要共用 `llm/summary.go` 的 `summaryDoc`：分块、并发、停止原因和截断建议、限定引用的合并、输出校验、逐段数字核对和缓存读写都在这里，按引用类型泛型（公告是页码，申报是节标签），两个摘要器只提供各自的输入格式、原文来源和结果字段。每块最多 20,000 个字符（英文原文，同样字数的 token 比中文少），最多 40 块，多块时再合并。模型按事项分段，每段的 `refs` 只能是输入里的节标签（如 `Item 2.02`、`Exhibit 99.1`），代码拒绝不存在的引用，合并不能增加分块摘要未引用的节；引用去重后按原文顺序排列。分块摘要每段上限 600 字（提示词要求 400 字，留出余量），合并后每段 800 字。
 - 数字核对每段只与它引用的节核对。英文原文的千分位合并后再核对，million、billion 换算成万、亿的写法按 `Verify` 的来源单位规则核对；原文 `November 2, 2026` 这类英文月份补上对应的月份数字，摘要写「11 月」时能找到来源。
-- 缓存保存在 `~/.sec/cache/ai/filings/`，键包含申报编号、目录页地址、模型实际协议/地址/名称、提示词版本和内容；同一申报目录下的不同链接命中同一份缓存。只有完整、正常结束且核对无警告的结果写入。EDGAR 的申报按编号不可变。
+- 缓存保存在 `~/.sec/cache/ai/filings/`，键包含申报编号、目录页地址和模型实际协议/地址/名称，提示词版本和内容记在结果的 `prompt_hash` 里核对（见 10-K 一节）；同一申报目录下的不同链接命中同一份缓存。只有完整、正常结束且核对无警告的结果写入。EDGAR 的申报按编号不可变。
 
 #### 进行中：10-K Risk Factors 和 MD&A
 
-拆分见 TODO.md 的「10-K 的 Risk Factors 和 MD&A 摘要」。已完成第一步：
+拆分见 TODO.md 的「10-K 的 Risk Factors 和 MD&A 摘要」。已完成 10-K 摘要：
+
+```bash
+sec filings AAPL --form 10-K --summary 1
+sec filings --summary 'https://www.sec.gov/Archives/edgar/data/320193/000032019326000026/aapl-20260926.htm'
+```
+
+- `sec filings --summary` 接受 10-K、10-K/A、10-KT 行和链接，和 8-K 用同一个 `llm.FilingSummarizer`、同样的参数、JSON 格式和缓存目录。CLI 抬头写「报告期」（财年截止日），8-K 写「事项日」。`provider/edgar.ReadFiling` 按申报目录页的类型选择 8-K 或 10-K 的读法，只用链接摘要时目录页只读一次；其他类型报「这份申报是 S-1，不是 8-K、10-K 或 10-KT」。可以摘要的类型只在 `edgar.SummarizableForms` 列一次，CLI 选择列表行、`ReadFiling` 和 `llm` 选择提示词都按它判断；`llm` 遇到其他类型报错，不套用 8-K 的设置。Desktop 后端也改用 `ReadFiling`：和 CLI 共用缓存，读不读得到缓存结果都一样；前端目前只在 8-K 行上有按钮，10-K 的按钮见后面的 Desktop 一项。
+- 只摘要 Item 1A 和 Item 7，提示词要求每段只写其中一节；代码只校验引用存在，不因为一段同时引用两节让整次摘要失败。10-K 有自己的提示词（`llm/prompts/tenk_summary.md`）：风险因素按原文顺序概括、突出公司特有的风险，不评价风险大小，只看一份年报时不能说某项风险是新增的；MD&A 概括经营结果和原文给出的原因、分部或产品表现、流动性和资本安排、公司自己的展望。合并后 Item 1A 和 Item 7 各 2 到 5 段，共约 2000 字以内；两节合计不超过一块（较小的申报公司）时不合并，按分块摘要的上限输出。
+- 每块 40,000 个字符（约 1 万 token），是 8-K 的两倍：两节合计常有 10 万到 17 万字，按 8-K 的块大小要分 6 到 9 块、超过 4 个并发分两轮请求。块大了，分块摘要最多 6 段、每段上限 800 字（提示词要求 400 字）；合并后的上限和 8-K 一样，最多 12 段、每段 800 字。
+- 读到原文才知道类型，所以缓存文件名不含提示词，只有申报编号、目录页地址和模型；结果的 `prompt_hash` 记下所用提示词版本和内容的 SHA-256，读缓存时按结果的类型核对，修改一类申报的提示词不会让另一类的缓存失效。缓存文件名改了，加入 10-K 后已有的 8-K 摘要缓存失效一次。
+- 数字核对时一节被多段引用，该节的数字来源只准备一次。
+- 实测 Apple 2026 财年 10-K（Item 1A 约 8.6 万字、Item 7 约 1.7 万字），DeepSeek `deepseek-v4-pro` 关闭思考：3 块加一次合并共 24 秒，5 段约 1800 字，35 个数字都找到来源（以百万美元为单位的金额换算成亿也能核对）。开着思考时每次请求推理 8000 到 16000 token、耗时 1.5 到 2.5 分钟，两次实测分别在合并和一个分块时超过 16000 token 的输出上限，按截断建议关闭思考即可。
+
+已完成的第一步 `Read10K`：
 
 - `provider/edgar.Read10K` 读取 10-K（含 10-K/A、过渡期年报 10-KT）主文件，取出 Item 1A 风险因素和 Item 7 管理层讨论与分析，各为一节。和 `Read8K` 共用 `readPrimary`：读申报目录页、核对表格类型、下载主文件并转成文字。
 - 章节从标题包含 Risk Factors（Item 1A）或 Management（Item 7）的 Item 标题行开始，到下一个其他 Item 的标题或 SIGNATURES 为止；目录里也有同样的标题行，但它到下一个目录行之间几乎没有正文，所以取最长的一段。章节中间只有编号的页眉（如微软每页的「Item 1A」）和每页重复的完整页眉是同一个 Item，不会截断章节；各段长度用前缀和计算，不会反复拼接。

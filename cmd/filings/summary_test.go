@@ -15,7 +15,10 @@ import (
 	"gopkg.in/h2non/gock.v1"
 )
 
-const cliFilingURL = "https://www.sec.gov/Archives/edgar/data/320193/000032019326000024/aapl-20261102.htm"
+const (
+	cliFilingURL = "https://www.sec.gov/Archives/edgar/data/320193/000032019326000024/aapl-20261102.htm"
+	cliTenKURL   = "https://www.sec.gov/Archives/edgar/data/320193/000032019326000026/aapl-20260926.htm"
+)
 
 func fakeSummarizer(t *testing.T) *llm.Fake {
 	t.Helper()
@@ -23,9 +26,13 @@ func fakeSummarizer(t *testing.T) *llm.Fake {
 	old := openSummarizer
 	openSummarizer = func(cmd *cobra.Command) (*llm.FilingSummarizer, *config.Config, error) {
 		return &llm.FilingSummarizer{Client: fake, Model: llm.Model{Profile: "test", Name: "fake"}, Read: func(ctx context.Context, url string) (*edgar.FilingDocument, error) {
-			require.Equal(t, cliFilingURL, url)
 			ref, err := edgar.ParseFilingURL(url)
 			require.NoError(t, err)
+			if url == cliTenKURL {
+				return &edgar.FilingDocument{FilingRef: *ref, Form: "10-K", FilingDate: "2026-11-03", ReportDate: "2026-09-26", URL: url,
+					Sections: []edgar.DocumentSection{{Label: "Item 1A", URL: url, Text: "Item 1A. Risk Factors. The Company depends on suppliers."}}}, ctx.Err()
+			}
+			require.Equal(t, cliFilingURL, url)
 			return &edgar.FilingDocument{FilingRef: *ref, Form: "8-K", FilingDate: "2026-11-02", ReportDate: "2026-11-02", URL: url,
 				Sections: []edgar.DocumentSection{{Label: "Item 2.02", URL: url, Text: "Item 2.02 Apple issued a press release."}}}, ctx.Err()
 		}}, &config.Config{SECEmail: "sec_dev@example.com"}, nil
@@ -45,7 +52,7 @@ func TestSummaryDirectLink(t *testing.T) {
 	fake.Replies = []llm.FakeReply{llm.FakeText(`{"sections":[{"text":"公司发布季度业绩新闻稿。","refs":["Item 2.02"]}]}`)}
 	out, err = run(t, "--summary", cliFilingURL)
 	require.NoError(t, err)
-	for _, text := range []string{"【AI 申报摘要】8-K 0000320193-26-000024", "申报日 2026-11-02", "模型 fake", "配置 test", "Item 2.02：" + cliFilingURL, "不构成投资建议"} {
+	for _, text := range []string{"【AI 申报摘要】8-K 0000320193-26-000024", "申报日 2026-11-02 · 事项日 2026-11-02", "模型 fake", "配置 test", "Item 2.02：" + cliFilingURL, "不构成投资建议"} {
 		require.Contains(t, out, text)
 	}
 }
@@ -53,14 +60,21 @@ func TestSummaryDirectLink(t *testing.T) {
 func TestSummaryByRow(t *testing.T) {
 	defer gock.Off()
 	t.Setenv("HOME", t.TempDir())
-	fakeSummarizer(t)
+	fake := fakeSummarizer(t)
 	mockSEC()
 	out, err := run(t, "AAPL", "--summary", "2", "--json")
 	require.NoError(t, err)
 	require.Contains(t, out, `"document_id": "0000320193-26-000024"`)
 	mockSEC()
-	_, err = run(t, "AAPL", "--summary", "1")
-	require.ErrorContains(t, err, "第 1 条是 10-K，目前只支持摘要 8-K")
+	fake.Replies = []llm.FakeReply{llm.FakeText(`{"sections":[{"text":"公司依赖供应商。","refs":["Item 1A"]}]}`)}
+	out, err = run(t, "AAPL", "--summary", "1")
+	require.NoError(t, err)
+	for _, text := range []string{"【AI 申报摘要】10-K 0000320193-26-000026", "申报日 2026-11-03 · 报告期 2026-09-26", "公司依赖供应商。（Item 1A）", "只摘要 10-K 的 Item 1A"} {
+		require.Contains(t, out, text)
+	}
+	mockSEC()
+	_, err = run(t, "AAPL", "--form", "all", "--summary", "3")
+	require.ErrorContains(t, err, "第 3 条是 4，目前只支持摘要 8-K、10-K、10-KT")
 	mockSEC()
 	_, err = run(t, "AAPL", "--summary", "3")
 	require.ErrorContains(t, err, "共 2 条")

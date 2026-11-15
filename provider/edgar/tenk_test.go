@@ -76,7 +76,7 @@ func TestRead10KShortSections(t *testing.T) {
 	_, err = client.Read10K(context.Background(), "https://www.sec.gov"+docIndex)
 	require.ErrorIs(t, err, ErrUnsupportedForm)
 	require.ErrorIs(t, err, ErrDocument, "Desktop 按 ErrDocument 返回 422")
-	require.EqualError(t, err, "这份申报是 8-K，不是 10-K")
+	require.EqualError(t, err, "这份申报是 8-K，不是 10-K 或 10-KT")
 	require.True(t, gock.IsDone())
 }
 
@@ -145,4 +145,26 @@ func TestFindSection(t *testing.T) {
 		require.Equal(t, c.want, section(c.text, c.item, c.title), name)
 	}
 	require.Empty(t, section("Item 1. Business\nText.", "1a", "risk factors"))
+}
+
+func TestReadFiling(t *testing.T) {
+	defer gock.Off()
+	client := &Client{Email: "test@example.com", CacheDir: t.TempDir()}
+	risk := strings.Repeat("Adverse economic conditions could harm demand. ", 40)
+	mock10K("10-K/A", tenK(risk, risk))
+	doc, err := client.ReadFiling(context.Background(), "https://www.sec.gov"+docIndex)
+	require.NoError(t, err)
+	require.Equal(t, "10-K/A", doc.Form)
+	require.Equal(t, []string{"Item 1A", "Item 7"}, []string{doc.Sections[0].Label, doc.Sections[1].Label})
+
+	mock10K("8-K", `<p>Item 2.02 Results of Operations.</p><p>Revenue grew.</p>`)
+	doc, err = client.ReadFiling(context.Background(), "https://www.sec.gov"+docIndex)
+	require.NoError(t, err)
+	require.Equal(t, "Item 2.02", doc.Sections[0].Label)
+
+	gock.New("https://www.sec.gov").Get(docIndex).Reply(200).BodyString(filingIndex("S-1", [2]string{docFolder + "a.htm", "S-1"}))
+	_, err = client.ReadFiling(context.Background(), "https://www.sec.gov"+docIndex)
+	require.ErrorIs(t, err, ErrUnsupportedForm)
+	require.EqualError(t, err, "这份申报是 S-1，不是 8-K、10-K 或 10-KT")
+	require.True(t, gock.IsDone(), "每份申报只读一次目录页和主文件")
 }
