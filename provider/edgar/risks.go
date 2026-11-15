@@ -247,9 +247,12 @@ func shingles(text string) map[string]bool {
 	return out
 }
 
+// straightQuotes 把弯引号换成直引号。
+var straightQuotes = strings.NewReplacer("’", "'", "‘", "'", "“", `"`, "”", `"`)
+
 // normalizeTitle 规范化小标题：小写，弯引号换成直引号，合并空白，去掉末尾的句号。
 func normalizeTitle(title string) string {
-	title = strings.NewReplacer("’", "'", "‘", "'", "“", `"`, "”", `"`).Replace(strings.ToLower(title))
+	title = straightQuotes.Replace(strings.ToLower(title))
 	return strings.TrimRight(strings.Join(strings.Fields(title), " "), ".?")
 }
 
