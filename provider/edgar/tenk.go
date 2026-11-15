@@ -47,20 +47,41 @@ var (
 // 各为一节，去掉目录、页眉页脚和页码。找不到或太短的章节在 Notes 里说明；两节都没有时报错，
 // 比如只补充第三部分的 10-K/A。raw 是该申报目录下任意文件的地址。
 func (c *Client) Read10K(ctx context.Context, raw string) (*FilingDocument, error) {
-	doc, _, text, err := c.readPrimary(ctx, raw, "10-K", "10-KT")
+	doc, err := c.readTenK(ctx, raw)
 	if err != nil {
 		return nil, err
 	}
-	return read10K(doc, text)
+	return doc, checkTenKSize(doc)
 }
 
-// read10K 从已读到的 10-K 主文件里取出 Item 1A 和 Item 7。
-func read10K(doc *FilingDocument, text string) (*FilingDocument, error) {
-	lines := strings.Split(text, "\n")
-	scanned := scanTenK(lines)
+// readTenK 读取一份 10-K 的章节和风险因素，不检查摘要的字数上限：风险因素对比不调用模型，也用不到 Item 7。
+func (c *Client) readTenK(ctx context.Context, raw string) (*FilingDocument, error) {
+	doc, _, lines, err := c.readPrimary(ctx, raw, "10-K", "10-KT")
+	if err != nil {
+		return nil, err
+	}
+	return read10K(doc, lines)
+}
+
+// checkTenKSize 检查参与摘要的 Item 1A 和 Item 7 合计不超过 MaxDocumentRunes。
+func checkTenKSize(doc *FilingDocument) error {
 	total := 0
+	for _, section := range doc.Sections {
+		total += utf8.RuneCountInString(section.Text)
+	}
+	if total > MaxDocumentRunes {
+		return fmt.Errorf("%w：10-K 的 Item 1A 和 Item 7 超过 %d 字", ErrDocument, MaxDocumentRunes)
+	}
+	return nil
+}
+
+// read10K 从已读到的 10-K 主文件里取出 Item 1A 和 Item 7，以及 Item 1A 里的风险因素小标题；字数上限由调用方检查。
+func read10K(doc *FilingDocument, docLines []docLine) (*FilingDocument, error) {
+	lines := lineTexts(docLines)
+	scanned := scanTenK(lines)
 	for _, want := range tenKSections {
-		section := findSection(lines, scanned, want.item, want.title)
+		start, end := findSection(lines, scanned, want.item, want.title)
+		section := sectionText(lines, scanned, start, end)
 		n := utf8.RuneCountInString(section)
 		switch {
 		case section == "":
@@ -68,15 +89,14 @@ func read10K(doc *FilingDocument, text string) (*FilingDocument, error) {
 		case n < minSectionRunes:
 			doc.Notes = append(doc.Notes, fmt.Sprintf(want.short, n))
 		default:
-			total += n
 			doc.Sections = append(doc.Sections, DocumentSection{Label: want.label, URL: doc.URL, Text: section})
+			if want.item == "1a" {
+				doc.RiskFactors = riskFactors(docLines, scanned, start, end)
+			}
 		}
 	}
 	if len(doc.Sections) == 0 {
 		return nil, fmt.Errorf("%w：10-K 正文里没有可摘要的 Item 1A 或 Item 7", ErrDocument)
-	}
-	if total > MaxDocumentRunes {
-		return nil, fmt.Errorf("%w：10-K 的 Item 1A 和 Item 7 超过 %d 字", ErrDocument, MaxDocumentRunes)
 	}
 	return doc, nil
 }
@@ -156,10 +176,11 @@ func standardTitle(item, text string) bool {
 	return false
 }
 
-// findSection 返回从标题包含 title 的 Item item 标题行到下一个其他 Item 的标题（或 SIGNATURES）之前的正文，去掉页眉页脚。
+// findSection 返回从标题包含 title 的 Item item 标题行到下一个其他 Item 的标题（或 SIGNATURES）之前的行范围 [start, end)，
+// 找不到时 start 为 -1。
 // 目录里也有同样的标题行，但它到下一个目录行之间几乎没有正文，所以取最长的一段；章节中间只有编号的页眉
 // （如 Item 1A）和每页重复的完整页眉是同一个 Item，不会截断章节。用前缀和计算各段长度，每页都有完整页眉时也不会反复拼接。
-func findSection(lines []string, scanned []tenKLine, item, title string) string {
+func findSection(lines []string, scanned []tenKLine, item, title string) (start, end int) {
 	// next[i] 是 i 及之后第一个结束章节的行：其他 Item 的标题或页眉，或 SIGNATURES。
 	next := make([]int, len(lines)+1)
 	next[len(lines)] = len(lines)
@@ -177,7 +198,7 @@ func findSection(lines []string, scanned []tenKLine, item, title string) string 
 			kept[i+1] += utf8.RuneCountInString(line)
 		}
 	}
-	start, end, best := -1, 0, 0
+	start, best := -1, 0
 	for i, l := range scanned {
 		if l.item != item || !strings.Contains(strings.ToLower(l.title), title) {
 			continue
@@ -186,6 +207,11 @@ func findSection(lines []string, scanned []tenKLine, item, title string) string 
 			start, end, best = i, stop, kept[stop]-kept[i]
 		}
 	}
+	return start, end
+}
+
+// sectionText 返回 [start, end) 范围内去掉页眉页脚的正文，start 为 -1 时返回空字符串。
+func sectionText(lines []string, scanned []tenKLine, start, end int) string {
 	if start < 0 {
 		return ""
 	}

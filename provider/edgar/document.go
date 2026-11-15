@@ -108,6 +108,8 @@ type FilingDocument struct {
 	URL        string // 主文件
 	Sections   []DocumentSection
 	Notes      []string // 没有读取的附件等说明
+	// RiskFactors 是 10-K Item 1A 里的风险因素小标题和正文，见 riskFactors；8-K 和没有识别出小标题时为空。
+	RiskFactors []RiskFactor
 }
 
 // indexDocument 是申报目录页文件表里的一行。
@@ -116,27 +118,27 @@ type indexDocument struct {
 }
 
 // readPrimary 读取申报目录页和主文件的文字，是 Read8K、Read10K 和 ReadFiling 共用的部分。forms 是可以读取的基本类型
-// （不含 /A），类型不对时在错误说明里列出。返回申报信息、目录页的文件表和主文件文字。
-func (c *Client) readPrimary(ctx context.Context, raw string, forms ...string) (*FilingDocument, []indexDocument, string, error) {
+// （不含 /A），类型不对时在错误说明里列出。返回申报信息、目录页的文件表和主文件的各行。
+func (c *Client) readPrimary(ctx context.Context, raw string, forms ...string) (*FilingDocument, []indexDocument, []docLine, error) {
 	ref, err := ParseFilingURL(raw)
 	if err != nil {
-		return nil, nil, "", err
+		return nil, nil, nil, err
 	}
 	body, err := c.get(ctx, ref.IndexURL)
 	if err != nil {
-		return nil, nil, "", fmt.Errorf("%w（申报目录）：%w", ErrDownload, err)
+		return nil, nil, nil, fmt.Errorf("%w（申报目录）：%w", ErrDownload, err)
 	}
 	doc := &FilingDocument{FilingRef: *ref}
 	docs, err := parseFilingIndex(body, ref, doc)
 	if err != nil {
-		return nil, nil, "", err
+		return nil, nil, nil, err
 	}
 	if !slices.Contains(forms, BaseForm(doc.Form)) {
 		want := forms[len(forms)-1]
 		if len(forms) > 1 {
 			want = strings.Join(forms[:len(forms)-1], "、") + " 或 " + want
 		}
-		return nil, nil, "", unsupportedForm{got: doc.Form, want: want}
+		return nil, nil, nil, unsupportedForm{got: doc.Form, want: want}
 	}
 	for _, d := range docs {
 		if strings.EqualFold(d.Type, doc.Form) {
@@ -145,13 +147,13 @@ func (c *Client) readPrimary(ctx context.Context, raw string, forms ...string) (
 		}
 	}
 	if doc.URL == "" || !textDocument[strings.ToLower(path.Ext(doc.URL))] {
-		return nil, nil, "", fmt.Errorf("%w：申报目录里没有 HTML 或文本格式的 %s 主文件", ErrDocument, doc.Form)
+		return nil, nil, nil, fmt.Errorf("%w：申报目录里没有 HTML 或文本格式的 %s 主文件", ErrDocument, doc.Form)
 	}
-	text, err := c.documentText(ctx, doc.URL)
+	lines, err := c.documentLines(ctx, doc.URL)
 	if err != nil {
-		return nil, nil, "", err
+		return nil, nil, nil, err
 	}
-	return doc, docs, text, nil
+	return doc, docs, lines, nil
 }
 
 // BaseForm 去掉修订版的 /A，如 10-K/A 是 10-K。
@@ -171,35 +173,38 @@ func Summarizable(form string) bool {
 // ReadFiling 按申报类型读取可以摘要的申报：8-K 同 Read8K，10-K 和 10-KT 同 Read10K（都含修订版）。
 // 只用链接摘要时事先不知道类型，申报目录页只读一次。
 func (c *Client) ReadFiling(ctx context.Context, raw string) (*FilingDocument, error) {
-	doc, docs, text, err := c.readPrimary(ctx, raw, SummarizableForms...)
+	doc, docs, lines, err := c.readPrimary(ctx, raw, SummarizableForms...)
 	if err != nil {
 		return nil, err
 	}
 	if BaseForm(doc.Form) == "8-K" {
-		return c.read8K(ctx, doc, docs, text)
+		return c.read8K(ctx, doc, docs, lines)
 	}
-	return read10K(doc, text)
+	if doc, err = read10K(doc, lines); err != nil {
+		return nil, err
+	}
+	return doc, checkTenKSize(doc)
 }
 
 // Read8K 读取一份 8-K（含 8-K/A）：主文件按 Item 切分（不含封面、签名和 Item 9.01 附件清单），
 // EX-99 附件（新闻稿、演示材料等）各为一节。raw 是该申报目录下任意文件的地址。
 func (c *Client) Read8K(ctx context.Context, raw string) (*FilingDocument, error) {
-	doc, docs, text, err := c.readPrimary(ctx, raw, "8-K")
+	doc, docs, lines, err := c.readPrimary(ctx, raw, "8-K")
 	if err != nil {
 		return nil, err
 	}
-	return c.read8K(ctx, doc, docs, text)
+	return c.read8K(ctx, doc, docs, lines)
 }
 
 // read8K 切分已读到的 8-K 主文件，并读取 EX-99 附件。
-func (c *Client) read8K(ctx context.Context, doc *FilingDocument, docs []indexDocument, text string) (*FilingDocument, error) {
+func (c *Client) read8K(ctx context.Context, doc *FilingDocument, docs []indexDocument, lines []docLine) (*FilingDocument, error) {
 	var exhibits []indexDocument
 	for _, d := range docs {
 		if exhibitType.MatchString(d.Type) {
 			exhibits = append(exhibits, d)
 		}
 	}
-	doc.Sections = splitItems(text, doc.URL)
+	doc.Sections = splitItems(strings.Join(lineTexts(lines), "\n"), doc.URL)
 	if len(doc.Sections) == 0 {
 		return nil, fmt.Errorf("%w：8-K 正文里没有找到 Item 段落", ErrDocument)
 	}
@@ -288,37 +293,126 @@ func parseFilingIndex(body []byte, ref *FilingRef, doc *FilingDocument) ([]index
 	return docs, nil
 }
 
-// documentText 下载申报文件并转成文字：HTML 按块换行，纯文本保留原有换行。
-func (c *Client) documentText(ctx context.Context, link string) (string, error) {
-	body, err := c.getLimit(ctx, link, MaxDocumentBytes)
-	if errors.Is(err, errTooLarge) {
-		return "", fmt.Errorf("%w：%s 超过 20 MB", ErrDocument, path.Base(link))
-	}
-	if err != nil {
-		return "", fmt.Errorf("%w（%s）：%w", ErrDownload, path.Base(link), err)
-	}
-	if strings.EqualFold(path.Ext(link), ".txt") {
-		return cleanLines(string(body)), nil
-	}
-	return htmlText(body)
+// docLine 是申报文件转成文字后的一行。lead 是行首连续加粗或斜体（同一种样式）的文字，用来识别风险因素小标题，
+// bold、italic 是它的样式；emphasized 表示整行都加粗、斜体或带下划线。纯文本文件没有样式。
+type docLine struct {
+	text         string
+	lead         string
+	bold, italic bool
+	emphasized   bool
 }
 
-// htmlText 提取 HTML 的可见文字。跳过脚本、样式、内联 XBRL 的隐藏数据（ix:header、display:none）；
+// lineTexts 返回各行的文字。
+func lineTexts(lines []docLine) []string {
+	texts := make([]string, len(lines))
+	for i, line := range lines {
+		texts[i] = line.text
+	}
+	return texts
+}
+
+// documentText 下载申报文件并转成文字：HTML 按块换行，纯文本保留原有换行。
+func (c *Client) documentText(ctx context.Context, link string) (string, error) {
+	lines, err := c.documentLines(ctx, link)
+	if err != nil {
+		return "", err
+	}
+	return strings.Join(lineTexts(lines), "\n"), nil
+}
+
+// documentLines 下载申报文件并按行转成文字，HTML 的行带样式。
+func (c *Client) documentLines(ctx context.Context, link string) ([]docLine, error) {
+	body, err := c.getLimit(ctx, link, MaxDocumentBytes)
+	if errors.Is(err, errTooLarge) {
+		return nil, fmt.Errorf("%w：%s 超过 20 MB", ErrDocument, path.Base(link))
+	}
+	if err != nil {
+		return nil, fmt.Errorf("%w（%s）：%w", ErrDownload, path.Base(link), err)
+	}
+	if strings.EqualFold(path.Ext(link), ".txt") {
+		return plainLines(string(body)), nil
+	}
+	return htmlLines(body)
+}
+
+// textStyle 是一段文字的样式，从外层标签继承。
+type textStyle struct{ bold, italic, underline bool }
+
+// styled 返回元素自己的样式：b、strong、标题标签加粗，i、em 斜体，u 下划线；style 属性的 font-weight、font-style、
+// 简写 font 和 text-decoration 可以打开也可以关闭外层的样式（内联 XBRL 常用 font-weight:400 写正文）。
+func (s textStyle) styled(n *html.Node) textStyle {
+	switch n.Data {
+	case "b", "strong", "h1", "h2", "h3", "h4", "h5", "h6":
+		s.bold = true
+	case "i", "em":
+		s.italic = true
+	case "u":
+		s.underline = true
+	}
+	for _, a := range n.Attr {
+		if a.Key != "style" {
+			continue
+		}
+		for decl := range strings.SplitSeq(strings.ToLower(a.Val), ";") {
+			name, value, ok := strings.Cut(decl, ":")
+			if !ok {
+				continue
+			}
+			value = strings.TrimSpace(value)
+			switch strings.TrimSpace(name) {
+			case "font-weight":
+				if weight, err := strconv.Atoi(value); err == nil {
+					s.bold = weight >= 600
+				} else {
+					s.bold = value == "bold" || value == "bolder"
+				}
+			case "font-style":
+				s.italic = value == "italic" || value == "oblique"
+			// 简写 font: bold italic 10pt Times：没写的粗细和样式恢复为常规。
+			case "font":
+				s.bold, s.italic = false, false
+				for token := range strings.FieldsSeq(value) {
+					weight, err := strconv.Atoi(token)
+					switch {
+					case token == "bold" || token == "bolder" || (err == nil && weight >= 600):
+						s.bold = true
+					case token == "italic" || token == "oblique":
+						s.italic = true
+					}
+				}
+			case "text-decoration", "text-decoration-line":
+				s.underline = strings.Contains(value, "underline")
+			}
+		}
+	}
+	return s
+}
+
+// sourceNewlines 把 HTML 源码里的换行换成空格。
+var sourceNewlines = strings.NewReplacer("\r", " ", "\n", " ")
+
+// segment 是一段连续的、样式相同的文字；分隔符的样式为空。
+type segment struct {
+	text  string
+	style textStyle
+}
+
+// htmlLines 提取 HTML 的可见文字。跳过脚本、样式、内联 XBRL 的隐藏数据（ix:header、display:none）；
 // 块级标签前后换行，表格单元格之间加空格，单元格里的块级标签也只加空格，一行表格保持在一行；其余标签里的文字直接相连。
-func htmlText(body []byte) (string, error) {
+func htmlLines(body []byte) ([]docLine, error) {
 	root, err := html.Parse(bytes.NewReader(body))
 	if err != nil {
-		return "", fmt.Errorf("%w：HTML 格式无效：%w", ErrDocument, err)
+		return nil, fmt.Errorf("%w：HTML 格式无效：%w", ErrDocument, err)
 	}
-	var b strings.Builder
-	var walk func(n *html.Node, inCell bool)
-	walk = func(n *html.Node, inCell bool) {
+	var segments []segment
+	var walk func(n *html.Node, inCell bool, style textStyle)
+	walk = func(n *html.Node, inCell bool, style textStyle) {
 		if n.Type == html.TextNode {
 			// 源码里的换行只是排版，不是段落。
-			b.WriteString(strings.NewReplacer("\r", " ", "\n", " ").Replace(n.Data))
+			segments = append(segments, segment{sourceNewlines.Replace(n.Data), style})
 			return
 		}
-		separator := byte(0)
+		separator := ""
 		if n.Type == html.ElementNode {
 			switch n.Data {
 			case "script", "style", "head", "title", "ix:header":
@@ -329,38 +423,99 @@ func htmlText(body []byte) (string, error) {
 					return
 				}
 			}
+			style = style.styled(n)
 			switch {
 			case n.Data == "td" || n.Data == "th":
-				separator, inCell = ' ', true
+				separator, inCell = " ", true
 			case blockTags[n.Data] && inCell:
-				separator = ' '
+				separator = " "
 			case blockTags[n.Data]:
-				separator = '\n'
+				separator = "\n"
 			}
 		}
-		if separator != 0 {
-			b.WriteByte(separator)
+		if separator != "" {
+			segments = append(segments, segment{text: separator})
 		}
 		for child := n.FirstChild; child != nil; child = child.NextSibling {
-			walk(child, inCell)
+			walk(child, inCell, style)
 		}
-		if separator != 0 {
-			b.WriteByte(separator)
+		if separator != "" {
+			segments = append(segments, segment{text: separator})
 		}
 	}
-	walk(root, false)
-	return cleanLines(b.String()), nil
-}
-
-// cleanLines 合并每行内的连续空白（strings.Fields 也把不换行空格当作空白），去掉空行。
-func cleanLines(text string) string {
-	var lines []string
-	for line := range strings.SplitSeq(strings.ReplaceAll(text, "\r\n", "\n"), "\n") {
-		if line = strings.Join(strings.Fields(line), " "); line != "" {
+	walk(root, false, textStyle{})
+	var lines []docLine
+	var pieces []segment
+	flush := func() {
+		if line, ok := styledLine(pieces); ok {
 			lines = append(lines, line)
 		}
+		pieces = pieces[:0]
 	}
-	return strings.Join(lines, "\n")
+	for _, seg := range segments {
+		for {
+			before, after, found := strings.Cut(seg.text, "\n")
+			pieces = append(pieces, segment{before, seg.style})
+			if !found {
+				break
+			}
+			flush()
+			seg.text = after
+		}
+	}
+	flush()
+	return lines, nil
+}
+
+// styledLine 把一行的各段文字合成一行，合并连续空白；整行是空白时返回 false。
+func styledLine(pieces []segment) (docLine, bool) {
+	var all, lead strings.Builder
+	var line docLine
+	line.emphasized = true
+	inLead, started := false, false
+	for _, p := range pieces {
+		all.WriteString(p.text)
+		if strings.TrimSpace(p.text) == "" {
+			if inLead {
+				lead.WriteString(p.text)
+			}
+			continue
+		}
+		s := p.style
+		if !s.bold && !s.italic && !s.underline {
+			line.emphasized = false
+		}
+		switch {
+		case !started:
+			started = true
+			inLead = s.bold || s.italic
+			line.bold, line.italic = s.bold, s.italic
+		case inLead && (s.bold != line.bold || s.italic != line.italic):
+			inLead = false
+		}
+		if inLead {
+			lead.WriteString(p.text)
+		}
+	}
+	line.text = strings.Join(strings.Fields(all.String()), " ")
+	if line.text == "" {
+		return docLine{}, false
+	}
+	if line.lead = strings.Join(strings.Fields(lead.String()), " "); line.lead == "" {
+		line.bold, line.italic = false, false
+	}
+	return line, true
+}
+
+// plainLines 合并纯文本每行内的连续空白（strings.Fields 也把不换行空格当作空白），去掉空行。
+func plainLines(text string) []docLine {
+	var lines []docLine
+	for line := range strings.SplitSeq(strings.ReplaceAll(text, "\r\n", "\n"), "\n") {
+		if line = strings.Join(strings.Fields(line), " "); line != "" {
+			lines = append(lines, docLine{text: line})
+		}
+	}
+	return lines
 }
 
 // splitItems 按行首的 Item 编号切分 8-K 正文：第一个 Item 之前是封面，SIGNATURE 之后是签名，都不参与摘要；
