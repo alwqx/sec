@@ -47,6 +47,7 @@
 43. Explain the risk factor changes with an AI model using `sec filings --risks --explain`.
 44. Add 10-K summaries and risk factor changes to the Desktop SEC filings list.
 45. Find the MD&A of banks whose 10-K Item 7 only points to the annual report, and summarize the first 100,000 characters of long MD&As.
+46. Add `sec ipo ask` to answer questions about an IPO prospectus with PDF page citations.
 
 ### v0.4.8
 

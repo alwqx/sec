@@ -3,6 +3,7 @@
 //	sec ipo list        — recent IPO listings (name / code / listing date / price / PE / first-day change)
 //	sec ipo calendar    — upcoming IPO calendar (purchase / publish / listing dates)
 //	sec ipo prospectus  — IPO prospectus (招股说明书) URLs from CNINFO for a stock code
+//	sec ipo ask         — ask an AI model about a prospectus, answered with PDF page citations
 package ipo
 
 import (
@@ -47,6 +48,7 @@ func NewIPOCLI() *cobra.Command {
 		newCalendarCmd(),
 		newProspectusCmd(),
 		newDownloadCmd(),
+		newAskCmd(),
 	)
 
 	return root

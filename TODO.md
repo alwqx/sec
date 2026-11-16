@@ -161,7 +161,8 @@
     - [x] 银行等公司的 MD&A 不在 Item 7（Item 7 只写「见年报第 X 页」，如摩根大通），按「Management’s discussion and analysis」标题在年报正文里找到它。同时识别标准标题在下一行的 Item 标题（美国银行），MD&A 最多取开头 10 万字（高盛、摩根大通、美国银行都有约 30 万字）。
     - [ ] 花旗的 10-K 正文不写 Item 编号，MD&A 已经按标题找到，风险因素还要按「RISK FACTORS」标题找；目前摘要只有 MD&A，风险因素对比报错。
     - [ ] 富国银行等公司的风险因素和 MD&A 在附件 Exhibit 13（年报）里，主文件只有引用，读取 EX-13 附件。
-  - [ ] 招股书 PDF 问答（`sec ipo ask`），回答附页码引用。
+  - [x] 招股书 PDF 问答（`sec ipo ask`），回答附页码引用。按问题里的词（BM25）挑出最相关的约 30 页一次交给模型。
+  - [ ] Desktop 招股书问答框：IPO 页面的招股书旁加问答框，复用 `llm.ProspectusAnswerer`。
 - [ ] `sec ask`：单次问答，agent loop 复用 `aitool/` 工具注册表；混合多个工具结果时带上各自截止日期，避免拼接不同时点的数据。
 - [ ] Desktop 对话面板：复用 `sec ask` 的 agent loop。
 
