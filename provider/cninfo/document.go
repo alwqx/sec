@@ -26,6 +26,22 @@ const (
 	MaxDocumentRunes = 400000
 )
 
+// 招股书问答读取整份招股说明书（科创板、北交所的常有 400 多页、10 MB 左右），只把和问题相关的几页发给模型，
+// 上限比公告摘要大。
+const (
+	MaxProspectusBytes = 40 * 1024 * 1024
+	MaxProspectusPages = 1000
+	MaxProspectusRunes = 1500000
+)
+
+// documentLimits 是读取一份 PDF 的大小、页数和字数上限。
+type documentLimits struct{ bytes, pages, runes int }
+
+var (
+	announcementLimits = documentLimits{MaxDocumentBytes, MaxDocumentPages, MaxDocumentRunes}
+	prospectusLimits   = documentLimits{MaxProspectusBytes, MaxProspectusPages, MaxProspectusRunes}
+)
+
 var (
 	documentPath = regexp.MustCompile(`^/finalpage/(\d{4}-\d{2}-\d{2})/(\d+)\.[pP][dD][fF]$`)
 	ErrDocument  = errors.New("公告 PDF 无法读取")
@@ -62,8 +78,17 @@ func DocumentURL(raw string) (*Document, error) {
 	return &Document{ID: m[2], URL: u.String(), AsOf: m[1]}, nil
 }
 
-// ReadDocument 下载并按页提取文本。重定向也检查来源，防止服务端请求离开巨潮 CDN。
+// ReadDocument 下载公告 PDF 并按页提取文本。重定向也检查来源，防止服务端请求离开巨潮 CDN。
 func ReadDocument(ctx context.Context, raw string) (*Document, error) {
+	return readDocument(ctx, raw, announcementLimits)
+}
+
+// ReadProspectus 和 ReadDocument 一样读取巨潮的 PDF，用招股书的上限（见 MaxProspectusPages）。
+func ReadProspectus(ctx context.Context, raw string) (*Document, error) {
+	return readDocument(ctx, raw, prospectusLimits)
+}
+
+func readDocument(ctx context.Context, raw string, limits documentLimits) (*Document, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -94,17 +119,18 @@ func ReadDocument(ctx context.Context, raw string) (*Document, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("%w：下载返回 HTTP %d", ErrDocument, resp.StatusCode)
 	}
-	if resp.ContentLength > MaxDocumentBytes {
-		return nil, fmt.Errorf("%w：文件超过 20 MB", ErrDocument)
+	tooLarge := fmt.Errorf("%w：文件超过 %d MB", ErrDocument, limits.bytes/1024/1024)
+	if resp.ContentLength > int64(limits.bytes) {
+		return nil, tooLarge
 	}
-	data, err := io.ReadAll(io.LimitReader(resp.Body, MaxDocumentBytes+1))
+	data, err := io.ReadAll(io.LimitReader(resp.Body, int64(limits.bytes)+1))
 	if err != nil {
 		return nil, fmt.Errorf("%w：下载未完成：%w", ErrDocument, err)
 	}
-	if len(data) > MaxDocumentBytes {
-		return nil, fmt.Errorf("%w：文件超过 20 MB", ErrDocument)
+	if len(data) > limits.bytes {
+		return nil, tooLarge
 	}
-	doc.Pages, err = extractDocumentPages(ctx, data)
+	doc.Pages, err = extractDocumentPages(ctx, data, limits)
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +149,7 @@ func (r documentReader) ReadAt(p []byte, off int64) (int, error) {
 	return r.Reader.ReadAt(p, off)
 }
 
-func extractDocumentPages(ctx context.Context, data []byte) (pages []DocumentPage, err error) {
+func extractDocumentPages(ctx context.Context, data []byte, limits documentLimits) (pages []DocumentPage, err error) {
 	// 第三方解析器遇到损坏文件时可能 panic，不能让 CLI 或 Desktop 随之退出。
 	defer func() {
 		if recover() != nil {
@@ -136,13 +162,17 @@ func extractDocumentPages(ctx context.Context, data []byte) (pages []DocumentPag
 	if !bytes.HasPrefix(data, []byte("%PDF-")) {
 		return nil, fmt.Errorf("%w：返回内容不是 PDF", ErrDocument)
 	}
+	// 巨潮的部分 PDF 在 %%EOF 后面还附了一串十六进制字符（如森峰激光的招股说明书），解析器要求文件以 %%EOF 结尾。
+	if i := bytes.LastIndex(data, []byte("%%EOF")); i >= 0 {
+		data = data[:i+len("%%EOF")]
+	}
 	reader, err := pdf.NewReader(documentReader{ctx, bytes.NewReader(data)}, int64(len(data)))
 	if err != nil {
 		return nil, fmt.Errorf("%w：PDF 损坏、加密或编码不支持", ErrDocument)
 	}
 	count := reader.NumPage()
-	if count < 1 || count > MaxDocumentPages {
-		return nil, fmt.Errorf("%w：页数须在 1 至 %d 页之间", ErrDocument, MaxDocumentPages)
+	if count < 1 || count > limits.pages {
+		return nil, fmt.Errorf("%w：页数须在 1 至 %d 页之间", ErrDocument, limits.pages)
 	}
 	total := 0
 	for n := 1; n <= count; n++ {
@@ -157,8 +187,8 @@ func extractDocumentPages(ctx context.Context, data []byte) (pages []DocumentPag
 			return -1
 		}, text))
 		total += utf8.RuneCountInString(text)
-		if total > MaxDocumentRunes {
-			return nil, fmt.Errorf("%w：文本超过 %d 字", ErrDocument, MaxDocumentRunes)
+		if total > limits.runes {
+			return nil, fmt.Errorf("%w：文本超过 %d 字", ErrDocument, limits.runes)
 		}
 		pages = append(pages, DocumentPage{Number: n, Text: text})
 	}

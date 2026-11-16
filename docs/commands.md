@@ -72,6 +72,7 @@ sec quote-history 600036 --freq week --json
 | `ipo list`                       | 新股上市列表                                                                                | IPO                                                          | 已有 |
 | `ipo prospectus`、`ipo download` | 招股说明书查询与下载                                                                        | IPO                                                          | 已有 |
 | `ipo calendar`                   | IPO 相关公告日期，不是准确的申购日历                                                        | IPO → 发行公告日期                                           | 已有 |
+| `ipo ask`                        | 用 AI 回答关于招股说明书的问题，回答附 PDF 页码，见 [AI/LLM 接入设计](ai.md#已实现招股书问答) | 无                                                           | 已有 |
 
 美股：`sec info` 的公司资料来自 SEC EDGAR（公司名称、曾用名、CIK、交易所、行业和 SIC、注册地、申报人类别、财年截止日、办公地址、电话），价格、52 周区间、市盈率和每股收益（最近四个季度）、总市值和总股本来自新浪美股行情；公司资料和行情任一失败时仍输出另一部分，`--json` 对应的 `company` 或 `quote` 为 `null`（`--json` 格式为 `{ex_code, ticker, company, quote}`，和 A 股不同）；SEC 没有的代码（比如 QQQ 等基金、场外交易股票）只显示行情；`-d` 输出分红表（见下）。每股收益为负表示亏损，亏损公司没有市盈率。`sec kline` 的美股标题用新浪美股行情。`sec quote-history` 和 `sec kline` 的美股行情来自东方财富：新浪搜索把美股都标成纳斯达克，按纳斯达克（105）查不到时依次改用纽交所（106）和 NYSE American（107）；类别股（比如 BRK.B）在东方财富写作 BRK_B，在新浪行情写作 brk$b。东方财富失败时，不复权日线改用新浪美股日线（从上市起全部历史，不复权，拆股当天价格会跳变），复权、周线和月线没有备用数据。
 

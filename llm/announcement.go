@@ -109,13 +109,7 @@ func (s *AnnouncementSummarizer) Summarize(ctx context.Context, rawURL string) (
 			}
 			return texts
 		},
-		cite: func(pages []int) string {
-			refs := make([]string, len(pages))
-			for i, n := range pages {
-				refs[i] = strconv.Itoa(n)
-			}
-			return "PDF 第 " + strings.Join(refs, "、") + " 页"
-		},
+		cite: CitePDFPages,
 	}
 	cited, model, err := d.summarize(ctx, chunkAnnouncement(doc.Pages))
 	if err != nil {
@@ -154,4 +148,13 @@ func chunkAnnouncement(pages []cninfo.DocumentPage) [][]cninfo.DocumentPage {
 
 func (s *AnnouncementSummarizer) summaryKey(doc *cninfo.Document) string {
 	return summaryCacheKey(s.CacheDir, doc.ID, doc.URL, s.Model.ID(), AnnouncementPromptVersion, announcementPrompt)
+}
+
+// CitePDFPages 把 PDF 页码写成「PDF 第 2、3 页」，公告摘要、招股书问答的引用和 CLI 都用它。
+func CitePDFPages(pages []int) string {
+	refs := make([]string, len(pages))
+	for i, n := range pages {
+		refs[i] = strconv.Itoa(n)
+	}
+	return "PDF 第 " + strings.Join(refs, "、") + " 页"
 }

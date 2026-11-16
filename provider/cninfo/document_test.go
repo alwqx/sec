@@ -78,14 +78,26 @@ func TestDocumentFailures(t *testing.T) {
 }
 
 func TestDocumentExtractionLimits(t *testing.T) {
-	_, err := extractDocumentPages(context.Background(), testpdf.Build(make([]string, MaxDocumentPages+1)...))
+	_, err := extractDocumentPages(context.Background(), testpdf.Build(make([]string, MaxDocumentPages+1)...), announcementLimits)
 	require.ErrorContains(t, err, "页数")
-	_, err = extractDocumentPages(context.Background(), testpdf.Build(strings.Repeat("文", MaxDocumentRunes+1)))
+	_, err = extractDocumentPages(context.Background(), testpdf.Build(strings.Repeat("文", MaxDocumentRunes+1)), announcementLimits)
 	require.ErrorContains(t, err, "文本超过")
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, err = extractDocumentPages(ctx, testpdf.Build("文本"))
+	_, err = extractDocumentPages(ctx, testpdf.Build("文本"), announcementLimits)
 	require.ErrorIs(t, err, context.Canceled)
+	// 招股书的上限更大：超过公告页数上限的 PDF 也能读。
+	pages, err := extractDocumentPages(context.Background(), testpdf.Build(make([]string, MaxDocumentPages+1)...), prospectusLimits)
+	require.ErrorContains(t, err, "未提取到文本", "页数没有超过招股书的上限，空白页才报错")
+	require.Empty(t, pages)
+}
+
+func TestExtractTrailingDataAfterEOF(t *testing.T) {
+	// 巨潮的部分 PDF 在 %%EOF 后面附了一串十六进制字符。
+	data := append(testpdf.Build("招股说明书"), []byte("\nEABAC48D476746D4F53682F2721FFB59")...)
+	pages, err := extractDocumentPages(context.Background(), data, announcementLimits)
+	require.NoError(t, err)
+	require.Equal(t, "招股说明书", pages[0].Text)
 }
 
 func TestExtractJoinsFragmentsByPosition(t *testing.T) {
@@ -97,7 +109,7 @@ func TestExtractJoinsFragmentsByPosition(t *testing.T) {
 		{X: 50, Y: 680, Text: "1,200"}, {X: 200, Y: 680, Text: "18.07"},
 		{X: 50, Y: 660, Text: "下一行"},
 	})
-	pages, err := extractDocumentPages(context.Background(), data)
+	pages, err := extractDocumentPages(context.Background(), data, announcementLimits)
 	require.NoError(t, err)
 	require.Equal(t, "2026年总资产27,859.52亿元\n1,200 18.07\n下一行", pages[0].Text)
 }
