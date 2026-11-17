@@ -23,6 +23,10 @@ const (
 	minTitleWords = 4
 	// maxCategoryRunes 是风险类别标题最多的字数。
 	maxCategoryRunes = 100
+	// minWrappedWords 是分成两行的小标题第一行最少的词数。样式和小标题相同的类别（摩根大通、美国银行都只加粗）
+	// 最多 4 个词（Regulatory, Compliance and Legal），花旗分栏断开的小标题第一行有 7 个词。更长的类别多半带
+	// Risk 或 Risks（Risks Related to Our Business and Industry），带这两个词的行不接。
+	minWrappedWords = 6
 )
 
 // riskTitle 返回一行开头的风险因素小标题：行首连续加粗或斜体、并且是一个完整句子的文字。小标题可以单独成段，
@@ -44,6 +48,13 @@ func riskTitle(line docLine) (string, bool) {
 		return lead + ".", true
 	}
 	return "", false
+}
+
+// mentionsRisk 判断文字里有没有 risk 或 risks 这个词（不计大小写），风险类别的标题多半有。
+func mentionsRisk(text string) bool {
+	return slices.ContainsFunc(strings.FieldsFunc(strings.ToLower(text), func(r rune) bool { return !unicode.IsLetter(r) }), func(w string) bool {
+		return w == "risk" || w == "risks"
+	})
 }
 
 // endsSentence 判断文字是否以句号或问号结尾，句末的右引号和右括号不算（如 a "trade war."）。
@@ -94,11 +105,23 @@ func riskFactors(lines []docLine, scanned []tenKLine, start, end int) []RiskFact
 			delete(titles, i)
 		}
 	}
-	// nextLine 返回 i 之后第一个不是页眉页脚的行。
-	nextLine := func(i int) int {
-		for i++; i < end && scanned[i].furniture; i++ {
+	nextLine := func(i int) int { return nextContentLine(scanned, i, end) }
+	// 分栏处断开的小标题（花旗的「Citi Faces Potential Disruptions from an Evolving」和下一行
+	// 「Business Environment, …」）：前一行整行是小标题的样式、不是句子、不是全大写、不带 Risk(s)、词数够多时
+	// 接到下一行的小标题前面。
+	// wrapped 是这样的第二行，小标题算在第一行，第二行只有小标题后面的部分是正文。
+	wrapped := map[int]bool{}
+	for i := start + 1; i < end; i++ {
+		line := lines[i]
+		j := nextLine(i)
+		title, ok := titles[j]
+		if !ok || titles[i] != "" || scanned[i].furniture || line.lead != line.text || (style{line.bold, line.italic}) != main ||
+			endsSentence(line.text) || allCaps(line.text) || len(strings.Fields(line.text)) < minWrappedWords || mentionsRisk(line.text) {
+			continue
 		}
-		return i
+		titles[i] = line.text + " " + title
+		delete(titles, j)
+		wrapped[j] = true
 	}
 	var risks []RiskFactor
 	var body []string
@@ -114,11 +137,13 @@ func riskFactors(lines []docLine, scanned []tenKLine, start, end int) []RiskFact
 		if scanned[i].furniture {
 			continue
 		}
-		if title, ok := titles[i]; ok {
-			finish()
-			risks = append(risks, RiskFactor{Category: category, Title: title})
-			current = len(risks) - 1
-			// 和正文写在同一段时，小标题后面的部分是正文。
+		// 和正文写在同一段时，小标题后面的部分是正文。
+		if title, ok := titles[i]; ok || wrapped[i] {
+			if ok {
+				finish()
+				risks = append(risks, RiskFactor{Category: category, Title: title})
+				current = len(risks) - 1
+			}
 			if rest := strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(line.text, line.lead), ".")); rest != "" {
 				body = append(body, rest)
 			}
@@ -297,8 +322,8 @@ func dice(a, b map[string]bool) float64 {
 }
 
 // RiskComparisonVersion 是识别风险因素小标题和对比规则的版本。规则改了（小标题、类别的识别，相似度的计算和阈值）
-// 要改这个值，依赖对比结果的缓存（如模型的解读）随之失效。
-const RiskComparisonVersion = "1"
+// 要改这个值，依赖对比结果的缓存（如模型的解读）随之失效。2：按标题找风险因素（花旗），接起断成两行的小标题。
+const RiskComparisonVersion = "2"
 
 // RiskFiling 是参与对比的一份 10-K。
 type RiskFiling struct {
@@ -320,7 +345,7 @@ type RiskChanges struct {
 
 // riskChangeNotes 是对比结果的说明。
 var riskChangeNotes = []string{
-	"风险因素按 Item 1A 里加粗或斜体的句子小标题识别；没有这样排版的小标题、纯文本的旧申报无法对比。",
+	"风险因素按 Item 1A（没有 Item 编号时是年报里的 Risk Factors 一章）里加粗或斜体的句子小标题识别；没有这样排版的小标题、纯文本的旧申报无法对比。",
 	"保留是小标题相同（不计大小写、引号和末尾句号），正文可能有改动；改写按小标题和正文的相似度配对，一条拆成两条或两条合成一条时，没配上的算新增或删除。新增和删除只说明小标题的变化，不代表公司面临的风险本身变了。",
 }
 

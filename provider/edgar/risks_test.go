@@ -182,3 +182,77 @@ func TestRiskFactorsIgnoreSummaryLimit(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, doc.RiskFactors, 2)
 }
+
+func TestRiskFactorsByTitle(t *testing.T) {
+	body := func(s string) string { return "<p>" + strings.Repeat(s+" ", 40) + "</p>" }
+	bi := func(s string) string {
+		return `<p><span style="font-weight:700;font-style:italic">` + s + `</span></p>`
+	}
+	// 花旗：正文没有 Item 标题，只有交叉索引表和目录；风险因素是全大写加粗的一章，类别也是全大写加粗，
+	// 小标题粗斜体，有一条在分栏处断成两行；下一章 SUSTAINABILITY 的样式和章标题相同。
+	citi := `<p><b>1A. Risk Factors 49–62</b></p><p><b>RISK FACTORS 49</b></p><p><b>SUSTAINABILITY 62</b></p>
+<p><b>RISK FACTORS</b></p>` + body("The following discussion presents the material risks.") + `
+<p><b>MARKET-RELATED RISKS</b></p>` + bi("Changes to Interest Rates Could Adversely Affect Citi’s Results.") + body("Rates moved sharply.") + `
+<p><b>STRATEGIC RISKS</b></p>` + bi("Citi Faces Potential Disruptions from an Evolving") + bi("Business Environment, Including Emerging Technologies.") + body("Competitors invest heavily.") +
+		bi("The Development and Use of AI Present Risks to Citi’s Businesses.") + body("AI models may be wrong.") + `
+<p><b>SUSTAINABILITY</b></p>` + body("Citi publishes a sustainability report.") + `
+<p><b>MANAGEMENT’S DISCUSSION AND ANALYSIS</b></p>` + body("Revenues increased 3% driven by Services and Markets in every quarter of the year.") +
+		body("Expenses declined.") + `<p><b>Report of Independent Registered Public Accounting Firm</b></p><p>Opinion.</p>`
+	lines, err := htmlLines([]byte(citi))
+	require.NoError(t, err)
+	doc, err := read10K(&FilingDocument{}, lines)
+	require.NoError(t, err)
+	require.Equal(t, "Item 1A", doc.Sections[0].Label)
+	require.True(t, strings.HasPrefix(doc.Sections[0].Text, "RISK FACTORS\nThe following discussion"), "跳过交叉索引表和目录里的标题行")
+	require.NotContains(t, doc.Sections[0].Text, "sustainability report", "到下一个同样式的章标题为止")
+	require.Contains(t, strings.Join(doc.Notes, ""), "10-K 正文里没有 Item 1A 标题，按「Risk Factors」标题")
+	var got [][2]string
+	for _, r := range doc.RiskFactors {
+		got = append(got, [2]string{r.Category, r.Title})
+	}
+	require.Equal(t, [][2]string{
+		{"MARKET-RELATED RISKS", "Changes to Interest Rates Could Adversely Affect Citi’s Results."},
+		{"STRATEGIC RISKS", "Citi Faces Potential Disruptions from an Evolving Business Environment, Including Emerging Technologies."},
+		{"STRATEGIC RISKS", "The Development and Use of AI Present Risks to Citi’s Businesses."},
+	}, got, "全大写的类别不结束章节；断成两行的小标题接起来，第一行不当成类别")
+	require.True(t, strings.HasPrefix(doc.RiskFactors[1].Text, "Competitors invest heavily."), doc.RiskFactors[1].Text)
+
+	// 摩根大通、美国银行：类别和小标题都只加粗，类别不超过 4 个词，不当成断开的小标题。
+	b := func(s string) string { return "<p><b>" + s + "</b></p>" }
+	risks := readRisks(t, `<p>ITEM 1A. RISK FACTORS</p>`+b("Regulatory, Compliance and Legal")+b("We are subject to extensive regulation in many jurisdictions.")+
+		body("Regulators may impose fines.")+body("Rules change often.")+b("Market")+b("We may be adversely affected by the financial markets.")+body("Markets fall.")+
+		`<p>Item 7. Management’s Discussion and Analysis</p>`+body("Net income rose 6% on higher net interest income across all segments of the firm.")+body("More.")+body("Even more.")+`<p>Item 8. Financial Statements</p>`)
+	require.Len(t, risks, 2)
+	require.Equal(t, "Regulatory, Compliance and Legal", risks[0].Category)
+	require.Equal(t, "We are subject to extensive regulation in many jurisdictions.", risks[0].Title)
+	require.Equal(t, "Market", risks[1].Category)
+
+	// 每页重复的「RISK FACTORS」页眉和只有编号的 Item 1A 页眉不结束章节。
+	paged := strings.Replace(citi, `<p><b>STRATEGIC RISKS</b></p>`, `<p><b>RISK FACTORS</b></p><p>Item 1A</p><p><b>STRATEGIC RISKS</b></p>`, 1)
+	paged = strings.Replace(paged, body("Competitors invest heavily."), body("Competitors invest heavily.")+`<p><b>RISK FACTORS</b></p>`+body("More about competitors."), 1)
+	lines, err = htmlLines([]byte(paged))
+	require.NoError(t, err)
+	doc, err = read10K(&FilingDocument{}, lines)
+	require.NoError(t, err)
+	require.Len(t, doc.RiskFactors, 3, "页眉之后的风险因素都在")
+	require.Contains(t, doc.RiskFactors[1].Text, "More about competitors.")
+	require.NotContains(t, doc.Sections[0].Text, "RISK FACTORS\nItem 1A", "同名页眉和 Item 页眉不放进正文")
+
+	// 较小的申报公司写明不适用时，不按标题去找别的部分。
+	small := `<p>ITEM 1. BUSINESS</p><p><b>RISK FACTORS</b></p>` + body("Forward-looking statements involve risks.") +
+		`<p><b>OTHER MATTERS</b></p><p>ITEM 1A. RISK FACTORS</p><p>Not applicable.</p><p>Item 7. Management’s Discussion and Analysis</p>` + body("Net income rose 6% on higher net interest income across all segments of the firm.") + `<p>Item 8. Financial Statements</p>`
+	lines, err = htmlLines([]byte(small))
+	require.NoError(t, err)
+	doc, err = read10K(&FilingDocument{}, lines)
+	require.NoError(t, err)
+	require.Equal(t, "Item 7", doc.Sections[0].Label)
+	require.Contains(t, strings.Join(doc.Notes, ""), "可能不适用")
+
+	// 带 Risks 的长类别和小标题样式相同，也不当成断开的小标题。
+	risks = readRisks(t, `<p>ITEM 1A. RISK FACTORS</p>`+b("Risks Related to Our Business and Industry")+b("We depend on a small number of customers.")+
+		body("Customers may leave.")+body("Contracts are short.")+
+		`<p>Item 7. Management’s Discussion and Analysis</p>`+body("Net income rose 6% on higher net interest income across all segments of the firm.")+`<p>Item 8. Financial Statements</p>`)
+	require.Len(t, risks, 1)
+	require.Equal(t, "Risks Related to Our Business and Industry", risks[0].Category)
+	require.Equal(t, "We depend on a small number of customers.", risks[0].Title)
+}

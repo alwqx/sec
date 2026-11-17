@@ -36,12 +36,20 @@ var (
 		"10": {"directors"}, "11": {"executive compensation"}, "12": {"security ownership"}, "13": {"certain relationships"},
 		"14": {"principal account"}, "15": {"exhibit"}, "16": {"form 10-k summary"},
 	}
+	// tenKSections 是参与摘要的两节。Item 太短或没有 Item 标题时按标题在年报正文里找（byTitle），heading 和 what
+	// 写进说明：银行的 Item 7 只写「见年报第 X 页」（摩根大通），花旗的 10-K 正文不写 Item 编号。
 	tenKSections = []struct {
 		item, title, label, short string
+		byTitle                   func([]docLine, []tenKLine) (start, end int, text string)
+		heading, what             string
 	}{
-		{"1a", "risk factors", "Item 1A", "Item 1A 风险因素正文只有 %d 字，可能不适用（如较小的申报公司）或只是引用其他部分，未参与摘要。"},
-		{"7", "management", "Item 7", "Item 7 管理层讨论与分析正文只有 %d 字，可能只是引用年报的其他部分（银行等公司常见），未参与摘要。"},
+		{"1a", "risk factors", "Item 1A", "Item 1A 风险因素正文只有 %d 字，可能不适用（如较小的申报公司）或只是引用其他部分，未参与摘要。",
+			riskFactorsByTitle, "Risk Factors", "风险因素"},
+		{"7", "management", "Item 7", "Item 7 管理层讨论与分析正文只有 %d 字，可能只是引用年报的其他部分（银行等公司常见），未参与摘要。",
+			mdnaByTitle, "Management’s discussion and analysis", "管理层讨论与分析"},
 	}
+	// notApplicable 匹配写明不适用的章节（较小的申报公司不必披露风险因素），这时不按标题去找别的部分。
+	notApplicable = regexp.MustCompile(`(?i)not applicable|smaller reporting compan`)
 )
 
 // Read10K 读取一份 10-K（含 10-K/A、过渡期年报 10-KT）主文件里的 Item 1A 风险因素和 Item 7 管理层讨论与分析，
@@ -85,15 +93,14 @@ func read10K(doc *FilingDocument, docLines []docLine) (*FilingDocument, error) {
 		section := sectionText(lines, scanned, start, end)
 		n := utf8.RuneCountInString(section)
 		var notes []string
-		// 银行等公司的 Item 7 只写「见年报第 X 页」，管理层讨论与分析在年报正文里，按标题找。
-		if want.item == "7" && n < minSectionRunes {
-			if text := mdnaByTitle(docLines, scanned); utf8.RuneCountInString(text) >= minSectionRunes {
-				where := "Item 7 只是引用年报的其他部分"
+		if n < minSectionRunes && !notApplicable.MatchString(section) {
+			if from, to, text := want.byTitle(docLines, scanned); utf8.RuneCountInString(text) >= minSectionRunes {
+				where := want.label + " 只是引用年报的其他部分"
 				if section == "" {
-					where = "10-K 正文里没有 Item 7 标题"
+					where = "10-K 正文里没有 " + want.label + " 标题"
 				}
-				section, n = text, utf8.RuneCountInString(text)
-				notes = append(notes, where+"，按「Management’s discussion and analysis」标题在年报正文里取出管理层讨论与分析。")
+				section, n, start, end = text, utf8.RuneCountInString(text), from, to
+				notes = append(notes, where+"，按「"+want.heading+"」标题在年报正文里取出"+want.what+"。")
 			}
 		}
 		if want.item == "7" && n > maxMDNARunes {
@@ -129,48 +136,106 @@ var mdnaEnds = []string{"report of independent registered public accounting firm
 // maxHeadingRunes 是按标题找章节时标题行的最大字数，更长的是正文。
 const maxHeadingRunes = 120
 
-// mdnaByTitle 在年报正文里按标题找管理层讨论与分析：从加粗或斜体的「Management's discussion and analysis」标题行
-// （以冒号结尾的是目录）到下一个结束行（审计报告或管理层内部控制报告的标题或目录行、Item 8、SIGNATURES），
-// 和 findSection 一样取正文最长的一段：目录、每页重复的同名页眉开始的段都更短。每页的同名页眉和其他页眉页脚不放进正文。
-// 找不到时返回空字符串。
-func mdnaByTitle(lines []docLine, scanned []tenKLine) string {
-	// heading 返回短行规范化后的文字，长行返回空字符串，不必为正文做规范化。
-	heading := func(i int) string {
-		if len(lines[i].text) > maxHeadingRunes*4 || utf8.RuneCountInString(lines[i].text) > maxHeadingRunes {
-			return ""
-		}
-		return normalizeTitle(lines[i].text)
+// headingText 返回短行规范化后的文字，长行返回空字符串，不必为正文做规范化。
+func headingText(lines []docLine, i int) string {
+	if len(lines[i].text) > maxHeadingRunes*4 || utf8.RuneCountInString(lines[i].text) > maxHeadingRunes {
+		return ""
 	}
+	return normalizeTitle(lines[i].text)
+}
+
+// sectionByTitle 在不按 Item 编排的年报正文里按标题找章节：从加粗或斜体、match 的标题行 start 到结束行 end（不含），
+// 取正文最长的一段：目录、每页重复的同名页眉开始的段都更短。endAt(start) 返回判断结束行的函数，每个标题行只准备一次。
+// 每页的同名页眉不是结束行，和其他页眉页脚一样不放进正文。找不到时 start 为 -1、text 为空字符串。
+func sectionByTitle(lines []docLine, scanned []tenKLine, match func(header string) bool, endAt func(start int) func(i int) bool) (start, end int, text string) {
+	var best []string
+	start, bestRunes := -1, 0
+	for from, l := range lines {
+		if !l.emphasized || scanned[from].furniture {
+			continue
+		}
+		header := headingText(lines, from)
+		if header == "" || !match(header) {
+			continue
+		}
+		isEnd := endAt(from)
+		section, n, i := []string{l.text}, utf8.RuneCountInString(l.text), from+1
+		for ; i < len(lines); i++ {
+			if lines[i].emphasized && headingText(lines, i) == header {
+				continue
+			}
+			if isEnd(i) {
+				break
+			}
+			if !scanned[i].furniture {
+				section, n = append(section, lines[i].text), n+utf8.RuneCountInString(lines[i].text)
+			}
+		}
+		if n > bestRunes {
+			best, bestRunes, start, end = section, n, from, i
+		}
+	}
+	return start, end, strings.Join(best, "\n")
+}
+
+// mdnaByTitle 在年报正文里按标题找管理层讨论与分析：从加粗或斜体的「Management's discussion and analysis」标题行
+// （以冒号结尾的是目录）到下一个结束行（审计报告或管理层内部控制报告的标题或目录行、Item 8、SIGNATURES）。
+// 找不到时 start 为 -1。
+func mdnaByTitle(lines []docLine, scanned []tenKLine) (start, end int, text string) {
 	// 结束行不要求加粗：目录里「Report of Independent Registered Public Accounting Firm 162」这样的行也结束目录开始的段。
 	isEnd := func(i int) bool {
 		if scanned[i].end || scanned[i].item == "8" {
 			return true
 		}
-		t := heading(i)
+		t := headingText(lines, i)
 		return t != "" && slices.ContainsFunc(mdnaEnds, func(end string) bool { return strings.HasPrefix(t, end) })
 	}
-	var best []string
-	bestRunes := 0
-	for start, l := range lines {
-		if !l.emphasized || scanned[start].furniture {
-			continue
-		}
-		header := heading(start)
-		if !strings.HasPrefix(header, "management's discussion and analysis") || strings.HasSuffix(header, ":") {
-			continue
-		}
-		section, n := []string{l.text}, utf8.RuneCountInString(l.text)
-		for i := start + 1; i < len(lines) && !isEnd(i); i++ {
-			if scanned[i].furniture || (lines[i].emphasized && heading(i) == header) {
-				continue
+	return sectionByTitle(lines, scanned, func(header string) bool {
+		return strings.HasPrefix(header, "management's discussion and analysis") && !strings.HasSuffix(header, ":")
+	}, func(int) func(int) bool { return isEnd })
+}
+
+// riskFactorsByTitle 在年报正文里按标题找风险因素：花旗的 10-K 正文不写 Item 编号，只在交叉索引表里列出页码，
+// 风险因素是单独成行的「RISK FACTORS」一章。从这个标题行到下一个样式相同（加粗、斜体、是否全大写都相同）、
+// 不是句子的标题行，或其他 Item 的标题、SIGNATURES（只有编号的 Item 1A 页眉不算）。风险类别（MARKET-RELATED RISKS）
+// 和章节标题样式一样，但下一行是风险因素小标题（或断成两行的小标题），不算结束。
+func riskFactorsByTitle(lines []docLine, scanned []tenKLine) (start, end int, text string) {
+	return sectionByTitle(lines, scanned, func(header string) bool { return header == "risk factors" }, func(start int) func(int) bool {
+		h := lines[start]
+		caps := allCaps(h.text)
+		return func(i int) bool {
+			if scanned[i].end || (scanned[i].item != "" && scanned[i].item != "1a") {
+				return true
 			}
-			section, n = append(section, lines[i].text), n+utf8.RuneCountInString(lines[i].text)
+			l := lines[i]
+			if scanned[i].furniture || !l.emphasized || l.bold != h.bold || l.italic != h.italic || headingText(lines, i) == "" ||
+				endsSentence(l.text) || allCaps(l.text) != caps {
+				return false
+			}
+			// 类别下一行是小标题；小标题断成两行时第一行加粗或斜体、不是句子，再看下一行。
+			next := nextContentLine(scanned, i, len(lines))
+			if next < len(lines) && lines[next].emphasized && !endsSentence(lines[next].text) {
+				next = nextContentLine(scanned, next, len(lines))
+			}
+			if next == len(lines) {
+				return true
+			}
+			_, title := riskTitle(lines[next])
+			return !title
 		}
-		if n > bestRunes {
-			best, bestRunes = section, n
-		}
+	})
+}
+
+// nextContentLine 返回 i 之后、end 之前第一个不是页眉页脚的行，没有时返回 end。
+func nextContentLine(scanned []tenKLine, i, end int) int {
+	for i++; i < end && scanned[i].furniture; i++ {
 	}
-	return strings.Join(best, "\n")
+	return i
+}
+
+// allCaps 判断文字里的字母是否都是大写，没有字母时为 false。
+func allCaps(text string) bool {
+	return strings.ToUpper(text) == text && strings.ToLower(text) != text
 }
 
 // truncateLines 截取不超过 n 个字的开头部分，尽量按整行截；按整行截剩下不到一半时（后面是很长的一行）截这一行的开头。

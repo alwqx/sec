@@ -49,6 +49,7 @@
 45. Find the MD&A of banks whose 10-K Item 7 only points to the annual report, and summarize the first 100,000 characters of long MD&As.
 46. Add `sec ipo ask` to answer questions about an IPO prospectus with PDF page citations.
 47. Add a question box to full prospectuses in the Desktop prospectus list.
+48. Find risk factors by their heading in 10-Ks without Item numbers, such as Citigroup's, and join risk titles split across two lines.
 
 ### v0.4.8
 
