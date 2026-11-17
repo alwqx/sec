@@ -207,6 +207,12 @@ export function summarizeAnnouncement(url: string, profile: string, signal?: Abo
   })
 }
 
+export function askProspectus(url: string, question: string, profile: string, signal?: AbortSignal): Promise<import('./types').ProspectusAnswer> {
+  return request('/api/v1/ai/prospectus/ask', signal, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, question, profile }),
+  })
+}
+
 export function summarizeFiling(url: string, profile: string, signal?: AbortSignal): Promise<import('./types').FilingSummary> {
   return request('/api/v1/ai/filings/summary', signal, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, profile }),

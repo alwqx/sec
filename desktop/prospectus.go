@@ -33,6 +33,8 @@ type prospectusDocument struct {
 	Title string `json:"title"`
 	Date  string `json:"date"`
 	URL   string `json:"url"`
+	// Askable 表示是招股说明书或招股意向书全文，可以用 AI 问答（cninfo.ProspectusKind）。
+	Askable bool `json:"askable"`
 }
 
 // queryProspectuses 复用 CLI 的首次公开发行及上市分类，保留招股意向书、招股说明书和发行公告。
@@ -55,7 +57,8 @@ func queryProspectuses(ctx context.Context, stock, begin, end string, page int) 
 			continue
 		}
 		seen[pdf] = true
-		results = append(results, prospectusDocument{ID: item.ID, Title: strings.TrimSpace(html.UnescapeString(titleTags.ReplaceAllString(item.Title, ""))), Date: item.DateText(), URL: pdf})
+		title := strings.TrimSpace(html.UnescapeString(titleTags.ReplaceAllString(item.Title, "")))
+		results = append(results, prospectusDocument{ID: item.ID, Title: title, Date: item.DateText(), URL: pdf, Askable: cninfo.ProspectusKind(title) != ""})
 	}
 	return results, response.HasMore || page < response.TotalPages, nil
 }

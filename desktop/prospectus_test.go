@@ -25,11 +25,13 @@ func TestProspectusQueryFiltersAndPagination(t *testing.T) {
 		{"announcementTitle": "取消", "existFlag": 1, "adjunctUrl": "finalpage/2018-06-01/125.pdf"},
 		{"announcementTitle": "失效", "invalidationFlag": 1, "adjunctUrl": "finalpage/2018-06-01/126.pdf"},
 		{"announcementTitle": "外部", "adjunctUrl": "https://example.com/file.pdf"},
+		{"announcementId": "7", "announcementTitle": "首次公开发行股票并上市招股意向书（注册稿）", "adjunctUrl": "finalpage/2018-06-01/127.pdf"},
 	}})
 	rows, more, err := queryProspectuses(context.Background(), "300750,org", "2018-01-01", "2018-12-31", 2)
 	require.NoError(t, err)
-	require.Len(t, rows, 2)
+	require.Len(t, rows, 3)
 	require.Equal(t, "招股说明书 & 附件", rows[0].Title)
+	require.Equal(t, []bool{false, false, true}, []bool{rows[0].Askable, rows[1].Askable, rows[2].Askable}, "只有招股说明书、招股意向书全文可以问答")
 	require.Equal(t, "2018-06-01", rows[0].Date)
 	require.Equal(t, "https://static.cninfo.com.cn/finalpage/2018-06-01/124.PDF", rows[1].URL)
 	require.True(t, more)

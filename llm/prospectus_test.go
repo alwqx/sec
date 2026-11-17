@@ -109,7 +109,8 @@ func TestProspectusAskFailures(t *testing.T) {
 
 	_, err = a.Ask(context.Background(), prospectusURL, "董事会秘书")
 	require.ErrorIs(t, err, ErrProspectusAsk)
-	require.ErrorContains(t, err, "没有和问题相关的页")
+	require.ErrorIs(t, err, ErrNoRelatedPages)
+	require.ErrorContains(t, err, "没有和问题相关的页，请换个说法")
 	_, err = a.Ask(context.Background(), prospectusURL, " ")
 	require.ErrorContains(t, err, "问题不能为空")
 	_, err = a.Ask(context.Background(), prospectusURL, strings.Repeat("问", maxQuestionRunes+1))

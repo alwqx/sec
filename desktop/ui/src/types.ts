@@ -177,6 +177,7 @@ export interface ProspectusDocument {
   title: string
   date: string
   url: string
+  askable: boolean // 招股说明书或招股意向书全文，可以 AI 问答
 }
 
 export interface ProspectusPage {
@@ -260,12 +261,38 @@ export interface ValuationExplanation {
   created_at: string
 }
 
+// PDFSection 是带 PDF 页码引用的一段，公告摘要和招股书问答共用。
+export interface PDFSection {
+  text: string
+  pages: number[]
+}
+
+// ProspectusAnswer 是一次招股书问答（llm.ProspectusAnswer）：pages 是按问题挑出来发给模型的页，每段引用其中的页码。
+export interface ProspectusAnswer {
+  document_id: string
+  source_url: string
+  as_of: string
+  question: string
+  page_count: number
+  pages: number[]
+  sections: PDFSection[]
+  text: string
+  notes: string[]
+  check: ValuationExplanation['check']
+  disclaimer: string
+  model: string
+  profile: string
+  prompt_version: string
+  cached: boolean
+  created_at: string
+}
+
 export interface AnnouncementSummary {
   document_id: string
   source_url: string
   as_of: string
   page_count: number
-  sections: { text: string; pages: number[] }[]
+  sections: PDFSection[]
   text: string
   notes: string[]
   check: ValuationExplanation['check']

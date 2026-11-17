@@ -80,6 +80,7 @@ func (s *desktopServer) Handler() http.Handler {
 	mux.Handle("POST /api/v1/ai/announcements/summary", s.withAuth(http.HandlerFunc(s.handleAIAnnouncement)))
 	mux.Handle("POST /api/v1/ai/filings/summary", s.withAuth(http.HandlerFunc(s.handleAIFiling)))
 	mux.Handle("POST /api/v1/ai/filings/risks", s.withAuth(http.HandlerFunc(s.handleAIFilingRisks)))
+	mux.Handle("POST /api/v1/ai/prospectus/ask", s.withAuth(http.HandlerFunc(s.handleAIProspectus)))
 	mux.Handle("PUT /api/v1/ai/default", s.withAuth(http.HandlerFunc(s.handleAIDefault)))
 	mux.Handle("PUT /api/v1/ai/enabled", s.withAuth(http.HandlerFunc(s.handleAIEnabled)))
 
