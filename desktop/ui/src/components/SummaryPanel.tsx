@@ -4,7 +4,7 @@ import { openDisclosure } from '../disclosure'
 import { useSummaryRequest } from '../hooks/useSummaryRequest'
 import type { AIProfileView, ValuationExplanation } from '../types'
 
-// SummaryResult 是公告和申报摘要共有的字段。
+// SummaryResult 是公告和申报摘要、招股书问答共有的字段。
 export interface SummaryResult {
   check: ValuationExplanation['check']
   notes: string[]
@@ -43,12 +43,18 @@ export default function SummaryPanel<T extends SummaryResult>({ label, title, bu
     </div>
     {busy && <p className="data-note" role="status">{busyNote}</p>}
     {error && <p className="error" role="alert">{error}</p>}
-    {result && <div className="explanation-result" role="status">
-      <p className="data-note">{meta(result)} · 模型 {result.model} · 配置 {result.profile}{result.cached ? ` · 缓存，生成于 ${new Date(result.created_at).toLocaleString('zh-CN')}` : ''}</p>
-      {sections(result, open)}
-      {explanationChecks(result).map(line => <p key={line} className={result.check.unsourced.length || result.check.advice_terms.length ? 'error' : 'data-note'}>核对：{line}</p>)}
-      {result.notes.map(note => <p key={note} className="data-note">{note}</p>)}
-      <p className="data-note">{result.disclaimer}</p>
-    </div>}
+    {result && <SummaryResultView result={result} meta={meta(result)}>{sections(result, open)}</SummaryResultView>}
+  </div>
+}
+
+// SummaryResultView 是摘要、解读和招股书问答结果的外框：第一行的文档信息、模型和缓存，children 是各段正文，
+// 后面是核对结果、说明和免责声明。
+export function SummaryResultView({ result, meta, children }: { result: SummaryResult; meta: string; children: ReactNode }) {
+  return <div className="explanation-result" role="status">
+    <p className="data-note">{meta} · 模型 {result.model} · 配置 {result.profile}{result.cached ? ` · 缓存，生成于 ${new Date(result.created_at).toLocaleString('zh-CN')}` : ''}</p>
+    {children}
+    {explanationChecks(result).map(line => <p key={line} className={result.check.unsourced.length || result.check.advice_terms.length ? 'error' : 'data-note'}>核对：{line}</p>)}
+    {result.notes.map(note => <p key={note} className="data-note">{note}</p>)}
+    <p className="data-note">{result.disclaimer}</p>
   </div>
 }

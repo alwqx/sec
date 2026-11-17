@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { downloadProspectus, prospectuses } from '../api'
+import { useAIModels } from '../hooks/useAIModels'
 import { useResource } from '../hooks/useResource'
 import type { ProspectusDocument, SavedDownload as SavedFile } from '../types'
+import ProspectusAsk from './ProspectusAsk'
 import ResourceState from './ResourceState'
 import SavedDownload from './SavedDownload'
+import SummaryModelPicker from './SummaryModelPicker'
 
 function Results({ code, begin, end }: { code: string; begin: string; end: string }) {
   const [page, setPage] = useState(1)
@@ -18,6 +21,18 @@ function Results({ code, begin, end }: { code: string; begin: string; end: strin
   useEffect(() => () => controller.current?.abort(), [])
   const rows = resource.data?.results ?? []
   const chosen = rows.filter(item => selected.includes(item.url))
+  // 没有出现过招股说明书、招股意向书全文时不读取模型配置。出现过以后一直读取：翻页、刷新时列表会短暂为空，
+  // 不能因此重新请求模型配置和系统钥匙串。
+  const askable = rows.some(item => item.askable)
+  const seenAskable = useRef(false)
+  if (askable) seenAskable.current = true
+  const models = useAIModels(seenAskable.current)
+  const { profile, unavailable } = models
+  // asking 是正在回答问题的行数，回答时禁用刷新和翻页（卸载行会取消回答）。
+  const [asking, setAsking] = useState(0)
+  const onAskBusy = useCallback((busy: boolean) => setAsking(current => current + (busy ? 1 : -1)), [])
+  const locked = busy || asking > 0
+  const lockedTitle = asking > 0 ? '正在回答问题，完成或取消后再刷新、翻页' : undefined
   const download = async (documents: ProspectusDocument[]) => {
     if (controller.current && !controller.current.signal.aborted) return
     if (!documents.length) return
@@ -52,12 +67,13 @@ function Results({ code, begin, end }: { code: string; begin: string; end: strin
     <div className="section-toolbar">
       <label><input type="checkbox" checked={rows.length > 0 && chosen.length === rows.length} disabled={busy || resource.loading || !rows.length} onChange={e => setSelected(e.target.checked ? rows.map(item => item.url) : [])} /> 全选本页</label>
       <button disabled={busy || !chosen.length || resource.loading} onClick={() => void download(chosen)}>下载所选（{chosen.length}）</button>
-      <button disabled={busy || resource.loading} onClick={reload}>刷新列表</button>
+      <button disabled={locked || resource.loading} title={lockedTitle} onClick={reload}>刷新列表</button>
       {busy && <button onClick={cancel}>取消下载</button>}
     </div>
     {progress && <p className="data-note" role="status">{progress}</p>}
     {error && <p className="error" role="alert">{error}</p>}
     {files.map(file => <SavedDownload key={file.path} file={file} />)}
+    {askable && <SummaryModelPicker models={models} action="提问" sends="问题和按问题挑出的招股书页面文本" extra="只有招股说明书、招股意向书全文可以提问，回答附物理 PDF 页码；扫描件暂不支持。" />}
     <ResourceState {...resource} retry={reload} />
     {resource.data && (rows.length ? <ul className="announcement-list">{rows.map(item => <li key={item.url}>
       <div className="announcement-meta"><time>{item.date || '日期未知'}</time></div>
@@ -67,8 +83,9 @@ function Results({ code, begin, end }: { code: string; begin: string; end: strin
         event.preventDefault()
         void window.secOpenDisclosure(item.url).catch(() => setError('原文打开失败，请尝试下载 PDF。'))
       }}>查看原文 ↗</a></div>
+      {item.askable && <ProspectusAsk url={item.url} profile={profile} unavailable={unavailable} onBusy={onAskBusy} />}
     </li>)}</ul> : <div className="empty-state">本页暂无有效招股说明书或 IPO 相关 PDF。{resource.data.has_more ? '可继续查看下一页。' : '可尝试扩大日期范围或确认证券代码。'}</div>)}
-    {resource.data && <div className="pagination"><span>第 {page} 页 · 本页 {rows.length} 份 PDF</span><div><button disabled={busy || resource.loading || page === 1} onClick={() => changePage(page - 1)}>上一页</button><button disabled={busy || resource.loading || !resource.data.has_more} onClick={() => changePage(page + 1)}>下一页</button></div></div>}
+    {resource.data && <div className="pagination"><span>第 {page} 页 · 本页 {rows.length} 份 PDF</span><div><button disabled={locked || resource.loading || page === 1} title={lockedTitle} onClick={() => changePage(page - 1)}>上一页</button><button disabled={locked || resource.loading || !resource.data.has_more} title={lockedTitle} onClick={() => changePage(page + 1)}>下一页</button></div></div>}
   </div>
 }
 

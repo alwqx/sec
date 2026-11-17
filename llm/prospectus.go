@@ -33,6 +33,9 @@ const (
 
 var ErrProspectusAsk = errors.New("招股书问答失败")
 
+// ErrNoRelatedPages 表示招股书里没有一页包含问题里的词，要换个问法，重试或换模型没有用。
+var ErrNoRelatedPages = fmt.Errorf("%w：招股书里没有和问题相关的页", ErrProspectusAsk)
+
 var prospectusPromptHash = promptHash(ProspectusPromptVersion, prospectusPrompt)
 
 // ProspectusAnswer 是对一份招股说明书的一次问答。Pages 是按问题挑出来发给模型的页，回答每段引用其中的页码。
@@ -116,7 +119,7 @@ func (a *ProspectusAnswerer) Ask(ctx context.Context, rawURL, question string) (
 	}
 	selected := selectPages(doc.Pages, rankPages(doc.Pages, question), prospectusBudgetRunes, prospectusMaxPages)
 	if len(selected) == 0 {
-		return nil, fmt.Errorf("%w：招股书里没有和问题相关的页，请换个说法，比如用招股书里的用语（营业收入、募集资金、实际控制人）", ErrProspectusAsk)
+		return nil, fmt.Errorf("%w，请换个说法，比如用招股书里的用语（营业收入、募集资金、实际控制人）", ErrNoRelatedPages)
 	}
 	sources := pageNumberSources(doc.Pages, selected)
 	d := summaryDoc[cninfo.DocumentPage, int]{

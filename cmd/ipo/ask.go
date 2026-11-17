@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/alwqx/sec/cmd/internal/aicli"
@@ -113,17 +112,12 @@ func prospectusTarget(ctx context.Context, input string) (string, string, error)
 	return a.PDFURL, fmt.Sprintf("%s %s", name, strings.TrimSpace(a.Title)), nil
 }
 
-// titleQualifier 是标题末尾括号里的说明，如「（注册稿）」「(更新后)」。
-var titleQualifier = regexp.MustCompile(`\s*[（(][^（()）]*[)）]$`)
-
-// pickProspectus 返回最新的招股说明书，没有时返回最新的招股意向书。去掉末尾括号里的说明后，标题要以它们结尾：
-// 「招股说明书提示性公告」「招股意向书附录」「招股说明书摘要」不是招股书全文。
+// pickProspectus 返回最新的招股说明书，没有时返回最新的招股意向书；摘要、附录、提示性公告不是全文，见 cninfo.ProspectusKind。
 func pickProspectus(announcements []*cninfo.Announcement) *cninfo.Announcement {
-	for _, suffix := range []string{"招股说明书", "招股意向书"} {
+	for _, kind := range []string{cninfo.KindProspectus, cninfo.KindPreliminary} {
 		var best *cninfo.Announcement
 		for _, a := range announcements {
-			title := strings.TrimSpace(titleQualifier.ReplaceAllString(strings.TrimSpace(a.Title), ""))
-			if strings.HasSuffix(title, suffix) && (best == nil || a.Time > best.Time) {
+			if cninfo.ProspectusKind(a.Title) == kind && (best == nil || a.Time > best.Time) {
 				best = a
 			}
 		}
