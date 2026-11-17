@@ -180,7 +180,7 @@ func (c *Client) ReadFiling(ctx context.Context, raw string) (*FilingDocument, e
 	if BaseForm(doc.Form) == "8-K" {
 		return c.read8K(ctx, doc, docs, lines)
 	}
-	if doc, err = read10K(doc, lines); err != nil {
+	if doc, err = read10K(doc, lines, c.annualReport(ctx, docs, "1a", "7")); err != nil {
 		return nil, err
 	}
 	return doc, checkTenKSize(doc)

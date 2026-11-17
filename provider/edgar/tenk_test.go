@@ -185,7 +185,7 @@ func TestReadTenKBankMDNA(t *testing.T) {
 <p><b>Management’s report on internal control over financial reporting</b></p><p>Management is responsible.</p>`
 	lines, err := htmlLines([]byte(jpm))
 	require.NoError(t, err)
-	doc, err := read10K(&FilingDocument{}, lines)
+	doc, err := read10K(&FilingDocument{}, lines, nil)
 	require.NoError(t, err)
 	require.Len(t, doc.Sections, 2)
 	require.Equal(t, "Item 7", doc.Sections[1].Label)
@@ -198,7 +198,7 @@ func TestReadTenKBankMDNA(t *testing.T) {
 <p>Management's Discussion and Analysis of Financial Condition and Results of Operations</p><p>` + mdna + `</p><p>Item 8. Financial Statements and Supplementary Data</p><p>Balance sheet.</p>`
 	lines, err = htmlLines([]byte(bac))
 	require.NoError(t, err)
-	doc, err = read10K(&FilingDocument{}, lines)
+	doc, err = read10K(&FilingDocument{}, lines, nil)
 	require.NoError(t, err)
 	require.True(t, strings.HasPrefix(doc.Sections[1].Text, "Item 7. Bank of America Corporation and Subsidiaries\nManagement's Discussion"), doc.Sections[1].Text[:80])
 	require.NotContains(t, doc.Sections[1].Text, "Balance sheet")
@@ -213,7 +213,7 @@ func TestReadTenKLongMDNA(t *testing.T) {
 	}
 	lines, err := htmlLines([]byte(`<p>ITEM 1A. RISK FACTORS</p><p>` + risk + `</p><p>Item 7. Management’s Discussion and Analysis</p>` + mdna.String() + `<p>Item 8. Financial Statements</p>`))
 	require.NoError(t, err)
-	doc, err := read10K(&FilingDocument{}, lines)
+	doc, err := read10K(&FilingDocument{}, lines, nil)
 	require.NoError(t, err)
 	n := utf8.RuneCountInString(doc.Sections[1].Text)
 	require.LessOrEqual(t, n, maxMDNARunes)
@@ -233,7 +233,7 @@ func TestMDNAByTitleEdges(t *testing.T) {
 <p><b>Report of Independent Registered Public Accounting Firm</b></p><p>Opinion.</p>`
 	lines, err := htmlLines([]byte(html))
 	require.NoError(t, err)
-	doc, err := read10K(&FilingDocument{}, lines)
+	doc, err := read10K(&FilingDocument{}, lines, nil)
 	require.NoError(t, err)
 	require.Equal(t, "MANAGEMENT’S DISCUSSION AND ANALYSIS\n"+strings.TrimSpace(mdna), doc.Sections[1].Text)
 	require.Contains(t, strings.Join(doc.Notes, ""), "10-K 正文里没有 Item 7 标题", "没有 Item 7 标题时不说成引用")
@@ -244,4 +244,81 @@ func TestTruncateLines(t *testing.T) {
 	require.Equal(t, "title\n"+strings.Repeat("x", 14), truncateLines("title\n"+strings.Repeat("x", 100), 20), "后面是很长的一行时截这一行的开头")
 	require.Equal(t, "abcd", truncateLines("abcdefgh", 4))
 	require.Equal(t, "ab\ncd", truncateLines("ab\ncd", 10))
+}
+
+func TestRead10KAnnualExhibit(t *testing.T) {
+	defer gock.Off()
+	client := &Client{Email: "test@example.com", CacheDir: t.TempDir()}
+	body := func(s string) string { return "<p>" + strings.Repeat(s+" ", 40) + "</p>" }
+	// 富国银行：Item 1A 和 Item 7 只引用年报，风险因素和 MD&A（Financial Review）在附件 EX-13 里，每页有「(continued)」页眉。
+	main := `<p>ITEM 1A. RISK FACTORS</p><p>Information in response to this Item 1A can be found in the 2025 Annual Report under “Financial Review – Risk Factors.”</p>
+<p>ITEM 7. MANAGEMENT’S DISCUSSION AND ANALYSIS</p><p>Information in response to this Item 7 can be found in the 2025 Annual Report under “Financial Review.”</p>
+<p>ITEM 8. FINANCIAL STATEMENTS</p><p>See the Annual Report.</p>`
+	// 年报开头的目录也有「Financial Review」标题，下一行是带页码的目录行，不从这里开始。
+	annual := `<p><b>Exhibit 13</b></p><p><b>Financial Review</b></p><p>2 Overview 114 4 Equity Securities</p>` + body("62 Risk Factors 134 14 Fair Value Measurements") +
+		`<p><b>Financial Review</b></p>` + body("Net income rose to $21.3 billion in 2025 on higher fee income.") +
+		`<p><b>Financial Review (continued)</b></p>` + body("Deposits grew across segments.") + `
+<p><b>Risk Factors</b></p>` + body("An investment in the Company involves risk.") + `
+<p><b>REGULATORY RISKS</b></p><p><b>Current and future legislation could require us to change certain business practices.</b> Rules are changing.</p>` + body("Regulators may act.") + `
+<p><b>Risk Factors (continued)</b></p><p><b>We face significant competition in financial services.</b> Competitors are many.</p>` + body("Fintechs grow.") + `
+<p><b>Controls and Procedures</b></p><p><b>Disclosure Controls and Procedures</b></p>` + body("Controls are effective.") + `
+<p><b>Management’s Report on Internal Control Over Financial Reporting</b></p><p>Management is responsible.</p>`
+	gock.New("https://www.sec.gov").Get(docIndex).Reply(200).BodyString(filingIndex("10-K", [2]string{docFolder + "wfc-10k.htm", "10-K"}, [2]string{docFolder + "wfc-ex13.htm", "EX-13"}))
+	gock.New("https://www.sec.gov").Get(docFolder + "wfc-10k.htm").Reply(200).BodyString(main)
+	gock.New("https://www.sec.gov").Get(docFolder + "wfc-ex13.htm").Reply(200).BodyString(annual)
+	doc, err := client.Read10K(context.Background(), "https://www.sec.gov"+docIndex)
+	require.NoError(t, err)
+	require.True(t, gock.IsDone(), "年报附件只下载一次")
+	require.Len(t, doc.Sections, 2)
+	ex13 := "https://www.sec.gov" + docFolder + "wfc-ex13.htm"
+	require.Equal(t, ex13, doc.Sections[0].URL, "引用链接到附件")
+	require.Equal(t, ex13, doc.Sections[1].URL)
+	require.True(t, strings.HasPrefix(doc.Sections[0].Text, "Risk Factors\nAn investment"), doc.Sections[0].Text[:40])
+	require.NotContains(t, doc.Sections[0].Text, "(continued)", "(continued) 页眉不放进正文，也不结束章节")
+	require.NotContains(t, doc.Sections[0].Text, "Controls are effective", "到下一个同样式的章标题为止")
+	require.True(t, strings.HasPrefix(doc.Sections[1].Text, "Financial Review\nNet income rose"), "跳过目录上的标题："+doc.Sections[1].Text[:40])
+	require.Contains(t, doc.Sections[1].Text, "Deposits grew")
+	require.NotContains(t, doc.Sections[1].Text, "An investment in the Company", "MD&A 到风险因素的标题为止，不重复摘要")
+	require.Contains(t, strings.Join(doc.Notes, ""), "Item 1A 只是引用年报，按「Risk Factors」标题在年报附件 Exhibit 13 里取出风险因素")
+	require.Contains(t, strings.Join(doc.Notes, ""), "Item 7 只是引用年报，按「Financial Review」标题在年报附件 Exhibit 13 里取出管理层讨论与分析")
+	var titles []string
+	for _, r := range doc.RiskFactors {
+		titles = append(titles, r.Category+" | "+r.Title)
+	}
+	require.Equal(t, []string{"REGULATORY RISKS | Current and future legislation could require us to change certain business practices.",
+		"REGULATORY RISKS | We face significant competition in financial services."}, titles)
+
+	// 主文件里找得到两节时不下载年报附件（没有为附件注册响应，下载会报错）。
+	gock.New("https://www.sec.gov").Get(docIndex).Reply(200).BodyString(filingIndex("10-K", [2]string{docFolder + "acme-10k.htm", "10-K"}, [2]string{docFolder + "wfc-ex13.htm", "EX-13"}))
+	gock.New("https://www.sec.gov").Get(docFolder + "acme-10k.htm").Reply(200).BodyString(tenK(strings.Repeat("Adverse economic conditions could harm demand. ", 20), strings.Repeat("Net sales increased 6% due to higher iPhone sales. ", 40)))
+	doc, err = client.Read10K(context.Background(), "https://www.sec.gov"+docIndex)
+	require.NoError(t, err)
+	require.Len(t, doc.Sections, 2)
+	require.True(t, gock.IsDone())
+
+	// 风险因素在主文件里、只有 Item 7 引用年报时：风险因素对比不为 Item 7 下载附件；摘要下载附件，附件超过大小时
+	// 照常返回风险因素，在说明里写明附件无法读取。
+	partial := tenK(strings.Repeat("Adverse economic conditions could harm demand. ", 20), "See the Annual Report.")
+	index := filingIndex("10-K", [2]string{docFolder + "acme-10k.htm", "10-K"}, [2]string{docFolder + "wfc-ex13.htm", "EX-13"})
+	gock.New("https://www.sec.gov").Get(docIndex).Reply(200).BodyString(index)
+	gock.New("https://www.sec.gov").Get(docFolder + "acme-10k.htm").Reply(200).BodyString(partial)
+	doc, err = client.readTenK(context.Background(), "https://www.sec.gov"+docIndex, "1a")
+	require.NoError(t, err)
+	require.Len(t, doc.Sections, 1)
+	require.True(t, gock.IsDone(), "没有下载附件")
+	gock.New("https://www.sec.gov").Get(docIndex).Reply(200).BodyString(index)
+	gock.New("https://www.sec.gov").Get(docFolder + "acme-10k.htm").Reply(200).BodyString(partial)
+	gock.New("https://www.sec.gov").Get(docFolder + "wfc-ex13.htm").Reply(200).BodyString(strings.Repeat("a", MaxDocumentBytes+1))
+	doc, err = client.Read10K(context.Background(), "https://www.sec.gov"+docIndex)
+	require.NoError(t, err)
+	require.Equal(t, "Item 1A", doc.Sections[0].Label)
+	require.Contains(t, strings.Join(doc.Notes, ""), "年报附件 Exhibit 13 无法读取")
+	require.True(t, gock.IsDone())
+
+	// 附件下载失败可能是暂时的，报错，不返回缺了一节的结果。
+	gock.New("https://www.sec.gov").Get(docIndex).Reply(200).BodyString(index)
+	gock.New("https://www.sec.gov").Get(docFolder + "acme-10k.htm").Reply(200).BodyString(partial)
+	gock.New("https://www.sec.gov").Get(docFolder + "wfc-ex13.htm").Reply(404)
+	_, err = client.Read10K(context.Background(), "https://www.sec.gov"+docIndex)
+	require.ErrorIs(t, err, ErrDownload)
 }

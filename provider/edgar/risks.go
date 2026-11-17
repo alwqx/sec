@@ -78,7 +78,7 @@ func riskFactors(lines []docLine, scanned []tenKLine, start, end int) []RiskFact
 	count := map[style]int{}
 	var order []style
 	for i := start + 1; i < end; i++ {
-		if scanned[i].furniture {
+		if scanned[i].furniture || continuedHeader(lines[i]) {
 			continue
 		}
 		if title, ok := riskTitle(lines[i]); ok {
@@ -134,7 +134,7 @@ func riskFactors(lines []docLine, scanned []tenKLine, start, end int) []RiskFact
 	}
 	for i := start + 1; i < end; i++ {
 		line := lines[i]
-		if scanned[i].furniture {
+		if scanned[i].furniture || continuedHeader(line) {
 			continue
 		}
 		// 和正文写在同一段时，小标题后面的部分是正文。
@@ -323,7 +323,8 @@ func dice(a, b map[string]bool) float64 {
 
 // RiskComparisonVersion 是识别风险因素小标题和对比规则的版本。规则改了（小标题、类别的识别，相似度的计算和阈值）
 // 要改这个值，依赖对比结果的缓存（如模型的解读）随之失效。2：按标题找风险因素（花旗），接起断成两行的小标题。
-const RiskComparisonVersion = "2"
+// 3：读取年报附件 Exhibit 13 里的风险因素（富国银行），「(continued)」页眉不放进正文。
+const RiskComparisonVersion = "3"
 
 // RiskFiling 是参与对比的一份 10-K。
 type RiskFiling struct {
@@ -352,7 +353,7 @@ var riskChangeNotes = []string{
 // RiskChanges 读取 raw 所在的 10-K 和上一年的 10-K（报告期更早的最近一份原始 10-K 或 10-KT，不含修订版），
 // 对比两年的风险因素。raw 是该申报目录下任意文件的地址。不调用模型，不受摘要的字数上限限制。
 func (c *Client) RiskChanges(ctx context.Context, raw string) (*RiskChanges, error) {
-	current, err := c.readTenK(ctx, raw)
+	current, err := c.readTenK(ctx, raw, "1a")
 	if err != nil {
 		return nil, err
 	}
@@ -363,7 +364,7 @@ func (c *Client) RiskChanges(ctx context.Context, raw string) (*RiskChanges, err
 	if err != nil {
 		return nil, err
 	}
-	old, err := c.readTenK(ctx, previous.URL)
+	old, err := c.readTenK(ctx, previous.URL, "1a")
 	if err != nil {
 		return nil, fmt.Errorf("读取上一年的 10-K（%s）失败：%w", previous.FilingDate, err)
 	}
@@ -378,8 +379,15 @@ func (c *Client) RiskChanges(ctx context.Context, raw string) (*RiskChanges, err
 	}, nil
 }
 
+// URL 是风险因素所在的文件：通常是主文件，富国银行是年报附件 Exhibit 13。
 func riskFiling(doc *FilingDocument) RiskFiling {
-	return RiskFiling{Accession: doc.Accession, Form: doc.Form, FilingDate: doc.FilingDate, ReportDate: doc.ReportDate, URL: doc.URL, Count: len(doc.RiskFactors)}
+	link := doc.URL
+	for _, s := range doc.Sections {
+		if s.Label == "Item 1A" {
+			link = s.URL
+		}
+	}
+	return RiskFiling{Accession: doc.Accession, Form: doc.Form, FilingDate: doc.FilingDate, ReportDate: doc.ReportDate, URL: link, Count: len(doc.RiskFactors)}
 }
 
 // previousTenK 返回 doc 之前最近的一份原始 10-K 或 10-KT：报告期早于 doc 的报告期，跳过修订版（多半只补充第三部分，

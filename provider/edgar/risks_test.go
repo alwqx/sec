@@ -57,7 +57,7 @@ func readRisks(t *testing.T, html string) []RiskFactor {
 	t.Helper()
 	lines, err := htmlLines([]byte(html))
 	require.NoError(t, err)
-	doc, err := read10K(&FilingDocument{}, lines)
+	doc, err := read10K(&FilingDocument{}, lines, nil)
 	require.NoError(t, err)
 	return doc.RiskFactors
 }
@@ -84,7 +84,7 @@ func TestRiskFactors(t *testing.T) {
 	require.Empty(t, risks[0].Category)
 
 	// 只有纯文本、没有样式时识别不出小标题。
-	doc, err := read10K(&FilingDocument{}, plainLines("Item 1A. Risk Factors\n"+strings.Repeat("The Company depends on suppliers. ", 60)+"\nItem 7. Management’s Discussion\n"+strings.Repeat("Sales rose. ", 200)))
+	doc, err := read10K(&FilingDocument{}, plainLines("Item 1A. Risk Factors\n"+strings.Repeat("The Company depends on suppliers. ", 60)+"\nItem 7. Management’s Discussion\n"+strings.Repeat("Sales rose. ", 200)), nil)
 	require.NoError(t, err)
 	require.Empty(t, doc.RiskFactors)
 }
@@ -183,6 +183,12 @@ func TestRiskFactorsIgnoreSummaryLimit(t *testing.T) {
 	require.Len(t, doc.RiskFactors, 2)
 }
 
+func TestRiskFilingURL(t *testing.T) {
+	doc := &FilingDocument{URL: "main.htm", Sections: []DocumentSection{{Label: "Item 1A", URL: "ex13.htm"}, {Label: "Item 7", URL: "ex13.htm"}}}
+	require.Equal(t, "ex13.htm", riskFiling(doc).URL, "链接到风险因素所在的文件")
+	require.Equal(t, "main.htm", riskFiling(&FilingDocument{URL: "main.htm"}).URL)
+}
+
 func TestRiskFactorsByTitle(t *testing.T) {
 	body := func(s string) string { return "<p>" + strings.Repeat(s+" ", 40) + "</p>" }
 	bi := func(s string) string {
@@ -200,12 +206,12 @@ func TestRiskFactorsByTitle(t *testing.T) {
 		body("Expenses declined.") + `<p><b>Report of Independent Registered Public Accounting Firm</b></p><p>Opinion.</p>`
 	lines, err := htmlLines([]byte(citi))
 	require.NoError(t, err)
-	doc, err := read10K(&FilingDocument{}, lines)
+	doc, err := read10K(&FilingDocument{}, lines, nil)
 	require.NoError(t, err)
 	require.Equal(t, "Item 1A", doc.Sections[0].Label)
 	require.True(t, strings.HasPrefix(doc.Sections[0].Text, "RISK FACTORS\nThe following discussion"), "跳过交叉索引表和目录里的标题行")
 	require.NotContains(t, doc.Sections[0].Text, "sustainability report", "到下一个同样式的章标题为止")
-	require.Contains(t, strings.Join(doc.Notes, ""), "10-K 正文里没有 Item 1A 标题，按「Risk Factors」标题")
+	require.Contains(t, strings.Join(doc.Notes, ""), "10-K 正文里没有 Item 1A 标题，按「RISK FACTORS」标题在年报正文里")
 	var got [][2]string
 	for _, r := range doc.RiskFactors {
 		got = append(got, [2]string{r.Category, r.Title})
@@ -232,7 +238,7 @@ func TestRiskFactorsByTitle(t *testing.T) {
 	paged = strings.Replace(paged, body("Competitors invest heavily."), body("Competitors invest heavily.")+`<p><b>RISK FACTORS</b></p>`+body("More about competitors."), 1)
 	lines, err = htmlLines([]byte(paged))
 	require.NoError(t, err)
-	doc, err = read10K(&FilingDocument{}, lines)
+	doc, err = read10K(&FilingDocument{}, lines, nil)
 	require.NoError(t, err)
 	require.Len(t, doc.RiskFactors, 3, "页眉之后的风险因素都在")
 	require.Contains(t, doc.RiskFactors[1].Text, "More about competitors.")
@@ -243,7 +249,7 @@ func TestRiskFactorsByTitle(t *testing.T) {
 		`<p><b>OTHER MATTERS</b></p><p>ITEM 1A. RISK FACTORS</p><p>Not applicable.</p><p>Item 7. Management’s Discussion and Analysis</p>` + body("Net income rose 6% on higher net interest income across all segments of the firm.") + `<p>Item 8. Financial Statements</p>`
 	lines, err = htmlLines([]byte(small))
 	require.NoError(t, err)
-	doc, err = read10K(&FilingDocument{}, lines)
+	doc, err = read10K(&FilingDocument{}, lines, nil)
 	require.NoError(t, err)
 	require.Equal(t, "Item 7", doc.Sections[0].Label)
 	require.Contains(t, strings.Join(doc.Notes, ""), "可能不适用")
