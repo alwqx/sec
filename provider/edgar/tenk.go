@@ -2,11 +2,14 @@ package edgar
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"path"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"unicode/utf8"
 )
 
@@ -36,17 +39,17 @@ var (
 		"10": {"directors"}, "11": {"executive compensation"}, "12": {"security ownership"}, "13": {"certain relationships"},
 		"14": {"principal account"}, "15": {"exhibit"}, "16": {"form 10-k summary"},
 	}
-	// tenKSections 是参与摘要的两节。Item 太短或没有 Item 标题时按标题在年报正文里找（byTitle），heading 和 what
-	// 写进说明：银行的 Item 7 只写「见年报第 X 页」（摩根大通），花旗的 10-K 正文不写 Item 编号。
+	// tenKSections 是参与摘要的两节。Item 太短或没有 Item 标题时按标题在年报正文或年报附件里找（byTitle），what 写进说明：
+	// 银行的 Item 7 只写「见年报第 X 页」（摩根大通），花旗的 10-K 正文不写 Item 编号，富国银行的在附件 Exhibit 13 里。
 	tenKSections = []struct {
 		item, title, label, short string
 		byTitle                   func([]docLine, []tenKLine) (start, end int, text string)
-		heading, what             string
+		what                      string
 	}{
 		{"1a", "risk factors", "Item 1A", "Item 1A 风险因素正文只有 %d 字，可能不适用（如较小的申报公司）或只是引用其他部分，未参与摘要。",
-			riskFactorsByTitle, "Risk Factors", "风险因素"},
+			riskFactorsByTitle, "风险因素"},
 		{"7", "management", "Item 7", "Item 7 管理层讨论与分析正文只有 %d 字，可能只是引用年报的其他部分（银行等公司常见），未参与摘要。",
-			mdnaByTitle, "Management’s discussion and analysis", "管理层讨论与分析"},
+			mdnaByTitle, "管理层讨论与分析"},
 	}
 	// notApplicable 匹配写明不适用的章节（较小的申报公司不必披露风险因素），这时不按标题去找别的部分。
 	notApplicable = regexp.MustCompile(`(?i)not applicable|smaller reporting compan`)
@@ -56,20 +59,55 @@ var (
 // 各为一节，去掉目录、页眉页脚和页码。找不到或太短的章节在 Notes 里说明；两节都没有时报错，
 // 比如只补充第三部分的 10-K/A。raw 是该申报目录下任意文件的地址。
 func (c *Client) Read10K(ctx context.Context, raw string) (*FilingDocument, error) {
-	doc, err := c.readTenK(ctx, raw)
+	doc, err := c.readTenK(ctx, raw, "1a", "7")
 	if err != nil {
 		return nil, err
 	}
 	return doc, checkTenKSize(doc)
 }
 
-// readTenK 读取一份 10-K 的章节和风险因素，不检查摘要的字数上限：风险因素对比不调用模型，也用不到 Item 7。
-func (c *Client) readTenK(ctx context.Context, raw string) (*FilingDocument, error) {
-	doc, _, lines, err := c.readPrimary(ctx, raw, "10-K", "10-KT")
+// readTenK 读取一份 10-K 的章节和风险因素，不检查摘要的字数上限。annualItems 是可以在年报附件里找的章节：
+// 风险因素对比不调用模型，也用不到 Item 7，只为风险因素读取附件。
+func (c *Client) readTenK(ctx context.Context, raw string, annualItems ...string) (*FilingDocument, error) {
+	doc, docs, lines, err := c.readPrimary(ctx, raw, "10-K", "10-KT")
 	if err != nil {
 		return nil, err
 	}
-	return read10K(doc, lines)
+	return read10K(doc, lines, c.annualReport(ctx, docs, annualItems...))
+}
+
+// annualExhibit 匹配年报附件 EX-13 的类型，也接受 EX-13.1 这样的编号。
+var annualExhibit = regexp.MustCompile(`(?i)^EX-13(\.\d+)?$`)
+
+// annualReport 是 10-K 附带的年报（Exhibit 13）：富国银行等公司的 Item 1A 和 Item 7 只引用年报，风险因素和 MD&A 在附件里。
+// items 是可以在附件里找的章节（tenKSections 的 item）。load 只在主文件里找不到这些章节时调用（富国银行的 EX-13 有 11 MB），
+// 只下载一次。
+type annualReport struct {
+	url   string
+	items []string
+	load  func() (*annualLines, error)
+}
+
+// annualLines 是年报附件的各行和分类结果。
+type annualLines struct {
+	lines   []docLine
+	scanned []tenKLine
+}
+
+// annualReport 返回申报目录里第一个 HTML 或文本格式的 EX-13，可以在里面找 items 这些章节；没有 EX-13 时返回 nil。
+func (c *Client) annualReport(ctx context.Context, docs []indexDocument, items ...string) *annualReport {
+	for _, d := range docs {
+		if annualExhibit.MatchString(d.Type) && textDocument[strings.ToLower(path.Ext(d.URL))] {
+			return &annualReport{url: d.URL, items: items, load: sync.OnceValues(func() (*annualLines, error) {
+				lines, err := c.documentLines(ctx, d.URL)
+				if err != nil {
+					return nil, err
+				}
+				return &annualLines{lines, scanTenK(lineTexts(lines))}, nil
+			})}
+		}
+	}
+	return nil
 }
 
 // checkTenKSize 检查参与摘要的 Item 1A 和 Item 7 合计不超过 MaxDocumentRunes。
@@ -85,22 +123,49 @@ func checkTenKSize(doc *FilingDocument) error {
 }
 
 // read10K 从已读到的 10-K 主文件里取出 Item 1A 和 Item 7，以及 Item 1A 里的风险因素小标题；字数上限由调用方检查。
-func read10K(doc *FilingDocument, docLines []docLine) (*FilingDocument, error) {
+// Item 太短或没有 Item 标题时先按标题在主文件里找，再找年报附件 annual（可以为 nil），找到的章节引用附件的地址。
+func read10K(doc *FilingDocument, docLines []docLine, annual *annualReport) (*FilingDocument, error) {
 	lines := lineTexts(docLines)
 	scanned := scanTenK(lines)
+	annualNoted := false
 	for _, want := range tenKSections {
 		start, end := findSection(lines, scanned, want.item, want.title)
 		section := sectionText(lines, scanned, start, end)
 		n := utf8.RuneCountInString(section)
+		// 章节所在的文件：主文件，或者按标题在年报附件里找到时是附件。
+		srcLines, srcScanned, srcURL := docLines, scanned, doc.URL
 		var notes []string
 		if n < minSectionRunes && !notApplicable.MatchString(section) {
-			if from, to, text := want.byTitle(docLines, scanned); utf8.RuneCountInString(text) >= minSectionRunes {
-				where := want.label + " 只是引用年报的其他部分"
-				if section == "" {
-					where = "10-K 正文里没有 " + want.label + " 标题"
-				}
+			where := want.label + " 只是引用年报"
+			if section == "" {
+				where = "10-K 正文里没有 " + want.label + " 标题"
+			}
+			// 说明里写找到的标题行，如「Management’s discussion and analysis」「Financial Review」。
+			found := func(from, to int, text, in string) {
 				section, n, start, end = text, utf8.RuneCountInString(text), from, to
-				notes = append(notes, where+"，按「"+want.heading+"」标题在年报正文里取出"+want.what+"。")
+				heading, _, _ := strings.Cut(text, "\n")
+				notes = append(notes, where+"，按「"+heading+"」标题在"+in+"里取出"+want.what+"。")
+			}
+			if from, to, text := want.byTitle(docLines, scanned); utf8.RuneCountInString(text) >= minSectionRunes {
+				found(from, to, text, "年报正文")
+			} else if annual != nil && slices.Contains(annual.items, want.item) {
+				a, err := annual.load()
+				switch {
+				// 下载失败可能是暂时的，报错让用户重试，不返回（并缓存）缺了这一节的结果。
+				case errors.Is(err, ErrDownload):
+					return nil, err
+				// 附件本身用不了（超过大小等），已经找到的章节照常返回。
+				case err != nil:
+					if !annualNoted {
+						annualNoted = true
+						doc.Notes = append(doc.Notes, fmt.Sprintf("年报附件 Exhibit 13 无法读取，未参与摘要：%v。", err))
+					}
+				default:
+					if from, to, text := want.byTitle(a.lines, a.scanned); utf8.RuneCountInString(text) >= minSectionRunes {
+						found(from, to, text, "年报附件 Exhibit 13 ")
+						srcLines, srcScanned, srcURL = a.lines, a.scanned, annual.url
+					}
+				}
 			}
 		}
 		if want.item == "7" && n > maxMDNARunes {
@@ -113,10 +178,10 @@ func read10K(doc *FilingDocument, docLines []docLine) (*FilingDocument, error) {
 		case n < minSectionRunes:
 			doc.Notes = append(doc.Notes, fmt.Sprintf(want.short, n))
 		default:
-			doc.Sections = append(doc.Sections, DocumentSection{Label: want.label, URL: doc.URL, Text: section})
+			doc.Sections = append(doc.Sections, DocumentSection{Label: want.label, URL: srcURL, Text: section})
 			doc.Notes = append(doc.Notes, notes...)
 			if want.item == "1a" {
-				doc.RiskFactors = riskFactors(docLines, scanned, start, end)
+				doc.RiskFactors = riskFactors(srcLines, srcScanned, start, end)
 			}
 		}
 	}
@@ -145,8 +210,9 @@ func headingText(lines []docLine, i int) string {
 }
 
 // sectionByTitle 在不按 Item 编排的年报正文里按标题找章节：从加粗或斜体、match 的标题行 start 到结束行 end（不含），
-// 取正文最长的一段：目录、每页重复的同名页眉开始的段都更短。endAt(start) 返回判断结束行的函数，每个标题行只准备一次。
-// 每页的同名页眉不是结束行，和其他页眉页脚一样不放进正文。找不到时 start 为 -1、text 为空字符串。
+// 取正文最长的一段：目录、每页重复的同名页眉开始的段都更短，下一行是目录行的标题不算。endAt(start) 返回判断结束行的函数，
+// 每个标题行只准备一次。每页的同名页眉和「(continued)」页眉不是结束行，和其他页眉页脚一样不放进正文。
+// 找不到时 start 为 -1、text 为空字符串。
 func sectionByTitle(lines []docLine, scanned []tenKLine, match func(header string) bool, endAt func(start int) func(i int) bool) (start, end int, text string) {
 	var best []string
 	start, bestRunes := -1, 0
@@ -158,10 +224,14 @@ func sectionByTitle(lines []docLine, scanned []tenKLine, match func(header strin
 		if header == "" || !match(header) {
 			continue
 		}
+		// 目录里的标题：下一行是带页码的目录行（富国银行年报开头的「Financial Review」下面是「2 Overview 114 4 Equity Securities」）。
+		if next := nextContentLine(scanned, from, len(lines)); next < len(lines) && tocLine.MatchString(lines[next].text) {
+			continue
+		}
 		isEnd := endAt(from)
 		section, n, i := []string{l.text}, utf8.RuneCountInString(l.text), from+1
 		for ; i < len(lines); i++ {
-			if lines[i].emphasized && headingText(lines, i) == header {
+			if continuedHeader(lines[i]) || (lines[i].emphasized && headingText(lines, i) == header) {
 				continue
 			}
 			if isEnd(i) {
@@ -179,7 +249,9 @@ func sectionByTitle(lines []docLine, scanned []tenKLine, match func(header strin
 }
 
 // mdnaByTitle 在年报正文里按标题找管理层讨论与分析：从加粗或斜体的「Management's discussion and analysis」标题行
-// （以冒号结尾的是目录）到下一个结束行（审计报告或管理层内部控制报告的标题或目录行、Item 8、SIGNATURES）。
+// 或「Financial Review」（富国银行年报里的 MD&A）
+// （以冒号结尾的是目录）到下一个结束行（审计报告或管理层内部控制报告的标题或目录行、单独成行的 Risk Factors 标题、
+// Item 8、SIGNATURES）。
 // 找不到时 start 为 -1。
 func mdnaByTitle(lines []docLine, scanned []tenKLine) (start, end int, text string) {
 	// 结束行不要求加粗：目录里「Report of Independent Registered Public Accounting Firm 162」这样的行也结束目录开始的段。
@@ -188,10 +260,11 @@ func mdnaByTitle(lines []docLine, scanned []tenKLine) (start, end int, text stri
 			return true
 		}
 		t := headingText(lines, i)
-		return t != "" && slices.ContainsFunc(mdnaEnds, func(end string) bool { return strings.HasPrefix(t, end) })
+		// 年报里风险因素可能在 MD&A 后面（花旗）或里面（富国银行的 Financial Review），单独成行的标题处结束，不重复摘要。
+		return t != "" && (slices.ContainsFunc(mdnaEnds, func(end string) bool { return strings.HasPrefix(t, end) }) || lines[i].emphasized && t == "risk factors")
 	}
 	return sectionByTitle(lines, scanned, func(header string) bool {
-		return strings.HasPrefix(header, "management's discussion and analysis") && !strings.HasSuffix(header, ":")
+		return header == "financial review" || strings.HasPrefix(header, "management's discussion and analysis") && !strings.HasSuffix(header, ":")
 	}, func(int) func(int) bool { return isEnd })
 }
 
@@ -400,4 +473,13 @@ func pageFurniture(line string) bool {
 		return true
 	}
 	return utf8.RuneCountInString(line) < 100 && formFooter.MatchString(line)
+}
+
+// tocLine 匹配带页码的目录行：以页码开头或结尾，如「2 Overview 114 4 Equity Securities」「RISK FACTORS 49」。
+var tocLine = regexp.MustCompile(`^\d{1,3}\s+\S|\S\s+\d{1,3}$`)
+
+// continuedHeader 判断一行是不是「Risk Factors (continued)」这样加粗或斜体、以 (continued) 结尾的页眉（富国银行的年报
+// 每页都有）。只在按标题找的章节和风险因素里当页眉跳过，不算全局的页眉页脚：表格的续表标题也可能这样写。
+func continuedHeader(line docLine) bool {
+	return line.emphasized && utf8.RuneCountInString(line.text) < 100 && strings.HasSuffix(strings.ToLower(line.text), "(continued)")
 }
