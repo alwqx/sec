@@ -22,10 +22,11 @@ var filingPrompt string
 //go:embed prompts/tenk_summary.md
 var tenKPrompt string
 
-// 提示词版本也记下发给模型的原文怎么取：取法改了（如 v2 加上银行年报里的 MD&A 和 MD&A 的字数上限）要改版本，缓存随之失效。
+// 提示词版本也记下发给模型的原文怎么取：取法改了（如 v2 加上银行年报里的 MD&A 和 MD&A 的字数上限，v3 按标题找花旗的风险因素）
+// 要改版本，缓存随之失效。
 const (
 	FilingPromptVersion = "edgar-8k-summary-v1"
-	TenKPromptVersion   = "edgar-10k-summary-v2"
+	TenKPromptVersion   = "edgar-10k-summary-v3"
 )
 
 // filingChunkRunes 是 8-K 每块的字符数。申报原文是英文，同样字数的 token 比中文少，块可以比公告大。
