@@ -107,16 +107,51 @@ var adviceCompounds = []adviceCompound{
 	{word: "建仓期", evidence: []string{"建仓期"}},
 }
 
-// negations 是否定短语，出现在同一句里建议用语前面不远处时不算给建议。只用短语，不用单字：
-// 「非常」「无论」「不断」「不错」里的非、无、不不是否定。
-var negations = []string{"不构成", "不建议", "不能", "不会", "不提供", "不给", "不应", "不宜", "不要", "不是", "并非", "无法", "没有", "勿"}
+// 否定的范围：否定短语管到同一句里它后面的建议用语，遇到断句标点或连词（stopWords）为止，最多隔 negationReach 个字。
+// 数字数时，闭合的引号连同里面的话、以及中间列举的其他建议用语都不算：「不能给出买入、持有或卖出的建议」
+// 「我不能回答“现在是否适合买入”或给出目标价」。建议用语在引号里时看整个引号有没有被否定，或者引号复述的是用户的话（reportCues）。
+// 以「关于」等开头的一句是话题，后面同一句话里有否定时不算（topicMarkers）。
 
-// immediateNegations 紧挨在建议用语前面时是否定，如「不买入」「非目标价」「无止损」。只在紧挨时算：
-// 「非常适合买入」里的非后面不是建议用语。
+// negations 是否定短语。只用短语，不用单字：「非常」「无论」「不断」「不错」里的非、无、不不是否定。
+var negations = []string{"不构成", "不建议", "不能", "不会", "不提供", "不给", "不应", "不宜", "不要", "不是", "不代表", "不意味着", "不等于", "不做", "并非", "无法", "没法", "没有", "勿"}
+
+// immediateNegations 紧挨在建议用语前面时是否定，如「不买入」「非目标价」「无止损」。
+// 只在紧挨时算：「非常适合买入」里的非后面不是建议用语。
 const immediateNegations = "不勿别非无"
 
-// negationWindow 是往前找否定短语的字符数。
-const negationWindow = 8
+// questionWords 紧挨在建议用语前面（中间可以有 questionModals 之一）时是在问，不是给建议：「是否买入需要你自己判断」
+// 「现在是否适合买入」。隔开时不算：「无论是否回调都建议买入」「看是否放量再加仓」。
+var (
+	questionWords  = []string{"是否", "能否"}
+	questionModals = []string{"适合", "应该", "应当", "要", "该", "可以"}
+)
+
+// stopWords 是连词，否定管不到它后面：「我不能保证“茅台”会涨所以买入」「不要止损直接加仓」「不能给出买入的理由而是建议你卖出」。
+// 整词匹配，「而且」不算。「建议」「可以」「应该」不算：「我不能给出买入建议或目标价」里的建议是名词，
+// 「不代表 sec 建议卖出」的否定管着它。
+var stopWords = []string{"但", "却", "而是", "所以", "因此", "直接"}
+
+// topicMarkers 开头的一句是话题，同一句话（到句号等为止）后面有否定时，话题里的建议用语不算：
+// 「关于买入时机和目标价，sec 没有这类数据」。
+var topicMarkers = []string{"关于", "对于", "至于"}
+
+// reportCues 是复述用户的话的说法，紧跟着的引号里是用户问的内容，不是建议：「关于你问的“目标价”」。
+var reportCues = []string{"你问的", "你问", "你提到的", "你提到", "你说的", "你说", "问题里的", "问题中的"}
+
+// quotePairs 是中文引号。只有同一行里、不超过 maxQuoteRunes 个字就闭合的才算引号，漏写闭引号时不会把后面几段都算进去。
+// 英文的 " 不分开闭，不处理。
+var quotePairs = [][2]string{{"「", "」"}, {"『", "』"}, {"“", "”"}, {"‘", "’"}}
+
+const maxQuoteRunes = 30
+
+// clauseBreaks 是断句的标点，sentenceBreaks 是一句话结束的标点。
+const (
+	clauseBreaks   = "。！？；，,.!?;：:\n"
+	sentenceBreaks = "。！？；.!?;\n"
+)
+
+// negationReach 是否定最多管到的字数（引号和列举的建议用语不算）。
+const negationReach = 12
 
 // maxListMarker 是行首列表序号的最大值，更大的数（如「1524、」）照常核对。
 const maxListMarker = 99
@@ -353,7 +388,7 @@ func followedBy(after, word string, gap int) bool {
 			return true
 		}
 		r, size := utf8.DecodeRuneInString(after)
-		if strings.ContainsRune("。！？；，,.!?;、\n ", r) {
+		if strings.ContainsRune(clauseBreaks+"、 ", r) {
 			return false
 		}
 		after = after[size:]
@@ -361,9 +396,10 @@ func followedBy(after, word string, gap int) bool {
 	return false
 }
 
-// findAdvice 找出投资建议用语，前面有否定的不算，出现在来源支持的复合词里的也不算（见 adviceCompound）。
+// findAdvice 找出投资建议用语，被否定的不算（见 negations 上面的说明），出现在来源支持的复合词里的也不算（见 adviceCompound）。
 func findAdvice(answer string, sources []string) []TermRef {
 	compounds := supportedCompounds(answer, sources)
+	quotes := quoteSpans(answer)
 	var out []TermRef
 	for _, term := range adviceTerms {
 		offset := 0
@@ -375,7 +411,7 @@ func findAdvice(answer string, sources []string) []TermRef {
 			start := offset + i
 			end := start + len(term)
 			offset = end
-			if negated(answer[:start]) || inCompound(answer, start, term, compounds) {
+			if inCompound(answer, start, term, compounds) || negated(answer, start, end, quotes) {
 				continue
 			}
 			out = append(out, TermRef{Text: term, Start: utf8.RuneCountInString(answer[:start]), End: utf8.RuneCountInString(answer[:end])})
@@ -430,28 +466,118 @@ func inCompound(answer string, start int, term string, compounds []adviceCompoun
 	return false
 }
 
-// negated 判断建议用语前面是否否定：紧挨着不、勿、别，或同一句里前面 negationWindow 个字以内有否定短语。
-func negated(before string) bool {
-	if r, _ := utf8.DecodeLastRuneInString(before); strings.ContainsRune(immediateNegations, r) {
+// span 是一对闭合的引号在回答里的字节位置，end 在闭引号之后。
+type span struct{ start, end int }
+
+// quoteSpans 找出回答里闭合的引号（见 quotePairs），按位置排序；套着的引号只取外层。
+func quoteSpans(answer string) []span {
+	var out []span
+	for i := 0; i < len(answer); {
+		open, pair := -1, [2]string{}
+		for _, q := range quotePairs {
+			if j := strings.Index(answer[i:], q[0]); j >= 0 && (open < 0 || i+j < open) {
+				open, pair = i+j, q
+			}
+		}
+		if open < 0 {
+			break
+		}
+		inner := answer[open+len(pair[0]):]
+		closing := strings.Index(inner, pair[1])
+		if closing < 0 || strings.Contains(inner[:closing], "\n") || utf8.RuneCountInString(inner[:closing]) > maxQuoteRunes {
+			i = open + len(pair[0])
+			continue
+		}
+		end := open + len(pair[0]) + closing + len(pair[1])
+		out = append(out, span{open, end})
+		i = end
+	}
+	return out
+}
+
+// negated 判断 answer[start:end] 处的建议用语是否被否定：紧挨着不、勿、别、非、无，在否定短语的范围里，或者在后面被否定的话题里。
+// 在引号里时看整个引号；引号前面紧挨着复述用户的说法时不算。
+func negated(answer string, start, end int, quotes []span) bool {
+	if r, _ := utf8.DecodeLastRuneInString(answer[:start]); strings.ContainsRune(immediateNegations, r) || asked(answer[:start]) {
 		return true
 	}
-	// 往前取最多 negationWindow 个字，遇到句号、逗号等就停，只看同一句。
-	rest := before
-	for count := 0; count < negationWindow && rest != ""; count++ {
-		_, size := utf8.DecodeLastRuneInString(rest)
-		rest = rest[:len(rest)-size]
+	for _, q := range quotes {
+		if q.start <= start && end <= q.end {
+			start = q.start
+			break
+		}
 	}
-	clause := before[len(rest):]
-	if i := strings.LastIndexAny(clause, "。！？；，,.!?;\n"); i >= 0 {
-		_, size := utf8.DecodeRuneInString(clause[i:])
-		clause = clause[i+size:]
+	reported := func(p int) bool {
+		before := strings.TrimRight(answer[:p], " ")
+		return slices.ContainsFunc(reportCues, func(cue string) bool { return strings.HasSuffix(before, cue) })
 	}
-	for _, n := range negations {
-		if strings.Contains(clause, n) {
+	if reported(start) || asked(answer[:start]) {
+		return true
+	}
+	// 从建议用语往前逐字找，跳过闭合的引号和列举的建议用语。
+	counted := 0
+	p := start
+	for p > 0 {
+		if q, ok := quoteEndingAt(quotes, p); ok {
+			if p = q.start; reported(p) {
+				return true
+			}
+			continue
+		}
+		before := answer[:p]
+		if slices.ContainsFunc(negations, func(n string) bool { return strings.HasSuffix(before, n) }) {
+			return true
+		}
+		if slices.ContainsFunc(stopWords, func(w string) bool { return strings.HasSuffix(before, w) }) {
+			return false
+		}
+		if i := slices.IndexFunc(adviceTerms, func(t string) bool { return strings.HasSuffix(before, t) }); i >= 0 {
+			p -= len(adviceTerms[i])
+			continue
+		}
+		r, size := utf8.DecodeLastRuneInString(before)
+		if strings.ContainsRune(clauseBreaks, r) {
+			break
+		}
+		if counted++; counted > negationReach {
+			return false
+		}
+		p -= size
+	}
+	return topicNegated(answer, p, end)
+}
+
+// asked 判断建议用语前面是不是 questionWords（见 questionWords）。
+func asked(before string) bool {
+	for _, m := range questionModals {
+		if trimmed, ok := strings.CutSuffix(before, m); ok && slices.ContainsFunc(questionWords, func(w string) bool { return strings.HasSuffix(trimmed, w) }) {
 			return true
 		}
 	}
-	return false
+	return slices.ContainsFunc(questionWords, func(w string) bool { return strings.HasSuffix(before, w) })
+}
+
+// topicNegated 判断从 clauseStart 开始的一句是不是以 topicMarkers 开头的话题、并且同一句话里 end 后面有否定。
+func topicNegated(answer string, clauseStart, end int) bool {
+	clause := strings.TrimLeft(answer[clauseStart:end], " ")
+	if !slices.ContainsFunc(topicMarkers, func(m string) bool { return strings.HasPrefix(clause, m) }) {
+		return false
+	}
+	rest := answer[end:]
+	if i := strings.IndexAny(rest, sentenceBreaks); i >= 0 {
+		rest = rest[:i]
+	}
+	return slices.ContainsFunc(negations, func(n string) bool { return strings.Contains(rest, n) })
+}
+
+// quoteEndingAt 返回在 p 处结束的引号。
+func quoteEndingAt(quotes []span, p int) (span, bool) {
+	for _, q := range quotes {
+		if q.end == p {
+			return q, true
+		}
+	}
+	return span{}, false
 }
 
 func dedupe(items []string) []string {
