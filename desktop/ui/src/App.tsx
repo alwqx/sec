@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
-import { ArrowLeftRight, ChartCandlestick, FilePlusCorner, Newspaper, Coins, Factory, Landmark, Settings as SettingsIcon, RefreshCw, Star, PanelLeftClose, PanelLeftOpen, type LucideIcon } from 'lucide-react'
+import { ArrowLeftRight, ChartCandlestick, FilePlusCorner, Newspaper, Coins, Factory, Landmark, MessageSquareText, Settings as SettingsIcon, RefreshCw, Star, PanelLeftClose, PanelLeftOpen, type LucideIcon } from 'lucide-react'
 import { loadWorkspace, saveWorkspace, search, loadWatchlist, changeWatchlist } from './api'
 import { settingsToSave } from './workspace'
 import type { BasicSecurity, WorkspaceSettings, WorkspaceState } from './types'
@@ -26,13 +26,15 @@ import Strategy from './components/Strategy'
 import Valuation from './components/Valuation'
 import Macro from './components/Macro'
 import Fx from './components/Fx'
+import AIChat from './components/AIChat'
 import secLogo from '../../assets/sec-logo.png'
 
-type Page = 'watch' | 'research' | 'ipo' | 'announcements' | 'macro' | 'fx' | 'metal' | 'commodity' | 'settings'
+type Page = 'watch' | 'research' | 'ask' | 'ipo' | 'announcements' | 'macro' | 'fx' | 'metal' | 'commodity' | 'settings'
 type Tab = 'overview' | 'company' | 'financials' | 'dividends' | 'announcements' | 'technical' | 'valuation'
 const pages: { id: Page; title: string; icon: LucideIcon }[] = [
   { id: 'watch', title: '自选', icon: Star },
   { id: 'research', title: '研究', icon: ChartCandlestick },
+  { id: 'ask', title: 'AI 问答', icon: MessageSquareText },
   { id: 'ipo', title: 'IPO', icon: FilePlusCorner },
   { id: 'announcements', title: '公告中心', icon: Newspaper },
   { id: 'macro', title: '宏观', icon: Landmark },
@@ -49,6 +51,9 @@ const initialWorkspace: WorkspaceState = { watchlist: [], settings: { refresh_se
 
 export default function App() {
   const [page, setPage] = useState<Page>('watch')
+  // 对话面板第一次打开后一直保留（切到别的页面只是隐藏），对话和正在进行的回答不会丢；没打开过时不读取模型配置。
+  const [askOpened, setAskOpened] = useState(false)
+  useEffect(() => { if (page === 'ask') setAskOpened(true) }, [page])
   const [tab, setTab] = useState<Tab>('company')
   const [announcementScope, setAnnouncementScope] = useState<'latest' | 'selected'>('latest')
   const [listMode, setListMode] = useState<'watchlist' | 'search'>('watchlist')
@@ -97,7 +102,8 @@ export default function App() {
   }, [workspace.settings.theme])
 
   useEffect(() => () => searchController.current?.abort(), [])
-  useEffect(() => { pageContentRef.current?.scrollTo(0, 0) }, [page])
+  // 对话面板自己回到最新的问答，不回到顶部。
+  useEffect(() => { if (page !== 'ask') pageContentRef.current?.scrollTo(0, 0) }, [page])
 
   useEffect(() => {
     if (!ready || (page !== 'watch' && page !== 'research')) return
@@ -263,6 +269,7 @@ export default function App() {
             </> : <div className="welcome-state"><div className="welcome-symbol" aria-hidden="true">↗</div><h2>从一只证券开始研究</h2><p>搜索证券，或从自选列表中选择。<br />行情、公司资料、财报与公告都在这里。</p><div className="welcome-examples">试试 <button onClick={() => void onSearch('招商银行')}>招商银行</button><button onClick={() => void onSearch('腾讯控股')}>腾讯控股</button><button onClick={() => void onSearch('AAPL')}>AAPL</button></div></div>}
           </section>
         </div>}
+        {askOpened && <div hidden={page !== 'ask'}><ErrorBoundary><AIChat security={selected} active={page === 'ask'} /></ErrorBoundary></div>}
         <ErrorBoundary key={page}>
         {page === 'macro' && <Macro />}
         {page === 'fx' && <Fx />}
