@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/alwqx/sec/cmd/announcements"
+	"github.com/alwqx/sec/cmd/ask"
 	"github.com/alwqx/sec/cmd/balancesheet"
 	"github.com/alwqx/sec/cmd/bond"
 	"github.com/alwqx/sec/cmd/commodity"
@@ -85,6 +86,7 @@ func NewCLI() *cobra.Command {
 		kline.NewKLineCLI(),
 		macro.NewMacroCLI(),
 		mcp.NewMCPCLI(),
+		ask.NewAskCLI(),
 		fx.NewFXCLI(),
 		quote.NewQuoteCLI(), quote.NewQuoteHistoryCLI(),
 		metal.NewMetalCLI(),
