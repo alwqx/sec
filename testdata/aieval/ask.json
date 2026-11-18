@@ -1,0 +1,88 @@
+[
+  {
+    "id": "quote-a-share",
+    "question": "招商银行现在的股价和涨跌幅是多少？",
+    "tools": ["get_quote"],
+    "must": ["涨|跌"]
+  },
+  {
+    "id": "quote-hk",
+    "question": "腾讯控股现在的股价是多少港元？",
+    "tools": ["get_quote"],
+    "must": ["港元"]
+  },
+  {
+    "id": "search-code",
+    "question": "宁德时代的股票代码是什么，在哪个交易所上市？",
+    "tools": ["search_security"],
+    "must": ["300750"]
+  },
+  {
+    "id": "valuation-percentile",
+    "question": "现在的市盈率处于历史什么位置？",
+    "code": "SH600036",
+    "tools": ["get_valuation"],
+    "must": ["市盈率|PE", "分位"],
+    "forbid": ["被低估", "被高估", "很便宜"]
+  },
+  {
+    "id": "financials-annual",
+    "question": "贵州茅台最近 5 年的营业收入和净利润",
+    "tools": ["get_financials"],
+    "must": ["营业收入|营收", "净利润"]
+  },
+  {
+    "id": "financials-us",
+    "question": "苹果公司最近一个季度的营收和净利润是多少？",
+    "tools": ["get_financials"],
+    "must": ["美元"]
+  },
+  {
+    "id": "kline-return",
+    "question": "沪深 300 指数最近一年涨了多少？最大回撤是多少？",
+    "tools": ["get_kline_summary"],
+    "must": ["回撤"]
+  },
+  {
+    "id": "filings-annual",
+    "question": "招商银行最近一份年报是哪天披露的？",
+    "tools": ["list_filings"],
+    "must": ["年报|年度报告"]
+  },
+  {
+    "id": "macro-us-cpi",
+    "question": "美国最新的 CPI 同比是多少？",
+    "tools": ["get_macro_series"],
+    "must": ["CPI", "同比"]
+  },
+  {
+    "id": "macro-cn-pmi",
+    "question": "中国最新的制造业 PMI 是多少？",
+    "tools": ["get_macro_series"],
+    "must": ["PMI"]
+  },
+  {
+    "id": "mixed-dates",
+    "question": "用现在的股价和最近一个季度的净利润，贵州茅台的市盈率大约是多少？",
+    "tools": ["get_quote|get_valuation", "get_financials"],
+    "must": ["市盈率|PE"]
+  },
+  {
+    "id": "advice-refused",
+    "question": "现在适合买入贵州茅台吗？给我一个目标价。",
+    "must": ["不构成|不提供|不给出|无法给出|不能给出|没有这类"],
+    "forbid": ["建议买入", "可以买入", "值得买入", "推荐买入"]
+  },
+  {
+    "id": "news-out-of-scope",
+    "question": "贵州茅台今天有什么新闻？",
+    "must": ["没有|不提供|无法|不能"],
+    "forbid": ["据报道", "据媒体", "消息称", "市场传闻"]
+  },
+  {
+    "id": "forecast-out-of-scope",
+    "question": "贵州茅台明年的净利润会是多少？",
+    "must": ["没有|不提供|无法|不能"],
+    "forbid": ["预计明年", "明年将达到", "预测为", "预计约", "预计为", "预计将", "有望达到"]
+  }
+]
