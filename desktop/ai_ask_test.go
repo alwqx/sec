@@ -1,13 +1,16 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/alwqx/sec/llm"
 	"github.com/stretchr/testify/require"
@@ -120,4 +123,97 @@ func TestAIAskFailures(t *testing.T) {
 	w = aiAskRequest(s, `{"question":"现在多少钱"}`, false)
 	require.Equal(t, http.StatusBadGateway, w.Code)
 	require.Contains(t, w.Body.String(), "模型没有给出回答")
+}
+
+// TestAIAskConversation 是追问：前几轮在服务端保存，浏览器只提交对话 id；追问的请求带上前一轮的问答，不带工具结果。
+func TestAIAskConversation(t *testing.T) {
+	defer gock.Off()
+	s := &desktopServer{dev: true, workspace: workspaceStore{path: filepath.Join(t.TempDir(), "workspace.json")}}
+	configureAIValuation(t, s)
+	mockAskModel(t, "截至 2026-10-30，招商银行最新价 41 元。")
+	body := `{"question":"现在多少钱","code":"SH600036","conversation":"conv-0001"}`
+	w := aiAskRequest(s, body, false)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	var first llm.Answer
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &first))
+	require.Zero(t, first.History)
+
+	var followUp string
+	gock.New("https://model.example").Post("/v1/chat/completions").AddMatcher(func(r *http.Request, _ *gock.Request) (bool, error) {
+		data, err := io.ReadAll(r.Body)
+		followUp = string(data)
+		return true, err
+	}).Reply(200).JSON(map[string]any{"model": "served", "choices": []any{map[string]any{"finish_reason": "stop", "message": map[string]any{"role": "assistant", "content": "前面查到最新价 41 元。"}}}})
+	w = aiAskRequest(s, `{"question":"那昨天收盘呢","conversation":"conv-0001"}`, true)
+	events := streamEvents(t, w.Body)
+	last := events[len(events)-1]
+	require.Equal(t, "done", last.Type, last.Data)
+	var second llm.Answer
+	require.NoError(t, json.Unmarshal([]byte(last.Data), &second))
+	require.Equal(t, 1, second.History)
+	require.True(t, second.Check.OK(), "前一轮查到的价格能核对上：%v", second.Check)
+	require.Contains(t, followUp, "截至 2026-10-30，招商银行最新价 41 元。", "带上前一轮的回答")
+	require.Contains(t, followUp, "这是追问")
+	require.Contains(t, followUp, `get_quote {\"codes\":[\"600036\"]}（截止 2026-10-30）`)
+	require.NotContains(t, followUp, "schema_version", "不带前一轮的工具结果")
+	require.NotContains(t, followUp, `"role":"tool"`)
+	require.True(t, gock.IsDone())
+
+	// 不带对话 id 时单独回答，不带上前几轮；对话 id 不合法时在请求模型之前拒绝。
+	gock.New("https://model.example").Post("/v1/chat/completions").AddMatcher(func(r *http.Request, _ *gock.Request) (bool, error) {
+		data, err := io.ReadAll(r.Body)
+		return !strings.Contains(string(data), "这是追问"), err
+	}).Reply(200).JSON(map[string]any{"choices": []any{map[string]any{"finish_reason": "stop", "message": map[string]any{"role": "assistant", "content": "好的。"}}}})
+	w = aiAskRequest(s, `{"question":"你好"}`, false)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	require.True(t, gock.IsDone())
+	for _, id := range []string{"short", "has space 1234", strings.Repeat("a", 65)} {
+		w = aiAskRequest(s, `{"question":"你好","conversation":"`+id+`"}`, false)
+		require.Equal(t, http.StatusBadRequest, w.Code, id)
+	}
+}
+
+func TestAskConversations(t *testing.T) {
+	var c askConversations
+	ctx := context.Background()
+	turns, err := c.begin(ctx, "conv-a")
+	require.NoError(t, err)
+	require.Empty(t, turns)
+	stopped, stop := context.WithCancel(ctx)
+	stop()
+	_, err = c.begin(stopped, "conv-a")
+	require.ErrorIs(t, err, errAskBusy, "同一个对话一次只回答一个问题")
+
+	// 上一个问题还在收尾（比如刚取消）时等它结束；失败、取消或没送到页面时不记下这一轮。
+	go func() {
+		time.Sleep(20 * time.Millisecond)
+		c.finish("conv-a", nil)
+	}()
+	turns, err = c.begin(ctx, "conv-a")
+	require.NoError(t, err)
+	require.Empty(t, turns)
+	c.finish("conv-a", nil)
+
+	// 只留最近 llm.MaxAskHistory 轮。
+	for i := range llm.MaxAskHistory + 2 {
+		_, err = c.begin(ctx, "conv-a")
+		require.NoError(t, err)
+		c.finish("conv-a", &llm.Answer{Question: fmt.Sprintf("q%d", i)})
+	}
+	turns, err = c.begin(ctx, "conv-a")
+	require.NoError(t, err)
+	require.Len(t, turns, llm.MaxAskHistory)
+	require.Equal(t, "q2", turns[0].Question)
+
+	// 对话太多时丢掉最久没用的，正在回答的不丢。
+	for i := range maxAskConversations + 3 {
+		id := fmt.Sprintf("conv-%04d", i)
+		_, err = c.begin(ctx, id)
+		require.NoError(t, err)
+		c.finish(id, &llm.Answer{Question: id})
+	}
+	require.Len(t, c.items, maxAskConversations)
+	require.Contains(t, c.items, "conv-a", "正在回答的对话不丢")
+	require.NotContains(t, c.items, "conv-0000")
+	require.Contains(t, c.items, fmt.Sprintf("conv-%04d", maxAskConversations+2))
 }

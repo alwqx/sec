@@ -14,26 +14,34 @@ import (
 	"unicode/utf8"
 
 	"github.com/alwqx/sec/aitool"
+	"github.com/alwqx/sec/utils"
 )
 
-// 问答（sec ask，以后 Desktop 对话面板复用）：模型按问题调用 aitool 的只读工具，工具结果发回后继续，直到给出回答。
-// 设计见 docs/ai.md 的「问答：sec ask 与 Desktop 对话面板」。
+// 问答（sec ask 和 Desktop 对话面板）：模型按问题调用 aitool 的只读工具，工具结果发回后继续，直到给出回答。
+// Desktop 的追问带上同一对话最近几轮的问答（见 AskTurn）。设计见 docs/ai.md 的「问答：sec ask 与 Desktop 对话面板」。
 
 //go:embed prompts/ask.md
 var askPrompt string
 
 // AskPromptVersion 是问答提示词的版本，写进结果。
-const AskPromptVersion = "ask-v2"
+const AskPromptVersion = "ask-v3"
 
 const (
 	// MaxAskRounds 是一次问答最多请求模型的轮数，包括给出回答的那一轮。
 	MaxAskRounds = 8
+	// MaxAskHistory 是追问时最多带上的前几轮问答。
+	MaxAskHistory = 5
 	// maxAskQuestionRunes 是问题的字数上限。
 	maxAskQuestionRunes = 500
 	// maxAskCodeRunes 是证券上下文（代码或名称）的字数上限。
 	maxAskCodeRunes = 32
 	// lastRoundNote 和工具结果一起发给模型，下一轮是最后一轮：让模型用已有的数据回答，不丢掉已经查到的结果。
 	lastRoundNote = "下一轮是最后一轮，不能再调用工具：请用已经取到的数据回答，没有取到的数据在回答里说明。"
+	// followUpNote 放在追问的问题前面，后面列出前几轮调用过的工具。
+	followUpNote = "这是追问。前面几轮的工具结果没有带上，只列出调用过的工具。前面回答里写出的数据可以直接引用，但要写明截止日期；" +
+		"前面回答里没有写出的数据（包括同一次查询结果里的其他字段）必须重新调用工具，不要凭记忆补充；需要更新的数据也重新调用。"
+	// maxHistoryInputRunes 是追问说明里每个工具参数最多显示的字数。
+	maxHistoryInputRunes = 200
 )
 
 // askToolTimeout 是单次工具调用的超时，和 sec mcp 一致。测试时调小。
@@ -73,6 +81,27 @@ type Answer struct {
 	Profile        string    `json:"profile"`
 	PromptVersion  string    `json:"prompt_version"`
 	CreatedAt      time.Time `json:"created_at"`
+	// History 是追问时带上的前几轮问答的个数，单独提问时为 0。
+	History int `json:"history,omitempty"`
+
+	// sources 是这一轮的数字核对来源（问题和成功的工具结果），留给追问核对，不输出。
+	sources []string
+}
+
+// AskTurn 是对话里已经回答的一轮，追问时带上。模型只看到问题、回答和调用过的工具（名字、参数、截止日期），
+// 工具结果不再发给模型（太长，本机模型的上下文放不下），只留在本机作为追问的数字核对来源：
+// 追问的回答引用前面查到的数字时能核对上，但前面回答里模型自己写的数字不算来源。
+type AskTurn struct {
+	Question string
+	Code     string
+	Answer   string
+	Steps    []ToolStep
+	sources  []string
+}
+
+// Turn 返回这次问答作为对话一轮的记录，追问时放进 Asker.History。
+func (a *Answer) Turn() AskTurn {
+	return AskTurn{Question: a.Question, Code: a.Code, Answer: a.Text, Steps: a.Steps, sources: a.sources}
 }
 
 // Asker 用 aitool 的工具回答问题。不缓存：行情等数据随时在变，同一个问题每次都重新查询。
@@ -82,6 +111,8 @@ type Asker struct {
 	Tools  *aitool.Registry
 	// OnStep 在每次工具调用结束后调用，CLI 用它在 stderr 显示进度；为 nil 时不调用。
 	OnStep func(ToolStep)
+	// History 是同一对话前几轮的问答，按顺序；追问时设置，只带上最近 MaxAskHistory 轮。sec ask 不用。
+	History []AskTurn
 }
 
 // NormalizeAskCode 去掉证券上下文首尾的空白，检查长度和换行。CLI 在读模型配置之前调用。
@@ -115,15 +146,22 @@ func (a *Asker) Ask(ctx context.Context, question, code string) (*Answer, error)
 	if code, err = NormalizeAskCode(code); err != nil {
 		return nil, err
 	}
-	prompt := question
-	if code != "" {
-		prompt = fmt.Sprintf("问题涉及的证券：%s（代码或名称，不确定时先用 search_security 查）\n\n%s", code, question)
-	}
 	var tools []Tool
 	for _, t := range a.Tools.Tools() {
 		tools = append(tools, Tool{Name: t.Name, Description: t.Description, InputSchema: t.InputSchema})
 	}
-	messages := []Message{{Role: RoleUser, Text: prompt}}
+	history := a.History[max(0, len(a.History)-MaxAskHistory):]
+	var messages []Message
+	for _, turn := range history {
+		messages = append(messages, Message{Role: RoleUser, Text: askQuestion(turn.Question, turn.Code)}, Message{Role: RoleAssistant, Text: turn.Answer})
+	}
+	prompt := askQuestion(question, code)
+	text := prompt
+	if len(history) > 0 {
+		text = historyNote(history) + "\n\n" + prompt
+	}
+	current := len(messages)
+	messages = append(messages, Message{Role: RoleUser, Text: text})
 	steps := []ToolStep{}
 	var results []*aitool.Result
 	for round := 1; round <= MaxAskRounds; round++ {
@@ -138,7 +176,9 @@ func (a *Asker) Ask(ctx context.Context, question, code string) (*Answer, error)
 			return nil, fmt.Errorf("%w：模型没有返回回复，请重试或更换模型", ErrAsk)
 		}
 		if len(resp.Message.ToolCalls) == 0 {
-			return a.answer(resp, question, code, round, messages, steps, results)
+			// 数字核对的来源：前几轮的问题和工具结果，这一轮的问题和工具结果。追问说明里的工具参数是模型自己给的，不算。
+			own := append([]string{prompt}, askSources(messages[current+1:])...)
+			return a.answer(resp, question, code, round, history, own, steps, results)
 		}
 		if round == MaxAskRounds {
 			break
@@ -166,6 +206,37 @@ func (a *Asker) Ask(ctx context.Context, question, code string) (*Answer, error)
 		messages = append(messages, reply)
 	}
 	return nil, fmt.Errorf("%w：请求模型 %d 轮后仍在调用工具，没有给出回答，请把问题问得具体一些或换一个模型", ErrAsk, MaxAskRounds)
+}
+
+// askQuestion 是发给模型的问题，带上证券上下文。
+func askQuestion(question, code string) string {
+	if code == "" {
+		return question
+	}
+	return fmt.Sprintf("问题涉及的证券：%s（代码或名称，不确定时先用 search_security 查）\n\n%s", code, question)
+}
+
+// historyNote 是追问的说明：前几轮调用过的工具，每轮一行。
+func historyNote(history []AskTurn) string {
+	lines := []string{followUpNote}
+	for i, turn := range history {
+		var calls []string
+		for _, step := range turn.Steps {
+			call := step.Tool + " " + utils.TruncateRunes(string(step.Input), maxHistoryInputRunes)
+			switch {
+			case step.Error != "":
+				call += "（失败）"
+			case step.AsOf != "":
+				call += "（截止 " + step.AsOf + "）"
+			}
+			calls = append(calls, call)
+		}
+		if len(calls) == 0 {
+			calls = []string{"没有调用工具"}
+		}
+		lines = append(lines, fmt.Sprintf("- 第 %d 问：%s", i+1, strings.Join(calls, "；")))
+	}
+	return strings.Join(lines, "\n")
 }
 
 // call 执行一次工具调用，返回结果（失败时为 nil）、调用记录和发给模型的内容。工具失败不算问答失败，
@@ -225,7 +296,7 @@ func jsonInput(input json.RawMessage) json.RawMessage {
 }
 
 // answer 检查最后一轮的回复，核对数字，附上说明和免责声明。
-func (a *Asker) answer(resp *Response, question, code string, round int, messages []Message, steps []ToolStep, results []*aitool.Result) (*Answer, error) {
+func (a *Asker) answer(resp *Response, question, code string, round int, history []AskTurn, own []string, steps []ToolStep, results []*aitool.Result) (*Answer, error) {
 	text := strings.TrimSpace(resp.Message.Text)
 	switch {
 	case resp.StopReason == StopRefusal:
@@ -237,11 +308,16 @@ func (a *Asker) answer(resp *Response, question, code string, round int, message
 	case resp.StopReason != StopEnd && resp.StopReason != StopMaxTokens:
 		return nil, fmt.Errorf("%w：模型没有正常完成回答（停止原因 %s）", ErrAsk, resp.RawStopReason)
 	}
+	sources := slices.Clone(own)
+	for _, turn := range history {
+		sources = append(sources, turn.sources...)
+	}
 	dates := dataDates(steps)
 	answer := &Answer{
-		Question: question, Code: code, Text: text, Steps: steps, Check: Verify(text, askSources(messages)...), DataDates: dates,
-		Notes: askNotes(steps, dates), Disclaimer: askDisclaimer(results), Truncated: resp.StopReason == StopMaxTokens,
+		Question: question, Code: code, Text: text, Steps: steps, Check: Verify(text, sources...), DataDates: dates,
+		Notes: askNotes(steps, dates, queried(history)), Disclaimer: askDisclaimer(results), Truncated: resp.StopReason == StopMaxTokens,
 		Rounds: round, Model: resp.Model, Profile: a.Model.Profile, PromptVersion: AskPromptVersion, CreatedAt: time.Now(),
+		History: len(history), sources: own,
 	}
 	if answer.Truncated {
 		answer.TruncationHint = a.Model.TruncationAdvice(resp, "回答超出上限")
@@ -280,11 +356,21 @@ func dataDates(steps []ToolStep) []string {
 	return dates
 }
 
-// askNotes 是代码给出的说明：模型没有调用工具时回答没有用到 sec 的数据；用到的数据截止日期不同时逐项列出，
-// 提醒不要把不同时点的数据放在一起比较。dates 见 dataDates。
-func askNotes(steps []ToolStep, dates []string) []string {
+// queried 返回前几轮是否有成功的工具调用。
+func queried(history []AskTurn) bool {
+	return slices.ContainsFunc(history, func(turn AskTurn) bool {
+		return slices.ContainsFunc(turn.Steps, func(step ToolStep) bool { return step.Error == "" })
+	})
+}
+
+// askNotes 是代码给出的说明：模型没有调用工具时回答没有用到 sec 的数据（earlier 时用的是前几轮查到的数据）；用到的数据
+// 截止日期不同时逐项列出，提醒不要把不同时点的数据放在一起比较。dates 见 dataDates，earlier 见 queried。
+func askNotes(steps []ToolStep, dates []string, earlier bool) []string {
 	notes := []string{}
-	if len(steps) == 0 {
+	switch {
+	case len(steps) == 0 && earlier:
+		return append(notes, "这一轮没有调用工具，回答里的数据来自前面几轮的查询，截止日期见前面的回答。")
+	case len(steps) == 0:
 		return append(notes, "模型没有调用工具，回答没有用到 sec 查询的数据。")
 	}
 	distinct := map[string]bool{}

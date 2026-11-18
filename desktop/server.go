@@ -18,6 +18,7 @@ type desktopServer struct {
 	dev          bool
 	workspace    workspaceStore
 	downloadRoot string
+	asks         askConversations
 }
 
 // Handler 返回装配好的路由。

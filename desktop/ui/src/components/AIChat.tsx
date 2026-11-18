@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { streamAsk } from '../api'
-import { askCode, maxAskQuestion, stepLine } from '../aiAsk'
+import { askCode, askMeta, maxAskHistory, maxAskQuestion, newConversationID, stepLine } from '../aiAsk'
 import { useAIModels } from '../hooks/useAIModels'
 import type { AskAnswer, AskStep, BasicSecurity } from '../types'
 import SummaryModelPicker from './SummaryModelPicker'
@@ -17,9 +17,9 @@ interface Turn {
   error?: string
 }
 
-// AIChat 是对话面板：模型调用 sec 的只读工具回答问题，和 sec ask 共用后端。每个问题单独回答，不带上之前的问答；
-// 对话只保存在内存，关闭窗口即清空。研究页选中的证券默认作为上下文带入，可以去掉。一次只回答一个问题，
-// 回答时逐条显示调用的工具、参数和截止日期，回答下方是数字核对结果、说明和免责声明。active 是面板当前是否显示：
+// AIChat 是对话面板：模型调用 sec 的只读工具回答问题，和 sec ask 共用后端。追问时后端带上同一对话最近几轮的问答
+// （按对话 id 保存在 Desktop 服务端，页面只提交 id），「新对话」换一个 id 重新开始；对话只保存在内存，关闭窗口即清空。
+// 研究页选中的证券默认作为上下文带入，可以去掉。一次只回答一个问题，回答时逐条显示调用的工具、参数和截止日期，回答下方是数字核对结果、说明和免责声明。active 是面板当前是否显示：
 // 面板切走后只是隐藏，再次显示时重新读取模型配置（设置页可能改过），并回到最新的问答。
 export default function AIChat({ security, active }: { security: BasicSecurity | null; active: boolean }) {
   const models = useAIModels()
@@ -27,6 +27,7 @@ export default function AIChat({ security, active }: { security: BasicSecurity |
   const [question, setQuestion] = useState('')
   const [includeSecurity, setIncludeSecurity] = useState(true)
   const [turns, setTurns] = useState<Turn[]>([])
+  const [conversation, setConversation] = useState(newConversationID)
   const [busy, setBusy] = useState(false)
   const controller = useRef<AbortController | null>(null)
   const nextID = useRef(1)
@@ -59,7 +60,7 @@ export default function AIChat({ security, active }: { security: BasicSecurity |
     setQuestion('')
     setTurns(all => [...all, { id, question: text, code, status: '正在请求模型…', steps: [] }])
     try {
-      const answer = await streamAsk({ question: text, code, profile: profile!.name }, event => {
+      const answer = await streamAsk({ question: text, code, profile: profile!.name, conversation }, event => {
         if (event.type === 'status') update(id, turn => ({ ...turn, status: event.text }))
         else if (event.type === 'step') update(id, turn => ({ ...turn, steps: [...turn.steps, event.step], status: `已完成 ${turn.steps.length + 1} 次工具调用，等待其余工具或模型…` }))
       }, request.signal)
@@ -76,7 +77,7 @@ export default function AIChat({ security, active }: { security: BasicSecurity |
 
   return <div className="page-panel ai-chat">
     <SummaryModelPicker models={models} action="提问" sends="问题、带入的证券代码和工具查到的行情、财务等数据"
-      extra="每个问题单独回答，不带上之前的问答；对话只保存在本窗口，关闭后清空。" />
+      extra={`追问时带上本对话最近 ${maxAskHistory} 轮的问答和调用过的工具（不发送工具结果，需要时重新查询）；点「新对话」重新开始。对话只保存在本窗口，关闭后清空。`} />
     <div className="chat-log" aria-label="对话记录">
       {!turns.length && <p className="data-note">可以问行情、K 线、财务、估值、公告和宏观数据，比如「现在的估值处于历史什么位置？」「最近 5 年的营业收入和净利润？」「美国最新的 CPI 同比是多少？」。模型只用 sec 查到的数据回答，不给投资建议。</p>}
       {turns.map(turn => <article key={turn.id} ref={turn.id === lastID ? lastTurn : undefined} className="chat-turn" aria-label={`问题：${turn.question}`}>
@@ -85,7 +86,7 @@ export default function AIChat({ security, active }: { security: BasicSecurity |
           <li key={index} className={step.error ? 'is-failed' : ''}>{stepLine(step)}</li>)}</ol>}
         {!turn.answer && !turn.error && <p className="data-note" role="status">{turn.status}</p>}
         {turn.error && <p className="error" role="alert">{turn.error}</p>}
-        {turn.answer && <SummaryResultView result={turn.answer} meta={`请求 ${turn.answer.rounds} 轮 · 调用工具 ${turn.answer.steps.length} 次`}>
+        {turn.answer && <SummaryResultView result={turn.answer} meta={askMeta(turn.answer)}>
           <p className="explanation-text">{turn.answer.text}</p>
           {turn.answer.truncated && <p className="error">输出达到上限，回答不完整{turn.answer.truncation_hint || '。'}</p>}
           {turn.answer.data_dates.length > 0 && <p className="data-note">数据截止：{turn.answer.data_dates.join('；')}</p>}
@@ -102,7 +103,7 @@ export default function AIChat({ security, active }: { security: BasicSecurity |
           }} />
         <button type="submit" disabled={blocked || busy || !question.trim()}>{busy ? '回答中…' : '提问'}</button>
         {busy && <button type="button" onClick={cancel}>取消</button>}
-        {!busy && turns.length > 0 && <button type="button" onClick={() => setTurns([])}>清空对话</button>}
+        {!busy && turns.length > 0 && <button type="button" onClick={() => { setTurns([]); setConversation(newConversationID()) }}>新对话</button>}
       </div>
     </form>
   </div>

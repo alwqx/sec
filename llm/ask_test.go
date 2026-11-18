@@ -3,6 +3,7 @@ package llm
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -219,4 +220,66 @@ func TestAskToolTimeoutAndCancel(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "slow 超过 0 秒没有返回", answer.Steps[0].Error)
 	require.True(t, fake.Requests[1].Messages[2].ToolResults[0].IsError)
+}
+
+// TestAskFollowUp 是追问：前几轮的问答按顺序带上，工具结果不发给模型，只列出调用过的工具；
+// 前几轮查到的数字作为核对来源，前面回答里模型自己写的数字不算。
+func TestAskFollowUp(t *testing.T) {
+	fake := &Fake{Replies: []FakeReply{
+		FakeToolCalls(call("1", "get_quote", `{"codes":["600519"]}`)),
+		FakeText("截至 2026-11-17 股价 1523.45 元，另有 999 元。"),
+	}}
+	a := Asker{Client: fake, Model: Model{Profile: "ds", Name: "m"}, Tools: askTools(t)}
+	first, err := a.Ask(context.Background(), "茅台股价", "600519")
+	require.NoError(t, err)
+	require.Zero(t, first.History)
+	require.Equal(t, []string{"999"}, unsourcedTexts(first.Check))
+
+	fake.Replies = []FakeReply{FakeText("前面查到 2026-11-17 股价 1523.45 元，999 元没有来源。")}
+	a.History = []AskTurn{first.Turn()}
+	second, err := a.Ask(context.Background(), "那它贵吗", "")
+	require.NoError(t, err)
+	require.Equal(t, 1, second.History)
+	require.Equal(t, []string{"999"}, unsourcedTexts(second.Check), "前一轮查到的数字能核对上，前一轮回答里没有来源的数字仍然没有来源")
+	require.Equal(t, []string{"这一轮没有调用工具，回答里的数据来自前面几轮的查询，截止日期见前面的回答。"}, second.Notes)
+	data, err := json.Marshal(first)
+	require.NoError(t, err)
+	require.NotContains(t, string(data), `"history"`, "单独提问不输出 history")
+
+	messages := fake.Requests[2].Messages
+	require.Len(t, messages, 3, "前一轮的问题和回答，加上这一轮的问题")
+	require.Equal(t, RoleUser, messages[0].Role)
+	require.True(t, strings.HasPrefix(messages[0].Text, "问题涉及的证券：600519"), "前一轮的问题带上它的证券上下文")
+	require.Equal(t, Message{Role: RoleAssistant, Text: first.Text}, messages[1], "前一轮只带回答，不带工具调用和结果")
+	require.True(t, strings.HasPrefix(messages[2].Text, followUpNote))
+	require.Contains(t, messages[2].Text, `- 第 1 问：get_quote {"codes":["600519"]}（截止 2026-11-17）`)
+	require.True(t, strings.HasSuffix(messages[2].Text, "\n\n那它贵吗"))
+	for _, m := range messages {
+		require.Empty(t, m.ToolResults)
+		require.NotContains(t, m.Text, "S&P 500", "工具结果不发给模型")
+	}
+
+	// 追问说明里的工具参数是模型给的，不算来源。
+	turn := AskTurn{Question: "q", Answer: "a", Steps: []ToolStep{{Tool: "get_financials", Input: json.RawMessage(`{"code":"600519","year":2031}`), Error: "失败了"}}}
+	fake.Replies = []FakeReply{FakeText("2031 年的数据没有取到。")}
+	a.History = []AskTurn{turn}
+	third, err := a.Ask(context.Background(), "为什么", "")
+	require.NoError(t, err)
+	require.Contains(t, fake.Requests[3].Messages[2].Text, `get_financials {"code":"600519","year":2031}（失败）`)
+	require.Equal(t, []string{"2031"}, unsourcedTexts(third.Check))
+	require.Equal(t, []string{"模型没有调用工具，回答没有用到 sec 查询的数据。"}, third.Notes, "前几轮没有查到数据时不说用的是前几轮的数据")
+
+	// 只带上最近 MaxAskHistory 轮。
+	a.History = nil
+	for i := range MaxAskHistory + 2 {
+		a.History = append(a.History, AskTurn{Question: fmt.Sprintf("第%d个问题", i), Answer: "好"})
+	}
+	fake.Replies = []FakeReply{FakeText("好")}
+	last, err := a.Ask(context.Background(), "再问", "")
+	require.NoError(t, err)
+	require.Equal(t, MaxAskHistory, last.History)
+	messages = fake.Requests[4].Messages
+	require.Len(t, messages, 2*MaxAskHistory+1)
+	require.Equal(t, "第2个问题", messages[0].Text)
+	require.Contains(t, messages[len(messages)-1].Text, "- 第 5 问：没有调用工具")
 }
