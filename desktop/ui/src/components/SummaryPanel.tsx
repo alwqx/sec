@@ -4,14 +4,14 @@ import { openDisclosure } from '../disclosure'
 import { useSummaryRequest } from '../hooks/useSummaryRequest'
 import type { AIProfileView, ValuationExplanation } from '../types'
 
-// SummaryResult 是公告和申报摘要、招股书问答共有的字段。
+// SummaryResult 是公告和申报摘要、招股书问答和对话面板的回答共有的字段。回答不缓存，没有 cached。
 export interface SummaryResult {
   check: ValuationExplanation['check']
   notes: string[]
   disclaimer: string
   model: string
   profile: string
-  cached: boolean
+  cached?: boolean
   created_at: string
 }
 

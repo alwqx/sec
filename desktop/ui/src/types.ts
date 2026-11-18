@@ -355,6 +355,41 @@ export interface RiskExplanation {
 }
 
 export type ValuationExplanationMeta = Pick<ValuationExplanation, 'ex_code' | 'name' | 'as_of' | 'model' | 'profile' | 'disclaimer' | 'cached'>
+// AskStep 是问答里的一次工具调用，和 llm.ToolStep 一致；as_of 为空表示结果里各项数据的日期不同或没有日期（如搜索）。
+export interface AskStep {
+  round: number
+  tool: string
+  input: unknown
+  as_of?: string
+  source?: string
+  error?: string
+  elapsed_ms: number
+}
+
+// AskAnswer 是一次问答的结果，和 llm.Answer 一致。
+export interface AskAnswer {
+  question: string
+  code?: string
+  text: string
+  steps: AskStep[]
+  check: ValuationExplanation['check']
+  data_dates: string[]
+  notes: string[]
+  disclaimer: string
+  truncated: boolean
+  truncation_hint?: string
+  rounds: number
+  model: string
+  profile: string
+  prompt_version: string
+  created_at: string
+}
+
+export type AskStreamEvent =
+  | { type: 'status'; text: string }
+  | { type: 'step'; step: AskStep }
+  | { type: 'done'; result: AskAnswer }
+
 export type ExplanationStreamEvent =
   | { type: 'status'; text: string }
   | { type: 'delta'; text: string }

@@ -165,7 +165,7 @@
   - [x] Desktop 招股书问答框：「招股说明书」栏目里招股说明书、招股意向书全文的行加问答框，复用 `llm.ProspectusAnswerer`。
 - [x] `sec ask`：单次问答，agent loop 复用 `aitool/` 工具注册表；混合多个工具结果时带上各自截止日期，避免拼接不同时点的数据。
 - [ ] 离线评测集第一版：`testdata/aieval/` 的问题、期望调用的工具和禁止出现的词，`go run ./scripts/aieval` 对真实模型手动运行。
-- [ ] Desktop 对话面板：复用 `sec ask` 的 agent loop。
+- [x] Desktop 对话面板：复用 `sec ask` 的 agent loop。左侧导航「AI 问答」，逐条显示工具调用，研究页的证券默认带入；每个问题单独回答。
 
 测试：CI 不调用真实模型，用假的模型客户端测试工具调用与提示词组装；回答质量用离线评测集手动运行。
 

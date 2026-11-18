@@ -1,6 +1,6 @@
 import type { BasicSecurity, SecurityQuote, Company, Dividend, WorkspaceState, PageResult, IPOListing, Announcement, FinancialReport, MetalData, SECFilings, USCompanyData, HKCompanyData, FundOverview, USFinancialsData, CommodityQuote, CommodityHistory, HistoryQuote, BondData, CompanyMetrics, SavedDownload, AnnualReportsPage, ProspectusPage , MacroCatalog, MacroDataset , FxDataset, FxSpread , HistoryOverlay , StrategyResult, ValuationResult, FinancialCharts, USDividends } from './types'
 
-import { readExplanationStream } from './sse'
+import { readAskStream, readExplanationStream } from './sse'
 
 async function request<T>(path: string, signal?: AbortSignal, options?: RequestInit): Promise<T> {
   const resp = await fetch(path, { ...options, signal })
@@ -234,6 +234,14 @@ export async function streamValuation(input: import('./aiValuation').ValuationEx
     method: 'POST', signal, headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' }, body: JSON.stringify(input),
   })
   return readExplanationStream(response, emit, signal)
+}
+
+// streamAsk 发送一个问题，逐条收到工具调用，最后得到完整回答。每个问题单独回答，不带上之前的问答。
+export async function streamAsk(input: { question: string; code: string; profile: string }, emit: (event: import('./types').AskStreamEvent) => void, signal?: AbortSignal): Promise<import('./types').AskAnswer> {
+  const response = await fetch('/api/v1/ai/ask', {
+    method: 'POST', signal, headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' }, body: JSON.stringify(input),
+  })
+  return readAskStream(response, emit, signal)
 }
 
 export function strategy(query: Record<string, string>, signal?: AbortSignal): Promise<StrategyResult> {

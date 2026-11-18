@@ -23,7 +23,7 @@ import (
 var askPrompt string
 
 // AskPromptVersion 是问答提示词的版本，写进结果。
-const AskPromptVersion = "ask-v1"
+const AskPromptVersion = "ask-v2"
 
 const (
 	// MaxAskRounds 是一次问答最多请求模型的轮数，包括给出回答的那一轮。

@@ -52,6 +52,7 @@
 48. Find risk factors by their heading in 10-Ks without Item numbers, such as Citigroup's, and join risk titles split across two lines.
 49. Read the risk factors and MD&A from the Exhibit 13 annual report when a 10-K only refers to it, such as Wells Fargo's.
 50. Add `sec ask` to answer a question with an AI model that calls sec's read-only data tools.
+51. Add an AI Q&A page to Desktop that answers like `sec ask` and lists each tool call as it finishes; `sec ask` now answers in plain text.
 
 ### v0.4.8
 

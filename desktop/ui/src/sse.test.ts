@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { SSEParser, readExplanationStream } from './sse.ts'
-import type { ExplanationStreamEvent, ValuationExplanation } from './types'
+import { SSEParser, readAskStream, readExplanationStream } from './sse.ts'
+import type { AskAnswer, AskStreamEvent, ExplanationStreamEvent, ValuationExplanation } from './types'
 
 const encoder = new TextEncoder()
 const result: ValuationExplanation = { ex_code: 'SH600036', name: '招商银行', as_of: '2026-10-30', text: '招商银行解读', disclaimer: '不构成投资建议', model: 'm', profile: 'p', prompt_version: 'v1', created_at: '2026-11-10T00:00:00Z', cached: false, truncated: false, check: { numbers: 0, unsourced: [], advice_terms: [] } }
@@ -121,4 +121,22 @@ test('回调失败关闭连接，大小限制阻止无界缓冲', async () => {
   assert.equal(canceled, true)
   const parser = new SSEParser(() => {})
   assert.throws(() => parser.push('data: ' + 'x'.repeat(1 << 20)), /大小限制/)
+})
+
+const answer: AskAnswer = { question: '现在多少钱', code: 'SH600036', text: '最新价 41 元。', steps: [{ round: 1, tool: 'get_quote', input: {}, as_of: '2026-11-17', elapsed_ms: 300 }], check: { numbers: 1, unsourced: [], advice_terms: [] }, data_dates: ['get_quote 2026-11-17'], notes: [], disclaimer: '不构成投资建议', truncated: false, rounds: 2, model: 'm', profile: 'p', prompt_version: 'ask-v1', created_at: '2026-11-17T00:00:00Z' }
+
+test('问答逐条收到工具调用，done 是完整回答', async () => {
+  const events: AskStreamEvent[] = []
+  const wire = frame('status', { text: '正在请求模型…' }) + ': ping\n\n' + frame('step', answer.steps[0]) + frame('done', answer)
+  const got = await readAskStream(new Response(wire, { headers: { 'Content-Type': 'text/event-stream' } }), event => events.push(event))
+  assert.deepEqual(got, answer)
+  assert.deepEqual(events.map(event => event.type), ['status', 'step', 'done'])
+})
+
+test('问答的 error 事件、提前结束和格式错误都是失败', async () => {
+  const read = (wire: string) => readAskStream(new Response(wire, { headers: { 'Content-Type': 'text/event-stream' } }), () => {})
+  await assert.rejects(read(frame('step', answer.steps[0]) + frame('error', { message: '模型可能不支持工具调用', status: 502 })), /不支持工具调用/)
+  await assert.rejects(read(frame('step', answer.steps[0])), /回答尚未完成/)
+  await assert.rejects(read(frame('done', { ...answer, steps: null })), /回答格式无效/)
+  await assert.rejects(readAskStream(new Response(JSON.stringify({ error: '问题不能为空' }), { status: 400 }), () => {}), /问题不能为空/)
 })
