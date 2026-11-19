@@ -383,6 +383,8 @@ export interface AskAnswer {
   profile: string
   prompt_version: string
   created_at: string
+  // history 是追问时带上的前几轮问答的个数，单独提问时没有。
+  history?: number
 }
 
 export type AskStreamEvent =

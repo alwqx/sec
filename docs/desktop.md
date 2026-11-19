@@ -251,12 +251,13 @@ provider 在保持原有数值字段的同时，通过 `MissingTenors` 记录上
 
 ### AI 问答（对话面板）
 
-左侧导航「AI 问答」：模型调用 sec 的只读工具（搜索、行情、K 线摘要、财务、估值、公告和申报、宏观）回答问题，和 `sec ask` 共用 `llm.Asker`、工具和提示词。每个问题单独回答，不带上之前的问答，也不接受浏览器提交的历史回答或工具结果；对话只保存在内存，切到别的页面保留（面板第一次打开后一直挂载，只是隐藏），关闭窗口即清空，可以「清空对话」。没打开过时不读取模型配置。
+左侧导航「AI 问答」：模型调用 sec 的只读工具（搜索、行情、K 线摘要、财务、估值、公告和申报、宏观）回答问题，和 `sec ask` 共用 `llm.Asker`、工具和提示词。同一对话里可以追问：后端带上最近 5 轮的问答和调用过的工具（不发送工具结果），历史按对话 id 保存在 Desktop 服务端的内存里，页面只提交 id，不提交历史回答或工具结果；「新对话」换一个 id 重新开始。对话只保存在内存，切到别的页面保留（面板第一次打开后一直挂载，只是隐藏），关闭窗口即清空。没打开过时不读取模型配置。
 
 - 研究页选中的证券默认作为上下文带入（`code`，如 `SH600036`），输入框上方可以取消勾选；换了证券时重新默认带入。
 - 模型配置下拉框、刷新和隐私说明和摘要列表一致，默认 `default`，临时切换不修改共享配置；未配置、未启用或配置无效时输入框置灰并给出原因。
 - 一次回答一个问题：Enter 发送，Shift+Enter 换行，输入法组字时的 Enter 不发送；回答中可以取消，取消会终止模型请求和正在执行的工具调用。
 - 回答时每个工具调用完成后显示一行（轮次、工具、参数、截止日期或失败原因、耗时，和 `sec ask` 在终端显示的一致），完成后显示回答、各工具的数据截止日期、数字及建议用语核对、说明（如用到的数据截止日期不同）和免责声明。模型文字按纯文本展示。
+- 追问的回答上方显示「带上前 N 轮问答」；这一轮没有调用工具、前几轮查到过数据时，说明写回答里的数据来自前面几轮的查询。失败、取消或没送到页面的回答不计入对话；取消后可以马上追问。
 - 切到别的页面时对话面板只是隐藏；再次打开时重新读取模型配置（设置页可能改过），并回到最新的问答。
 
 接口为 `POST /api/v1/ai/ask`，前端用 `Accept: text/event-stream`：`status` 是进度，`step` 是一次工具调用（`llm.ToolStep`），`done` 是完整回答（`llm.Answer`），`error` 是失败终态；不带这个头时返回 JSON 的 `llm.Answer`。
@@ -311,7 +312,7 @@ macOS 按当前进程架构匹配 `sec-<tag>-desktop-darwin-<arch>.dmg`，不将
 | GET | `/api/v1/filings?code=$AAPL&type=periodic&page=1` | 美股 SEC 申报：`company`、`ticker`、`total`、`has_more`、`results`；type 为 periodic（10-K/10-Q/20-F/40-F）、current（8-K/6-K）、insider（Form 3/4/5/144）、all，留空为主要申报；`truncated` 为 true 表示更早的申报没有读取；SEC 没有这家公司时 404 |
 | GET | `/api/v1/filings/risks?url=<10-K 链接>` | 对比一份 10-K 和上一年 10-K 的风险因素小标题（`edgar.RiskChanges`）：`current`、`previous`、`added`、`removed`、`revised`、`kept`、`notes`，不含正文，不调用模型；不是 10-K、识别不出小标题或没有上一年的 10-K 时 422 |
 | POST | `/api/v1/ai/prospectus/ask` | 招股书问答（`llm.ProspectusAnswer`）：只接收巨潮 PDF `url`、`question` 和可选 `profile`，和 `sec ipo ask` 共用缓存；无效链接或问题（为空、超过 200 字、没有可以查找的词）400，模型配置不可用 409，招股书里没有和问题相关的页 422，PDF 读取失败或模型失败 502，超过 10 分钟 504 |
-| POST | `/api/v1/ai/ask` | 对话面板的一次问答（`llm.Answer`）：只接收 `question`、可选的 `code`（证券上下文）和 `profile`，和 `sec ask` 共用 `llm.Asker`；`Accept: text/event-stream` 时逐条发送 `step`，最后 `done` 或 `error`。问题为空、超过 500 字或 `code` 超过 32 字、带换行时 400，模型配置不可用 409，模型失败 502（还没调用工具就被拒绝时提示可能不支持工具调用），超过 10 分钟 504 |
+| POST | `/api/v1/ai/ask` | 对话面板的一次问答（`llm.Answer`）：只接收 `question`、可选的 `code`（证券上下文）、`profile` 和 `conversation`（对话 id，8—64 位字母、数字和 `-`；带上时追问，后端带上这个对话保存的最近 5 轮），和 `sec ask` 共用 `llm.Asker`；`Accept: text/event-stream` 时逐条发送 `step`，最后 `done` 或 `error`。问题为空、超过 500 字或 `code` 超过 32 字、带换行时、对话 id 不合法时 400，模型配置不可用或同一对话上一个问题还在回答时 409，模型失败 502（还没调用工具就被拒绝时提示可能不支持工具调用），超过 10 分钟 504 |
 | POST | `/api/v1/ai/filings/risks` | 用模型解读风险因素变化（`llm.RiskExplanation`）：只接收 `url` 和可选 `profile`，和 `sec filings --risks --explain` 共用缓存；无效链接 400，模型配置不可用 409，申报内容的问题 422，SEC 下载失败 502，超过 10 分钟 504 |
 | GET | `/api/v1/fund/overview?code=OF005827` | 基金概况（`fund.Info`）：净值或货币基金收益、阶段收益率、基金档案和 `notes`；没有这只基金时 404，两个数据源都失败时 502 |
 | GET | `/api/v1/hk/company?code=HK00700` | 港股公司概况：公司资料、价格、市盈率、市净率和市值，`currency` 是交易币种，`equity` 为 false 时是基金、信托、权证等，`notes` 是东方财富失败或没有数据的说明；代码不存在时 404，新浪行情失败时 502 |

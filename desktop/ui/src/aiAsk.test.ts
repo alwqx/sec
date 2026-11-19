@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { askCode, stepLine } from './aiAsk.ts'
-import type { AskStep, BasicSecurity } from './types'
+import { askCode, askMeta, newConversationID, stepLine } from './aiAsk.ts'
+import type { AskAnswer, AskStep, BasicSecurity } from './types'
 
 const step: AskStep = { round: 1, tool: 'get_quote', input: { codes: ['600036'] }, as_of: '2026-11-17', elapsed_ms: 340 }
 
@@ -18,4 +18,16 @@ test('研究页的证券默认带入，去掉或没有选中时为空', () => {
   assert.equal(askCode(security, true), 'SH600036')
   assert.equal(askCode(security, false), '')
   assert.equal(askCode(null, true), '')
+})
+
+test('新对话的 id 是 32 位十六进制，每次不同', () => {
+  const id = newConversationID()
+  assert.match(id, /^[0-9a-f]{32}$/)
+  assert.notEqual(newConversationID(), id)
+})
+
+test('回答上方显示请求轮数、工具调用次数，追问时显示带上了前几轮', () => {
+  const answer = { rounds: 2, steps: [step] } as unknown as AskAnswer
+  assert.equal(askMeta(answer), '请求 2 轮 · 调用工具 1 次')
+  assert.equal(askMeta({ ...answer, history: 3 }), '请求 2 轮 · 调用工具 1 次 · 带上前 3 轮问答')
 })

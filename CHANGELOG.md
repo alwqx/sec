@@ -55,6 +55,7 @@
 51. Add an AI Q&A page to Desktop that answers like `sec ask` and lists each tool call as it finishes; `sec ask` now answers in plain text.
 52. Add an offline eval set for `sec ask`, run by hand against a real model with `go run ./scripts/aieval`.
 53. Stop the number check from flagging advice terms in refusals that quote the question or list several terms.
+54. Let Desktop AI Q&A answer follow-up questions with the last 5 turns of the conversation.
 
 ### v0.4.8
 

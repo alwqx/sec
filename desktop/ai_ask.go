@@ -5,6 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"regexp"
+	"slices"
+	"sync"
 	"time"
 
 	"github.com/alwqx/sec/aitool"
@@ -15,14 +18,114 @@ import (
 // askTimeout 是一次问答的整体时限，和 sec ask 一致。
 const askTimeout = 10 * time.Minute
 
-// handleAIAsk 是 Desktop 对话面板的一次问答，和 sec ask 共用 llm.Asker 和 aitool 的工具。只接收问题、可选的证券上下文和
-// 临时模型配置，不接受浏览器提交的历史回答、工具结果或提示词：每个问题单独回答。问题和证券在读取模型配置之前校验。
+// maxAskConversations 是内存里最多保留的对话数，超过时丢掉最久没用的。
+const maxAskConversations = 20
+
+// conversationID 是浏览器生成的对话 id。
+var conversationID = regexp.MustCompile(`^[A-Za-z0-9-]{8,64}$`)
+
+// askBusyWait 是同一个对话上一个问题还没结束时最多等多久。页面取消后马上追问时，上一个请求已经随连接断开取消，
+// 只是还在收尾（停下正在执行的工具调用），等它结束就可以继续。
+var askBusyWait = 5 * time.Second
+
+// errAskBusy 表示同一个对话上一个问题还没回答完。
+var errAskBusy = errors.New("这个对话上一个问题还在回答，请等它完成或取消")
+
+// askConversations 是对话面板的对话，只在内存里，关闭 Desktop 即清空。每个对话保存最近 llm.MaxAskHistory 轮的
+// llm.AskTurn（问答和本机留作核对来源的工具结果）：历史在服务端，浏览器只提交对话 id，不能伪造前面的回答或工具结果。
+type askConversations struct {
+	mu    sync.Mutex
+	items map[string]*askConversation
+}
+
+type askConversation struct {
+	turns []llm.AskTurn
+	// done 在回答问题时不为 nil，回答结束时关闭。
+	done chan struct{}
+	used time.Time
+}
+
+// begin 开始回答对话 id 里的一个问题，返回前几轮；没有这个对话时新建一个（新对话，或者已经被丢掉的旧对话）。
+// 同一个对话一次只回答一个问题：上一个问题还没结束时最多等 askBusyWait，ctx 取消或等不到时返回 errAskBusy。
+// 回答结束后必须调用 finish。
+func (c *askConversations) begin(ctx context.Context, id string) ([]llm.AskTurn, error) {
+	ctx, cancel := context.WithTimeout(ctx, askBusyWait)
+	defer cancel()
+	for {
+		turns, done := c.tryBegin(id)
+		if done == nil {
+			return turns, nil
+		}
+		select {
+		case <-done:
+		case <-ctx.Done():
+			return nil, errAskBusy
+		}
+	}
+}
+
+// tryBegin 在对话空闲时开始回答，返回前几轮；正在回答时返回它的 done。
+func (c *askConversations) tryBegin(id string) ([]llm.AskTurn, chan struct{}) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.items == nil {
+		c.items = map[string]*askConversation{}
+	}
+	conv, ok := c.items[id]
+	if !ok {
+		conv = &askConversation{}
+		c.items[id] = conv
+		c.evict(id)
+	}
+	if conv.done != nil {
+		return nil, conv.done
+	}
+	conv.done, conv.used = make(chan struct{}), time.Now()
+	return slices.Clone(conv.turns), nil
+}
+
+// finish 结束一个问题；answer 不为 nil（回答已经送到页面）时把这一轮记下来，只留最近 llm.MaxAskHistory 轮。
+func (c *askConversations) finish(id string, answer *llm.Answer) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	conv, ok := c.items[id]
+	if !ok {
+		return
+	}
+	close(conv.done)
+	conv.done, conv.used = nil, time.Now()
+	if answer != nil {
+		conv.turns = append(conv.turns, answer.Turn())
+		conv.turns = conv.turns[max(0, len(conv.turns)-llm.MaxAskHistory):]
+	}
+}
+
+// evict 在对话超过 maxAskConversations 个时丢掉最久没用、没在回答的对话，不丢刚建的 keep。
+func (c *askConversations) evict(keep string) {
+	for len(c.items) > maxAskConversations {
+		oldest := ""
+		for id, conv := range c.items {
+			if id != keep && conv.done == nil && (oldest == "" || conv.used.Before(c.items[oldest].used)) {
+				oldest = id
+			}
+		}
+		if oldest == "" {
+			return
+		}
+		delete(c.items, oldest)
+	}
+}
+
+// handleAIAsk 是 Desktop 对话面板的一次问答，和 sec ask 共用 llm.Asker 和 aitool 的工具。只接收问题、可选的证券上下文、
+// 临时模型配置和可选的对话 id，不接受浏览器提交的历史回答、工具结果或提示词。带对话 id 时是追问：带上这个对话在服务端
+// 保存的前几轮（见 askConversations），回答送到页面后记下这一轮；不带时单独回答。问题、证券和对话 id 在读取模型配置之前校验。
 // 请求 Accept: text/event-stream 时逐条发送工具调用（step），最后发送 done 或 error；否则返回 JSON 的 llm.Answer。
 func (s *desktopServer) handleAIAsk(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		Question string `json:"question"`
-		Code     string `json:"code"`
-		Profile  string `json:"profile"`
+		Question     string `json:"question"`
+		Code         string `json:"code"`
+		Profile      string `json:"profile"`
+		Conversation string `json:"conversation"`
 	}
 	if !s.readAIRequest(w, r, &in) {
 		return
@@ -37,11 +140,24 @@ func (s *desktopServer) handleAIAsk(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	if in.Conversation != "" && !conversationID.MatchString(in.Conversation) {
+		writeError(w, http.StatusBadRequest, "对话 id 不合法")
+		return
+	}
 	client, model, _, ok := s.openAIModel(w, r, in.Profile)
 	if !ok {
 		return
 	}
 	asker := &llm.Asker{Client: client, Model: model, Tools: aitool.Default(macro.AISource())}
+	// delivered 是已经送到页面的回答，结束时记进对话；失败、取消或没送到时为 nil，前几轮不变。
+	var delivered *llm.Answer
+	if in.Conversation != "" {
+		if asker.History, err = s.asks.begin(r.Context(), in.Conversation); err != nil {
+			writeError(w, http.StatusConflict, err.Error())
+			return
+		}
+		defer func() { s.asks.finish(in.Conversation, delivered) }()
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), askTimeout)
 	defer cancel()
 	steps := 0
@@ -56,6 +172,9 @@ func (s *desktopServer) handleAIAsk(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeJSON(w, answer)
+		if r.Context().Err() == nil {
+			delivered = answer
+		}
 		return
 	}
 	stream := newAIStream(w, ctx)
@@ -82,7 +201,9 @@ func (s *desktopServer) handleAIAsk(w http.ResponseWriter, r *http.Request) {
 		_ = stream.send("error", map[string]any{"message": message, "status": status})
 		return
 	}
-	_ = stream.send("done", answer)
+	if stream.send("done", answer) == nil {
+		delivered = answer
+	}
 }
 
 // askFailure 返回问答失败的状态码和提示。模型错误只给 llm.PublicError 的部分（厂商错误正文可能回显 Key）；

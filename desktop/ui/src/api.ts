@@ -236,8 +236,9 @@ export async function streamValuation(input: import('./aiValuation').ValuationEx
   return readExplanationStream(response, emit, signal)
 }
 
-// streamAsk 发送一个问题，逐条收到工具调用，最后得到完整回答。每个问题单独回答，不带上之前的问答。
-export async function streamAsk(input: { question: string; code: string; profile: string }, emit: (event: import('./types').AskStreamEvent) => void, signal?: AbortSignal): Promise<import('./types').AskAnswer> {
+// streamAsk 发送一个问题，逐条收到工具调用，最后得到完整回答。conversation 是对话 id：前几轮的问答保存在 Desktop 服务端，
+// 同一个 id 的问题是追问；页面不提交历史回答。
+export async function streamAsk(input: { question: string; code: string; profile: string; conversation: string }, emit: (event: import('./types').AskStreamEvent) => void, signal?: AbortSignal): Promise<import('./types').AskAnswer> {
   const response = await fetch('/api/v1/ai/ask', {
     method: 'POST', signal, headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' }, body: JSON.stringify(input),
   })
