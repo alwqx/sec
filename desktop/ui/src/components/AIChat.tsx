@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { streamAsk } from '../api'
-import { askCode, askMeta, maxAskHistory, maxAskQuestion, newConversationID, stepLine } from '../aiAsk'
+import { answeredSteps, askCode, askMeta, maxAskHistory, maxAskQuestion, newConversationID, stepLine } from '../aiAsk'
 import { useAIModels } from '../hooks/useAIModels'
 import type { AskAnswer, AskStep, BasicSecurity } from '../types'
 import SummaryModelPicker from './SummaryModelPicker'
@@ -64,7 +64,7 @@ export default function AIChat({ security, active }: { security: BasicSecurity |
         if (event.type === 'status') update(id, turn => ({ ...turn, status: event.text }))
         else if (event.type === 'step') update(id, turn => ({ ...turn, steps: [...turn.steps, event.step], status: `已完成 ${turn.steps.length + 1} 次工具调用，等待其余工具或模型…` }))
       }, request.signal)
-      update(id, turn => ({ ...turn, answer, steps: answer.steps }))
+      update(id, turn => ({ ...turn, answer, steps: answeredSteps(turn.steps, answer) }))
     } catch (e) {
       const message = request.signal.aborted ? '已取消' : e instanceof Error ? e.message : String(e)
       update(id, turn => ({ ...turn, error: message }))

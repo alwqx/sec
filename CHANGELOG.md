@@ -56,6 +56,7 @@
 52. Add an offline eval set for `sec ask`, run by hand against a real model with `go run ./scripts/aieval`.
 53. Stop the number check from flagging advice terms in refusals that quote the question or list several terms.
 54. Let Desktop AI Q&A answer follow-up questions with the last 5 turns of the conversation.
+55. Run the tool calls of one AI Q&A round concurrently, up to 4 at a time.
 
 ### v0.4.8
 

@@ -20,6 +20,12 @@ export function stepLine(step: AskStep): string {
   return `${line} · ${(step.elapsed_ms / 1000).toFixed(1)}s`
 }
 
+// answeredSteps 是回答完成后显示的工具调用：同一轮的调用同时执行，逐条收到的是结束顺序；已经全部收到时保留这个顺序，
+// 不按回答里的调用顺序重排，免得各行跳动（和 sec ask 在终端显示的一致）。没有全部收到时用回答里的。
+export function answeredSteps(streamed: AskStep[], answer: AskAnswer): AskStep[] {
+  return streamed.length === answer.steps.length ? streamed : answer.steps
+}
+
 // newConversationID 是新对话的 id：32 位十六进制随机数。用 getRandomValues，不依赖只在安全上下文里可用的 randomUUID。
 export function newConversationID(): string {
   return Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join('')

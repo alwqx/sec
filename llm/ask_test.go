@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -68,7 +70,10 @@ func TestAsk(t *testing.T) {
 	require.Equal(t, 3, answer.Rounds)
 	require.True(t, answer.Check.OK(), "数字都在工具结果里：%v", answer.Check)
 	require.Equal(t, "m", answer.Model, "厂商没有返回模型时用配置的模型")
-	require.Equal(t, answer.Steps, shown, "每次调用都显示")
+	require.ElementsMatch(t, answer.Steps, shown, "每次调用都显示，同一轮按结束顺序")
+	for i := 1; i < len(shown); i++ {
+		require.LessOrEqual(t, shown[i-1].Round, shown[i].Round, "按轮次显示")
+	}
 
 	require.Len(t, answer.Steps, 4)
 	require.Equal(t, "2026-11-17", answer.Steps[0].AsOf)
@@ -192,6 +197,92 @@ func TestAskFailures(t *testing.T) {
 type nilClient struct{}
 
 func (nilClient) Chat(context.Context, Request) (*Response, error) { return nil, nil }
+
+// TestAskParallelTools 是同一轮的工具调用同时执行：最多 maxParallelTools 个，结果按调用顺序发回；
+// 工具 panic 只算这次调用失败；取消时等其余调用都停下才返回。
+func TestAskParallelTools(t *testing.T) {
+	var active, peak, started, returned atomic.Int32
+	full := make(chan struct{})
+	var once sync.Once
+	tools, err := aitool.NewRegistry(
+		aitool.Tool{Name: "wait", Description: "说明", InputSchema: json.RawMessage(`{"type":"object"}`),
+			Call: func(ctx context.Context, input json.RawMessage) (*aitool.Result, error) {
+				var args struct{ N int }
+				if err := json.Unmarshal(input, &args); err != nil {
+					return nil, err
+				}
+				n := active.Add(1)
+				defer active.Add(-1)
+				for p := peak.Load(); n > p && !peak.CompareAndSwap(p, n); p = peak.Load() {
+				}
+				if n == maxParallelTools {
+					once.Do(func() { close(full) })
+				}
+				// 依次执行时第一个调用等不到其余调用开始。
+				select {
+				case <-full:
+				case <-time.After(2 * time.Second):
+					return nil, fmt.Errorf("没有同时执行")
+				}
+				time.Sleep(time.Duration(6-args.N) * 15 * time.Millisecond) // 后调用的先结束
+				return aitool.NewResult("wait", "测试", map[string]int{"n": args.N}), nil
+			}},
+		aitool.Tool{Name: "boom", Description: "说明", InputSchema: json.RawMessage(`{"type":"object"}`),
+			Call: func(context.Context, json.RawMessage) (*aitool.Result, error) { panic("出错了") }},
+	)
+	require.NoError(t, err)
+	var calls []ToolCall
+	for i := range 6 {
+		calls = append(calls, call(fmt.Sprint(i), "wait", fmt.Sprintf(`{"n":%d}`, i)))
+	}
+	calls = append(calls, call("p", "boom", `{}`))
+	fake := &Fake{Replies: []FakeReply{FakeToolCalls(calls...), FakeText("好")}}
+	var shown []string
+	a := Asker{Client: fake, Model: Model{Name: "m"}, Tools: tools, OnStep: func(s ToolStep) { shown = append(shown, string(s.Input)) }}
+	answer, err := a.Ask(context.Background(), "问题", "")
+	require.NoError(t, err)
+	require.Equal(t, int32(maxParallelTools), peak.Load(), "最多同时执行 maxParallelTools 个")
+	require.Len(t, answer.Steps, 7)
+	require.Len(t, shown, 7)
+	results := fake.Requests[1].Messages[2].ToolResults
+	for i, step := range answer.Steps[:6] {
+		require.Empty(t, step.Error)
+		require.JSONEq(t, fmt.Sprintf(`{"n":%d}`, i), string(step.Input), "调用记录按调用顺序")
+		require.Equal(t, fmt.Sprint(i), results[i].CallID, "结果按调用顺序发回")
+		require.Contains(t, results[i].Content, fmt.Sprintf(`{"n":%d}`, i))
+	}
+	require.NotEqual(t, shown[:4], []string{`{"n":0}`, `{"n":1}`, `{"n":2}`, `{"n":3}`}, "OnStep 按结束顺序")
+	require.Equal(t, "boom 执行出错", answer.Steps[6].Error, "工具 panic 只算这次调用失败")
+	require.True(t, results[6].IsError)
+
+	// 一个调用执行中取消，其余调用也停下，开始执行的调用都返回后 Ask 才返回；还没开始的调用不再执行。
+	ctx, cancel := context.WithCancel(context.Background())
+	tools, err = aitool.NewRegistry(
+		aitool.Tool{Name: "cancel", Description: "说明", InputSchema: json.RawMessage(`{"type":"object"}`),
+			Call: func(toolCtx context.Context, input json.RawMessage) (*aitool.Result, error) {
+				started.Add(1)
+				defer returned.Add(1)
+				cancel()
+				<-toolCtx.Done()
+				return nil, toolCtx.Err()
+			}},
+		aitool.Tool{Name: "slow", Description: "说明", InputSchema: json.RawMessage(`{"type":"object"}`),
+			Call: func(toolCtx context.Context, input json.RawMessage) (*aitool.Result, error) {
+				started.Add(1)
+				defer returned.Add(1)
+				<-toolCtx.Done()
+				time.Sleep(20 * time.Millisecond)
+				return nil, toolCtx.Err()
+			}},
+	)
+	require.NoError(t, err)
+	fake = &Fake{Replies: []FakeReply{FakeToolCalls(call("1", "slow", `{}`), call("2", "cancel", `{}`), call("3", "slow", `{}`)), FakeText("不会用到")}}
+	a = Asker{Client: fake, Model: Model{Name: "m"}, Tools: tools}
+	_, err = a.Ask(ctx, "问题", "")
+	require.ErrorIs(t, err, context.Canceled)
+	require.Equal(t, started.Load(), returned.Load(), "等开始执行的调用都停下才返回")
+	require.Len(t, fake.Requests, 1)
+}
 
 func TestAskToolTimeoutAndCancel(t *testing.T) {
 	tools := askTools(t)

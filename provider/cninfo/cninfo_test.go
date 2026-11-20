@@ -1,10 +1,32 @@
 package cninfo
 
 import (
+	"os"
+	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
+
+// TestWriteStockListCache 是股票列表缓存先写临时文件再改名：覆盖旧文件，不留临时文件。
+func TestWriteStockListCache(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "cninfo_stocks.json")
+	require.NoError(t, writeStockListCache(path, []byte(`{"stockList":[]}`)))
+	require.NoError(t, writeStockListCache(path, []byte(`{"stockList":[{"code":"600036"}]}`)))
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	require.JSONEq(t, `{"stockList":[{"code":"600036"}]}`, string(data))
+	entries, err := os.ReadDir(dir)
+	require.NoError(t, err)
+	require.Len(t, entries, 1, "不留临时文件")
+	if runtime.GOOS != "windows" {
+		info, err := os.Stat(path)
+		require.NoError(t, err)
+		require.Equal(t, os.FileMode(0644), info.Mode().Perm())
+	}
+}
 
 func TestColumnForCode(t *testing.T) {
 	tests := []struct {

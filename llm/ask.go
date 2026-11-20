@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"runtime/debug"
 	"slices"
 	"strings"
 	"time"
@@ -43,6 +44,9 @@ const (
 	// maxHistoryInputRunes 是追问说明里每个工具参数最多显示的字数。
 	maxHistoryInputRunes = 200
 )
+
+// maxParallelTools 是同一轮最多同时执行的工具调用数，和摘要分块的并发数一致，避免一次向上游发出太多请求。
+const maxParallelTools = summaryConcurrency
 
 // askToolTimeout 是单次工具调用的超时，和 sec mcp 一致。测试时调小。
 var askToolTimeout = 30 * time.Second
@@ -185,20 +189,17 @@ func (a *Asker) Ask(ctx context.Context, question, code string) (*Answer, error)
 		}
 		// 部分本机模型调用工具时停止原因仍是 stop，以有没有工具调用为准。
 		messages = append(messages, resp.Message)
+		outcomes, err := a.runTools(ctx, round, resp.Message.ToolCalls)
+		if err != nil {
+			return nil, err
+		}
 		reply := Message{Role: RoleUser}
-		for _, call := range resp.Message.ToolCalls {
-			result, step, content, err := a.call(ctx, round, call)
-			if err != nil {
-				return nil, err
+		for i, outcome := range outcomes {
+			steps = append(steps, outcome.step)
+			if outcome.result != nil {
+				results = append(results, outcome.result)
 			}
-			steps = append(steps, step)
-			if result != nil {
-				results = append(results, result)
-			}
-			reply.ToolResults = append(reply.ToolResults, ToolResult{CallID: call.ID, Content: content, IsError: step.Error != ""})
-			if a.OnStep != nil {
-				a.OnStep(step)
-			}
+			reply.ToolResults = append(reply.ToolResults, ToolResult{CallID: resp.Message.ToolCalls[i].ID, Content: outcome.content, IsError: outcome.step.Error != ""})
 		}
 		if round == MaxAskRounds-1 {
 			reply.Text = lastRoundNote
@@ -239,15 +240,78 @@ func historyNote(history []AskTurn) string {
 	return strings.Join(lines, "\n")
 }
 
+// toolOutcome 是一次工具调用的结果，见 call。
+type toolOutcome struct {
+	result  *aitool.Result
+	step    ToolStep
+	content string
+}
+
+// runTools 同时执行一轮的工具调用（最多 maxParallelTools 个），按调用顺序返回。每个调用结束时按结束顺序调用 OnStep，
+// 都在调用 runTools 的 goroutine 里，OnStep 不用加锁。ctx 取消时其余调用随之取消，等它们都停下后返回 error。
+func (a *Asker) runTools(ctx context.Context, round int, calls []ToolCall) ([]toolOutcome, error) {
+	type finished struct {
+		index   int
+		outcome toolOutcome
+		err     error
+	}
+	done := make(chan finished, len(calls))
+	slots := make(chan struct{}, maxParallelTools)
+	for i, call := range calls {
+		go func() {
+			select {
+			case slots <- struct{}{}:
+				defer func() { <-slots }()
+			case <-ctx.Done():
+			}
+			// 两边都就绪时 select 随机选一边，取消后拿到空位的调用也不再执行。
+			if err := ctx.Err(); err != nil {
+				done <- finished{index: i, err: err}
+				return
+			}
+			result, step, content, err := a.call(ctx, round, call)
+			done <- finished{i, toolOutcome{result, step, content}, err}
+		}()
+	}
+	outcomes := make([]toolOutcome, len(calls))
+	var failed error
+	for range calls {
+		f := <-done
+		switch {
+		case failed != nil:
+		case f.err != nil:
+			failed = f.err
+		default:
+			outcomes[f.index] = f.outcome
+			if a.OnStep != nil {
+				a.OnStep(f.outcome.step)
+			}
+		}
+	}
+	if failed != nil {
+		return nil, failed
+	}
+	return outcomes, nil
+}
+
 // call 执行一次工具调用，返回结果（失败时为 nil）、调用记录和发给模型的内容。工具失败不算问答失败，
-// 原因交给模型，让它改参数或在回答里说明；只有 ctx 取消时返回 error。
-func (a *Asker) call(ctx context.Context, round int, call ToolCall) (*aitool.Result, ToolStep, string, error) {
-	step := ToolStep{Round: round, Tool: call.Name, Input: jsonInput(call.Input)}
+// 原因交给模型，让它改参数或在回答里说明；工具 panic 也算这次调用失败。只有 ctx 取消时返回 error。
+func (a *Asker) call(ctx context.Context, round int, call ToolCall) (result *aitool.Result, step ToolStep, content string, err error) {
+	step = ToolStep{Round: round, Tool: call.Name, Input: jsonInput(call.Input)}
 	start := time.Now()
 	fail := func(message string) (*aitool.Result, ToolStep, string, error) {
 		step.Error, step.ElapsedMS = message, time.Since(start).Milliseconds()
 		return nil, step, message, nil
 	}
+	// 工具在单独的 goroutine 里执行，panic 不能交给上层的 recover，否则整个进程退出。
+	defer func() {
+		if p := recover(); p != nil {
+			// 堆栈记在 Debug 级别，不夹在 sec ask 的进度行里。
+			slog.ErrorContext(ctx, "tool call panicked", "tool", call.Name, "panic", p)
+			slog.DebugContext(ctx, "tool call panic stack", "tool", call.Name, "stack", string(debug.Stack()))
+			result, step, content, err = fail(call.Name + " 执行出错")
+		}
+	}()
 	tool, ok := a.Tools.Lookup(call.Name)
 	if !ok {
 		var names []string
@@ -258,7 +322,7 @@ func (a *Asker) call(ctx context.Context, round int, call ToolCall) (*aitool.Res
 	}
 	toolCtx, cancel := context.WithTimeout(ctx, askToolTimeout)
 	defer cancel()
-	result, err := tool.Call(toolCtx, call.Input)
+	result, err = tool.Call(toolCtx, call.Input)
 	switch {
 	case ctx.Err() != nil:
 		return nil, step, "", ctx.Err()
@@ -273,14 +337,14 @@ func (a *Asker) call(ctx context.Context, round int, call ToolCall) (*aitool.Res
 		return fail(call.Name + " 没有返回结果")
 	}
 	// 不转义 HTML：「MD&A」「S&P 500」转义成 \u0026 后，数字核对会把 0026 当作来源，也多费 token。和 sec mcp 一致。
-	var content bytes.Buffer
-	encoder := json.NewEncoder(&content)
+	var encoded bytes.Buffer
+	encoder := json.NewEncoder(&encoded)
 	encoder.SetEscapeHTML(false)
 	if err := encoder.Encode(result); err != nil {
 		return fail(fmt.Sprintf("%s 的结果无法编码：%v", call.Name, err))
 	}
 	step.AsOf, step.Source, step.ElapsedMS = result.AsOf, result.Source, time.Since(start).Milliseconds()
-	return result, step, strings.TrimSuffix(content.String(), "\n"), nil
+	return result, step, strings.TrimSuffix(encoded.String(), "\n"), nil
 }
 
 // jsonInput 返回可以写进 JSON 的参数：OpenAI 兼容接口返回的不合法参数保留成了字符串，这里编码成 JSON 字符串。

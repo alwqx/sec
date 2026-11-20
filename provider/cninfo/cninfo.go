@@ -196,10 +196,30 @@ func loadStockListCache() ([]byte, bool) {
 
 // saveStockListCache saves stock list data to cache.
 func saveStockListCache(data []byte) {
-	path := stockListCachePath()
-	if err := os.WriteFile(path, data, 0644); err != nil {
+	if err := writeStockListCache(stockListCachePath(), data); err != nil {
 		slog.Warn("failed to cache stock list", "error", err)
 	}
+}
+
+// writeStockListCache 先写临时文件再改名，同时查询公告的调用（如问答同一轮查两家公司）不会读到写了一半的缓存。
+func writeStockListCache(path string, data []byte) error {
+	f, err := os.CreateTemp(filepath.Dir(path), ".cninfo-stocks-*")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(f.Name())
+	_, err = f.Write(data)
+	closeErr := f.Close()
+	if err != nil {
+		return err
+	}
+	if closeErr != nil {
+		return closeErr
+	}
+	if err := os.Chmod(f.Name(), 0644); err != nil {
+		return err
+	}
+	return os.Rename(f.Name(), path)
 }
 
 // GetStockList fetches the full stock-to-orgId mapping from CNINFO.
