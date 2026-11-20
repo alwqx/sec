@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { askCode, askMeta, newConversationID, stepLine } from './aiAsk.ts'
+import { answeredSteps, askCode, askMeta, newConversationID, stepLine } from './aiAsk.ts'
 import type { AskAnswer, AskStep, BasicSecurity } from './types'
 
 const step: AskStep = { round: 1, tool: 'get_quote', input: { codes: ['600036'] }, as_of: '2026-11-17', elapsed_ms: 340 }
@@ -30,4 +30,11 @@ test('回答上方显示请求轮数、工具调用次数，追问时显示带�
   const answer = { rounds: 2, steps: [step] } as unknown as AskAnswer
   assert.equal(askMeta(answer), '请求 2 轮 · 调用工具 1 次')
   assert.equal(askMeta({ ...answer, history: 3 }), '请求 2 轮 · 调用工具 1 次 · 带上前 3 轮问答')
+})
+
+test('回答完成后保留逐条收到的结束顺序，没有全部收到时用回答里的调用记录', () => {
+  const valuation: AskStep = { ...step, tool: 'get_valuation', input: { code: 'SH600036' } }
+  const answer = { steps: [step, valuation] } as unknown as AskAnswer
+  assert.deepEqual(answeredSteps([valuation, step], answer), [valuation, step])
+  assert.deepEqual(answeredSteps([valuation], answer), [step, valuation])
 })
