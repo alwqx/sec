@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -316,7 +318,86 @@ func (f *Facts) convertLines(statement Statement) []LineItem {
 		item.Unit = f.unit(item.Unit)
 		lines = append(lines, item)
 	}
+	if statement == Income {
+		at := map[string]int{}
+		for i, item := range lines {
+			at[item.Key] = i
+		}
+		revenue, okRevenue := at["revenue"]
+		cost, okCost := at["cost"]
+		gross, okGross := at["gross_profit"]
+		if okRevenue && okCost && okGross {
+			lines[revenue].Concepts = f.revenueConcepts(lines[revenue], lines[cost], lines[gross])
+		}
+	}
 	return lines
+}
+
+// revenueTolerance 是营业收入和「营业成本 + 毛利」核对时允许的相对差。
+const revenueTolerance = 0.005
+
+// revenueConcepts 返回这家公司营业收入候选科目的顺序。营业收入的科目偶尔标错：蔚来 FY2021—FY2023 的 Revenues 只是
+// 关联方收入（0.58 亿到 1.67 亿人民币），营业成本却有几百亿，按优先级会选中它。所以逐个核对同时有营业成本和毛利的期间：
+// 某个期间有科目和「营业成本 + 毛利」对得上（差别在 revenueTolerance 以内）时，同一期间有值但对不上的科目排到后面，
+// 只在其他科目都没有值时才用。排到后面的科目之间按对得上的期间数减去这类不符的次数从多到少排列，相同时保持原来的优先级：
+// 网易的 Revenues 是总收入，从来对不上按净收入算的毛利，2014 年还和对得上的 SalesRevenueNet 同时申报；
+// SalesRevenueNet 只有 2017 年对不上，所以排在 Revenues 前面。
+// 顺序对这家公司的所有年度和季度都一样，同一行不会逐年在总收入和净收入两种口径之间切换。
+// 核对用的是各期间最新申报的数值，只影响科目顺序，不影响数值第一次披露的日期。
+func (f *Facts) revenueConcepts(revenue, cost, gross LineItem) []string {
+	type period struct{ start, end string }
+	seen := map[period]bool{}
+	matches, mismatches := map[string]int{}, map[string]int{}
+	for _, concept := range gross.Concepts {
+		for _, g := range f.concepts[concept][gross.Unit] {
+			p := period{g.Start, g.End}
+			if g.Start == "" || seen[p] {
+				continue
+			}
+			seen[p] = true
+			same := func(v fact) bool { return nearStart(v.Start, p.start) }
+			c, okCost := f.pick(cost, p.end, same)
+			gp, okGross := f.pick(gross, p.end, same)
+			expected := c.Val + gp.Val
+			if !okCost || !okGross || expected == 0 {
+				continue
+			}
+			matched := false
+			var mismatched []string
+			for _, name := range revenue.Concepts {
+				one := revenue
+				one.Concepts = []string{name}
+				v, ok := f.pick(one, p.end, same)
+				if !ok {
+					continue
+				}
+				if math.Abs(v.Val-expected) <= revenueTolerance*math.Abs(expected) {
+					matched = true
+					matches[name]++
+				} else {
+					mismatched = append(mismatched, name)
+				}
+			}
+			if matched {
+				for _, name := range mismatched {
+					mismatches[name]++
+				}
+			}
+		}
+	}
+	if len(mismatches) == 0 {
+		return revenue.Concepts
+	}
+	order := slices.Clone(revenue.Concepts)
+	score := func(name string) int { return matches[name] - mismatches[name] }
+	sort.SliceStable(order, func(i, j int) bool {
+		a, b := order[i], order[j]
+		if (mismatches[a] > 0) != (mismatches[b] > 0) {
+			return mismatches[a] == 0
+		}
+		return mismatches[a] > 0 && score(a) > score(b)
+	})
+	return order
 }
 
 // reports 判断公司是否申报过其中任一科目。
