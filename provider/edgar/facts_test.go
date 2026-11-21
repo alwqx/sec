@@ -155,6 +155,98 @@ func TestQuarterValueMissingOrDifferentConcepts(t *testing.T) {
 	require.False(t, ok, "上一条截止日相隔两季时不能推算")
 }
 
+// TestRevenueCheckedAgainstCostAndGrossProfit 是营业收入科目标错（蔚来 FY2021—FY2023 的 Revenues 只是关联方收入）时，
+// 和「营业成本 + 毛利」对不上的科目在这家公司的所有期间都排到最后，只在其他科目都没有值时才用。
+func TestRevenueCheckedAgainstCostAndGrossProfit(t *testing.T) {
+	f := &Facts{Currency: "CNY", concepts: map[string]map[string][]fact{
+		"Revenues": {"CNY": {
+			{Start: "2024-01-01", End: "2024-03-31", Val: 40},
+			{Start: "2023-01-01", End: "2023-12-31", Val: 167},
+			{Start: "2023-01-01", End: "2023-09-30", Val: 120},
+			{Start: "2022-01-01", End: "2022-12-31", Val: 123},
+			{Start: "2021-01-01", End: "2021-12-31", Val: 58},
+			{Start: "2020-01-01", End: "2020-12-31", Val: 30},
+		}},
+		"RevenueFromContractWithCustomerExcludingAssessedTax": {"CNY": {
+			{Start: "2024-01-01", End: "2024-03-31", Val: 10000},
+			{Start: "2023-01-01", End: "2023-12-31", Val: 55618},
+			{Start: "2023-01-01", End: "2023-09-30", Val: 40000},
+			{Start: "2022-01-01", End: "2022-12-31", Val: 49269},
+			{Start: "2021-01-01", End: "2021-12-31", Val: 36136},
+		}},
+		"CostOfGoodsAndServicesSold": {"CNY": {
+			{Start: "2023-01-01", End: "2023-12-31", Val: 52566},
+			{Start: "2022-01-01", End: "2022-12-31", Val: 44125},
+		}},
+		// 毛利的起始日比成本晚一天，在 nearStart 的范围内仍然核对。
+		"GrossProfit": {"CNY": {
+			{Start: "2023-01-02", End: "2023-12-31", Val: 3052},
+			{Start: "2022-01-01", End: "2022-12-31", Val: 4000},
+		}},
+	}}
+	revenue := f.lines(Income)[0]
+	require.Equal(t, "Revenues", revenue.Concepts[len(revenue.Concepts)-1], "对不上的 Revenues 排到最后")
+	year := func(v fact) bool { return v.Start != "" && isYear(days(v.Start, v.End)) }
+	for end, want := range map[string]float64{
+		"2023-12-31": 55618, // 对得上的科目
+		"2022-12-31": 49269, // 这一年都对不上，仍然不用 Revenues
+		"2021-12-31": 36136, // 没有成本和毛利
+		"2020-12-31": 30,    // 只有 Revenues 有值
+	} {
+		v, ok := f.pick(revenue, end, year)
+		require.True(t, ok, end)
+		require.Equal(t, want, v.Val, end)
+	}
+
+	// 季度没有成本和毛利的单季数时同样不用 Revenues。
+	q1, derived, ok, _ := f.quarterValue(revenue, "2024-03-31", "", "2024-01-01")
+	require.True(t, ok)
+	require.False(t, derived)
+	require.Equal(t, 10000.0, q1)
+	// 第四季度用全年减 9 个月，不用 Revenues 的 167 - 120。
+	q4, derived, ok, _ := f.quarterValue(revenue, "2023-12-31", "2023-09-30", "2023-01-01")
+	require.True(t, ok)
+	require.True(t, derived)
+	require.Equal(t, 15618.0, q4)
+}
+
+// TestRevenueOrderWhenFirstMatches 是第一个科目对得上时仍然先用它；都对不上时保持原来的优先级。
+func TestRevenueOrderWhenFirstMatches(t *testing.T) {
+	facts := func(revenues float64) *Facts {
+		return &Facts{Currency: "USD", concepts: map[string]map[string][]fact{
+			"Revenues": {"USD": {{Start: "2023-01-01", End: "2023-12-31", Val: revenues}}},
+			"RevenueFromContractWithCustomerExcludingAssessedTax": {"USD": {{Start: "2023-01-01", End: "2023-12-31", Val: 800}}},
+			"CostOfGoodsAndServicesSold":                          {"USD": {{Start: "2023-01-01", End: "2023-12-31", Val: 600}}},
+			"GrossProfit":                                         {"USD": {{Start: "2023-01-01", End: "2023-12-31", Val: 400}}},
+		}}
+	}
+	require.Equal(t, "Revenues", facts(1000).lines(Income)[0].Concepts[0])
+	require.Equal(t, Lines[Income][0].Concepts, facts(900).lines(Income)[0].Concepts)
+}
+
+// TestRevenueDemotedConceptsRanked 是有多个科目对不上时（比如网易的 Revenues 是总收入，SalesRevenueNet 只有一年对不上），
+// 按对得上的期间数减去不符的次数排列，不按原来的优先级让从来对不上的 Revenues 排在前面。
+func TestRevenueDemotedConceptsRanked(t *testing.T) {
+	annual := func(year string, val float64) fact {
+		return fact{Start: year + "-01-01", End: year + "-12-31", Val: val}
+	}
+	f := &Facts{Currency: "CNY", concepts: map[string]map[string][]fact{
+		"Revenues":        {"CNY": {annual("2013", 1050), annual("2014", 1100)}},
+		"SalesRevenueNet": {"CNY": {annual("2014", 1000), annual("2015", 1200), annual("2016", 1500)}},
+		"RevenueFromContractWithCustomerExcludingAssessedTax": {"CNY": {annual("2016", 1300)}},
+		"CostOfRevenue": {"CNY": {annual("2013", 450), annual("2014", 400), annual("2015", 500), annual("2016", 600)}},
+		"GrossProfit":   {"CNY": {annual("2013", 500), annual("2014", 600), annual("2015", 700), annual("2016", 700)}},
+	}}
+	revenue := f.lines(Income)[0]
+	require.Equal(t, []string{"SalesRevenueNet", "Revenues"}, revenue.Concepts[len(revenue.Concepts)-2:])
+	year := func(v fact) bool { return v.Start != "" && isYear(days(v.Start, v.End)) }
+	for end, want := range map[string]float64{"2013-12-31": 1050, "2014-12-31": 1000, "2016-12-31": 1300} {
+		v, ok := f.pick(revenue, end, year)
+		require.True(t, ok, end)
+		require.Equal(t, want, v.Val, end)
+	}
+}
+
 func TestQuarterEndsExcludeStubPeriods(t *testing.T) {
 	f := &Facts{Currency: "USD", concepts: map[string]map[string][]fact{
 		"Revenues": {"USD": {

@@ -62,7 +62,7 @@
 
 数据优先使用 SEC EDGAR 官方接口，见 [命令文档](docs/commands.md) 和 [估值文档](docs/valuation.md)。
 
-- [ ] 美股营业收入取错科目：蔚来（`$NIO`）FY2023 及更早的营业收入只有 1.67 亿、1.23 亿人民币，而营业成本有 525.66 亿，FY2024 起正常（657.32 亿），像是这些年份选中了一个金额很小的收入科目。`sec financials`、Desktop 财报和 `get_financials` 都受影响，`get_financials` 会算出 FY2024 营收同比 39217% 和 FY2023 上千的毛利率。核对 `provider/edgar` 收入科目的选择顺序，按年份选科目时和营业成本、毛利交叉校验。
+- [x] 美股营业收入取错科目：蔚来（`$NIO`）FY2021—FY2023 的 `Revenues` 只是关联方收入，按优先级被选中，营业收入只有 0.58 亿到 1.67 亿人民币。和「营业成本 + 毛利」对不上的收入科目在这家公司的所有期间都排到后面（`edgar.Facts.revenueConcepts`）。
 - [x] 共用 SEC companyfacts 缓存：Desktop 的 `cachedUSFacts`（`desktop/us.go`，10 分钟）挪到 `provider/edgar`，让 `sec mcp` 的 `get_financials` 和以后的 `get_valuation` 共用；现在 `sec mcp` 每次调用都重新下载几 MB 的 companyfacts。
 - [ ] Desktop 美股栏目的错误重试：财报、财报图表、分红接口对没有 XBRL 数据的公司返回 404，但前端 `ResourceState` 对所有错误都显示"重新加载"按钮，`api.ts` 的 `request()` 也不保留 HTTP 状态码，重试永远不会成功。请求失败时保留状态码，404 不显示重试按钮。
 - [ ] Desktop 美股接口超时：`serveUS` 的 30 秒超时被当成上游失败（502），提示里是原始的 `context deadline exceeded`，可以改成专门的超时提示。
