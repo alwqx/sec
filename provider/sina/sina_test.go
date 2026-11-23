@@ -251,6 +251,37 @@ func TestSearchOTCLast(t *testing.T) {
 	}
 }
 
+// 关键字明确是代码（带市场前缀或纯数字）时，代码相同的结果排在最前，不让拼音首字母相同的布鲁可（HK00325）抢在贝莱德前面；
+// 不带前缀的字母可能是拼音首字母，保持新浪的顺序。
+func TestSearchExactCodeFirst(t *testing.T) {
+	defer gock.Off()
+	codes := func(key, body string) []string {
+		searchURL().Reply(200).BodyString(body)
+		secs, err := Search(context.Background(), key)
+		require.NoError(t, err, key)
+		got := []string{}
+		for _, sec := range secs {
+			got = append(got, sec.ExCode)
+		}
+		return got
+	}
+	blk := `var suggestvalue="布鲁可,31,00325,00325,布鲁可,,布鲁可,99,1,,,,;贝莱德,41,blk,blk,贝莱德,,贝莱德,99,1,ESG,,,;布鲁克,41,brkr,brkr,布鲁克,,布鲁克,99,1,,,,";`
+	for _, key := range []string{"$BLK", "$blk", " $Blk "} {
+		require.Equal(t, []string{"$BLK", "HK00325", "$BRKR"}, codes(key, blk), key)
+	}
+	for _, key := range []string{"BLK", "blk", "布鲁"} {
+		require.Equal(t, []string{"HK00325", "$BLK", "$BRKR"}, codes(key, blk), "不带前缀的字母和名称保持新浪的顺序：%s", key)
+	}
+	byd := `var suggestvalue="比亚迪,11,002594,sz002594,比亚迪,,比亚迪,99,1,,,,;博伊德赌场,41,byd,byd,博伊德赌场,,博伊德赌场,99,1,,,,";`
+	require.Equal(t, []string{"SZ002594", "$BYD"}, codes("byd", byd), "拼音首字母 byd 仍然先是比亚迪")
+	require.Equal(t, []string{"$BYD", "SZ002594"}, codes("$BYD", byd))
+
+	// 纯数字比较不带前缀的代码，同代码的多个结果（平安银行、上证指数、华夏成长都是 000001）保持原来的先后；带前缀时只认完整代码。
+	same := `var suggestvalue="平安银行,11,000001,sz000001,平安银行,,平安银行,99,1,,,,;某股票,11,600001,sh600001,某股票,,某股票,99,1,,,,;上证指数,11,000001,sh000001,上证指数,,上证指数,99,1,,,,;华夏成长,21,000001,of000001,华夏成长,,华夏成长,99,1,,,,";`
+	require.Equal(t, []string{"SZ000001", "SH000001", "OF000001", "SH600001"}, codes("000001", same))
+	require.Equal(t, []string{"SH000001", "SZ000001", "SH600001", "OF000001"}, codes("sh000001", same))
+}
+
 // 关键字里的 & 和 = 不能变成新的参数。
 func TestSearchEscapesKeyword(t *testing.T) {
 	defer gock.Off()
