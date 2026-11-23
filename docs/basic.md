@@ -80,7 +80,7 @@ hkstock/hkstock.go (Profile，港股)
 provider/eastmoney/hkprofile.go (GetHKProfile, GetHKValuation)
 ```
 
-1. `sina.Resolve(ctx, key)` — 搜索证券代码，取第一个结果；美股场外交易的外国公司代码（如 TCEHY）排在港股和 A 股后面，所以「腾讯」取到 HK00700
+1. `sina.Resolve(ctx, key)` — 搜索证券代码，取第一个结果；美股场外交易的外国公司代码（如 TCEHY）排在港股和 A 股后面，所以「腾讯」取到 HK00700；关键字明确是代码时（带市场前缀的 `$BLK`、`SH600036`，或纯数字的 `600036`），代码相同的结果排在最前面。新浪也按拼音首字母匹配，所以 `$BLK` 取到贝莱德，不是拼音首字母也是 BLK 的布鲁可（HK00325）；不带前缀的字母（`BLK`、`byd`）可能是拼音首字母，保持新浪的顺序，`byd` 仍然是比亚迪，查美股要写 `$BLK`
 2. `sina.Profile(ctx, opts)` — 查询公司概况（合并 quote + profile + corp info）。港股改用 `hkstock.Profile`，见下方「港股」
 3. 若 `-d` 指定：`sina.QueryDividends(ctx, code)` — 查询分红历史
 

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -37,7 +38,7 @@ var ErrNotFound = errors.New("没有这只证券的行情")
 // hkCode 匹配带 HK 前缀的港股代码，如 hk00700、HK700。
 var hkCode = regexp.MustCompile(`^(?i)hk(\d{1,5})$`)
 
-// Search 根据关键字查询证券信息。没有匹配时返回空列表和 nil，请求失败时返回错误。
+// Search 根据关键字查询证券信息。没有匹配时返回空列表和 nil，请求失败时返回错误。结果的顺序见 rankResults。
 // 新浪搜索不认 hk00700 这样带前缀的港股代码，这时改用补足 5 位的数字搜索，只留下代码完全相同的港股。
 func Search(ctx context.Context, key string) ([]*BasicSecurity, error) {
 	m := hkCode.FindStringSubmatch(strings.TrimSpace(key))
@@ -46,7 +47,7 @@ func Search(ctx context.Context, key string) ([]*BasicSecurity, error) {
 		if err != nil {
 			return nil, err
 		}
-		return otcLast(key, secs), nil
+		return rankResults(key, secs), nil
 	}
 	code := strings.Repeat("0", 5-len(m[1])) + m[1]
 	secs, err := search(ctx, code)
@@ -65,27 +66,32 @@ func Search(ctx context.Context, key string) ([]*BasicSecurity, error) {
 // usOTC 匹配美股场外交易的外国公司代码：5 个字母，以 F（普通股）或 Y（ADR）结尾，如 TCEHY、TCTZF。
 var usOTC = regexp.MustCompile(`^[A-Z]{4}[FY]$`)
 
-// otcLast 把美股场外交易的外国公司代码排到其他结果后面，其余顺序不变。
-// 新浪搜索「腾讯」时 TCEHY 排在港股 00700 前面，按第一个结果取数据的命令会拿到场外 ADR。
-// 直接搜索场外代码本身时不调整。
-func otcLast(key string, secs []*BasicSecurity) []*BasicSecurity {
-	key = strings.ToUpper(strings.TrimPrefix(strings.TrimSpace(key), "$"))
-	isOTC := func(sec *BasicSecurity) bool {
+// digits 匹配纯数字的代码，如 600036、00700。
+var digits = regexp.MustCompile(`^\d+$`)
+
+// rankResults 调整新浪搜索结果的顺序，同一档内保持新浪的顺序：
+//  1. 关键字明确是代码时，代码相同的结果排在最前：带市场前缀的完整代码（$BLK、SH600036，见 fullCode）比较完整代码，
+//     纯数字比较不带前缀的代码。新浪也按拼音首字母匹配，搜索 $BLK 时布鲁可（HK00325，拼音首字母 BLK）排在贝莱德前面，
+//     按第一个结果取数据的命令会拿错证券。不带前缀的字母（BLK、byd）可能是美股代码，也可能是拼音首字母，不调整：
+//     byd 仍然先是比亚迪，不是博伊德赌场（$BYD）。
+//  2. 美股场外交易的外国公司代码排在最后：新浪搜索「腾讯」时 TCEHY 排在港股 00700 前面。直接搜索场外代码本身
+//     （tcehy、$TCEHY）时不排到后面。
+func rankResults(key string, secs []*BasicSecurity) []*BasicSecurity {
+	key = strings.TrimSpace(key)
+	bare := strings.ToUpper(strings.TrimPrefix(key, "$"))
+	isCode, isDigits := fullCode.MatchString(key), digits.MatchString(key)
+	rank := func(sec *BasicSecurity) int {
 		code := strings.TrimPrefix(sec.ExCode, "$")
-		return sec.ExChange == types.ExChangeNasdaq && usOTC.MatchString(code) && code != key
-	}
-	res := make([]*BasicSecurity, 0, len(secs))
-	for _, sec := range secs {
-		if !isOTC(sec) {
-			res = append(res, sec)
+		switch {
+		case isCode && strings.EqualFold(sec.ExCode, key), isDigits && sec.Code == key:
+			return 0
+		case sec.ExChange == types.ExChangeNasdaq && usOTC.MatchString(code) && code != bare:
+			return 2
 		}
+		return 1
 	}
-	for _, sec := range secs {
-		if isOTC(sec) {
-			res = append(res, sec)
-		}
-	}
-	return res
+	slices.SortStableFunc(secs, func(a, b *BasicSecurity) int { return rank(a) - rank(b) })
+	return secs
 }
 
 func search(ctx context.Context, key string) ([]*BasicSecurity, error) {
