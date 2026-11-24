@@ -12,7 +12,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"regexp"
+	"runtime/debug"
 )
 
 // SchemaVersion 是 Result 的格式版本。删除或重命名字段、改变含义时加 1，新增字段不变。
@@ -27,6 +29,7 @@ type Tool struct {
 	// InputSchema 是参数的 JSON Schema，顶层必须是 object。MCP 和模型 tool use 共用。
 	InputSchema json.RawMessage
 	// Call 执行工具。参数不合法时返回 InputError，上游失败返回其他 error；error 文本会原样交给模型。
+	// 从 Registry 取出的工具 panic 时返回 ErrPanic，见 NewRegistry。
 	Call func(ctx context.Context, input json.RawMessage) (*Result, error)
 }
 
@@ -84,6 +87,43 @@ func Decode(input json.RawMessage, v any) error {
 	return nil
 }
 
+// ErrPanic 表示工具 panic 了。错误文本是「<工具名> 执行出错」，不含 panic 的值；panic 已经在 aitool 里记了日志，
+// 调用方不用再记（见 ShouldLog）。用 errors.Is 判断。
+var ErrPanic = errors.New("工具执行出错")
+
+type panicError struct{ tool string }
+
+func (e panicError) Error() string        { return e.tool + " 执行出错" }
+func (e panicError) Is(target error) bool { return target == ErrPanic }
+
+// ShouldLog 判断调用方是否要把工具返回的 err 记成错误日志：参数错误是模型的问题，panic 已经记过。
+func ShouldLog(err error) bool {
+	return err != nil && !IsInputError(err) && !errors.Is(err, ErrPanic)
+}
+
+// LogPanic 记录工具调用中的 panic：错误日志只记 panic 的值，堆栈只在开启 Debug 时记，不夹在 sec ask 的进度行里。
+func LogPanic(ctx context.Context, tool string, value any) {
+	slog.ErrorContext(ctx, "tool call panicked", "tool", tool, "panic", value)
+	if slog.Default().Enabled(ctx, slog.LevelDebug) {
+		slog.DebugContext(ctx, "tool call panic stack", "tool", tool, "stack", string(debug.Stack()))
+	}
+}
+
+// recovering 在 call 外面接住 panic，变成这次调用的 ErrPanic。sec mcp、sec ask 和 Desktop 都在单独的 goroutine 里
+// 执行工具，panic 交不到上层的 recover，不接住整个进程就会退出。只能接住执行 call 的 goroutine 里的 panic，
+// 工具自己另起的 goroutine（比如 sina.ResolveAll、valuation.Analyze 里的并发请求）里的 panic 仍会让进程退出。
+func recovering(name string, call func(context.Context, json.RawMessage) (*Result, error)) func(context.Context, json.RawMessage) (*Result, error) {
+	return func(ctx context.Context, input json.RawMessage) (result *Result, err error) {
+		defer func() {
+			if p := recover(); p != nil {
+				LogPanic(ctx, name, p)
+				result, err = nil, panicError{tool: name}
+			}
+		}()
+		return call(ctx, input)
+	}
+}
+
 // toolName 和 MCP 对工具名的要求一致，并且只用小写，便于模型记忆。
 var toolName = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}$`)
 
@@ -94,6 +134,7 @@ type Registry struct {
 }
 
 // NewRegistry 检查并注册工具：名字合法且不重复、有说明、参数 Schema 顶层是 object、有 Call。
+// 注册的 Call 包上 recovering，工具 panic 只算这次调用失败（ErrPanic）。
 func NewRegistry(tools ...Tool) (*Registry, error) {
 	r := &Registry{byName: make(map[string]int, len(tools))}
 	for _, tool := range tools {
@@ -112,6 +153,7 @@ func NewRegistry(tools ...Tool) (*Registry, error) {
 		if err := json.Unmarshal(tool.InputSchema, &schema); err != nil || schema.Type != "object" {
 			return nil, fmt.Errorf("工具 %s 的参数 Schema 顶层必须是 object", tool.Name)
 		}
+		tool.Call = recovering(tool.Name, tool.Call)
 		r.byName[tool.Name] = len(r.tools)
 		r.tools = append(r.tools, tool)
 	}

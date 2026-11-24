@@ -75,7 +75,7 @@ func handler(tool aitool.Tool) gomcp.ToolHandler {
 		defer cancel()
 		result, err := tool.Call(ctx, req.Params.Arguments)
 		if err != nil {
-			if !aitool.IsInputError(err) {
+			if aitool.ShouldLog(err) {
 				slog.ErrorContext(ctx, "tool call failed", "tool", tool.Name, "error", err)
 			}
 			return errorResult(err.Error()), nil

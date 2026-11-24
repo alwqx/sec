@@ -59,6 +59,8 @@
 55. Run the tool calls of one AI Q&A round concurrently, up to 4 at a time.
 56. Fix US revenue picking a mistagged concept, such as NIO's related-party revenue, by checking it against cost plus gross profit.
 57. Put the search result whose code matches a prefixed or numeric keyword first, so `$BLK` resolves to BlackRock instead of a stock whose pinyin initials are BLK.
+58. Recover from AI tool panics in the tool registry, so a tool that panics no longer crashes `sec mcp`.
+59. Upgrade `github.com/gorilla/websocket` to fix vulnerability GO-2026-6278 reported by CI.
 
 ### v0.4.8
 
