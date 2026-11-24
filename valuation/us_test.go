@@ -1,13 +1,17 @@
 package valuation
 
 import (
+	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/alwqx/sec/provider/edgar"
 	"github.com/alwqx/sec/provider/sina"
+	"github.com/alwqx/sec/utils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -401,4 +405,57 @@ func TestForeignReason(t *testing.T) {
 		require.NoError(t, err, tt.name)
 		require.Contains(t, foreignReason(facts), tt.want, tt.name)
 	}
+}
+
+func TestAnalyzeUSRecoversPanic(t *testing.T) {
+	origProfile, origQuote, origBars := loadUSProfile, queryUSQuote, queryUSDailyBars
+	t.Cleanup(func() {
+		loadUSProfile, queryUSQuote, queryUSDailyBars = origProfile, origQuote, origBars
+	})
+
+	cacheDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(cacheDir, "company_tickers.json"), []byte(`{"0":{"cik_str":1,"ticker":"TEST","title":"Test Corp"}}`), 0600))
+	client := &edgar.Client{CacheDir: cacheDir}
+
+	// 1. loadFacts panic 时返回 ErrPanic，并取消同一轮的其他请求。
+	canceled := make(chan bool, 1)
+	loadUSProfile = func(context.Context, *edgar.Client, int) (*edgar.Profile, error) { return nil, nil }
+	queryUSQuote = func(context.Context, string) (*sina.USQuote, error) { return nil, nil }
+	queryUSDailyBars = func(ctx context.Context, _ string) ([]*sina.Bar, error) {
+		select {
+		case <-ctx.Done():
+			canceled <- true
+			return nil, ctx.Err()
+		case <-time.After(2 * time.Second):
+			canceled <- false
+			return nil, nil
+		}
+	}
+	_, err := AnalyzeUS(context.Background(), client, "$TEST", DefaultDCFParams(), func(context.Context, int) (*edgar.Facts, error) {
+		panic("facts boom")
+	})
+	require.ErrorIs(t, err, utils.ErrPanic)
+	require.ErrorContains(t, err, "获取 SEC 财务数据失败")
+	require.True(t, <-canceled, "facts panic 时应取消其他并发请求")
+
+	// 2. 日线（必需）panic 时返回 ErrPanic。
+	facts := usFacts(t)
+	queryUSDailyBars = func(context.Context, string) ([]*sina.Bar, error) { panic("bars boom") }
+	_, err = AnalyzeUS(context.Background(), client, "$TEST", DefaultDCFParams(), func(context.Context, int) (*edgar.Facts, error) {
+		return facts, nil
+	})
+	require.ErrorIs(t, err, utils.ErrPanic)
+	require.ErrorContains(t, err, "获取美股日线失败")
+
+	// 3. 可选子任务（Profile、Quote）panic 时仍能完成估值。
+	loadUSProfile = func(context.Context, *edgar.Client, int) (*edgar.Profile, error) { panic("profile boom") }
+	queryUSQuote = func(context.Context, string) (*sina.USQuote, error) { panic("quote boom") }
+	queryUSDailyBars = func(context.Context, string) ([]*sina.Bar, error) {
+		return usBars("2026-08-03", "2026-10-30", "", 20, 10), nil
+	}
+	r, err := AnalyzeUS(context.Background(), client, "$TEST", DefaultDCFParams(), func(context.Context, int) (*edgar.Facts, error) {
+		return facts, nil
+	})
+	require.NoError(t, err)
+	require.Equal(t, "$TEST", r.Code)
 }

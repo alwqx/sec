@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alwqx/sec/utils"
 	"github.com/alwqx/sec/watchlist"
 )
 
@@ -61,7 +62,7 @@ func (c *Client) CoverShares(ctx context.Context, cik int, since string) (*Cover
 		return nil, err
 	}
 	dir = filepath.Join(dir, "covers", coverCacheVersion, strconv.Itoa(cik))
-	all, failed, firstErr := readFilings(result.Filings, func(f Filing) (*ClassShares, error) {
+	all, failed, firstErr := readFilings(ctx, "edgar.CoverShares", result.Filings, func(f Filing) (*ClassShares, error) {
 		return c.coverShares(ctx, cik, dir, f)
 	})
 	points := []ClassShares{}
@@ -107,7 +108,8 @@ func filingFile(cik int, f Filing, name string) string {
 }
 
 // readFilings 用 filingWorkers 个并发逐份读取申报，返回读到的结果（顺序不定）、失败数和第一个错误。
-func readFilings[T any](filings []Filing, read func(Filing) (T, error)) ([]T, int, error) {
+// 单份申报读取时发生 panic 会被接住并记为该项失败，避免 worker 提前退出导致无缓冲 jobs 通道阻塞或进程退出。
+func readFilings[T any](ctx context.Context, task string, filings []Filing, read func(Filing) (T, error)) ([]T, int, error) {
 	var (
 		mu       sync.Mutex
 		results  []T
@@ -119,7 +121,12 @@ func readFilings[T any](filings []Filing, read func(Filing) (T, error)) ([]T, in
 	for range filingWorkers {
 		wg.Go(func() {
 			for f := range jobs {
-				v, err := read(f)
+				var v T
+				err := utils.Recover(ctx, task, func() error {
+					var err error
+					v, err = read(f)
+					return err
+				})
 				mu.Lock()
 				if err != nil {
 					failed++

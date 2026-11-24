@@ -61,6 +61,7 @@
 57. Put the search result whose code matches a prefixed or numeric keyword first, so `$BLK` resolves to BlackRock instead of a stock whose pinyin initials are BLK.
 58. Recover from AI tool panics in the tool registry, so a tool that panics no longer crashes `sec mcp`.
 59. Upgrade `github.com/gorilla/websocket` to fix vulnerability GO-2026-6278 reported by CI.
+60. Recover from panics inside concurrent goroutines spawned by AI tools (`sina.ResolveAll`, `financials.Analyze`, `valuation.Analyze`, `valuation.AnalyzeUS`, `edgar.CoverShares`/`ClassEarnings`) and convert them into per-task errors so they no longer crash `sec mcp`, `sec ask`, or Desktop.
 
 ### v0.4.8
 

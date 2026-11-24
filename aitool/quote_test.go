@@ -3,10 +3,12 @@ package aitool
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 
 	"github.com/alwqx/sec/provider/sina"
+	"github.com/alwqx/sec/utils"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/h2non/gock.v1"
 )
@@ -168,4 +170,31 @@ func TestQuoteItemNAV(t *testing.T) {
 	data, err := json.Marshal(item)
 	require.NoError(t, err)
 	require.Contains(t, string(data), `"volume":null,"amount":null`)
+}
+
+// TestQuotePanicErrorPreservesChain 是搜索全部因 panic 失败时保留 utils.ErrPanic 错误链供 ShouldLog 去重；
+// 同批混有非 panic 上游失败时仍允许记录日志。
+func TestQuotePanicErrorPreservesChain(t *testing.T) {
+	orig := resolveAllCodes
+	t.Cleanup(func() { resolveAllCodes = orig })
+
+	resolveAllCodes = func(context.Context, []string) []sina.ResolvedKey {
+		return []sina.ResolvedKey{{Key: "600519", Err: utils.ErrPanic}}
+	}
+	_, err := QuoteTool().Call(context.Background(), json.RawMessage(`{"codes":["600519"]}`))
+	require.ErrorContains(t, err, "没有查到任何证券：600519 搜索失败：内部错误")
+	require.ErrorIs(t, err, utils.ErrPanic)
+	require.True(t, IsPanic(err))
+	require.False(t, ShouldLog(err), "全部搜索失败都是 panic，已记过日志")
+
+	resolveAllCodes = func(context.Context, []string) []sina.ResolvedKey {
+		return []sina.ResolvedKey{
+			{Key: "600519", Err: utils.ErrPanic},
+			{Key: "000001", Err: errors.New("HTTP 500")},
+		}
+	}
+	_, err = QuoteTool().Call(context.Background(), json.RawMessage(`{"codes":["600519","000001"]}`))
+	require.ErrorContains(t, err, "HTTP 500")
+	require.False(t, IsPanic(err))
+	require.True(t, ShouldLog(err), "还有未记录的非 panic 上游失败，调用方应继续记日志")
 }

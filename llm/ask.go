@@ -325,7 +325,7 @@ func (a *Asker) call(ctx context.Context, round int, call ToolCall) (result *ait
 	switch {
 	case ctx.Err() != nil:
 		return nil, step, "", ctx.Err()
-	case errors.Is(err, aitool.ErrPanic):
+	case aitool.IsPanic(err):
 		// 超时后才 panic 的调用也报执行出错，不报超时，免得模型原样重试。
 		return fail(err.Error())
 	case err != nil && toolCtx.Err() != nil:

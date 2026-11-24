@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/alwqx/sec/provider/sina"
+	"github.com/alwqx/sec/utils"
 	"github.com/alwqx/sec/valuation"
 )
 
@@ -206,6 +207,8 @@ func callValuation(ctx context.Context, input json.RawMessage) (*Result, error) 
 			r, err = analyzeA(ctx, sec.ExCode, params)
 		}
 		switch {
+		case errors.Is(err, utils.ErrPanic):
+			return nil, fmt.Errorf("估值计算失败：%w", err)
 		// 美股读取申报封面超时时，错误同时包着 ErrNoData（ErrStaleShares）和 ctx 的错误，要先当作超时，让模型重试而不是换代码。
 		case ctx.Err() != nil || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled):
 			return nil, fmt.Errorf("估值计算超时或被取消：%w", err)

@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/alwqx/sec/provider/eastmoney"
+	"github.com/alwqx/sec/provider/sina"
+	"github.com/alwqx/sec/utils"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/h2non/gock.v1"
 )
@@ -324,4 +326,47 @@ func TestAnalyzeUnsupportedCode(t *testing.T) {
 		_, err := Analyze(context.Background(), code, DefaultDCFParams())
 		require.ErrorIs(t, err, ErrNoData, code)
 	}
+}
+
+func TestAnalyzeRecoversPanic(t *testing.T) {
+	origHistory, origReports, origPlans, origSina := getValuationHistory, getPerformanceReports, getDividendPlans, querySinaDividends
+	t.Cleanup(func() {
+		getValuationHistory, getPerformanceReports, getDividendPlans, querySinaDividends = origHistory, origReports, origPlans, origSina
+	})
+
+	samplePoints := []*eastmoney.ValuationPoint{
+		{Date: "2026-10-29", Name: "平安银行", Close: 11, MarketCap: 2e11, Shares: 2e10, PE: num(4), PB: num(0.4), PS: num(1)},
+		{Date: "2026-10-30", Name: "平安银行", Close: 11.64, MarketCap: 2e11, Shares: 2e10, PE: num(5), PB: num(0.5)},
+	}
+	sampleReports := []*eastmoney.PerformanceReport{
+		{Date: "2025-12-31", EPS: num(2), BPS: num(20), ROE: num(11), Revenue: num(100), Profit: num(40)},
+	}
+
+	// 1. 必需子任务（估值历史）panic 时返回 ErrPanic，不退出进程。
+	getValuationHistory = func(context.Context, string) ([]*eastmoney.ValuationPoint, error) { panic("history boom") }
+	getPerformanceReports = func(context.Context, string) ([]*eastmoney.PerformanceReport, error) { return sampleReports, nil }
+	getDividendPlans = func(context.Context, string) ([]*eastmoney.DividendPlan, error) { return nil, nil }
+	querySinaDividends = func(context.Context, string) ([]sina.Dividend, error) { return nil, nil }
+
+	_, err := Analyze(context.Background(), "SZ000001", DefaultDCFParams())
+	require.ErrorIs(t, err, utils.ErrPanic)
+	require.ErrorContains(t, err, "获取估值数据失败")
+
+	// 2. 必需子任务（业绩报表）panic 时返回 ErrPanic。
+	getValuationHistory = func(context.Context, string) ([]*eastmoney.ValuationPoint, error) { return samplePoints, nil }
+	getPerformanceReports = func(context.Context, string) ([]*eastmoney.PerformanceReport, error) { panic("reports boom") }
+
+	_, err = Analyze(context.Background(), "SZ000001", DefaultDCFParams())
+	require.ErrorIs(t, err, utils.ErrPanic)
+	require.ErrorContains(t, err, "获取业绩报表失败")
+
+	// 3. 可选子任务（分红方案、新浪分红核对）panic 时仍返回估值，只降级附加说明。
+	getPerformanceReports = func(context.Context, string) ([]*eastmoney.PerformanceReport, error) { return sampleReports, nil }
+	getDividendPlans = func(context.Context, string) ([]*eastmoney.DividendPlan, error) { panic("dividend boom") }
+	querySinaDividends = func(context.Context, string) ([]sina.Dividend, error) { panic("sina boom") }
+
+	r, err := Analyze(context.Background(), "SZ000001", DefaultDCFParams())
+	require.NoError(t, err)
+	require.Equal(t, "SZ000001", r.Code)
+	require.Contains(t, r.DividendsNote, "分红数据获取失败")
 }

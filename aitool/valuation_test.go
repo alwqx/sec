@@ -11,6 +11,7 @@ import (
 
 	"github.com/alwqx/sec/provider/eastmoney"
 	"github.com/alwqx/sec/provider/sina"
+	"github.com/alwqx/sec/utils"
 	"github.com/alwqx/sec/valuation"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/h2non/gock.v1"
@@ -188,6 +189,20 @@ func TestValuationErrors(t *testing.T) {
 	_, _, err = callValuationJSON(t, `{"code":"$TEST"}`)
 	require.False(t, IsInputError(err))
 	require.ErrorContains(t, err, "估值计算失败")
+
+	// 工具超时后子 goroutine 发生 panic：仍按估值计算失败返回，不报超时，且保留 utils.ErrPanic。
+	stubValuation(t, nil, func(ctx context.Context, exCode string, params valuation.DCFParams) (*valuation.Result, error) {
+		<-ctx.Done()
+		return nil, fmt.Errorf("获取 SEC 财务数据失败: %w", utils.ErrPanic)
+	})
+	expiredCtx, cancel := context.WithTimeout(context.Background(), 5*time.Millisecond)
+	defer cancel()
+	_, err = ValuationTool().Call(expiredCtx, json.RawMessage(`{"code":"$TEST"}`))
+	require.ErrorIs(t, err, utils.ErrPanic)
+	require.True(t, IsPanic(err))
+	require.False(t, ShouldLog(err))
+	require.ErrorContains(t, err, "估值计算失败")
+	require.NotContains(t, err.Error(), "超时")
 }
 
 func TestSummarizePeers(t *testing.T) {

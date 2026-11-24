@@ -45,7 +45,7 @@ func (c *Client) ClassEarnings(ctx context.Context, cik int, since string) (*Ear
 		return nil, err
 	}
 	dir = filepath.Join(dir, "earnings", earningsCacheVersion, strconv.Itoa(cik))
-	all, failed, firstErr := readFilings(result.Filings, func(f Filing) ([]ClassEarnings, error) {
+	all, failed, firstErr := readFilings(ctx, "edgar.ClassEarnings", result.Filings, func(f Filing) ([]ClassEarnings, error) {
 		return cachedFiling(dir, f, func() ([]ClassEarnings, bool, error) {
 			earnings, err := c.filingEarnings(ctx, cik, f)
 			return earnings, len(earnings) > 0, err

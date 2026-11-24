@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/alwqx/sec/provider/eastmoney"
+	"github.com/alwqx/sec/utils"
 )
 
 // ErrNoData 表示没有可用的财务报表。
@@ -87,17 +88,24 @@ var companyTypeNames = map[eastmoney.CompanyType]string{
 	eastmoney.CompanyGeneral: "general", eastmoney.CompanyBank: "bank", eastmoney.CompanySecurities: "securities", eastmoney.CompanyInsurance: "insurance",
 }
 
+// 东方财富接口函数，测试时替换。
+var (
+	companyTypeOf  = eastmoney.CompanyTypeOf
+	statementDates = eastmoney.StatementDates
+	getStatements  = eastmoney.GetStatements
+)
+
 // Analyze 查询最近 10 个年度或 12 个单季的报表。任一张报表失败都返回错误，不输出部分结果。
 func Analyze(ctx context.Context, exCode string, quarterly bool) (*Analysis, error) {
 	exCode = strings.ToUpper(strings.TrimSpace(exCode))
-	kind, err := eastmoney.CompanyTypeOf(ctx, exCode)
+	kind, err := companyTypeOf(ctx, exCode)
 	if errors.Is(err, eastmoney.ErrUnsupportedCode) {
 		return nil, ErrNoData
 	}
 	if err != nil {
 		return nil, err
 	}
-	dates, err := eastmoney.StatementDates(ctx, exCode, kind, !quarterly)
+	dates, err := statementDates(ctx, exCode, kind, !quarterly)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +126,11 @@ func Analyze(ctx context.Context, exCode string, quarterly bool) (*Analysis, err
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			rows[i], errs[i] = eastmoney.GetStatements(ctx, exCode, kind, statement, quarterly, dates)
+			errs[i] = utils.Recover(ctx, "eastmoney.GetStatements", func() error {
+				var err error
+				rows[i], err = getStatements(ctx, exCode, kind, statement, quarterly, dates)
+				return err
+			})
 		}()
 	}
 	wg.Wait()

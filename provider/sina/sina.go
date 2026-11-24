@@ -165,6 +165,9 @@ func MergeNote(key, first, exCode string) string {
 	return fmt.Sprintf("%s 和 %s 是同一只证券（%s），已合并为一条", key, first, exCode)
 }
 
+// resolveKey 是 ResolveAll 调用的单条解析函数，测试时替换。
+var resolveKey = Resolve
+
 // ResolveAll 对每个关键字并发调用 Resolve，结果和 keys 一一对应、顺序相同，并按证券代码（不区分大小写）标出重复。
 // ctx 被取消时仍返回全部结果，没完成的关键字 Err 是 ctx 的错误，调用方用 ctx.Err() 判断。
 func ResolveAll(ctx context.Context, keys []string) []ResolvedKey {
@@ -176,7 +179,12 @@ func ResolveAll(ctx context.Context, keys []string) []ResolvedKey {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			secs, err := Resolve(ctx, key)
+			var secs []*BasicSecurity
+			err := utils.Recover(ctx, "sina.Resolve", func() error {
+				var err error
+				secs, err = resolveKey(ctx, key)
+				return err
+			})
 			switch {
 			case err != nil:
 				results[i].Err = err

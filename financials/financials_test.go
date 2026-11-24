@@ -1,9 +1,11 @@
 package financials
 
 import (
+	"context"
 	"testing"
 
 	"github.com/alwqx/sec/provider/eastmoney"
+	"github.com/alwqx/sec/utils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -171,4 +173,27 @@ func TestGeneralTypeWithFinancialFormat(t *testing.T) {
 	require.Equal(t, "营业收入", period.Income.Steps[0].Total.Label)
 	require.Equal(t, 100.0, *period.Metrics.Revenue)
 	require.Nil(t, Build("2025-12-31", eastmoney.CompanyGeneral, map[string]any{}, nil, nil).Income)
+}
+
+func TestAnalyzeRecoversPanic(t *testing.T) {
+	origType, origDates, origStmt := companyTypeOf, statementDates, getStatements
+	t.Cleanup(func() {
+		companyTypeOf, statementDates, getStatements = origType, origDates, origStmt
+	})
+	companyTypeOf = func(context.Context, string) (eastmoney.CompanyType, error) {
+		return eastmoney.CompanyGeneral, nil
+	}
+	statementDates = func(context.Context, string, eastmoney.CompanyType, bool) ([]string, error) {
+		return []string{"2025-12-31"}, nil
+	}
+	getStatements = func(_ context.Context, _ string, _ eastmoney.CompanyType, statement eastmoney.Statement, _ bool, _ []string) (map[string]map[string]any, error) {
+		if statement == eastmoney.StatementBalance {
+			panic("balance sheet parse boom")
+		}
+		return map[string]map[string]any{"2025-12-31": moutai}, nil
+	}
+
+	analysis, err := Analyze(context.Background(), "SH600519", false)
+	require.Nil(t, analysis)
+	require.ErrorIs(t, err, utils.ErrPanic)
 }

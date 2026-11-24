@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alwqx/sec/utils"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/h2non/gock.v1"
 )
@@ -143,4 +144,23 @@ func TestParseCoverRowspanDate(t *testing.T) {
 	date, classes := parseCover(page)
 	require.Equal(t, "2026-07-26", date, "股数在第 2 个数值列，对应第一行跨两行的日期")
 	require.Equal(t, 1400.0, classes[0].Shares)
+}
+
+func TestReadFilingsRecoversPanic(t *testing.T) {
+	filings := make([]Filing, 10)
+	for i := range filings {
+		filings[i] = Filing{Accession: fmt.Sprintf("0000000000-26-%06d", i)}
+	}
+	// 超过 filingWorkers（4）个任务 panic，不能让进程退出或阻塞无缓冲 jobs 通道。
+	results, failed, firstErr := readFilings(context.Background(), "edgar.test", filings, func(f Filing) (string, error) {
+		if strings.HasSuffix(f.Accession, "0") || strings.HasSuffix(f.Accession, "1") ||
+			strings.HasSuffix(f.Accession, "2") || strings.HasSuffix(f.Accession, "3") ||
+			strings.HasSuffix(f.Accession, "4") || strings.HasSuffix(f.Accession, "5") {
+			panic("parse cover boom")
+		}
+		return f.Accession, nil
+	})
+	require.Len(t, results, 4)
+	require.Equal(t, 6, failed)
+	require.ErrorIs(t, firstErr, utils.ErrPanic)
 }

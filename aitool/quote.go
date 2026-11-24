@@ -3,6 +3,7 @@ package aitool
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"strings"
@@ -97,7 +98,11 @@ func callQuote(ctx context.Context, input json.RawMessage) (*Result, error) {
 		if !resolved.searchFailed {
 			return nil, Inputf("没有找到这些证券：%s。请检查代码，或改用名称、拼音重试", missingText(missing))
 		}
-		return nil, fmt.Errorf("没有查到任何证券：%s", missingText(missing))
+		msg := fmt.Sprintf("没有查到任何证券：%s", missingText(missing))
+		if !resolved.nonPanicFailure {
+			return nil, &wrappedPanicError{msg: msg}
+		}
+		return nil, errors.New(msg)
 	}
 
 	exCodes := make([]string, 0, len(secs))
@@ -162,22 +167,35 @@ func quoteCodes(raw []string) ([]string, error) {
 	return codes, nil
 }
 
+// wrappedPanicError 保持原有错误文案，同时保留 utils.ErrPanic 错误链，供 ShouldLog 跳过重复错误日志。
+type wrappedPanicError struct{ msg string }
+
+func (e *wrappedPanicError) Error() string { return e.msg }
+func (e *wrappedPanicError) Unwrap() error { return utils.ErrPanic }
+
+// resolveAllCodes 是 get_quote 调用的批量解析函数，测试时替换。
+var resolveAllCodes = sina.ResolveAll
+
 // resolvedCodes 是搜索结果。
 type resolvedCodes struct {
-	secs         []*sina.BasicSecurity
-	missing      []missingItem
-	merged       []string // 搜到同一只证券的输入被合并的说明
-	searchFailed bool     // 有输入因为搜索接口失败而没有结果，而不是找不到
+	secs            []*sina.BasicSecurity
+	missing         []missingItem
+	merged          []string // 搜到同一只证券的输入被合并的说明
+	searchFailed    bool     // 有输入因为搜索接口失败而没有结果，而不是找不到
+	nonPanicFailure bool     // 存在非 panic 的搜索失败，调用方仍需记录错误日志
 }
 
 // resolveCodes 并发搜索，结果保持输入顺序，搜到同一只证券的输入只保留第一个，并说明合并了哪些。
 func resolveCodes(ctx context.Context, codes []string) resolvedCodes {
 	out := resolvedCodes{secs: []*sina.BasicSecurity{}, missing: []missingItem{}}
-	for _, result := range sina.ResolveAll(ctx, codes) {
+	for _, result := range resolveAllCodes(ctx, codes) {
 		switch {
 		case result.Err != nil:
 			out.missing = append(out.missing, missingItem{result.Key, fmt.Sprintf("搜索失败：%v", result.Err)})
 			out.searchFailed = true
+			if !errors.Is(result.Err, utils.ErrPanic) {
+				out.nonPanicFailure = true
+			}
 		case result.NotFound():
 			out.missing = append(out.missing, missingItem{result.Key, "未找到证券"})
 		case result.DuplicateOf != "":
