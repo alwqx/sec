@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"runtime/debug"
 	"slices"
 	"strings"
 	"time"
@@ -295,7 +294,8 @@ func (a *Asker) runTools(ctx context.Context, round int, calls []ToolCall) ([]to
 }
 
 // call 执行一次工具调用，返回结果（失败时为 nil）、调用记录和发给模型的内容。工具失败不算问答失败，
-// 原因交给模型，让它改参数或在回答里说明；工具 panic 也算这次调用失败。只有 ctx 取消时返回 error。
+// 原因交给模型，让它改参数或在回答里说明；工具 panic 也算这次调用失败（由 aitool 接住，见 aitool.ErrPanic）。
+// 只有 ctx 取消时返回 error。
 func (a *Asker) call(ctx context.Context, round int, call ToolCall) (result *aitool.Result, step ToolStep, content string, err error) {
 	step = ToolStep{Round: round, Tool: call.Name, Input: jsonInput(call.Input)}
 	start := time.Now()
@@ -303,12 +303,11 @@ func (a *Asker) call(ctx context.Context, round int, call ToolCall) (result *ait
 		step.Error, step.ElapsedMS = message, time.Since(start).Milliseconds()
 		return nil, step, message, nil
 	}
-	// 工具在单独的 goroutine 里执行，panic 不能交给上层的 recover，否则整个进程退出。
+	// call 在 runTools 起的 goroutine 里执行，查找工具、编码结果等 call 自己的代码 panic 时也只算这次调用失败，
+	// 否则整个进程退出；工具本身的 panic 已经由 aitool 接住。
 	defer func() {
 		if p := recover(); p != nil {
-			// 堆栈记在 Debug 级别，不夹在 sec ask 的进度行里。
-			slog.ErrorContext(ctx, "tool call panicked", "tool", call.Name, "panic", p)
-			slog.DebugContext(ctx, "tool call panic stack", "tool", call.Name, "stack", string(debug.Stack()))
+			aitool.LogPanic(ctx, call.Name, p)
 			result, step, content, err = fail(call.Name + " 执行出错")
 		}
 	}()
@@ -326,10 +325,13 @@ func (a *Asker) call(ctx context.Context, round int, call ToolCall) (result *ait
 	switch {
 	case ctx.Err() != nil:
 		return nil, step, "", ctx.Err()
+	case errors.Is(err, aitool.ErrPanic):
+		// 超时后才 panic 的调用也报执行出错，不报超时，免得模型原样重试。
+		return fail(err.Error())
 	case err != nil && toolCtx.Err() != nil:
 		return fail(fmt.Sprintf("%s 超过 %d 秒没有返回", call.Name, int(askToolTimeout.Seconds())))
 	case err != nil:
-		if !aitool.IsInputError(err) {
+		if aitool.ShouldLog(err) {
 			slog.ErrorContext(ctx, "tool call failed", "tool", call.Name, "error", err)
 		}
 		return fail(err.Error())

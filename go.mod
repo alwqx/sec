@@ -5,7 +5,7 @@ go 1.26.11
 require (
 	github.com/PuerkitoBio/goquery v1.12.0
 	github.com/gofrs/flock v0.12.1
-	github.com/gorilla/websocket v1.5.3
+	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674
 	github.com/ledongthuc/pdf v0.0.0-20261020125853-5e46805f718e
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/olekukonko/tablewriter v0.0.5

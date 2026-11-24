@@ -313,6 +313,40 @@ func TestAskToolTimeoutAndCancel(t *testing.T) {
 	require.True(t, fake.Requests[1].Messages[2].ToolResults[0].IsError)
 }
 
+// panicJSON 编码时 panic，模拟 Asker 自己编码结果时出错。
+type panicJSON struct{}
+
+func (panicJSON) MarshalJSON() ([]byte, error) { panic("编码出错") }
+
+// TestAskToolPanics 是超时后才 panic 的工具报执行出错、不报超时；Asker 自己的代码（编码结果）panic 也只算这次调用失败。
+func TestAskToolPanics(t *testing.T) {
+	schema := json.RawMessage(`{"type":"object"}`)
+	tools, err := aitool.NewRegistry(
+		aitool.Tool{Name: "late", Description: "说明", InputSchema: schema,
+			Call: func(ctx context.Context, _ json.RawMessage) (*aitool.Result, error) {
+				<-ctx.Done()
+				panic("超时后出错")
+			}},
+		aitool.Tool{Name: "encode", Description: "说明", InputSchema: schema,
+			Call: func(context.Context, json.RawMessage) (*aitool.Result, error) {
+				return aitool.NewResult("encode", "测试", panicJSON{}), nil
+			}},
+	)
+	require.NoError(t, err)
+	original := askToolTimeout
+	askToolTimeout = 10 * time.Millisecond
+	t.Cleanup(func() { askToolTimeout = original })
+	fake := &Fake{Replies: []FakeReply{FakeToolCalls(call("1", "late", `{}`), call("2", "encode", `{}`)), FakeText("没有取到。")}}
+	a := Asker{Client: fake, Model: Model{Name: "m"}, Tools: tools}
+	answer, err := a.Ask(context.Background(), "问题", "")
+	require.NoError(t, err)
+	require.Equal(t, "late 执行出错", answer.Steps[0].Error, "超时后 panic 不报超时，免得模型原样重试")
+	require.Equal(t, "encode 执行出错", answer.Steps[1].Error)
+	for _, result := range fake.Requests[1].Messages[2].ToolResults {
+		require.True(t, result.IsError)
+	}
+}
+
 // TestAskFollowUp 是追问：前几轮的问答按顺序带上，工具结果不发给模型，只列出调用过的工具；
 // 前几轮查到的数字作为核对来源，前面回答里模型自己写的数字不算。
 func TestAskFollowUp(t *testing.T) {

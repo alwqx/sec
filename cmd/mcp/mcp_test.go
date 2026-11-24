@@ -100,6 +100,35 @@ func TestCallInputError(t *testing.T) {
 	require.Error(t, err)
 }
 
+// TestCallPanic 是工具 panic 时返回 IsError 的结果，server 不退出，之后的调用照常执行。
+func TestCallPanic(t *testing.T) {
+	ctx := context.Background()
+	registry, err := aitool.NewRegistry(aitool.Tool{Name: "boom", Description: "说明", InputSchema: json.RawMessage(`{"type":"object"}`),
+		Call: func(_ context.Context, input json.RawMessage) (*aitool.Result, error) {
+			if string(input) == `{"ok":true}` {
+				return aitool.NewResult("boom", "测试", nil), nil
+			}
+			panic("出错了")
+		}})
+	require.NoError(t, err)
+	serverTransport, clientTransport := gomcp.NewInMemoryTransports()
+	serverSession, err := NewServer(registry).Connect(ctx, serverTransport, nil)
+	require.NoError(t, err)
+	defer serverSession.Close()
+	session, err := gomcp.NewClient(&gomcp.Implementation{Name: "test", Version: "1"}, nil).Connect(ctx, clientTransport, nil)
+	require.NoError(t, err)
+	defer session.Close()
+
+	result, err := session.CallTool(ctx, &gomcp.CallToolParams{Name: "boom", Arguments: map[string]any{}})
+	require.NoError(t, err)
+	require.True(t, result.IsError)
+	require.Equal(t, "boom 执行出错", text(t, result))
+
+	result, err = session.CallTool(ctx, &gomcp.CallToolParams{Name: "boom", Arguments: map[string]any{"ok": true}})
+	require.NoError(t, err)
+	require.False(t, result.IsError, text(t, result))
+}
+
 // TestCommand 通过 cobra 命令本身走一遍握手和 tools/list：协议走 cmd 的输入输出，关闭输入后正常退出。
 func TestCommand(t *testing.T) {
 	inReader, inWriter := io.Pipe()

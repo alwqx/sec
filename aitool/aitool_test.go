@@ -3,6 +3,7 @@ package aitool
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -70,4 +71,34 @@ func TestResultJSON(t *testing.T) {
 	data, err := json.Marshal(NewResult("get_quote", "新浪财经行情", map[string]int{"a": 1}))
 	require.NoError(t, err)
 	require.JSONEq(t, `{"schema_version":"1","tool":"get_quote","source":"新浪财经行情","notes":[],"data":{"a":1}}`, string(data))
+}
+
+// TestRegistryRecoversPanic 是注册表里的工具 panic 时只算这次调用失败（ErrPanic），之后的调用照常执行。
+func TestRegistryRecoversPanic(t *testing.T) {
+	schema := json.RawMessage(`{"type":"object"}`)
+	r, err := NewRegistry(Tool{Name: "boom", Description: "说明", InputSchema: schema,
+		Call: func(_ context.Context, input json.RawMessage) (*Result, error) {
+			if string(input) == `{"ok":true}` {
+				return NewResult("boom", "测试", nil), nil
+			}
+			var m map[string]int
+			m["x"] = 1 // 运行时错误的 panic
+			return nil, nil
+		}})
+	require.NoError(t, err)
+	tool, ok := r.Lookup("boom")
+	require.True(t, ok)
+	result, err := tool.Call(context.Background(), json.RawMessage(`{}`))
+	require.Nil(t, result)
+	require.True(t, errors.Is(err, ErrPanic))
+	require.False(t, IsInputError(err))
+	require.Equal(t, "boom 执行出错", err.Error(), "不把 panic 的值交给模型")
+	require.False(t, ShouldLog(err), "panic 已经记过日志")
+	require.False(t, ShouldLog(Inputf("参数错误")))
+	require.False(t, ShouldLog(nil))
+	require.True(t, ShouldLog(errors.New("上游失败")))
+
+	result, err = r.Tools()[0].Call(context.Background(), json.RawMessage(`{"ok":true}`))
+	require.NoError(t, err)
+	require.Equal(t, "boom", result.Tool)
 }
