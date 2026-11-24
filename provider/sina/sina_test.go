@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/alwqx/sec/types"
+	"github.com/alwqx/sec/utils"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/h2non/gock.v1"
 )
@@ -369,4 +370,23 @@ func TestResolveAllCanceled(t *testing.T) {
 	require.Len(t, results, 1)
 	require.Equal(t, "600036", results[0].Key)
 	require.Error(t, results[0].Err)
+}
+
+func TestResolveAllRecoversPanic(t *testing.T) {
+	orig := resolveKey
+	t.Cleanup(func() { resolveKey = orig })
+	resolveKey = func(_ context.Context, key string) ([]*BasicSecurity, error) {
+		if key == "boom" {
+			panic("unexpected nil slice")
+		}
+		return []*BasicSecurity{{Code: "600036", ExCode: "SH600036", Name: "招商银行"}}, nil
+	}
+
+	results := ResolveAll(context.Background(), []string{"boom", "600036"})
+	require.Len(t, results, 2)
+	require.ErrorIs(t, results[0].Err, utils.ErrPanic)
+	require.Nil(t, results[0].Security)
+	require.NoError(t, results[1].Err)
+	require.NotNil(t, results[1].Security)
+	require.Equal(t, "SH600036", results[1].Security.ExCode)
 }

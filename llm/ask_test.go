@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/alwqx/sec/aitool"
+	"github.com/alwqx/sec/utils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -327,6 +328,11 @@ func TestAskToolPanics(t *testing.T) {
 				<-ctx.Done()
 				panic("超时后出错")
 			}},
+		aitool.Tool{Name: "sublate", Description: "说明", InputSchema: schema,
+			Call: func(ctx context.Context, _ json.RawMessage) (*aitool.Result, error) {
+				<-ctx.Done()
+				return nil, fmt.Errorf("财报获取失败：%w", utils.ErrPanic)
+			}},
 		aitool.Tool{Name: "encode", Description: "说明", InputSchema: schema,
 			Call: func(context.Context, json.RawMessage) (*aitool.Result, error) {
 				return aitool.NewResult("encode", "测试", panicJSON{}), nil
@@ -336,12 +342,13 @@ func TestAskToolPanics(t *testing.T) {
 	original := askToolTimeout
 	askToolTimeout = 10 * time.Millisecond
 	t.Cleanup(func() { askToolTimeout = original })
-	fake := &Fake{Replies: []FakeReply{FakeToolCalls(call("1", "late", `{}`), call("2", "encode", `{}`)), FakeText("没有取到。")}}
+	fake := &Fake{Replies: []FakeReply{FakeToolCalls(call("1", "late", `{}`), call("2", "sublate", `{}`), call("3", "encode", `{}`)), FakeText("没有取到。")}}
 	a := Asker{Client: fake, Model: Model{Name: "m"}, Tools: tools}
 	answer, err := a.Ask(context.Background(), "问题", "")
 	require.NoError(t, err)
 	require.Equal(t, "late 执行出错", answer.Steps[0].Error, "超时后 panic 不报超时，免得模型原样重试")
-	require.Equal(t, "encode 执行出错", answer.Steps[1].Error)
+	require.Equal(t, "财报获取失败：内部错误", answer.Steps[1].Error, "超时后子 goroutine panic 也不报超时")
+	require.Equal(t, "encode 执行出错", answer.Steps[2].Error)
 	for _, result := range fake.Requests[1].Messages[2].ToolResults {
 		require.True(t, result.IsError)
 	}

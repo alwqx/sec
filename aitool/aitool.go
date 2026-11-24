@@ -15,6 +15,8 @@ import (
 	"log/slog"
 	"regexp"
 	"runtime/debug"
+
+	"github.com/alwqx/sec/utils"
 )
 
 // SchemaVersion 是 Result 的格式版本。删除或重命名字段、改变含义时加 1，新增字段不变。
@@ -96,9 +98,14 @@ type panicError struct{ tool string }
 func (e panicError) Error() string        { return e.tool + " 执行出错" }
 func (e panicError) Is(target error) bool { return target == ErrPanic }
 
-// ShouldLog 判断调用方是否要把工具返回的 err 记成错误日志：参数错误是模型的问题，panic 已经记过。
+// IsPanic 判断 err 是否来自工具执行或其内部并发子 goroutine 的 panic。
+func IsPanic(err error) bool {
+	return errors.Is(err, ErrPanic) || errors.Is(err, utils.ErrPanic)
+}
+
+// ShouldLog 判断调用方是否要把工具返回的 err 记成错误日志：参数错误是模型的问题，panic（含工具内部 goroutine 的 panic）已经记过。
 func ShouldLog(err error) bool {
-	return err != nil && !IsInputError(err) && !errors.Is(err, ErrPanic)
+	return err != nil && !IsInputError(err) && !IsPanic(err)
 }
 
 // LogPanic 记录工具调用中的 panic：错误日志只记 panic 的值，堆栈只在开启 Debug 时记，不夹在 sec ask 的进度行里。
@@ -110,8 +117,9 @@ func LogPanic(ctx context.Context, tool string, value any) {
 }
 
 // recovering 在 call 外面接住 panic，变成这次调用的 ErrPanic。sec mcp、sec ask 和 Desktop 都在单独的 goroutine 里
-// 执行工具，panic 交不到上层的 recover，不接住整个进程就会退出。只能接住执行 call 的 goroutine 里的 panic，
-// 工具自己另起的 goroutine（比如 sina.ResolveAll、valuation.Analyze 里的并发请求）里的 panic 仍会让进程退出。
+// 执行工具，panic 交不到上层的 recover，不接住整个进程就会退出。工具自己另起的 goroutine（sina.ResolveAll、
+// financials.Analyze、valuation.Analyze、valuation.AnalyzeUS、edgar.CoverShares/ClassEarnings）通过 utils.Recover
+// 接住 panic 并转成对应子任务的错误。
 func recovering(name string, call func(context.Context, json.RawMessage) (*Result, error)) func(context.Context, json.RawMessage) (*Result, error) {
 	return func(ctx context.Context, input json.RawMessage) (result *Result, err error) {
 		defer func() {

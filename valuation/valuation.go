@@ -18,6 +18,7 @@ import (
 
 	"github.com/alwqx/sec/provider/eastmoney"
 	"github.com/alwqx/sec/provider/sina"
+	"github.com/alwqx/sec/utils"
 )
 
 const (
@@ -184,6 +185,14 @@ func aShareCode(exCode string) bool {
 	return len(exCode) == 8 && (strings.HasPrefix(exCode, "SH") || strings.HasPrefix(exCode, "SZ") || strings.HasPrefix(exCode, "BJ"))
 }
 
+// Analyze 的上游请求函数，测试时替换。
+var (
+	getValuationHistory   = eastmoney.GetValuationHistory
+	getPerformanceReports = eastmoney.GetPerformanceReports
+	getDividendPlans      = eastmoney.GetDividendPlans
+	querySinaDividends    = sina.QueryDividends
+)
+
 // Analyze 查询数据并计算估值，params 应已通过 Validate。估值或业绩报表失败时返回错误，不输出部分结果；分红或同行业数据失败时只写入对应的说明。
 func Analyze(ctx context.Context, exCode string, params DCFParams) (*Result, error) {
 	var (
@@ -200,15 +209,27 @@ func Analyze(ctx context.Context, exCode string, params DCFParams) (*Result, err
 	wg.Add(4)
 	go func() {
 		defer wg.Done()
-		points, err1 = eastmoney.GetValuationHistory(ctx, exCode)
+		err1 = utils.Recover(ctx, "eastmoney.GetValuationHistory", func() error {
+			var err error
+			points, err = getValuationHistory(ctx, exCode)
+			return err
+		})
 	}()
 	go func() {
 		defer wg.Done()
-		reports, err2 = eastmoney.GetPerformanceReports(ctx, exCode)
+		err2 = utils.Recover(ctx, "eastmoney.GetPerformanceReports", func() error {
+			var err error
+			reports, err = getPerformanceReports(ctx, exCode)
+			return err
+		})
 	}()
 	go func() {
 		defer wg.Done()
-		plans, err3 = eastmoney.GetDividendPlans(ctx, exCode)
+		err3 = utils.Recover(ctx, "eastmoney.GetDividendPlans", func() error {
+			var err error
+			plans, err = getDividendPlans(ctx, exCode)
+			return err
+		})
 	}()
 	// 新浪的分红记录只用来核对东方财富是否缺记录，获取失败或超时不影响结果，也不应拖慢估值。
 	go func() {
@@ -219,7 +240,11 @@ func Analyze(ctx context.Context, exCode string, params DCFParams) (*Result, err
 		}
 		checkCtx, cancel := context.WithTimeout(ctx, sinaCheckTimeout)
 		defer cancel()
-		check, err4 = sina.QueryDividends(checkCtx, exCode[2:])
+		err4 = utils.Recover(checkCtx, "sina.QueryDividends", func() error {
+			var err error
+			check, err = querySinaDividends(checkCtx, exCode[2:])
+			return err
+		})
 	}()
 	wg.Wait()
 	if errors.Is(err1, eastmoney.ErrUnsupportedCode) {

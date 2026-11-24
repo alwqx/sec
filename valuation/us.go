@@ -16,6 +16,7 @@ import (
 	"github.com/alwqx/sec/provider/edgar"
 	"github.com/alwqx/sec/provider/sina"
 	"github.com/alwqx/sec/usstock"
+	"github.com/alwqx/sec/utils"
 )
 
 // ErrStaleShares 表示 SEC 没有最近的流通股数，无法计算市值。
@@ -27,6 +28,15 @@ var ErrForeign = errors.New("美股估值暂只支持美国本土公司（按 US
 
 // usHistoryYears 是美股估值历史的年数，和 A 股的估值历史长度相近。
 const usHistoryYears = 10
+
+// AnalyzeUS 的上游请求函数，测试时替换。
+var (
+	loadUSProfile = func(ctx context.Context, client *edgar.Client, cik int) (*edgar.Profile, error) {
+		return client.Profile(ctx, cik)
+	}
+	queryUSQuote     = sina.QueryUSQuote
+	queryUSDailyBars = sina.QueryUSDailyBars
+)
 
 // AnalyzeUS 计算美股估值：价格来自新浪美股日线（不复权），利润、收入、净资产、股息和股本来自 SEC XBRL。
 // 每天的市值 = 收盘价 × 当时的流通股数，估值倍数只用当天之前已经申报的数据，不用后来才公布的数值。
@@ -57,10 +67,14 @@ func AnalyzeUS(ctx context.Context, client *edgar.Client, exCode string, params 
 	wg.Add(4)
 	go func() {
 		defer wg.Done()
-		facts, factsErr = loadFacts(fetchCtx, company.CIK)
-		if factsErr == nil {
-			foreign = foreignReason(facts)
-		}
+		factsErr = utils.Recover(fetchCtx, "valuation.loadUSFacts", func() error {
+			var err error
+			facts, err = loadFacts(fetchCtx, company.CIK)
+			if err == nil {
+				foreign = foreignReason(facts)
+			}
+			return err
+		})
 		if factsErr != nil || foreign != "" {
 			cancel()
 		}
@@ -68,16 +82,28 @@ func AnalyzeUS(ctx context.Context, client *edgar.Client, exCode string, params 
 	go func() {
 		defer wg.Done()
 		// 行业只用于显示和判断金融业，获取失败不影响估值。
-		profile, _ = client.Profile(fetchCtx, company.CIK)
+		_ = utils.Recover(fetchCtx, "edgar.Profile", func() error {
+			var err error
+			profile, err = loadUSProfile(fetchCtx, client, company.CIK)
+			return err
+		})
 	}()
 	go func() {
 		defer wg.Done()
 		// 新浪的当前股数用来核对拆股和多类股票的折算，获取失败时不核对。
-		quote, _ = sina.QueryUSQuote(fetchCtx, exCode)
+		_ = utils.Recover(fetchCtx, "sina.QueryUSQuote", func() error {
+			var err error
+			quote, err = queryUSQuote(fetchCtx, exCode)
+			return err
+		})
 	}()
 	go func() {
 		defer wg.Done()
-		bars, barsErr = sina.QueryUSDailyBars(fetchCtx, exCode)
+		barsErr = utils.Recover(fetchCtx, "sina.QueryUSDailyBars", func() error {
+			var err error
+			bars, err = queryUSDailyBars(fetchCtx, exCode)
+			return err
+		})
 	}()
 	wg.Wait()
 	if factsErr != nil {

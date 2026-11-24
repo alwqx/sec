@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
 
+	"github.com/alwqx/sec/utils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -93,7 +95,12 @@ func TestRegistryRecoversPanic(t *testing.T) {
 	require.True(t, errors.Is(err, ErrPanic))
 	require.False(t, IsInputError(err))
 	require.Equal(t, "boom 执行出错", err.Error(), "不把 panic 的值交给模型")
+	require.True(t, IsPanic(err))
 	require.False(t, ShouldLog(err), "panic 已经记过日志")
+	subPanic := fmt.Errorf("估值计算失败：%w", utils.ErrPanic)
+	require.True(t, IsPanic(subPanic))
+	require.False(t, ShouldLog(subPanic), "子 goroutine panic 已经记过日志")
+	require.False(t, IsPanic(errors.New("上游失败")))
 	require.False(t, ShouldLog(Inputf("参数错误")))
 	require.False(t, ShouldLog(nil))
 	require.True(t, ShouldLog(errors.New("上游失败")))

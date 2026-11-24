@@ -169,7 +169,7 @@
 - [x] Desktop 对话面板：复用 `sec ask` 的 agent loop。左侧导航「AI 问答」，逐条显示工具调用，研究页的证券默认带入；每个问题单独回答。
 - [x] Desktop 追问：同一对话带上最近 5 轮问答和调用过的工具（不发送工具结果），历史保存在服务端内存，页面只提交对话 id；前几轮的工具结果作为数字核对来源。
 - [x] 同一轮的工具调用同时执行（最多 4 个），结果按调用顺序发回模型。
-- [ ] 工具内部 goroutine 的 panic：`aitool` 注册表只能接住执行工具的 goroutine 里的 panic，工具自己另起的 goroutine（`sina.ResolveAll` 每个代码一个、`valuation.Analyze` 的 4 个并发请求）里的 panic 仍会让 `sec mcp`、`sec ask` 和 Desktop 退出。在这些 goroutine 里接住 panic，转成这一项的错误。
+- [x] 工具内部 goroutine 的 panic：`aitool` 注册表只能接住执行工具的 goroutine 里的 panic，工具自己另起的 goroutine（`sina.ResolveAll` 每个代码一个、`valuation.Analyze` 的 4 个并发请求）里的 panic 仍会让 `sec mcp`、`sec ask` 和 Desktop 退出。在这些 goroutine 里接住 panic，转成这一项的错误。
 
 测试：CI 不调用真实模型，用假的模型客户端测试工具调用与提示词组装；回答质量用离线评测集手动运行。
 
