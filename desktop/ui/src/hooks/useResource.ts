@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
+import { errorStatus as statusOf } from '../api'
 
 // 每次切换资源时取消旧请求，不把上一只证券或上一页的结果显示到当前页面。
 // 调用者使用 useCallback 稳定 load 的身份。
 export function useResource<T>(load: (signal: AbortSignal) => Promise<T>) {
   const [data, setData] = useState<T | null>(null)
   const [error, setError] = useState('')
+  const [errorStatus, setErrorStatus] = useState<number | null>(null)
   const [loading, setLoading] = useState(true)
   const [retry, setRetry] = useState(0)
   useEffect(() => {
@@ -12,10 +14,14 @@ export function useResource<T>(load: (signal: AbortSignal) => Promise<T>) {
     setData(null)
     setLoading(true)
     setError('')
+    setErrorStatus(null)
     void load(controller.signal).then(value => {
       if (!controller.signal.aborted) setData(value)
     }).catch((e: unknown) => {
-      if (!controller.signal.aborted) setError(e instanceof Error ? e.message : String(e))
+      if (!controller.signal.aborted) {
+        setError(e instanceof Error ? e.message : String(e))
+        setErrorStatus(statusOf(e))
+      }
     }).finally(() => {
       if (!controller.signal.aborted) setLoading(false)
     })
@@ -23,5 +29,5 @@ export function useResource<T>(load: (signal: AbortSignal) => Promise<T>) {
   }, [load, retry])
   // reload 的身份保持不变，可以放进调用者 effect 的依赖。
   const reload = useCallback(() => setRetry(n => n + 1), [])
-  return { data, error, loading, reload }
+  return { data, error, errorStatus, loading, reload }
 }

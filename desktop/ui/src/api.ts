@@ -1,12 +1,32 @@
 import type { BasicSecurity, SecurityQuote, Company, Dividend, WorkspaceState, PageResult, IPOListing, Announcement, FinancialReport, MetalData, SECFilings, USCompanyData, HKCompanyData, FundOverview, USFinancialsData, CommodityQuote, CommodityHistory, HistoryQuote, BondData, CompanyMetrics, SavedDownload, AnnualReportsPage, ProspectusPage , MacroCatalog, MacroDataset , FxDataset, FxSpread , HistoryOverlay , StrategyResult, ValuationResult, FinancialCharts, USDividends } from './types'
 
-import { readAskStream, readExplanationStream } from './sse'
+import { readAskStream, readExplanationStream } from './sse.ts'
+
+// APIError 保留请求失败时的 HTTP 状态码，便于界面区分资源不存在（404）和临时故障。
+export class APIError extends Error {
+  readonly status: number
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = 'APIError'
+    this.status = status
+  }
+}
+
+// errorStatus 取出请求错误里的 HTTP 状态码；网络失败等没有状态码的错误返回 null。
+export function errorStatus(error: unknown): number | null {
+  return error instanceof APIError ? error.status : null
+}
+
+// canRetryError 判断是否显示「重新加载」按钮：404 表示该证券没有对应数据，重试不会成功。
+export function canRetryError(status: number | null | undefined): boolean {
+  return status !== 404
+}
 
 async function request<T>(path: string, signal?: AbortSignal, options?: RequestInit): Promise<T> {
   const resp = await fetch(path, { ...options, signal })
   if (!resp.ok) {
     const body = await resp.json().catch(() => null)
-    throw new Error(body?.error ?? `请求失败 (${resp.status})`)
+    throw new APIError(body?.error ?? `请求失败 (${resp.status})`, resp.status)
   }
   return resp.json() as Promise<T>
 }

@@ -231,7 +231,7 @@ export default function FinancialCharts({ code }: { code: string }) {
       {freqToggle}
       <label>结构图报告期<select value={period.date} onChange={event => setDate(event.target.value)}>{[...periods].reverse().map(item => <option key={item.date} value={item.date}>{periodLabel(item, data.quarterly)}{data.quarterly ? '' : ' 年报'}</option>)}</select></label>
     </div>
-    {resource.error && <ResourceState loading={false} error={resource.error} retry={resource.reload} />}
+    {resource.error && <ResourceState loading={false} error={resource.error} errorStatus={resource.errorStatus} retry={resource.reload} />}
     <p className="data-note">{data.quarterly ? '单季：利润表和现金流量表是该季度的值，资产负债表是季末值。' : '年度：最近 10 个年报。'}{sec
       ? `数据来自 SEC EDGAR 的 XBRL 财务数据，财年按截止日所在年份标注，金额以${unit}列报；每一步都和报表中的合计科目对齐，没有单列或占收入不到 0.5% 的科目合并为“其他”。SEC 数据只有归母净利润，税后到归母净利润之间的少数股东损益、终止经营等合为一项；期初现金是上期末资产负债表的现金，受限现金、汇率变动等差额合为一项。`
       : `数据来自东方财富 F10 财务报表，每一步都和报表中的合计科目对齐，没有单列或占收入不到 0.5% 的科目合并为“其他”。${typeNotes[data.company_type]}`}</p>
