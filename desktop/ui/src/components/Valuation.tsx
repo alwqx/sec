@@ -166,9 +166,9 @@ function Dividends({ dividends, note, us }: { dividends: ValuationDividends | nu
   </section>
 }
 
-function DCFResult({ data, loading, error, retry }: { data: ValuationResult; loading: boolean; error: string; retry: () => void }) {
+function DCFResult({ data, loading, error, errorStatus, retry }: { data: ValuationResult; loading: boolean; error: string; errorStatus?: number | null; retry: () => void }) {
   const dcf = data.dcf
-  if (loading || error) return <ResourceState loading={loading} error={error} retry={retry} />
+  if (loading || error) return <ResourceState loading={loading} error={error} errorStatus={errorStatus} retry={retry} />
   if (!dcf.applicable) return <div className="empty-state">{dcf.note}</div>
   return <>
     <dl className="quote-grid metrics-grid">
@@ -212,7 +212,7 @@ export default function Valuation({ code }: { code: string }) {
           <button type="submit">应用</button><button type="button" onClick={reset}>恢复默认</button>
         </form>
         {data.dcf.warning && <p className="error" role="note">{data.dcf.warning}</p>}
-        <DCFResult data={data} loading={resource.loading} error={resource.error} retry={resource.reload} />
+        <DCFResult data={data} loading={resource.loading} error={resource.error} errorStatus={resource.errorStatus} retry={resource.reload} />
         <p className="data-note">两阶段股权现金流折现：5 年增长期加永续期。现金流用近四个季度归母净利润的 70% 近似，折现结果视为股权价值，未单独扣除净负债。增长率留空时取近 5 年净利润 CAGR，限制在 ±15%；填 0 表示零增长。结果对参数高度敏感。</p></section>
       <Annuals data={data} />
       {data.shares_note && <p className="data-note">股数说明：{data.shares_note}</p>}

@@ -62,6 +62,7 @@
 58. Recover from AI tool panics in the tool registry, so a tool that panics no longer crashes `sec mcp`.
 59. Upgrade `github.com/gorilla/websocket` to fix vulnerability GO-2026-6278 reported by CI.
 60. Recover from panics inside concurrent goroutines spawned by AI tools (`sina.ResolveAll`, `financials.Analyze`, `valuation.Analyze`, `valuation.AnalyzeUS`, `edgar.CoverShares`/`ClassEarnings`) and convert them into per-task errors so they no longer crash `sec mcp`, `sec ask`, or Desktop.
+61. Preserve HTTP status codes on failed Desktop API requests and hide the retry button in `ResourceState` on 404 responses.
 
 ### v0.4.8
 
