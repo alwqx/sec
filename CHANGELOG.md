@@ -66,6 +66,8 @@
 62. Return HTTP 504 with a dedicated timeout message instead of 502 with raw `context deadline exceeded` when Desktop US endpoints (`serveUS`) time out.
 63. Add `sina.QueryAdjustFactors` to read Sina's adjustment factors for upcoming proportional price adjustment.
 64. Compute proportional forward-adjusted K-lines (`eastmoney.QuoteFQTRatio`) in the `history` package from unadjusted daily bars and Sina's adjustment factors.
+65. Default `get_kline_summary` to proportional adjustment (`fq=ratio`) and use it for `sec strategy --backtest`.
+66. Check only the open of the latest bar against East Money in proportional adjustment, so an in-progress trading day no longer reports a factor mismatch.
 
 ### v0.4.8
 

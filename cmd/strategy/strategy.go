@@ -170,7 +170,7 @@ type analysis struct {
 // defaultDays 是没有指定 --begin 时往前取的日历天数。
 const defaultDays = 250
 
-// fetchOHLCV 查询区间行情，并往前多取预热数据，和 Desktop 技术分析一致。回测使用前复权价格，避免除权日出现虚假的涨跌。
+// fetchOHLCV 查询区间行情，并往前多取预热数据，和 Desktop 技术分析一致。回测使用等比前复权价格，避免除权日出现虚假的涨跌，老股票往前很多年也不会出现非正的价格。
 func fetchOHLCV(cmd *cobra.Command, code string, required int) (*analysis, error) {
 	freqText, _ := cmd.Flags().GetString("freq")
 	freq, err := eastmoney.ParseFreq(freqText)
@@ -215,7 +215,7 @@ func fetchOHLCV(cmd *cobra.Command, code string, required int) (*analysis, error
 		if err := backtest.Supported(sec.ExCode); err != nil {
 			return nil, err
 		}
-		req.FQT = eastmoney.QuoteFQTFront
+		req.FQT = eastmoney.QuoteFQTRatio
 	}
 	beginDay, endDay := begin.Format("20060102"), end.Format("20060102")
 	req.Begin = history.IndicatorWarmup(begin, required, freq).Format("20060102")

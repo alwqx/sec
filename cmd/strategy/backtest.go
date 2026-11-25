@@ -55,7 +55,7 @@ func drawdownText(p backtest.Performance) string {
 
 // printBacktest 输出回测结果：和买入持有对比的表现、成交明细和没有成交的信号。
 func printBacktest(out io.Writer, r *backtest.Result) {
-	fmt.Fprintf(out, "回测: %s 至 %s，前复权日线，初始资金 %.0f 元\n", r.Begin, r.End, r.Config.Cash)
+	fmt.Fprintf(out, "回测: %s 至 %s，等比前复权日线，初始资金 %.0f 元\n", r.Begin, r.End, r.Config.Cash)
 	fmt.Fprintf(out, "信号在收盘产生，下一交易日开盘成交，每次全仓买入或全部卖出；按 100 股一手，开盘涨停买不进、跌停卖不出、停牌顺延。\n")
 	fmt.Fprintf(out, "成本: 佣金 %.4g%%（最低 %.0f 元），卖出印花税 %.4g%%，滑点 %.4g%%\n\n", r.Config.Commission*100, r.Config.MinCommission, r.Config.StampTax*100, r.Config.Slippage*100)
 	table := termtable.New(out, []string{"", "策略", "买入持有"}, termtable.Compact, termtable.NoWrap, termtable.PlainHeader)

@@ -32,10 +32,15 @@ func adjustTolerance(price float64) float64 {
 // getRatio 计算等比前复权。不复权日线从请求开始前一到两个周期取到最新：周线、月线的第一根要有完整周期和前收盘，
 // 请求区间之后的除权也会影响区间内的价格。周线、月线由复权后的日线合成，再按日期筛选：
 // 结束日期在周期中间时不返回这个周期，和东方财富一致（周期的日期是它最后一个交易日，晚于结束日期）。
+// 先查复权因子：文件很小，港股 ETF 等没有因子的证券不用先下载全部日线。
 func getRatio(ctx context.Context, req *eastmoney.GetQuoteHistoryReq, required string) (*Result, error) {
 	exCode, err := adjustExCode(req.MarketCode, req.Code)
 	if err != nil {
 		return nil, err
+	}
+	segments, err := sina.QueryAdjustFactors(ctx, exCode)
+	if err != nil {
+		return nil, fmt.Errorf("等比复权: %w", err)
 	}
 	raw := *req
 	raw.FQT, raw.Freq, raw.End = eastmoney.QuoteFQTDefault, eastmoney.FreqDay, "20500101"
@@ -48,11 +53,7 @@ func getRatio(ctx context.Context, req *eastmoney.GetQuoteHistoryReq, required s
 	}
 	// 美股按纽交所等其他市场代码查到时，和 Get 一样写回请求。
 	req.MarketCode = raw.MarketCode
-	segments, err := sina.QueryAdjustFactors(ctx, exCode)
-	if err != nil {
-		return nil, fmt.Errorf("等比复权: %w", err)
-	}
-	if cashAdjusted(segments) {
+	if cashAdjusted(segments) && len(got.Quotes) > 0 {
 		if got.Note != "" {
 			return nil, fmt.Errorf("%w: 东方财富暂不可用，无法核对 %s 的复权因子", ErrAdjustedUnavailable, exCode)
 		}
@@ -130,7 +131,13 @@ func segmentIndex(quotes []*eastmoney.Quote, segments []sina.AdjustSegment) ([]i
 
 // checkSegments 逐根核对每段换算出的开高低收和东方财富前复权。对不上的段如果和前一段一致，是多出来的记录
 // （如南方中证 500ETF 份额折算基准日 2022-08-26 的一段），去掉；否则报错。区间里没有 K 线的段无从核对，原样保留。
+// 最后一根只核对开盘价：交易时段里最高、最低和收盘还在变，不复权和前复权是先后两次请求，价格可能已经不同；
+// 开盘价开盘后不再变，最后一根是除权日时仍能核对最新一段。
 func checkSegments(segments []sina.AdjustSegment, raw, qfq []*eastmoney.Quote) ([]sina.AdjustSegment, error) {
+	var last time.Time
+	if len(raw) > 0 {
+		last = raw[len(raw)-1].Date
+	}
 	front := make(map[string]*eastmoney.Quote, len(qfq))
 	for _, quote := range qfq {
 		front[quote.Date.Format(time.DateOnly)] = quote
@@ -149,7 +156,11 @@ func checkSegments(segments []sina.AdjustSegment, raw, qfq []*eastmoney.Quote) (
 			if !ok {
 				continue
 			}
-			for _, pair := range [][2]float64{{quote.Open, adjusted.Open}, {quote.High, adjusted.High}, {quote.Low, adjusted.Low}, {quote.Close, adjusted.Close}} {
+			pairs := [][2]float64{{quote.Open, adjusted.Open}, {quote.High, adjusted.High}, {quote.Low, adjusted.Low}, {quote.Close, adjusted.Close}}
+			if quote.Date.Equal(last) {
+				pairs = pairs[:1]
+			}
+			for _, pair := range pairs {
 				if math.Abs(pair[0]*segment.Scale+segment.Offset-pair[1]) > adjustTolerance(pair[1]) {
 					return false
 				}
