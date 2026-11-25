@@ -65,7 +65,7 @@
 - [x] 美股营业收入取错科目：蔚来（`$NIO`）FY2021—FY2023 的 `Revenues` 只是关联方收入，按优先级被选中，营业收入只有 0.58 亿到 1.67 亿人民币。和「营业成本 + 毛利」对不上的收入科目在这家公司的所有期间都排到后面（`edgar.Facts.revenueConcepts`）。
 - [x] 共用 SEC companyfacts 缓存：Desktop 的 `cachedUSFacts`（`desktop/us.go`，10 分钟）挪到 `provider/edgar`，让 `sec mcp` 的 `get_financials` 和以后的 `get_valuation` 共用；现在 `sec mcp` 每次调用都重新下载几 MB 的 companyfacts。
 - [x] Desktop 美股栏目的错误重试：财报、财报图表、分红接口对没有 XBRL 数据的公司返回 404，但前端 `ResourceState` 对所有错误都显示"重新加载"按钮，`api.ts` 的 `request()` 也不保留 HTTP 状态码，重试永远不会成功。请求失败时保留状态码，404 不显示重试按钮。
-- [ ] Desktop 美股接口超时：`serveUS` 的 30 秒超时被当成上游失败（502），提示里是原始的 `context deadline exceeded`，可以改成专门的超时提示。
+- [x] Desktop 美股接口超时：`serveUS` 的 30 秒超时被当成上游失败（502），提示里是原始的 `context deadline exceeded`，可以改成专门的超时提示。
 - [ ] （暂缓）外国公司估值，包括 IFRS 公司（台积电、诺和诺德、SAP）和以外币列报的 US GAAP 公司（阿里巴巴、ASML）。评估结论是投入大、结果难保证准确，重心先放在美国本土上市公司的估值；目前外国公司估值报"暂不支持"（`valuation.ErrForeign`）。现有做法用 ADS 价格乘 SEC 封面的普通股数，ADS 比例不是 1 时市值出错（网易 1 ADS = 5 股，估出 3871 亿美元，新浪是 774 亿；阿里巴巴封面股数疑似少一位）。调研记录：
   - 汇率：美联储 FRED 的 H.10 日度汇率覆盖所需币种（`DEXTAUS`、`DEXJPUS`、`DEXCHUS`、`DEXDNUS`、`DEXUSEU`、`DEXBZUS`、`DEXUSUK`、`DEXSDUS`、`DEXINUS` 等，多数从 1970—80 年代开始），每周更新、滞后几天，仓库已有 `provider/fred` 客户端。欧洲央行没有台币。口径上宜按当天汇率把市值折成列报币种，再和原币财报比较，不用美元便利折算数。
   - ADS 比例没有统一来源：companyfacts 的 `dei:EntityListingDepositoryReceiptRatio` 多数公司按类别标注，读不到（7 家里只有阿里巴巴有）；20-F 封面第 12(b) 条的证券名称有时写明（"each representing eight Ordinary Shares"），丰田、台积电没有；台积电要用 XBRL 实例里按 ADS 维度的每股收益反推；新浪的 ADS 折算股数可以反解当前比例，但只有当前值，且受库存股影响（丰田算出 11.07，实际为 10）。比例会随拆股变化（丰田 2021 年从 2 变为 10）。存托银行网站是 JS 页面，不适合。

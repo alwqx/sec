@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -34,10 +35,15 @@ func (s *desktopServer) handleUSCompany(w http.ResponseWriter, r *http.Request) 
 		switch {
 		case errors.Is(profileErr, edgar.ErrNotFound):
 			notes = append(notes, "SEC EDGAR 没有这个代码，基金、场外交易股票等可能不向 SEC 申报公司资料。")
+		case isTimeout(profileErr):
+			notes = append(notes, "公司资料获取超时，请稍后重试。")
 		case profileErr != nil:
 			notes = append(notes, "公司资料获取失败："+profileErr.Error())
 		}
-		if quoteErr != nil {
+		switch {
+		case isTimeout(quoteErr):
+			notes = append(notes, "行情获取超时，请稍后重试。")
+		case quoteErr != nil:
 			notes = append(notes, "行情获取失败："+quoteErr.Error())
 		}
 		return map[string]any{"info": info, "notes": notes}, nil
@@ -66,6 +72,9 @@ func (e usUpstream) Error() string {
 	return e.message + "：" + e.err.Error()
 }
 
+// usRequestTimeout 是美股接口单次请求的超时时间，测试时可调小。
+var usRequestTimeout = 30 * time.Second
+
 // serveUS 是美股 SEC 接口共用的准备：先校验美股代码（无效时 400），再创建带 30 秒超时的 ctx 和用共享配置联系邮箱的 SEC 客户端
 // （读取失败时 500），交给 handle；handle 的结果写成 JSON，错误按 usFail 映射。cancel 在这里 defer，handle 不用管。
 // what 是数据的名称，比如"财报"，用在错误提示里。
@@ -75,17 +84,20 @@ func (s *desktopServer) serveUS(w http.ResponseWriter, r *http.Request, what str
 		writeError(w, http.StatusBadRequest, "只支持美股代码，比如 $AAPL")
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), usRequestTimeout)
 	defer cancel()
 	client, err := s.edgarClient(ctx)
 	if err != nil {
+		if r.Context().Err() != nil {
+			return
+		}
 		slog.ErrorContext(ctx, "读取共享配置失败", "path", r.URL.Path, "error", err)
 		writeError(w, http.StatusInternalServerError, "读取 SEC 联系邮箱失败，请在设置中检查")
 		return
 	}
 	result, err := handle(ctx, client, code)
 	if err != nil {
-		usFail(w, r, err, what, code)
+		usFail(w, r, ctx, err, what, code)
 		return
 	}
 	writeJSON(w, result)
@@ -101,22 +113,35 @@ func usFacts(ctx context.Context, client *edgar.Client, code string) (edgar.Comp
 	return company, facts, err
 }
 
-// usFail 写出错误响应：参数错误 400；请求已取消时不写；usUpstream 用它的提示返回 502；SEC 没有这家公司或没有 XBRL 数据时 404；
-// 数据不足以整理（没有利润表、IFRS 公司没有季度数据）时 404 并说明原因；其他是上游失败（502）。日志带上请求路径，区分是哪个接口。
-func usFail(w http.ResponseWriter, r *http.Request, err error, what, code string) {
+// isTimeout 判断 err 是否为 context 超时或传输层网络超时（如 TLS 握手超时、DNS 超时）。
+func isTimeout(err error) bool {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	var netErr net.Error
+	return errors.As(err, &netErr) && netErr.Timeout()
+}
+
+// usFail 写出错误响应：参数错误 400；请求已取消时不写；SEC 没有这家公司或没有 XBRL 数据、数据不足以整理
+// （没有利润表、IFRS 公司没有季度数据）时 404 并说明原因；接口或上游超时返回 504 和专门的超时提示；
+// usUpstream 用它的提示返回 502；其他是上游失败（502）。日志带上请求路径，区分是哪个接口。
+func usFail(w http.ResponseWriter, r *http.Request, ctx context.Context, err error, what, code string) {
 	var bad usBadRequest
 	var upstream usUpstream
 	switch {
 	case errors.As(err, &bad):
 		writeError(w, http.StatusBadRequest, bad.Error())
 	case r.Context().Err() != nil:
-	case errors.As(err, &upstream):
-		slog.ErrorContext(r.Context(), "查询美股"+what+"失败", "path", r.URL.Path, "code", code, "error", upstream.err)
-		writeError(w, http.StatusBadGateway, upstream.message)
 	case errors.Is(err, edgar.ErrNotFound) || errors.Is(err, edgar.ErrNoXBRL):
 		writeError(w, http.StatusNotFound, "SEC EDGAR 没有这家公司的"+what+"数据，可能不向 SEC 申报")
 	case errors.Is(err, financials.ErrNoSECData) || errors.Is(err, financials.ErrIFRSQuarterly):
 		writeError(w, http.StatusNotFound, err.Error())
+	case errors.Is(ctx.Err(), context.DeadlineExceeded) || isTimeout(err):
+		slog.ErrorContext(r.Context(), "查询美股"+what+"超时", "path", r.URL.Path, "code", code, "error", err)
+		writeError(w, http.StatusGatewayTimeout, "美股"+what+"获取超时，请稍后重试")
+	case errors.As(err, &upstream):
+		slog.ErrorContext(r.Context(), "查询美股"+what+"失败", "path", r.URL.Path, "code", code, "error", upstream.err)
+		writeError(w, http.StatusBadGateway, upstream.message)
 	default:
 		slog.ErrorContext(r.Context(), "查询美股"+what+"失败", "path", r.URL.Path, "code", code, "error", err)
 		writeError(w, http.StatusBadGateway, "美股"+what+"获取失败："+err.Error())
