@@ -85,7 +85,7 @@ func TestKlineSummary(t *testing.T) {
 		MatchParam("beg", "^20260901$").MatchParam("end", "^20261031$").
 		Reply(200).BodyString(`{"data":{"code":"600036","market":1,"name":"招商银行","klines":[` + klineLines(25) + `]}}`)
 
-	result, data, err := callKlineJSON(t, `{"code":"600036","begin":"2026-09-01","end":"2026-10-31"}`)
+	result, data, err := callKlineJSON(t, `{"code":"600036","begin":"2026-09-01","end":"2026-10-31","fq":"qfq"}`)
 	require.NoError(t, err)
 	require.True(t, gock.IsDone())
 	require.Equal(t, "get_kline_summary", result.Tool)
@@ -93,7 +93,7 @@ func TestKlineSummary(t *testing.T) {
 	require.Equal(t, "2026-09-25", result.AsOf, "最后一根 K 线的日期")
 	require.Equal(t, "SH600036", data.ExCode)
 	require.Equal(t, "day", data.Freq)
-	require.Equal(t, "qfq", data.FQ, "默认前复权")
+	require.Equal(t, "qfq", data.FQ)
 	require.Equal(t, "2026-09-01", data.Begin)
 
 	require.Equal(t, 25, data.Summary.Bars)
@@ -109,9 +109,78 @@ func TestKlineSummary(t *testing.T) {
 	require.NotNil(t, data.Recent[0].Amount)
 
 	notes := strings.Join(result.Notes, "\n")
-	require.Contains(t, notes, "前复权")
+	require.Contains(t, notes, "和东方财富网站一致")
 	require.Contains(t, notes, "区间共 25 根 K 线，recent 只列最近 20 根")
 	require.NotContains(t, notes, "没有成交额")
+}
+
+// noAdjustFactors 是没有除权记录的新浪复权因子。
+const noAdjustFactors = `var sh600036qfq={"total":1,"data":[{"d":"1900-01-01", "f":"1.0000000000000000"}]}`
+
+func TestKlineSummaryRatioDefault(t *testing.T) {
+	defer gock.Off()
+	suggestKey("600036").Reply(200).BodyString(cmbSuggest)
+	// 等比复权取不复权日线：多取 16 天，一直取到最新。
+	gock.New("https://push2his.eastmoney.com").Get("/api/qt/stock/kline/get").
+		MatchParam("secid", `^1\.600036$`).MatchParam("fqt", "^0$").MatchParam("klt", "^101$").
+		MatchParam("beg", "^20260816$").MatchParam("end", "^20500101$").
+		Reply(200).BodyString(`{"data":{"code":"600036","market":1,"name":"招商银行","klines":[` + klineLines(25) + `]}}`)
+	gock.New("https://finance.sina.com.cn").Get("/realstock/company/sh600036/qfq.js").Reply(200).BodyString(noAdjustFactors)
+
+	result, data, err := callKlineJSON(t, `{"code":"600036","begin":"2026-09-01","end":"2026-10-31"}`)
+	require.NoError(t, err)
+	require.True(t, gock.IsDone())
+	require.Equal(t, "ratio", data.FQ, "默认等比前复权")
+	require.Equal(t, "东方财富 K 线、新浪复权因子", result.Source)
+	require.Equal(t, 25, data.Summary.Bars)
+	require.Equal(t, 24.0, *data.Summary.ChangePct)
+	require.Equal(t, 0.96, *data.Recent[0].ChangePct, "涨跌幅按复权后的前收盘重算：10.5 / 10.4 - 1")
+	require.Contains(t, strings.Join(result.Notes, "\n"), "等比前复权")
+}
+
+func TestKlineSummaryRatioErrors(t *testing.T) {
+	defer gock.Off()
+	suggestKey("600036").Persist().Reply(200).BodyString(cmbSuggest)
+	kline := `{"data":{"code":"600036","market":1,"name":"招商银行","klines":[` + klineLines(3) + `]}}`
+	mismatch := `var sh600036qfq={"total":1,"data":[{"d":"1900-01-01", "f":"1", "s":"1", "u":"0.5"}]}`
+
+	// 指定 ratio 时，没有复权因子（港股 ETF、港股指数等）提示改用 bfq。
+	gock.New("https://finance.sina.com.cn").Get("/realstock/company/sh600036/qfq.js").Reply(404)
+	_, _, err := callKlineJSON(t, `{"code":"600036","begin":"2026-09-01","end":"2026-10-31","fq":"ratio"}`)
+	require.True(t, IsInputError(err))
+	require.ErrorContains(t, err, "请改用 fq=bfq")
+
+	// 指定 ratio 时，按金额调整的因子和东方财富前复权对不上，提示改用 qfq 或 bfq。
+	gock.New("https://push2his.eastmoney.com").Get("/api/qt/stock/kline/get").MatchParam("fqt", "^0$").Reply(200).BodyString(kline)
+	gock.New("https://finance.sina.com.cn").Get("/realstock/company/sh600036/qfq.js").Reply(200).BodyString(mismatch)
+	gock.New("https://push2his.eastmoney.com").Get("/api/qt/stock/kline/get").MatchParam("fqt", "^1$").Reply(200).BodyString(kline)
+	_, _, err = callKlineJSON(t, `{"code":"600036","begin":"2026-09-01","end":"2026-10-31","fq":"ratio"}`)
+	require.True(t, IsInputError(err))
+	require.ErrorContains(t, err, "请改用 fq=qfq 或 bfq")
+}
+
+// 没指定 fq 时，等比复权做不了就改用前复权并说明。
+func TestKlineSummaryRatioFallsBackToQfq(t *testing.T) {
+	defer gock.Off()
+	suggestKey("600036").Persist().Reply(200).BodyString(cmbSuggest)
+	kline := `{"data":{"code":"600036","market":1,"name":"招商银行","klines":[` + klineLines(3) + `]}}`
+
+	gock.New("https://finance.sina.com.cn").Get("/realstock/company/sh600036/qfq.js").Reply(404)
+	gock.New("https://push2his.eastmoney.com").Get("/api/qt/stock/kline/get").MatchParam("fqt", "^1$").Reply(200).BodyString(kline)
+	result, data, err := callKlineJSON(t, `{"code":"600036","begin":"2026-09-01","end":"2026-10-31"}`)
+	require.NoError(t, err)
+	require.Equal(t, "qfq", data.FQ)
+	require.Equal(t, "东方财富 K 线", result.Source)
+	require.Contains(t, strings.Join(result.Notes, "\n"), "没有这只证券的复权因子")
+
+	gock.New("https://push2his.eastmoney.com").Get("/api/qt/stock/kline/get").MatchParam("fqt", "^0$").Reply(200).BodyString(kline)
+	gock.New("https://finance.sina.com.cn").Get("/realstock/company/sh600036/qfq.js").Reply(200).
+		BodyString(`var sh600036qfq={"total":1,"data":[{"d":"1900-01-01", "f":"1", "s":"1", "u":"0.5"}]}`)
+	gock.New("https://push2his.eastmoney.com").Get("/api/qt/stock/kline/get").MatchParam("fqt", "^1$").Times(2).Reply(200).BodyString(kline)
+	result, data, err = callKlineJSON(t, `{"code":"600036","begin":"2026-09-01","end":"2026-10-31"}`)
+	require.NoError(t, err)
+	require.Equal(t, "qfq", data.FQ)
+	require.Contains(t, strings.Join(result.Notes, "\n"), "对不上")
 }
 
 func TestKlineSummaryFallback(t *testing.T) {
@@ -120,7 +189,7 @@ func TestKlineSummaryFallback(t *testing.T) {
 	gock.New("https://push2his.eastmoney.com").Get("/api/qt/stock/kline/get").Persist().Reply(503)
 
 	// 前复权没有备用数据，是上游问题。
-	_, _, err := callKlineJSON(t, `{"code":"600036","begin":"2026-10-01","end":"2026-10-31"}`)
+	_, _, err := callKlineJSON(t, `{"code":"600036","begin":"2026-10-01","end":"2026-10-31","fq":"qfq"}`)
 	require.False(t, IsInputError(err))
 	require.ErrorContains(t, err, "K 线获取失败")
 	require.ErrorContains(t, err, "可切换为不复权")
@@ -140,6 +209,17 @@ func TestKlineSummaryFallback(t *testing.T) {
 	require.Contains(t, notes, "新浪备用数据")
 	require.Contains(t, notes, "没有成交额")
 	require.NotContains(t, notes, "复权价")
+
+	// 等比复权用新浪日线和复权因子计算。
+	gock.New("https://money.finance.sina.com.cn").Get("/quotes_service").Reply(200).BodyString(
+		`[{"day":"2026-10-29","open":"10","high":"11","low":"9","close":"10","volume":"100"},` +
+			`{"day":"2026-10-30","open":"10","high":"12","low":"10","close":"11","volume":"300"}]`)
+	gock.New("https://finance.sina.com.cn").Get("/realstock/company/sh600036/qfq.js").Reply(200).BodyString(noAdjustFactors)
+	result, data, err = callKlineJSON(t, `{"code":"600036","begin":"2026-10-01","end":"2026-10-31"}`)
+	require.NoError(t, err)
+	require.Equal(t, "新浪财经 K 线（备用）、新浪复权因子", result.Source)
+	require.Equal(t, "ratio", data.FQ)
+	require.Contains(t, strings.Join(result.Notes, "\n"), "新浪日线计算等比前复权")
 }
 
 func TestKlineSummaryErrors(t *testing.T) {
@@ -168,6 +248,7 @@ func TestKlineSummaryErrors(t *testing.T) {
 	require.ErrorContains(t, err, "BJ920000（安徽凤凰）暂不支持 K 线")
 
 	suggestKey("600036").Reply(200).BodyString(cmbSuggest)
+	gock.New("https://finance.sina.com.cn").Get("/realstock/company/sh600036/qfq.js").Reply(200).BodyString(noAdjustFactors)
 	gock.New("https://push2his.eastmoney.com").Get("/api/qt/stock/kline/get").
 		Reply(200).BodyString(`{"data":{"code":"600036","market":1,"name":"招商银行","klines":[]}}`)
 	_, _, err = callKlineJSON(t, `{"code":"600036","begin":"2026-10-01","end":"2026-10-07"}`)

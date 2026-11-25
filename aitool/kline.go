@@ -41,8 +41,8 @@ const klineSchema = `{
     },
     "fq": {
       "type": "string",
-      "enum": ["qfq", "bfq", "hfq"],
-      "description": "复权方式：qfq 前复权（默认，涨跌幅和回撤不受分红拆股影响）、bfq 不复权（当时的实际成交价）、hfq 后复权"
+      "enum": ["ratio", "qfq", "bfq", "hfq"],
+      "description": "复权方式：ratio 等比前复权（默认，按每次除权除息的比例缩放更早的价格，涨跌幅和回撤不受分红拆股影响）、qfq 前复权（和东方财富网站一致，分红按金额减去，区间长时早期价格接近 0 甚至为负）、bfq 不复权（当时的实际成交价）、hfq 后复权"
     }
   },
   "required": ["code"],
@@ -55,7 +55,7 @@ func KlineSummaryTool() Tool {
 		Name: "get_kline_summary",
 		Description: "查询一只沪深、港股或美股证券在一段区间的 K 线摘要：区间首尾收盘价和涨跌幅、最高最低价及日期、最大回撤、" +
 			"最新的 MA5/MA20/MA60、平均成交量和成交额，再加最近 20 根 K 线。不返回全部 K 线。" +
-			"用于回答走势、涨跌、回撤和均线的问题；最新价格请用 get_quote。默认前复权日线，取最近 1 年。",
+			"用于回答走势、涨跌、回撤和均线的问题；最新价格请用 get_quote。默认等比前复权日线，取最近 1 年。",
 		InputSchema: json.RawMessage(klineSchema),
 		Call:        callKlineSummary,
 	}
@@ -167,11 +167,30 @@ func callKlineSummary(ctx context.Context, input json.RawMessage) (*Result, erro
 		Begin: begin.Format(eastmoney.TimeYYMMDD), End: end.Format(eastmoney.TimeYYMMDD),
 	}
 	got, err := history.Get(ctx, req)
+	// 没指定 fq 时，等比复权做不了就改用按金额的前复权，不让模型多调用一次；指定了 ratio 时照常报错。
+	var fallbackNote string
+	if strings.TrimSpace(in.FQ) == "" {
+		switch {
+		case errors.Is(err, sina.ErrNoAdjustFactors):
+			fallbackNote = "新浪没有这只证券的复权因子（港股 ETF、港股指数等），不能等比复权，已改用按金额的前复权 qfq"
+		case errors.Is(err, history.ErrAdjustMismatch):
+			fallbackNote = "新浪复权因子和东方财富前复权对不上，等比复权价格不可信，已改用按金额的前复权 qfq"
+		}
+		if fallbackNote != "" {
+			fqName, req.FQT = "qfq", eastmoney.QuoteFQTFront
+			got, err = history.Get(ctx, req)
+		}
+	}
 	switch {
 	case errors.Is(err, history.ErrRangeNotCovered):
 		return nil, Inputf("K 线备用数据覆盖不了这个区间，请缩短区间后重试：%v", err)
+	case errors.Is(err, sina.ErrNoAdjustFactors):
+		return nil, Inputf("新浪没有 %s（%s）的复权因子（港股 ETF、港股指数等），不能等比复权，请改用 fq=bfq，或按金额复权的 fq=qfq", sec.ExCode, sec.Name)
+	case errors.Is(err, history.ErrAdjustMismatch):
+		return nil, Inputf("%s（%s）的新浪复权因子和东方财富前复权对不上，等比复权价格不可信，请改用 fq=qfq 或 bfq：%v", sec.ExCode, sec.Name, err)
 	case errors.Is(err, eastmoney.ErrNoData):
-		// 前复权时 history 会提示切换为不复权，但东方财富本来就没有这只证券，切换也没用。
+		// 东方财富本来就没有这只证券，history 关于切换复权方式的提示没有用。等比复权时沪深证券会先改用新浪备用数据，
+		// 新浪也没有数据才报错，所以这里多是港股、美股或 qfq、hfq。
 		return nil, Inputf("东方财富没有 %s（%s）的 K 线数据，可能已退市或不是股票、ETF", sec.ExCode, sec.Name)
 	case err != nil:
 		return nil, fmt.Errorf("K 线获取失败：%w", err)
@@ -190,14 +209,22 @@ func callKlineSummary(ctx context.Context, input json.RawMessage) (*Result, erro
 	if got.Note != "" {
 		source = "新浪财经 K 线（备用）"
 	}
+	if fqName == "ratio" {
+		source += "、新浪复权因子"
+	}
 	result := NewResult("get_kline_summary", source, data)
 	result.AsOf = data.Summary.LastDate
 	if got.Note != "" {
 		result.Notes = append(result.Notes, got.Note)
 	}
+	if fallbackNote != "" {
+		result.Notes = append(result.Notes, fallbackNote)
+	}
 	switch fqName {
+	case "ratio":
+		result.Notes = append(result.Notes, "价格是等比前复权价，以最新交易日为基准：只有最新交易日的价格是实际成交价，更早的价格（区间结束日不是最新交易日时也包括它）按之后每次除权除息的比例缩放，不是当时的成交价；涨跌幅和回撤相当于分红再投入的持有收益")
 	case "qfq":
-		result.Notes = append(result.Notes, "价格是前复权价：最新价和实际成交价一致，更早的价格按分红、拆股调整过，不是当时的成交价")
+		result.Notes = append(result.Notes, "价格是前复权价（和东方财富网站一致），以最新交易日为基准：只有最新交易日的价格是实际成交价，更早的价格按之后的分红金额减去、按拆股比例调整，不是当时的成交价；区间长时涨跌幅和回撤会失真")
 	case "hfq":
 		result.Notes = append(result.Notes, "价格是后复权价，和实际成交价不同，只适合比较涨跌")
 	}
@@ -205,7 +232,7 @@ func callKlineSummary(ctx context.Context, input json.RawMessage) (*Result, erro
 		result.Notes = append(result.Notes, fmt.Sprintf("区间共 %d 根 K 线，recent 只列最近 %d 根，summary 按全部 K 线计算", len(quotes), recentBars))
 	}
 	if data.Summary.ChangePct == nil {
-		result.Notes = append(result.Notes, "第一根 K 线的收盘价 ≤ 0，change_pct 为 null。前复权按分红金额直接从更早的价格里减去，区间长时早期价格接近 0 甚至为负，max_drawdown 等百分比也会失真；需要区间涨跌幅和回撤时请缩短区间，或改用 bfq")
+		result.Notes = append(result.Notes, "第一根 K 线的收盘价 ≤ 0，change_pct 为 null。前复权按分红金额直接从更早的价格里减去，区间长时早期价格接近 0 甚至为负，max_drawdown 等百分比也会失真；需要区间涨跌幅和回撤时请改用默认的 fq=ratio（等比前复权）")
 	}
 	if data.Summary.AvgAmount == nil {
 		result.Notes = append(result.Notes, "数据源没有成交额，avg_amount 和 amount 为 null")
@@ -213,17 +240,19 @@ func callKlineSummary(ctx context.Context, input json.RawMessage) (*Result, erro
 	return result, nil
 }
 
-// klineFQ 解析复权方式，默认前复权。
+// klineFQ 解析复权方式，默认等比前复权。
 func klineFQ(text string) (string, eastmoney.FuQuanType, error) {
 	switch strings.ToLower(strings.TrimSpace(text)) {
-	case "", "qfq":
+	case "", "ratio":
+		return "ratio", eastmoney.QuoteFQTRatio, nil
+	case "qfq":
 		return "qfq", eastmoney.QuoteFQTFront, nil
 	case "bfq":
 		return "bfq", eastmoney.QuoteFQTDefault, nil
 	case "hfq":
 		return "hfq", eastmoney.QuoteFQTPost, nil
 	}
-	return "", 0, Inputf("fq 只能是 qfq、bfq 或 hfq")
+	return "", 0, Inputf("fq 只能是 ratio、qfq、bfq 或 hfq")
 }
 
 // klineRange 解析区间。没给开始日期时按周期往前取：日线 1 年，周线 3 年，月线 10 年。

@@ -111,6 +111,13 @@ func TestRatioCashFactorsAreChecked(t *testing.T) {
 	require.True(t, gock.IsDone())
 	require.Equal(t, []float64{9, 9, 9.9, 9.9}, closes(result.Quotes), "比例 = (10 − 1) ÷ 10")
 
+	// 交易时段里最后一根还在变，前复权请求晚一点，价格已经不同：不算对不上。
+	mockKline(105, "AAPL", "0", ratioDays)
+	mockKline(105, "AAPL", "1", append(append([]string{}, cashDays[:4]...), "2026-07-02,9.9,10.1,10.2,9.8,1,100,0,0,0,0.1"))
+	mockFactors("/us_stock/company/reinstatement/AAPL_qfq.js", factors)
+	_, err = Get(context.Background(), ratioReq("AAPL", 105, eastmoney.FreqDay))
+	require.NoError(t, err)
+
 	// 新浪说分红 1 元，东方财富按 2 元减：对不上，报错。
 	defer gock.Off()
 	mockKline(105, "AAPL", "0", ratioDays)
@@ -122,11 +129,10 @@ func TestRatioCashFactorsAreChecked(t *testing.T) {
 
 func TestRatioErrors(t *testing.T) {
 	defer gock.Off()
-	mockKline(1, "600036", "0", ratioDays)
 	gock.New("https://finance.sina.com.cn").Get("/realstock/company/sh600036/qfq.js").Reply(404)
 	_, err := Get(context.Background(), ratioReq("600036", 1, eastmoney.FreqDay))
 	require.ErrorIs(t, err, sina.ErrNoAdjustFactors)
-	require.True(t, gock.IsDone())
+	require.True(t, gock.IsDone(), "先查复权因子，没有因子时不下载日线")
 
 	_, err = Get(context.Background(), ratioReq("430047", 0x7f, eastmoney.FreqDay))
 	require.ErrorIs(t, err, ErrUnsupportedMarket)
@@ -235,8 +241,9 @@ func TestRatioAdjustRoundsPrices(t *testing.T) {
 
 func TestCheckSegmentsTolerance(t *testing.T) {
 	parse := func(date string) time.Time { parsed, _ := time.Parse(time.DateOnly, date); return parsed }
+	// 第二根是最后一根，只核对开盘价。
 	quote := func(price float64) []*eastmoney.Quote {
-		return []*eastmoney.Quote{{Date: parse("2026-07-01"), Open: price, High: price, Low: price, Close: price}}
+		return []*eastmoney.Quote{{Date: parse("2026-06-30"), Open: price, High: price, Low: price, Close: price}, {Date: parse("2026-07-01"), Open: price, Close: 1}}
 	}
 	segments := []sina.AdjustSegment{{Date: "1900-01-01", Scale: 1, Offset: -1}}
 	_, err := checkSegments(segments, quote(700000), quote(700002))
@@ -245,4 +252,12 @@ func TestCheckSegmentsTolerance(t *testing.T) {
 	require.ErrorIs(t, err, ErrAdjustMismatch)
 	_, err = checkSegments(segments, quote(10), quote(9.01))
 	require.ErrorIs(t, err, ErrAdjustMismatch, "低价证券仍按 0.006")
+
+	// 最后一根是除权日：最新一段只有这一根，开盘价仍要核对。
+	raw := []*eastmoney.Quote{{Date: parse("2026-06-30"), Open: 10, High: 10, Low: 10, Close: 10}, {Date: parse("2026-07-01"), Open: 9, High: 9, Low: 9, Close: 9}}
+	qfq := []*eastmoney.Quote{{Date: parse("2026-06-30"), Open: 9, High: 9, Low: 9, Close: 9}, {Date: parse("2026-07-01"), Open: 9, High: 9.5, Low: 8, Close: 8.8}}
+	_, err = checkSegments([]sina.AdjustSegment{{Date: "1900-01-01", Scale: 1, Offset: -1}, {Date: "2026-07-01", Scale: 1, Offset: 0}}, raw, qfq)
+	require.NoError(t, err, "最后一根的最高、最低和收盘还在变")
+	_, err = checkSegments([]sina.AdjustSegment{{Date: "1900-01-01", Scale: 1, Offset: -1}, {Date: "2026-07-01", Scale: 1, Offset: 0.5}}, raw, qfq)
+	require.ErrorIs(t, err, ErrAdjustMismatch, "最新一段的因子不对，开盘价对不上")
 }
