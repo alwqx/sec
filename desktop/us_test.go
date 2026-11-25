@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/alwqx/sec/provider/edgar"
 	"github.com/stretchr/testify/require"
@@ -317,3 +319,90 @@ func TestUSUpstream(t *testing.T) {
 	require.False(t, errors.Is(err, edgar.ErrNotFound))
 	require.Equal(t, "都失败了", usUpstream{"都失败了", nil}.Error())
 }
+
+// TestServeUSTimeout 验证 serveUS 超时和上游超时都返回 504 及专门的中文提示，不暴露原始 context deadline exceeded；
+// 请求方主动取消和 404 保持各自语义。
+func TestServeUSTimeout(t *testing.T) {
+	srv := usServer(t)
+	orig := usRequestTimeout
+	usRequestTimeout = 10 * time.Millisecond
+	t.Cleanup(func() { usRequestTimeout = orig })
+
+	// 1. serveUS 自身超时返回 504 和专门提示。
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/us/financials?code=$AAPL", nil)
+	srv.serveUS(rr, req, "财报", func(ctx context.Context, _ *edgar.Client, _ string) (any, error) {
+		<-ctx.Done()
+		return nil, fmt.Errorf("读取 SEC：%w", ctx.Err())
+	})
+	require.Equal(t, http.StatusGatewayTimeout, rr.Code)
+	require.Contains(t, rr.Body.String(), "美股财报获取超时，请稍后重试")
+	require.NotContains(t, rr.Body.String(), "context deadline exceeded")
+
+	// 2. handleUSCompany 包装成 usUpstream 时，serveUS 超时也返回 504。
+	rr = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/us/company?code=$AAPL", nil)
+	srv.serveUS(rr, req, "公司资料", func(ctx context.Context, _ *edgar.Client, _ string) (any, error) {
+		<-ctx.Done()
+		return nil, usUpstream{"美股公司资料和行情都获取失败，请稍后重试", ctx.Err()}
+	})
+	require.Equal(t, http.StatusGatewayTimeout, rr.Code)
+	require.Contains(t, rr.Body.String(), "美股公司资料获取超时，请稍后重试")
+
+	// 3. 单次上游请求超时（早于 serveUS 30 秒时限）同样返回 504，含不匹配 DeadlineExceeded 的 net.Error 超时（如 TLS 握手超时）。
+	usRequestTimeout = time.Second
+	for _, err := range []error{
+		fmt.Errorf("request failed: %w", context.DeadlineExceeded),
+		fmt.Errorf("request failed: %w", fakeTimeoutError{}),
+	} {
+		rr = httptest.NewRecorder()
+		req = httptest.NewRequest(http.MethodGet, "/api/v1/us/dividends?code=$AAPL", nil)
+		srv.serveUS(rr, req, "分红", func(context.Context, *edgar.Client, string) (any, error) {
+			return nil, err
+		})
+		require.Equal(t, http.StatusGatewayTimeout, rr.Code)
+		require.Contains(t, rr.Body.String(), "美股分红获取超时，请稍后重试")
+		require.NotContains(t, rr.Body.String(), "TLS handshake timeout")
+	}
+
+	// 4. 客户端请求进行中取消时，不写出 504。
+	canceledCtx, cancel := context.WithCancel(context.Background())
+	rr = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/us/financials?code=$AAPL", nil).WithContext(canceledCtx)
+	srv.serveUS(rr, req, "财报", func(ctx context.Context, _ *edgar.Client, _ string) (any, error) {
+		cancel()
+		return nil, ctx.Err()
+	})
+	require.Empty(t, rr.Body.String())
+
+	// 5. 404 错误在 ctx 到期时仍按 404 返回，不误判成超时。
+	usRequestTimeout = 10 * time.Millisecond
+	rr = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/us/financials?code=$AAPL", nil)
+	srv.serveUS(rr, req, "财报", func(ctx context.Context, _ *edgar.Client, _ string) (any, error) {
+		<-ctx.Done()
+		return nil, edgar.ErrNoXBRL
+	})
+	require.Equal(t, http.StatusNotFound, rr.Code)
+}
+
+// TestUSCompanyPartialTimeout 验证公司资料超时但行情成功时，备注给出专门超时提示，不暴露原始 context deadline exceeded。
+func TestUSCompanyPartialTimeout(t *testing.T) {
+	defer gock.Off()
+	srv := usServer(t)
+	gock.New("https://www.sec.gov").Get("/files/company_tickers.json").Persist().ReplyError(context.DeadlineExceeded)
+	gock.New("https://hq.sinajs.cn").Get("/list=gb_aapl").Reply(200).
+		BodyString(`var hq_str_gb_aapl="苹果,200.00,1.00,2026-11-06 05:00:00,2.00,198.00,201.00,197.00,230.00,160.00,1000,1000,3000000000000,6.00,33.33,0,0,0,0,15000000000,0,0,0,0,,Nov 05 04:00PM EST,198.00,0,1,2026,200000,0,0,0,0,198.00";`).
+		AddHeader("Content-Type", "application/javascript; charset=gbk")
+	rr := usRequest(t, srv, "/api/v1/us/company?code=$AAPL")
+	require.Equal(t, http.StatusOK, rr.Code, rr.Body.String())
+	require.Contains(t, rr.Body.String(), "公司资料获取超时，请稍后重试")
+	require.NotContains(t, rr.Body.String(), "context deadline exceeded")
+}
+
+// fakeTimeoutError 模拟 net/http TLS 握手超时：实现 net.Error.Timeout() 但不匹配 context.DeadlineExceeded。
+type fakeTimeoutError struct{}
+
+func (fakeTimeoutError) Error() string   { return "net/http: TLS handshake timeout" }
+func (fakeTimeoutError) Timeout() bool   { return true }
+func (fakeTimeoutError) Temporary() bool { return true }
