@@ -37,7 +37,11 @@ func Get(ctx context.Context, req *eastmoney.GetQuoteHistoryReq) (*Result, error
 
 // GetFrom 和 Get 相同，但 req.Begin 可以早于 required：两者之间是计算指标用的预热数据。
 // 备用数据只需覆盖 required，预热数据尽力而为。
+// 等比前复权（QuoteFQTRatio）由不复权日线和新浪复权因子计算，见 getRatio。
 func GetFrom(ctx context.Context, req *eastmoney.GetQuoteHistoryReq, required string) (*Result, error) {
+	if req.FQT == eastmoney.QuoteFQTRatio {
+		return getRatio(ctx, req, required)
+	}
 	quotes, err := getEastMoney(ctx, req)
 	if err == nil {
 		return &Result{Quotes: quotes}, nil
@@ -180,6 +184,18 @@ func compactDate(date string) string {
 	return strings.ReplaceAll(date, "-", "")
 }
 
+// setChange 按前收盘计算涨跌额、涨跌幅和振幅，和东方财富一样保留小数位，去掉浮点噪声。前收盘无效时标为未知。
+func setChange(quote *eastmoney.Quote, previous float64) {
+	quote.NoChange = previous <= 0
+	if quote.NoChange {
+		quote.Change, quote.ChangeRate, quote.Amplitude = 0, 0, 0
+		return
+	}
+	quote.Change = round(quote.Close-previous, 3)
+	quote.ChangeRate = round((quote.Close-previous)/previous*100, 2)
+	quote.Amplitude = round((quote.High-quote.Low)/previous*100, 2)
+}
+
 func round(value float64, digits int) float64 {
 	scale := math.Pow10(digits)
 	return math.Round(value*scale) / scale
@@ -206,13 +222,8 @@ func toQuotes(bars []*sina.Bar, req *eastmoney.GetQuoteHistoryReq, required stri
 			Open: bar.Open, Close: bar.Close, High: bar.High, Low: bar.Low, Volume: bar.Volume, NoTurnover: true, NoChange: true,
 		}
 		// 涨跌和振幅需要前一日收盘价。返回数据的第一条没有，它可能是上市首日，也可能只是被截断。
-		if i > 0 && bars[i-1].Close > 0 {
-			quote.NoChange = false
-			previous := bars[i-1].Close
-			// 和东方财富一样保留小数位，去掉浮点噪声。
-			quote.Change = round(bar.Close-previous, 3)
-			quote.ChangeRate = round((bar.Close-previous)/previous*100, 2)
-			quote.Amplitude = round((bar.High-bar.Low)/previous*100, 2)
+		if i > 0 {
+			setChange(quote, bars[i-1].Close)
 		}
 		quotes = append(quotes, quote)
 	}
