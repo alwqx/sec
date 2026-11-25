@@ -30,6 +30,7 @@ const (
 	QuoteFQTDefault          FuQuanType = 0 // 不复权
 	QuoteFQTFront            FuQuanType = 1 // 前复权
 	QuoteFQTPost             FuQuanType = 2 // 后复权
+	QuoteFQTRatio            FuQuanType = 3 // 等比前复权：东方财富接口不支持，由 history 包用新浪复权因子计算
 )
 
 var (
@@ -63,7 +64,8 @@ func getOriginQuoteHistory(ctx context.Context, req *GetQuoteHistoryReq) (res *Q
 	case QuoteFQTPost:
 		values.Add("fqt", "2")
 	default:
-		values.Add("fqt", "0")
+		// 不认识的复权方式不能悄悄当成不复权。
+		return nil, fmt.Errorf("东方财富 K 线不支持复权方式 %d", req.FQT)
 	}
 
 	reqURL := fmt.Sprintf("%s/api/qt/stock/kline/get?%s", EastMoneyPush2HisApiBase, values.Encode())

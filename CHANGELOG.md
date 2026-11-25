@@ -65,6 +65,7 @@
 61. Preserve HTTP status codes on failed Desktop API requests and hide the retry button in `ResourceState` on 404 responses.
 62. Return HTTP 504 with a dedicated timeout message instead of 502 with raw `context deadline exceeded` when Desktop US endpoints (`serveUS`) time out.
 63. Add `sina.QueryAdjustFactors` to read Sina's adjustment factors for upcoming proportional price adjustment.
+64. Compute proportional forward-adjusted K-lines (`eastmoney.QuoteFQTRatio`) in the `history` package from unadjusted daily bars and Sina's adjustment factors.
 
 ### v0.4.8
 

@@ -56,6 +56,8 @@ func fqName(fqt eastmoney.FuQuanType) string {
 		return "qfq"
 	case eastmoney.QuoteFQTPost:
 		return "hfq"
+	case eastmoney.QuoteFQTRatio:
+		return "ratio"
 	}
 	return "bfq"
 }
